@@ -25,7 +25,7 @@ pub enum SourceUnitPart {
     ContractDefinition(Box<ContractDefinition>),
     ImportDirective(Import),
     EnumDefinition(Box<EnumDefinition>),
-    StructDefinition(Box<StructDefinition>),
+    DataDefinition(Box<DataDefinition>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -99,7 +99,7 @@ pub struct VariableDeclaration {
 
 #[derive(Debug, PartialEq)]
 #[allow(clippy::vec_box)]
-pub struct StructDefinition {
+pub struct DataDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
     pub name: Identifier,
@@ -108,7 +108,7 @@ pub struct StructDefinition {
 
 #[derive(Debug, PartialEq)]
 pub enum ContractPart {
-    StructDefinition(Box<StructDefinition>),
+    DataDefinition(Box<DataDefinition>),
     EnumDefinition(Box<EnumDefinition>),
     ContractVariableDefinition(Box<ContractVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),

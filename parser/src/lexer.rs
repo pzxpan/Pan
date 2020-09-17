@@ -32,7 +32,7 @@ pub enum Token<'input> {
     Function,
     Import,
 
-    Struct,
+    Data,
     Enum,
 
 
@@ -210,7 +210,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Interface => write!(f, "interface"),
             Token::Function => write!(f, "function"),
             Token::Import => write!(f, "import"),
-            Token::Struct => write!(f, "struct"),
+            Token::Data => write!(f, "data"),
             Token::Enum => write!(f, "enum"),
             Token::Public => write!(f, "public"),
             Token::Private => write!(f, "private"),
@@ -329,7 +329,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "return" => Token::Return,
     "returns" => Token::Returns,
     "string" => Token::String,
-    "struct" => Token::Struct,
+    "data" => Token::Data,
     "true" => Token::True,
     "uint8" => Token::Uint(8),
     "uint16" => Token::Uint(16),

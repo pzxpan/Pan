@@ -15,7 +15,7 @@ SourceUnitPart: SourceUnitPart = {
     ContractDefinition => SourceUnitPart::ContractDefinition(<>),
     ImportDirective => SourceUnitPart::ImportDirective(<>),
     EnumDefinition => SourceUnitPart::EnumDefinition(<>),
-    StructDefinition => SourceUnitPart::StructDefinition(<>),
+    DataDefinition => SourceUnitPart::DataDefinition(<>),
 }
 
 ImportDirective: Import = {
@@ -68,9 +68,9 @@ VariableDeclaration: VariableDeclaration = {
     },
 }
 
-StructDefinition: Box<StructDefinition> = {
-    <doc:DocComments> <l:@L> "struct" <name:Identifier> "{" <fields:(<VariableDeclaration> ";")*> "}" <r:@R> => {
-        Box::new(StructDefinition{loc: Loc(file_no, l, r), doc, name, fields})
+DataDefinition: Box<DataDefinition> = {
+    <doc:DocComments> <l:@L> "data" <name:Identifier> "{" <fields:(<VariableDeclaration> ";")*> "}" <r:@R> => {
+        Box::new(DataDefinition{loc: Loc(file_no, l, r), doc, name, fields})
     }
 }
 
@@ -81,7 +81,7 @@ ContractTy: ContractTy = {
 }
 
 ContractPart: ContractPart = {
-    StructDefinition => ContractPart::StructDefinition(<>),
+    DataDefinition => ContractPart::DataDefinition(<>),
     EnumDefinition => ContractPart::EnumDefinition(<>),
     ContractVariableDefinition => ContractPart::ContractVariableDefinition(<>),
     FunctionDefinition => ContractPart::FunctionDefinition(<>),
@@ -488,7 +488,7 @@ extern {
         Uint => Token::Uint(<u16>),
         Int => Token::Int(<u16>),
         Bytes => Token::Bytes(<u8>),
-        "struct" => Token::Struct,
+        "data" => Token::Data,
 
         "import" => Token::Import,
         "contract" => Token::Contract,

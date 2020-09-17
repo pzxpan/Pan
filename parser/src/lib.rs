@@ -123,7 +123,7 @@ mod test {
                 },
                 base: Vec::new(),
                 parts: vec![
-                    ContractPart::StructDefinition(Box::new(StructDefinition {
+                    ContractPart::DataDefinition(Box::new(DataDefinition {
                         doc: vec![],
                         name: Identifier {
                             loc: Loc(0, 42, 54),
