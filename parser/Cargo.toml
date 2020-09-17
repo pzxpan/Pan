@@ -1,0 +1,25 @@
+[package]
+name = "parser"
+version = "0.1.0"
+description = "Parser for Pan code."
+authors = [ "Pan " ]
+build = "build.rs"
+repository = "https://www.panfp.cn/Pan"
+license = "MIT"
+edition = "2018"
+
+[build-dependencies]
+lalrpop="0.19"
+
+[dependencies]
+lalrpop-util="0.19"
+log="0.4.1"
+num-bigint = "0.2"
+num-traits = "0.2"
+unic-emoji-char = "0.9"
+unic-ucd-ident = "0.9"
+phf = { version = "0.8", features = ["macros"] }
+unicode-xid = "0.2.0"
+serde_json = "1.0"
+serde = "1.0"
+serde_derive = { version = "1.0" }
