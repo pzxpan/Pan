@@ -1,4 +1,4 @@
-contract foo {
+struct foo {
    data dddd {
            bool exists;
            uint keyIdx;

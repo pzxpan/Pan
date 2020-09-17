@@ -22,7 +22,7 @@ pub struct SourceUnit(pub Vec<SourceUnitPart>);
 
 #[derive(Debug, PartialEq)]
 pub enum SourceUnitPart {
-    ContractDefinition(Box<ContractDefinition>),
+    StructDefinition(Box<StructDefinition>),
     ImportDirective(Import),
     EnumDefinition(Box<EnumDefinition>),
     DataDefinition(Box<DataDefinition>),
@@ -107,26 +107,26 @@ pub struct DataDefinition {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ContractPart {
+pub enum StructPart {
     DataDefinition(Box<DataDefinition>),
     EnumDefinition(Box<EnumDefinition>),
-    ContractVariableDefinition(Box<ContractVariableDefinition>),
+    StructVariableDefinition(Box<StructVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ContractTy {
-    Contract(Loc),
+pub enum StructTy {
+    Struct(Loc),
     Interface(Loc),
     Library(Loc),
 }
 
-impl fmt::Display for ContractTy {
+impl fmt::Display for StructTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ContractTy::Contract(_) => write!(f, "contract"),
-            ContractTy::Interface(_) => write!(f, "interface"),
-            ContractTy::Library(_) => write!(f, "library"),
+            StructTy::Struct(_) => write!(f, "struct"),
+            StructTy::Interface(_) => write!(f, "interface"),
+            StructTy::Library(_) => write!(f, "library"),
         }
     }
 }
@@ -139,13 +139,13 @@ pub struct Base {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ContractDefinition {
+pub struct StructDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
-    pub ty: ContractTy,
+    pub ty: StructTy,
     pub name: Identifier,
     pub base: Vec<Base>,
-    pub parts: Vec<ContractPart>,
+    pub parts: Vec<StructPart>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -163,7 +163,7 @@ pub enum VariableAttribute {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ContractVariableDefinition {
+pub struct StructVariableDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
     pub ty: Expression,

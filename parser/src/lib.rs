@@ -112,18 +112,18 @@ mod test {
             .parse(&src, 0, lex)
             .unwrap();
 
-        let a = SourceUnit(vec![SourceUnitPart::ContractDefinition(Box::new(
-            ContractDefinition {
+        let a = SourceUnit(vec![SourceUnitPart::StructDefinition(Box::new(
+            StructDefinition {
                 doc: vec![],
                 loc: Loc(0, 0, 325),
-                ty: ContractTy::Contract(Loc(0, 0, 8)),
+                ty: StructTy::Struct(Loc(0, 0, 8)),
                 name: Identifier {
                     loc: Loc(0, 9, 12),
                     name: "foo".to_string(),
                 },
                 base: Vec::new(),
                 parts: vec![
-                    ContractPart::DataDefinition(Box::new(DataDefinition {
+                    StructPart::DataDefinition(Box::new(DataDefinition {
                         doc: vec![],
                         name: Identifier {
                             loc: Loc(0, 42, 54),
@@ -169,8 +169,8 @@ mod test {
                             },
                         ],
                     })),
-                    ContractPart::ContractVariableDefinition(Box::new(
-                        ContractVariableDefinition {
+                    StructPart::StructVariableDefinition(Box::new(
+                        StructVariableDefinition {
                             doc: vec![],
                             ty: Expression::Type(Loc(0, 253, 259), Type::String),
                             attrs: vec![],
@@ -182,8 +182,8 @@ mod test {
                             initializer: None,
                         },
                     )),
-                    ContractPart::ContractVariableDefinition(Box::new(
-                        ContractVariableDefinition {
+                    StructPart::StructVariableDefinition(Box::new(
+                        StructVariableDefinition {
                             doc: vec![],
                             ty: Expression::Type(Loc(0, 290, 295), Type::Int(64)),
                             attrs: vec![],
