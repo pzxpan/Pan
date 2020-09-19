@@ -11,6 +11,12 @@ pub struct Identifier {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct EnumIdentifier {
+    pub loc: Loc,
+    pub name: Expression,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct DocComment {
     pub offset: usize,
     pub tag: String,
@@ -26,6 +32,7 @@ pub enum SourceUnitPart {
     ImportDirective(Import),
     EnumDefinition(Box<EnumDefinition>),
     DataDefinition(Box<DataDefinition>),
+    ConstDefinition(Box<ConstVariableDefinition>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -109,6 +116,7 @@ pub struct DataDefinition {
 #[derive(Debug, PartialEq)]
 pub enum StructPart {
     DataDefinition(Box<DataDefinition>),
+    ConstDefinition(Box<ConstVariableDefinition>),
     EnumDefinition(Box<EnumDefinition>),
     StructVariableDefinition(Box<StructVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
@@ -153,7 +161,7 @@ pub struct EnumDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
     pub name: Identifier,
-    pub values: Vec<Identifier>,
+    pub values: Expression,
 }
 
 #[derive(Debug, PartialEq)]
@@ -170,6 +178,15 @@ pub struct StructVariableDefinition {
     pub attrs: Vec<VariableAttribute>,
     pub name: Identifier,
     pub initializer: Option<Expression>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ConstVariableDefinition {
+    pub doc: Vec<DocComment>,
+    pub loc: Loc,
+    pub ty: Expression,
+    pub name: Identifier,
+    pub initializer: Expression,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -194,102 +211,159 @@ pub struct NamedArgument {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    ArraySubscript(Loc, Box<Expression>, Option<Box<Expression>>),
-    MemberAccess(Loc, Box<Expression>, Identifier),
-    FunctionCall(Loc, Box<Expression>, Vec<Expression>),
-    FunctionCallBlock(Loc, Box<Expression>, Box<Statement>),
-    NamedFunctionCall(Loc, Box<Expression>, Vec<NamedArgument>),
+    //逻辑表达式
+    And(Loc, Box<Expression>, Box<Expression>),
+    Or(Loc, Box<Expression>, Box<Expression>),
     Not(Loc, Box<Expression>),
-    UnaryPlus(Loc, Box<Expression>),
-    UnaryMinus(Loc, Box<Expression>),
-    Power(Loc, Box<Expression>, Box<Expression>),
-    Multiply(Loc, Box<Expression>, Box<Expression>),
-    Divide(Loc, Box<Expression>, Box<Expression>),
-    Modulo(Loc, Box<Expression>, Box<Expression>),
-    Add(Loc, Box<Expression>, Box<Expression>),
-    Subtract(Loc, Box<Expression>, Box<Expression>),
-    ShiftLeft(Loc, Box<Expression>, Box<Expression>),
-    ShiftRight(Loc, Box<Expression>, Box<Expression>),
-    BitwiseAnd(Loc, Box<Expression>, Box<Expression>),
-    BitwiseXor(Loc, Box<Expression>, Box<Expression>),
-    BitwiseOr(Loc, Box<Expression>, Box<Expression>),
+
+    Equal(Loc, Box<Expression>, Box<Expression>),
+    NotEqual(Loc, Box<Expression>, Box<Expression>),
+
     Less(Loc, Box<Expression>, Box<Expression>),
     More(Loc, Box<Expression>, Box<Expression>),
     LessEqual(Loc, Box<Expression>, Box<Expression>),
     MoreEqual(Loc, Box<Expression>, Box<Expression>),
-    Equal(Loc, Box<Expression>, Box<Expression>),
-    NotEqual(Loc, Box<Expression>, Box<Expression>),
-    And(Loc, Box<Expression>, Box<Expression>),
-    Or(Loc, Box<Expression>, Box<Expression>),
+    //新加
+    In(Loc, Box<Expression>, Box<Expression>),
+    Is(Loc, Box<Expression>, Box<Expression>),
 
+    //赋值
     Assign(Loc, Box<Expression>, Box<Expression>),
-    AssignOr(Loc, Box<Expression>, Box<Expression>),
-    AssignAnd(Loc, Box<Expression>, Box<Expression>),
-    AssignXor(Loc, Box<Expression>, Box<Expression>),
-    AssignShiftLeft(Loc, Box<Expression>, Box<Expression>),
-    AssignShiftRight(Loc, Box<Expression>, Box<Expression>),
+    //一元操作符
+    UnaryPlus(Loc, Box<Expression>),
+    UnaryMinus(Loc, Box<Expression>),
+
+    //二元
+    Add(Loc, Box<Expression>, Box<Expression>),
+    Subtract(Loc, Box<Expression>, Box<Expression>),
+    Multiply(Loc, Box<Expression>, Box<Expression>),
+    Divide(Loc, Box<Expression>, Box<Expression>),
+    Power(Loc, Box<Expression>, Box<Expression>),
+    Modulo(Loc, Box<Expression>, Box<Expression>),
+
     AssignAdd(Loc, Box<Expression>, Box<Expression>),
     AssignSubtract(Loc, Box<Expression>, Box<Expression>),
     AssignMultiply(Loc, Box<Expression>, Box<Expression>),
     AssignDivide(Loc, Box<Expression>, Box<Expression>),
     AssignModulo(Loc, Box<Expression>, Box<Expression>),
+
+    //位运算
+    ShiftLeft(Loc, Box<Expression>, Box<Expression>),
+    ShiftRight(Loc, Box<Expression>, Box<Expression>),
+    BitwiseAnd(Loc, Box<Expression>, Box<Expression>),
+    BitwiseXor(Loc, Box<Expression>, Box<Expression>),
+    BitwiseOr(Loc, Box<Expression>, Box<Expression>),
+
+    AssignOr(Loc, Box<Expression>, Box<Expression>),
+    AssignAnd(Loc, Box<Expression>, Box<Expression>),
+    AssignXor(Loc, Box<Expression>, Box<Expression>),
+    AssignShiftLeft(Loc, Box<Expression>, Box<Expression>),
+    AssignShiftRight(Loc, Box<Expression>, Box<Expression>),
+
+    Subscript(Loc, Box<Expression>, Option<Box<Expression>>),
+    Slice(Loc, Vec<Expression>),
+    Attribute(Loc, Box<Expression>, Identifier),
+
+    FunctionCall(Loc, Box<Expression>, Vec<Expression>),
+
+    //新加
+    //异步 迭代器
+    Await(Loc, Box<Expression>),
+    Yield(Loc, Option<Box<Expression>>),
+
     BoolLiteral(Loc, bool),
     NumberLiteral(Loc, BigInt),
     StringLiteral(Vec<StringLiteral>),
+    ArrayLiteral(Loc, Vec<Expression>),
+
     Type(Loc, Type),
     Variable(Identifier),
+
+    //新增
     List(Loc, Vec<(Loc, Option<Parameter>)>),
-    ArrayLiteral(Loc, Vec<Expression>),
+    Tuple(Loc, Vec<(Loc, Option<Parameter>)>),
+    Dict(Loc, Vec<(Loc, Option<Parameter>, Parameter)>),
+    Set(Loc, Vec<(Loc, Option<Parameter>)>),
+
+    Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum ComprehensionKind {
+    GeneratorExpression { element: Expression },
+    List { element: Expression },
+    Set { element: Expression },
+    Dict { key: Expression, value: Expression },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Comprehension {
+    pub loc: Loc,
+    pub target: Expression,
+    pub iter: Expression,
+    pub ifs: Vec<Expression>,
+    pub is_async: bool,
 }
 
 impl Expression {
     pub fn loc(&self) -> Loc {
+        use Expression::*;
         match self {
-            | Expression::ArraySubscript(loc, _, _)
-            | Expression::MemberAccess(loc, _, _)
-            | Expression::FunctionCall(loc, _, _)
-            | Expression::FunctionCallBlock(loc, _, _)
-            | Expression::NamedFunctionCall(loc, _, _)
-            | Expression::Not(loc, _)
-            | Expression::UnaryPlus(loc, _)
-            | Expression::UnaryMinus(loc, _)
-            | Expression::Power(loc, _, _)
-            | Expression::Multiply(loc, _, _)
-            | Expression::Divide(loc, _, _)
-            | Expression::Modulo(loc, _, _)
-            | Expression::Add(loc, _, _)
-            | Expression::Subtract(loc, _, _)
-            | Expression::ShiftLeft(loc, _, _)
-            | Expression::ShiftRight(loc, _, _)
-            | Expression::BitwiseAnd(loc, _, _)
-            | Expression::BitwiseXor(loc, _, _)
-            | Expression::BitwiseOr(loc, _, _)
-            | Expression::Less(loc, _, _)
-            | Expression::More(loc, _, _)
-            | Expression::LessEqual(loc, _, _)
-            | Expression::MoreEqual(loc, _, _)
-            | Expression::Equal(loc, _, _)
-            | Expression::NotEqual(loc, _, _)
-            | Expression::And(loc, _, _)
-            | Expression::Or(loc, _, _)
-            | Expression::Assign(loc, _, _)
-            | Expression::AssignOr(loc, _, _)
-            | Expression::AssignAnd(loc, _, _)
-            | Expression::AssignXor(loc, _, _)
-            | Expression::AssignShiftLeft(loc, _, _)
-            | Expression::AssignShiftRight(loc, _, _)
-            | Expression::AssignAdd(loc, _, _)
-            | Expression::AssignSubtract(loc, _, _)
-            | Expression::AssignMultiply(loc, _, _)
-            | Expression::AssignDivide(loc, _, _)
-            | Expression::AssignModulo(loc, _, _)
-            | Expression::BoolLiteral(loc, _)
-            | Expression::NumberLiteral(loc, _)
-            | Expression::ArrayLiteral(loc, _)
-            | Expression::List(loc, _)
-            | Expression::Type(loc, _)
-            | Expression::Variable(Identifier { loc, .. }) => *loc,
-            Expression::StringLiteral(v) => v[0].loc,
+            | Subscript(loc, _, _)
+            | Attribute(loc, _, _)
+            | FunctionCall(loc, _, _)
+            | Not(loc, _)
+            | UnaryPlus(loc, _)
+            | UnaryMinus(loc, _)
+            | Power(loc, _, _)
+            | Multiply(loc, _, _)
+            | Divide(loc, _, _)
+            | Modulo(loc, _, _)
+            | Add(loc, _, _)
+            | Subtract(loc, _, _)
+            | ShiftLeft(loc, _, _)
+            | ShiftRight(loc, _, _)
+            | BitwiseAnd(loc, _, _)
+            | BitwiseXor(loc, _, _)
+            | BitwiseOr(loc, _, _)
+            | Less(loc, _, _)
+            | More(loc, _, _)
+            | LessEqual(loc, _, _)
+            | MoreEqual(loc, _, _)
+            | Equal(loc, _, _)
+            | NotEqual(loc, _, _)
+            | And(loc, _, _)
+            | Or(loc, _, _)
+            | Assign(loc, _, _)
+            | AssignOr(loc, _, _)
+            | AssignAnd(loc, _, _)
+            | AssignXor(loc, _, _)
+            | AssignShiftLeft(loc, _, _)
+            | AssignShiftRight(loc, _, _)
+            | AssignAdd(loc, _, _)
+            | AssignSubtract(loc, _, _)
+            | AssignMultiply(loc, _, _)
+            | AssignDivide(loc, _, _)
+            | AssignModulo(loc, _, _)
+            | BoolLiteral(loc, _)
+            | NumberLiteral(loc, _)
+            | ArrayLiteral(loc, _)
+            | List(loc, _)
+            | Type(loc, _)
+            | Variable(Identifier { loc, .. })
+            | Yield(loc, _)
+            | In(loc, _, _)
+            | Is(loc, _, _)
+            | Slice(loc, _)
+            | Await(loc, _)
+            | Tuple(loc, _)
+            | Dict(loc, _)
+            | Set(loc, _)
+            | Comprehension(loc, _, _)
+
+            => *loc,
+            StringLiteral(v) => v[0].loc,
         }
     }
 }
@@ -368,7 +442,7 @@ pub struct FunctionDefinition {
     pub name: Option<Identifier>,
     pub name_loc: Loc,
     pub params: Vec<(Loc, Option<Parameter>)>,
-    pub attributes: Vec<FunctionAttribute>,
+    pub is_pub: bool,
     pub returns: Vec<(Loc, Option<Parameter>)>,
     pub body: Option<Statement>,
 }
@@ -376,12 +450,16 @@ pub struct FunctionDefinition {
 #[derive(Debug, PartialEq, Clone)]
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
 pub enum Statement {
+    Break(Loc),
+    Continue(Loc),
+    Return(Loc, Option<Expression>),
     Block(Loc, Vec<Statement>),
     Args(Loc, Vec<NamedArgument>),
     If(Loc, Expression, Box<Statement>, Option<Box<Statement>>),
-    While(Loc, Expression, Box<Statement>),
     Expression(Loc, Expression),
     VariableDefinition(Loc, VariableDeclaration, Option<Expression>),
+    ConstDefinition(Loc, VariableDeclaration, Option<Expression>),
+    While(Loc, Expression, Box<Statement>),
     For(
         Loc,
         Option<Box<Statement>>,
@@ -389,10 +467,6 @@ pub enum Statement {
         Option<Box<Statement>>,
         Option<Box<Statement>>,
     ),
-    DoWhile(Loc, Box<Statement>, Expression),
-    Continue(Loc),
-    Break(Loc),
-    Return(Loc, Option<Expression>),
 }
 
 
@@ -412,9 +486,10 @@ impl Statement {
             | Statement::Expression(loc, _)
             | Statement::VariableDefinition(loc, _, _)
             | Statement::For(loc, _, _, _, _)
-            | Statement::DoWhile(loc, _, _)
+            | Statement::While(loc, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)
+            | Statement::ConstDefinition(loc, _, _)
             | Statement::Return(loc, _) => *loc,
         }
     }

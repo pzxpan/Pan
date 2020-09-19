@@ -66,6 +66,11 @@ VariableDeclaration: VariableDeclaration = {
     <l:@L> <ty:Precedence0> <name:Identifier> <r:@R> => VariableDeclaration {
         loc: Loc(file_no, l, r), ty, name
     },
+    <l:@L> "let" <name:Identifier> ":" <ty: Precedence0> <r:@R> => VariableDeclaration {
+            loc: Loc(file_no, l, r), ty, name
+    },
+
+
 }
 
 DataDefinition: Box<DataDefinition> = {
@@ -85,7 +90,6 @@ StructPart: StructPart = {
     EnumDefinition => StructPart::EnumDefinition(<>),
     StructVariableDefinition => StructPart::StructVariableDefinition(<>),
     FunctionDefinition => StructPart::FunctionDefinition(<>),
-
 }
 
 Bases: Vec<Base> = {
@@ -109,7 +113,7 @@ StructDefinition: Box<StructDefinition> = {
 }
 
 EnumDefinition: Box<EnumDefinition> = {
-    <doc:DocComments> <l:@L> "enum" <name:Identifier> "{" <values:Comma<Identifier>> "}" <r:@R> => {
+    <doc:DocComments> <l:@L> "enum" <name:Identifier> "{" <values:Expression> "}" <r:@R> => {
         Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, values})
     }
 }
@@ -233,18 +237,12 @@ FunctionCall: Expression = {
     <a:@L> <i:Precedence0> "(" <v:Comma<Expression>> ")" <b:@R> => {
         Expression::FunctionCall(Loc(file_no, a, b), Box::new(i), v)
     },
-    <i:Precedence0> <l:@L> <block:BlockStatement> <r:@R> => {
-        Expression::FunctionCallBlock(Loc(file_no, l, r), Box::new(i), Box::new(block))
-    },
-    <a:@L> <i:Precedence0> "(" "{" <v:Comma<NamedArgument>> "}" ")" <b:@R> => {
-        Expression::NamedFunctionCall(Loc(file_no, a, b), Box::new(i), v)
-    },
 }
 
 Precedence0: Expression = {
     <FunctionCall> => <>,
-    <a:@L> <e:Precedence0> "[" <i:Expression?> "]" <b:@R> => Expression::ArraySubscript(Loc(file_no, a, b), Box::new(e), box_option(i)),
-    <a:@L> <e:Precedence0> "." <i:Identifier> <b:@R> => Expression::MemberAccess(Loc(file_no, a, b), Box::new(e), i),
+    <a:@L> <e:Precedence0> "[" <i:Expression?> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), box_option(i)),
+    <a:@L> <e:Precedence0> "." <i:Identifier> <b:@R> => Expression::Attribute(Loc(file_no, a, b), Box::new(e), i),
     // Solidity has ".address" members on external function types. Address is a keyword, so special casing needed
 
     <a:@L> "true" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), true),
@@ -256,7 +254,11 @@ Precedence0: Expression = {
         Expression::ArrayLiteral(Loc(file_no, a, b), v)
     },
     <Identifier> => Expression::Variable(<>),
+    <l:@L> <n:LexNumber> <r:@R> => {
+        let s: String = n.chars().filter(|v| *v != '_').collect();
 
+        Expression::NumberLiteral(Loc(file_no, l, r), BigInt::from_str(&s).unwrap())
+    },
     <l:@L> <a:ParameterList> <r:@R> => {
         if a.len() == 1 {
             if let Some(Parameter{ ty,  name: None, .. }) = &a[0].1 {
@@ -323,19 +325,19 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 
 FunctionDefinition: Box<FunctionDefinition> = {
-    <doc:DocComments> <l:@L> <ty:FunctionTy> <nl:@L> <name:Identifier?> <nr:@R> <params:ParameterList>
+    <doc:DocComments> <l:@L> <ty:FunctionTy> <nl:@L>  <name:Identifier?> <nr:@R> <params:ParameterList>
     <attributes:FunctionAttribute*>
     <returns:("returns" <ParameterList>)?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let returns = returns.unwrap_or(Vec::new());
 
+
         Box::new(FunctionDefinition{
             doc,
             loc: Loc(file_no, l, r),
-
             name,
             name_loc: Loc(file_no, nl, nr),
             params,
-            attributes,
+            is_pub:true,
             returns,
             body,
         })
@@ -392,9 +394,6 @@ SimpleStatement: Statement = {
 NonIfStatement: Statement = {
     BlockStatement => <>,
     <SimpleStatement> ";" => <>,
-    <l:@L>"do" <b:Statement> "while" "(" <e:Expression> ")" <r:@R> ";" => {
-        Statement::DoWhile(Loc(file_no, l, r), Box::new(b), e)
-    },
     <l:@L> "continue" <r:@R> ";" => {
         Statement::Continue(Loc(file_no, l, r))
     },
@@ -527,5 +526,6 @@ extern {
         "from" => Token::From,
         "is" => Token::Is,
         "virtual" => Token::Virtual,
+         "let" => Token::Let,
     }
 }

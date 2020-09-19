@@ -141,6 +141,7 @@ pub enum Token<'input> {
     View,
     Virtual,
     Payable,
+    Let,
 
 }
 
@@ -239,6 +240,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::From => write!(f, "from"),
             Token::Is => write!(f, "is"),
             Token::Virtual => write!(f, "virtual"),
+            Token::Let => write!(f, "let"),
             Token::Payable => write!(f, "payable"),
             Token::View => write!(f, "view"),
         }
@@ -349,6 +351,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "from" => Token::From,
     "is" => Token::Is,
     "virtual" => Token::Virtual,
+    "let" => Token::Let,
 
 };
 
