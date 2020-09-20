@@ -6,7 +6,9 @@ struct foo {
          }
         string __abba_$ = "ddd";
         int64 $thing_102;
-function Person(uint age) {
+
+
+pub function Person(uint age) {
     let a :string = "32";
     let a :bool = true;
     for i in i<200 {

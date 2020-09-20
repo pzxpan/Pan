@@ -312,12 +312,6 @@ FunctionAttribute: FunctionAttribute = {
     <l:@L> "virtual" <r:@R> => FunctionAttribute::Virtual(Loc(file_no, <>)),
 }
 
-// Modifier has special case
-FunctionTy: FunctionTy = {
-    "constructor" => FunctionTy::Constructor,
-    "function" => FunctionTy::Function,
-}
-
 BlockStatementOrSemiColon: Option<Statement> = {
     <@L> <@R> ";" => None,
     BlockStatement => Some(<>),
@@ -325,11 +319,10 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 
 FunctionDefinition: Box<FunctionDefinition> = {
-    <doc:DocComments> <l:@L> <ty:FunctionTy> <nl:@L>  <name:Identifier?> <nr:@R> <params:ParameterList>
-    <attributes:FunctionAttribute*>
-    <returns:("returns" <ParameterList>)?> <body:BlockStatementOrSemiColon> <r:@R> => {
+    <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun" <nl:@L>  <name:Identifier?> <nr:@R> <params:ParameterList>
+    <returns:ParameterList?> <body:BlockStatementOrSemiColon> <r:@R> => {
+        let is_pub = is_pub.is_some();
         let returns = returns.unwrap_or(Vec::new());
-
 
         Box::new(FunctionDefinition{
             doc,
@@ -337,7 +330,7 @@ FunctionDefinition: Box<FunctionDefinition> = {
             name,
             name_loc: Loc(file_no, nl, nr),
             params,
-            is_pub:true,
+            is_pub,
             returns,
             body,
         })
@@ -490,7 +483,7 @@ extern {
         "view" => Token::View,
         "payable" => Token::Payable,
         "constructor" => Token::Constructor,
-        "function" => Token::Function,
+        "fun" => Token::Function,
         "return" => Token::Return,
         "returns" => Token::Return,
         "if" => Token::If,
@@ -508,5 +501,6 @@ extern {
         "virtual" => Token::Virtual,
          "let" => Token::Let,
          "in" => Token::In,
+         "pub" => Token::Pub
     }
 }
