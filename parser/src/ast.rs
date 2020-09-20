@@ -462,9 +462,8 @@ pub enum Statement {
     While(Loc, Expression, Box<Statement>),
     For(
         Loc,
-        Option<Box<Statement>>,
-        Option<Box<Expression>>,
-        Option<Box<Statement>>,
+        Expression,
+        Expression,
         Option<Box<Statement>>,
     ),
 }
@@ -485,7 +484,7 @@ impl Statement {
             | Statement::While(loc, _, _)
             | Statement::Expression(loc, _)
             | Statement::VariableDefinition(loc, _, _)
-            | Statement::For(loc, _, _, _, _)
+            | Statement::For(loc, _, _, _)
             | Statement::While(loc, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)

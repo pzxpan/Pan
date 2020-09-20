@@ -349,37 +349,17 @@ BlockStatement: Statement = {
     <l:@L> "{" <v:CommaOne<NamedArgument>> "}" <r:@R> => Statement::Args(Loc(file_no, l, r), v),
 }
 
-OpenStatement: Statement = {
-    <l:@L> "if" "(" <cond:Expression> ")" <body:Statement> <r:@R> => {
-        Statement::If(Loc(file_no, l, r), cond, Box::new(body), None)
-    },
-    <l:@L> "if" "(" <cond:Expression> ")" <body:ClosedStatement> "else" <o:OpenStatement> <r:@R> => {
-        Statement::If(Loc(file_no, l, r), cond, Box::new(body), Some(Box::new(o)))
-    },
-    <l:@L> "while" "(" <e:Expression> ")" <b:OpenStatement> <r:@R> => {
-        Statement::While(Loc(file_no, l, r), e, Box::new(b))
-    }
-}
-
-ClosedStatement: Statement = {
-    NonIfStatement,
-    <l:@L> "if" "(" <cond:Expression> ")" <body:ClosedStatement> "else" <o:ClosedStatement> <r:@R> => {
-        Statement::If(Loc(file_no, l, r), cond, Box::new(body), Some(Box::new(o)))
-    },
-    <l:@L> "while" "(" <e:Expression> ")" <b:ClosedStatement> <r:@R> => {
-        Statement::While(Loc(file_no, l, r), e, Box::new(b))
-    },
-    <l:@L> "for" "(" <b:SimpleStatement?> ";" <c:Expression?> ";" <n:SimpleStatement?> ")" <block:ClosedStatement> <r:@R> => {
-        Statement::For(Loc(file_no, l, r), box_option(b), box_option(c), box_option(n), Some(Box::new(block)))
-    },
-    <l:@L> "for" "(" <b:SimpleStatement?> ";" <c:Expression?> ";" <n:SimpleStatement?> ")" ";" <r:@R> => {
-        Statement::For(Loc(file_no, l, r), box_option(b), box_option(c), box_option(n), None)
-    }
-}
-
 Statement: Statement = {
-    OpenStatement,
-    ClosedStatement
+   NonIfStatement,
+   <l:@L> "if"  <cond:Expression>  <body:BlockStatement> "else" <o:BlockStatement> <r:@R> => {
+      Statement::If(Loc(file_no, l, r), cond, Box::new(body), Some(Box::new(o)))
+   },
+   <l:@L> "while"  <e:Expression>  <b:BlockStatement> <r:@R> => {
+      Statement::While(Loc(file_no, l, r), e, Box::new(b))
+    },
+   <l:@L> "for"  <b:Expression>  "in"  <c:Expression>  <block:BlockStatement> <r:@R> => {
+      Statement::For(Loc(file_no, l, r), b, c,  Some(Box::new(block)))
+   },
 }
 
 SimpleStatement: Statement = {
@@ -527,5 +507,6 @@ extern {
         "is" => Token::Is,
         "virtual" => Token::Virtual,
          "let" => Token::Let,
+         "in" => Token::In,
     }
 }

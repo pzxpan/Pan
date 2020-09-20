@@ -35,28 +35,20 @@ pub enum Token<'input> {
     Data,
     Enum,
 
-
-
     Public,
     Private,
 
-
     Constant,
 
-
-
     Pure,
-
 
     Do,
     Continue,
     Break,
 
-
     Emit,
     Return,
     Returns,
-
 
     Uint(u16),
     Int(u16),
@@ -124,7 +116,6 @@ pub enum Token<'input> {
 
     Constructor,
 
-
     Member,
     Colon,
     OpenBracket,
@@ -142,7 +133,7 @@ pub enum Token<'input> {
     Virtual,
     Payable,
     Let,
-
+    In,
 }
 
 impl<'input> fmt::Display for Token<'input> {
@@ -241,6 +232,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Is => write!(f, "is"),
             Token::Virtual => write!(f, "virtual"),
             Token::Let => write!(f, "let"),
+            Token::In => write!(f, "in"),
             Token::Payable => write!(f, "payable"),
             Token::View => write!(f, "view"),
         }
@@ -352,6 +344,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "is" => Token::Is,
     "virtual" => Token::Virtual,
     "let" => Token::Let,
+    "in" => Token::In,
 
 };
 
@@ -370,8 +363,7 @@ impl<'input> Lexer<'input> {
         end: usize,
         ch: char,
     ) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
-        if ch == '0' {
-        }
+        if ch == '0' {}
 
         let mut end = end;
         while let Some((i, ch)) = self.chars.peek() {
@@ -529,7 +521,7 @@ impl<'input> Lexer<'input> {
                     }
                 }
                 Some((start, ch)) if ch.is_ascii_digit() => {
-                    return self.parse_number(start, start, ch)
+                    return self.parse_number(start, start, ch);
                 }
                 Some((i, ';')) => return Some(Ok((i, Token::Semicolon, i + 1))),
                 Some((i, ',')) => return Some(Ok((i, Token::Comma, i + 1))),
@@ -817,7 +809,7 @@ fn lexertest() {
     let tokens =
         Lexer::new("\"foo\"").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
 
-    assert_eq!(tokens, vec!(Ok((0, Token::StringLiteral("foo"), 5)),));
+    assert_eq!(tokens, vec!(Ok((0, Token::StringLiteral("foo"), 5)), ));
 
     let tokens = Lexer::new("pragma solidity >=0.5.0 <0.7.0;")
         .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
@@ -902,7 +894,7 @@ fn lexertest() {
 
     assert_eq!(
         tokens,
-        vec!(Ok((0, Token::Subtract, 1)), Ok((1, Token::Number("4"), 2)),)
+        vec!(Ok((0, Token::Subtract, 1)), Ok((1, Token::Number("4"), 2)), )
     );
 
     let tokens =
