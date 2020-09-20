@@ -121,7 +121,7 @@ mod test {
                     loc: Loc(0, 9, 12),
                     name: "foo".to_string(),
                 },
-                base: Vec::new(),
+                own: Vec::new(),
                 parts: vec![
                     StructPart::DataDefinition(Box::new(DataDefinition {
                         doc: vec![],

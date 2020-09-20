@@ -1,4 +1,4 @@
-struct foo {
+struct foo<B,C,D> {
    data dddd {
            bool exists;
            uint keyIdx;

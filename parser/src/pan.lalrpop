@@ -92,13 +92,13 @@ StructPart: StructPart = {
     FunctionDefinition => StructPart::FunctionDefinition(<>),
 }
 
-Bases: Vec<Base> = {
+Owns: Vec<Own> = {
     => Vec::new(),
-    "is" <CommaOne<Base>> => <>,
+    "<" <CommaOne<Own>> ">" => <>,
 }
 
-Base: Base = {
-    <l:@L> <name:Identifier> <args:("(" <Comma<Expression>> ")")?> <r:@R> => Base {
+Own: Own = {
+    <l:@L> <name:Identifier> <args:("(" <Comma<Expression>> ")")?> <r:@R> => Own {
         loc: Loc(file_no, l, r),
         name,
         args
@@ -106,9 +106,9 @@ Base: Base = {
 }
 
 StructDefinition: Box<StructDefinition> = {
-    <doc:DocComments> <l:@L> <ty:StructTy> <name:Identifier> <base:Bases>
+    <doc:DocComments> <l:@L> <ty:StructTy> <name:Identifier> <own:Owns>
     "{" <parts:(<StructPart>)*> "}" <r:@R> => {
-        Box::new(StructDefinition{doc, loc: Loc(file_no, l, r), ty, name, base, parts})
+        Box::new(StructDefinition{doc, loc: Loc(file_no, l, r), ty, name, own, parts})
     }
 }
 

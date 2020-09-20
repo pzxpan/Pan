@@ -140,7 +140,7 @@ impl fmt::Display for StructTy {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Base {
+pub struct Own {
     pub loc: Loc,
     pub name: Identifier,
     pub args: Option<Vec<Expression>>,
@@ -152,7 +152,7 @@ pub struct StructDefinition {
     pub loc: Loc,
     pub ty: StructTy,
     pub name: Identifier,
-    pub base: Vec<Base>,
+    pub own: Vec<Own>,
     pub parts: Vec<StructPart>,
 }
 
@@ -432,7 +432,7 @@ pub enum FunctionAttribute {
     Visibility(Visibility),
     Virtual(Loc),
     Override(Loc, Vec<Identifier>),
-    BaseOrModifier(Loc, Base),
+    OwnOrModifier(Loc, Own),
 }
 
 #[derive(Debug, PartialEq)]
