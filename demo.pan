@@ -7,7 +7,8 @@ struct foo<B,C,D> {
         string __abba_$ = "ddd";
         int64 $thing_102;
 
-lambda (x,y) : {x = x + y;}
+lambda (x,y) : {x = x + y;
+    return x ;}
 pub function Person(uint age) (foo) {
     let a :string = "32";
     let a :bool = true;

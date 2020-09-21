@@ -70,7 +70,6 @@ VariableDeclaration: VariableDeclaration = {
             loc: Loc(file_no, l, r), ty, name
     },
 
-
 }
 
 DataDefinition: Box<DataDefinition> = {
