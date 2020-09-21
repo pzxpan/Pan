@@ -69,7 +69,6 @@ VariableDeclaration: VariableDeclaration = {
     <l:@L> "let" <name:Identifier> ":" <ty: Precedence0> <r:@R> => VariableDeclaration {
             loc: Loc(file_no, l, r), ty, name
     },
-
 }
 
 DataDefinition: Box<DataDefinition> = {
@@ -89,7 +88,7 @@ StructPart: StructPart = {
     EnumDefinition => StructPart::EnumDefinition(<>),
     StructVariableDefinition => StructPart::StructVariableDefinition(<>),
     FunctionDefinition => StructPart::FunctionDefinition(<>),
-    LambdaDefinition => StructPart::LambdaDefinition(<>),
+
 }
 
 Owns: Vec<Own> = {
@@ -337,12 +336,13 @@ FunctionDefinition: Box<FunctionDefinition> = {
     },
 }
 
-LambdaDefinition: Box<LambdaDefinition> = {
-    <l:@L> "lambda" <params:ParameterList> ":" <body:BlockStatementOrSemiColon> <r:@R> =>
-       Box::new(LambdaDefinition{
-       loc: Loc(file_no, l, r),
+LambdaDefinition: Statement = {
+    <l:@L> "let" <name:Identifier>  "="  <params:ParameterList> "=>" <body:BlockStatement> <r:@R> =>
+       Statement::LambdaDefinition(
+       Loc(file_no, l, r),
+       name,
        params,
-       body})
+       Box::new(body))
 }
 
 BlockStatement: Statement = {
@@ -361,6 +361,7 @@ Statement: Statement = {
    <l:@L> "for"  <b:Expression>  "in"  <c:Expression>  <block:BlockStatement> <r:@R> => {
       Statement::For(Loc(file_no, l, r), b, c,  Some(Box::new(block)))
    },
+
 }
 
 SimpleStatement: Statement = {
@@ -387,6 +388,7 @@ NonIfStatement: Statement = {
     <l:@L> "return" <e:Expression> <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), Some(e))
     },
+     LambdaDefinition => <>,
 }
 
 Comma<T>: Vec<T> = {

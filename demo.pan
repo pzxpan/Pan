@@ -7,9 +7,13 @@ struct foo<B,C,D> {
         string __abba_$ = "ddd";
         int64 $thing_102;
 
-lambda (x,y) : {x = x + y;
-    return x ;}
+
 pub function Person(uint age) (foo) {
+    let aa =  (uint x,uint y) => {
+        x = x + y;
+        return x;
+    }
+
     let a :string = "32";
     let a :bool = true;
     for i in i < 200 {

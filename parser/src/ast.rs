@@ -120,7 +120,6 @@ pub enum StructPart {
     EnumDefinition(Box<EnumDefinition>),
     StructVariableDefinition(Box<StructVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
-    LambdaDefinition(Box<LambdaDefinition>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -449,12 +448,13 @@ pub struct FunctionDefinition {
     pub body: Option<Statement>,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct LambdaDefinition {
-    pub loc: Loc,
-    pub params: Vec<(Loc, Option<Parameter>)>,
-    pub body: Option<Statement>,
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct LambdaDefinition {
+//     pub loc: Loc,
+//     pub params: Vec<(Loc, Option<Parameter>)>,
+//     pub name: Option<Identifier>,
+//     pub body: Option<Statement>,
+// }
 
 #[derive(Debug, PartialEq, Clone)]
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
@@ -475,6 +475,10 @@ pub enum Statement {
         Expression,
         Option<Box<Statement>>,
     ),
+    LambdaDefinition(Loc,
+                     Identifier,
+                     Vec<(Loc, Option<Parameter>)>,
+                     Box<Statement>),
 }
 
 
@@ -495,6 +499,7 @@ impl Statement {
             | Statement::VariableDefinition(loc, _, _)
             | Statement::For(loc, _, _, _)
             | Statement::While(loc, _, _)
+            | Statement::LambdaDefinition(loc, _, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)
             | Statement::ConstDefinition(loc, _, _)
