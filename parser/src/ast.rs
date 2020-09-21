@@ -120,6 +120,7 @@ pub enum StructPart {
     EnumDefinition(Box<EnumDefinition>),
     StructVariableDefinition(Box<StructVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
+    LambdaDefinition(Box<LambdaDefinition>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -360,6 +361,7 @@ impl Expression {
             | Tuple(loc, _)
             | Dict(loc, _)
             | Set(loc, _)
+
             | Comprehension(loc, _, _)
 
             => *loc,
@@ -444,6 +446,13 @@ pub struct FunctionDefinition {
     pub params: Vec<(Loc, Option<Parameter>)>,
     pub is_pub: bool,
     pub returns: Vec<(Loc, Option<Parameter>)>,
+    pub body: Option<Statement>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct LambdaDefinition {
+    pub loc: Loc,
+    pub params: Vec<(Loc, Option<Parameter>)>,
     pub body: Option<Statement>,
 }
 
