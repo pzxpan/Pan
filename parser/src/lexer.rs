@@ -252,6 +252,8 @@ pub struct Lexer<'input> {
     input: &'input str,
     chars: Peekable<CharIndices<'input>>,
     last_tokens: [Option<Token<'input>>; 2],
+    column: usize,
+    row: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -367,7 +369,29 @@ impl<'input> Lexer<'input> {
             input,
             chars: input.char_indices().peekable(),
             last_tokens: [None, None],
+            row: 1,
+            column: 0,
         }
+    }
+
+    pub fn row(&self) -> usize {
+        self.row()
+    }
+
+    pub fn column(&self) -> usize {
+        self.column
+    }
+    pub fn reset(&mut self) {
+        self.row = 1;
+        self.column = 1;
+    }
+    pub fn go_right(&mut self) {
+        self.column += 1;
+    }
+
+    pub fn newline(&mut self) {
+        self.row += 1;
+        self.column = 0;
     }
 
     fn parse_number(
@@ -388,15 +412,19 @@ impl<'input> Lexer<'input> {
         }
 
         Some(Ok((
-            start,
+            self.row,
             Token::Number(&self.input[start..=end]),
-            end + 1,
+            self.column,
         )))
     }
 
     fn next(&mut self) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
         loop {
+            self.go_right();
             match self.chars.next() {
+                Some((start, '\n')) => {
+                    self.newline();
+                }
                 Some((start, ch)) if ch == '_' || ch == '\'' || UnicodeXID::is_xid_start(ch) => {
                     let end;
 
@@ -414,11 +442,11 @@ impl<'input> Lexer<'input> {
                     }
 
                     let id = &self.input[start..end];
-
+                    self.column += end - start - 1;
                     return if let Some(w) = KEYWORDS.get(id) {
-                        Some(Ok((start, *w, end)))
+                        Some(Ok((self.row, *w, self.column)))
                     } else {
-                        Some(Ok((start, Token::Identifier(id), end)))
+                        Some(Ok((self.row, Token::Identifier(id), self.column)))
                     };
                 }
                 Some((start, '"')) => {
@@ -439,23 +467,23 @@ impl<'input> Lexer<'input> {
                             }
                         } else {
                             return Some(Err(LexicalError::EndOfFileInString(
-                                start,
+                                self.row,
                                 self.input.len(),
                             )));
                         }
                     }
 
                     return Some(Ok((
-                        start,
+                        self.row,
                         Token::StringLiteral(&self.input[start + 1..end]),
-                        end + 1,
+                        self.column,
                     )));
                 }
                 Some((start, '/')) => {
                     match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
-                            return Some(Ok((start, Token::DivideAssign, start + 2)));
+                            return Some(Ok((self.row, Token::DivideAssign, self.column)));
                         }
                         Some((_, '/')) => {
                             // line comment
@@ -478,12 +506,12 @@ impl<'input> Lexer<'input> {
                             if let Some(doc_start) = doc_comment_start {
                                 if last > doc_start {
                                     return Some(Ok((
-                                        start + 3,
+                                        self.row,
                                         Token::DocComment(
                                             CommentType::Line,
                                             &self.input[doc_start..=last],
                                         ),
-                                        last + 1,
+                                        self.column,
                                     )));
                                 }
                             }
@@ -509,7 +537,7 @@ impl<'input> Lexer<'input> {
                                     last = i;
                                 } else {
                                     return Some(Err(LexicalError::EndOfFileInComment(
-                                        start,
+                                        self.row,
                                         self.input.len(),
                                     )));
                                 }
@@ -518,188 +546,188 @@ impl<'input> Lexer<'input> {
                             if let Some(doc_start) = doc_comment_start {
                                 if last > doc_start {
                                     return Some(Ok((
-                                        start + 3,
+                                        self.row,
                                         Token::DocComment(
                                             CommentType::Block,
                                             &self.input[doc_start..last],
                                         ),
-                                        last,
+                                        self.column,
                                     )));
                                 }
                             }
                         }
                         _ => {
-                            return Some(Ok((start, Token::Divide, start + 1)));
+                            return Some(Ok((self.row, Token::Divide, self.column)));
                         }
                     }
                 }
                 Some((start, ch)) if ch.is_ascii_digit() => {
                     return self.parse_number(start, start, ch);
                 }
-                Some((i, ';')) => return Some(Ok((i, Token::Semicolon, i + 1))),
-                Some((i, ',')) => return Some(Ok((i, Token::Comma, i + 1))),
-                Some((i, '(')) => return Some(Ok((i, Token::OpenParenthesis, i + 1))),
-                Some((i, ')')) => return Some(Ok((i, Token::CloseParenthesis, i + 1))),
-                Some((i, '{')) => return Some(Ok((i, Token::OpenCurlyBrace, i + 1))),
-                Some((i, '}')) => return Some(Ok((i, Token::CloseCurlyBrace, i + 1))),
-                Some((i, '~')) => return Some(Ok((i, Token::Complement, i + 1))),
+                Some((i, ';')) => return Some(Ok((self.row, Token::Semicolon, self.column))),
+                Some((i, ',')) => return Some(Ok((self.row, Token::Comma, self.column))),
+                Some((i, '(')) => return Some(Ok((self.row, Token::OpenParenthesis, self.column))),
+                Some((i, ')')) => return Some(Ok((self.row, Token::CloseParenthesis, self.column))),
+                Some((i, '{')) => return Some(Ok((self.row, Token::OpenCurlyBrace, self.column))),
+                Some((i, '}')) => return Some(Ok((self.row, Token::CloseCurlyBrace, self.column))),
+                Some((i, '~')) => return Some(Ok((self.row, Token::Complement, self.column))),
                 Some((i, '=')) => match self.chars.peek() {
                     Some((_, '=')) => {
                         self.chars.next();
-                        return Some(Ok((i, Token::Equal, i + 2)));
+                        return Some(Ok((self.row, Token::Equal, self.column)));
                     }
                     Some((_, '>')) => {
                         self.chars.next();
-                        return Some(Ok((i, Token::Arrow, i + 2)));
+                        return Some(Ok((self.row, Token::Arrow, self.column)));
                     }
                     _ => {
-                        return Some(Ok((i, Token::Assign, i + 1)));
+                        return Some(Ok((self.row, Token::Assign, self.column)));
                     }
                 },
                 Some((i, '!')) => {
                     if let Some((_, '=')) = self.chars.peek() {
                         self.chars.next();
-                        return Some(Ok((i, Token::NotEqual, i + 2)));
+                        return Some(Ok((self.row, Token::NotEqual, self.column)));
                     } else {
-                        return Some(Ok((i, Token::Not, i + 1)));
+                        return Some(Ok((self.row, Token::Not, self.column)));
                     }
                 }
                 Some((i, '|')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::BitwiseOrAssign, i + 2)))
+                            Some(Ok((self.row, Token::BitwiseOrAssign, self.column)))
                         }
                         Some((_, '|')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::Or, i + 2)))
+                            Some(Ok((self.row, Token::Or, self.column)))
                         }
-                        _ => Some(Ok((i, Token::BitwiseOr, i + 1))),
+                        _ => Some(Ok((self.row, Token::BitwiseOr, self.column))),
                     };
                 }
                 Some((i, '&')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::BitwiseAndAssign, i + 2)))
+                            Some(Ok((self.row, Token::BitwiseAndAssign, self.column)))
                         }
                         Some((_, '&')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::And, i + 2)))
+                            Some(Ok((self.row, Token::And, self.column)))
                         }
-                        _ => Some(Ok((i, Token::BitwiseAnd, i + 1))),
+                        _ => Some(Ok((self.row, Token::BitwiseAnd, self.column))),
                     };
                 }
                 Some((i, '^')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::BitwiseXorAssign, i + 2)))
+                            Some(Ok((self.row, Token::BitwiseXorAssign, self.column)))
                         }
-                        _ => Some(Ok((i, Token::BitwiseXor, i + 1))),
+                        _ => Some(Ok((self.row, Token::BitwiseXor, self.column))),
                     };
                 }
                 Some((i, '+')) => {
-                    return Some(Ok((i, Token::Add, i + 1)));
+                    return Some(Ok((self.row, Token::Add, self.column)));
                 }
                 Some((i, '-')) => {
-                    return Some(Ok((i, Token::Subtract, i + 1)));
+                    return Some(Ok((self.row, Token::Subtract, self.column)));
                 }
                 Some((i, '*')) => {
                     return match self.chars.peek() {
                         Some((_, '*')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::Power, i + 2)))
+                            Some(Ok((self.row, Token::Power, self.column)))
                         }
-                        _ => Some(Ok((i, Token::Mul, i + 1))),
+                        _ => Some(Ok((self.row, Token::Mul, self.column))),
                     };
                 }
                 Some((i, '%')) => {
-                    return Some(Ok((i, Token::Modulo, i + 1)));
+                    return Some(Ok((self.row, Token::Modulo, self.column)));
                 }
                 Some((i, '<')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::LessEqual, i + 2)))
+                            Some(Ok((self.row, Token::LessEqual, self.column)))
                         }
-                        _ => Some(Ok((i, Token::Less, i + 1))),
+                        _ => Some(Ok((self.row, Token::Less, self.column))),
                     };
                 }
                 Some((i, '>')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
-                            Some(Ok((i, Token::MoreEqual, i + 2)))
+                            Some(Ok((self.row, Token::MoreEqual, self.column)))
                         }
-                        _ => Some(Ok((i, Token::More, i + 1))),
+                        _ => Some(Ok((self.row, Token::More, self.column))),
                     };
                 }
                 Some((i, '.')) => if let Some((pos, ch)) = self.chars.peek() {
                     match *ch {
                         '=' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::ReAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::ReAssign, self.column)));
+                        }
                         '+' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::AddAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::AddAssign, self.column)));
+                        }
                         '*' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::MulAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::MulAssign, self.column)));
+                        }
                         '/' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::DivideAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::DivideAssign, self.column)));
+                        }
 
                         '-' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::SubtractAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::SubtractAssign, self.column)));
+                        }
                         '%' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::ModuloAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::ModuloAssign, self.column)));
+                        }
                         '|' => {
                             self.chars.next();
-                           return Some(Ok((i, Token::BitwiseOrAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::BitwiseOrAssign, self.column)));
+                        }
                         '&' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::BitwiseAndAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::BitwiseAndAssign, self.column)));
+                        }
                         '^' => {
                             self.chars.next();
-                            return Some(Ok((i, Token::BitwiseXorAssign, i + 2)))
-                        },
+                            return Some(Ok((self.row, Token::BitwiseXorAssign, self.column)));
+                        }
                         '>' => {
                             self.chars.next();
                             if let Some((pp, ch)) = self.chars.peek() {
                                 if *ch == '>' {
                                     self.chars.next();
-                                    return Some(Ok((i, Token::ShiftRightAssign, i + 3)))
+                                    return Some(Ok((self.row, Token::ShiftRightAssign, self.column)));
                                 }
                             }
-                        },
+                        }
                         '<' => {
                             self.chars.next();
                             if let Some((pp, ch)) = self.chars.peek() {
                                 if *ch == '<' {
                                     self.chars.next();
-                                    return Some(Ok((i, Token::ShiftLeftAssign, i + 3)))
+                                    return Some(Ok((self.row, Token::ShiftLeftAssign, self.column)));
                                 }
                             }
-                        },
-                        _ =>  return Some(Ok((i, Token::Member, i + 1)))
+                        }
+                        _ => return Some(Ok((self.row, Token::Member, self.column)))
                     }
                 }
 
-                Some((i, '[')) => return Some(Ok((i, Token::OpenBracket, i + 1))),
-                Some((i, ']')) => return Some(Ok((i, Token::CloseBracket, i + 1))),
-                Some((i, ':')) => return Some(Ok((i, Token::Colon, i + 1))),
-                Some((i, '?')) => return Some(Ok((i, Token::Question, i + 1))),
+                Some((i, '[')) => return Some(Ok((self.row, Token::OpenBracket, self.column))),
+                Some((i, ']')) => return Some(Ok((self.row, Token::CloseBracket, self.column))),
+                Some((i, ':')) => return Some(Ok((self.row, Token::Colon, self.column))),
+                Some((i, '?')) => return Some(Ok((self.row, Token::Question, self.column))),
                 Some((_, ch)) if ch.is_whitespace() => (),
                 Some((start, _)) => {
                     let mut end;
@@ -718,8 +746,8 @@ impl<'input> Lexer<'input> {
                     }
 
                     return Some(Err(LexicalError::UnrecognisedToken(
-                        start,
-                        end,
+                        self.row,
+                        self.column,
                         self.input[start..end].to_owned(),
                     )));
                 }

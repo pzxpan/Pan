@@ -4,6 +4,31 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Loc(pub usize, pub usize, pub usize);
 
+impl Loc {
+    pub fn new(row: usize, column: usize) -> Self {
+        Loc(1, row, column)
+    }
+    pub fn row(&self) -> usize {
+        self.1
+    }
+
+    pub fn column(&self) -> usize {
+        self.2
+    }
+    pub fn reset(&mut self) {
+        self.1 = 1;
+        self.2 = 1;
+    }
+    pub fn go_right(&mut self) {
+        self.2 += 1;
+    }
+
+    pub fn newline(&mut self) {
+        self.1 += 1;
+        self.2 = 1;
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub loc: Loc,
