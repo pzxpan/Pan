@@ -59,6 +59,8 @@ pub enum Token<'input> {
     String,
 
     Semicolon,
+    MutRef,
+    ReadOnlyRef,
     Comma,
     OpenParenthesis,
     CloseParenthesis,
@@ -151,7 +153,8 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Uint(w) => write!(f, "uint{}", w),
             Token::Int(w) => write!(f, "int{}", w),
             Token::Bytes(w) => write!(f, "bytes{}", w),
-
+            Token::MutRef => write!(f, "ref'"),
+            Token::ReadOnlyRef => write!(f, "ref"),
             Token::Semicolon => write!(f, ";"),
             Token::Comma => write!(f, ","),
             Token::OpenParenthesis => write!(f, "("),
@@ -350,7 +353,9 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "let" => Token::Let,
     "lambda" => Token::Lambda,
     "in" => Token::In,
-    "pub" => Token::Pub
+    "pub" => Token::Pub,
+    "ref'" => Token::MutRef,
+    "ref" => Token::ReadOnlyRef,
 
 };
 
@@ -390,12 +395,12 @@ impl<'input> Lexer<'input> {
     fn next(&mut self) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
         loop {
             match self.chars.next() {
-                Some((start, ch)) if ch == '_' || ch == '$' || UnicodeXID::is_xid_start(ch) => {
+                Some((start, ch)) if ch == '_' || ch == '\'' || UnicodeXID::is_xid_start(ch) => {
                     let end;
 
                     loop {
                         if let Some((i, ch)) = self.chars.peek() {
-                            if !UnicodeXID::is_xid_continue(*ch) && *ch != '$' {
+                            if !UnicodeXID::is_xid_continue(*ch) && *ch != '\'' {
                                 end = *i;
                                 break;
                             }

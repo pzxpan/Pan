@@ -372,6 +372,8 @@ impl Expression {
 pub struct Parameter {
     pub loc: Loc,
     pub ty: Expression,
+    pub is_ref: bool,
+    pub is_mut: bool,
     pub name: Option<Identifier>,
 }
 

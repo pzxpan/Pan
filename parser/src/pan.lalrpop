@@ -43,9 +43,7 @@ SingleDocComment: (usize, CommentType, &'input str)= {
 
 Type: Type = {
     "bool" => Type::Bool,
-
     "string" => Type::String,
-
     Uint => Type::Uint(<>),
     Int => Type::Int(<>),
     Bytes => Type::Bytes(<>),
@@ -290,9 +288,19 @@ StringLiteral: StringLiteral = {
 // and as an added bonus we can generate error messages about missing parameters/returns
 // to functions
 Parameter: Parameter = {
-    <l:@L><name:Identifier?> ":" <ty:Expression>   <r:@R> => {
+    <l:@L><name:Identifier?> ":"  "ref'"  <ty:Expression>   <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty,  name}
+        Parameter{loc, ty, is_ref:true, is_mut:true, name}
+    },
+
+    <l:@L><name:Identifier?> ":"  "ref"  <ty:Expression>   <r:@R> => {
+            let loc = Loc(file_no, l, r);
+            Parameter{loc, ty, is_ref:true, is_mut: false, name}
+    },
+
+    <l:@L><name:Identifier?> ":" <ty:Expression> <r:@R> => {
+            let loc = Loc(file_no, l, r);
+            Parameter{loc, ty, is_ref:false, is_mut: false, name}
     }
 }
 
@@ -426,6 +434,8 @@ extern {
         LexStringLiteral => Token::StringLiteral(<&'input str>),
         LexNumber => Token::Number(<&'input str>),
         ";" => Token::Semicolon,
+        "ref'" => Token::MutRef,
+        "ref" => Token::ReadOnlyRef,
         "{" => Token::OpenCurlyBrace,
         "}" => Token::CloseCurlyBrace,
         "(" => Token::OpenParenthesis,
