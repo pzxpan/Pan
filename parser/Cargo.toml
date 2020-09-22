@@ -2,7 +2,7 @@
 name = "parser"
 version = "0.1.0"
 description = "Parser for Pan code."
-authors = [ "Pan " ]
+authors = [ "Pan Zhenxing" ]
 build = "build.rs"
 repository = "https://www.panfp.cn/Pan"
 license = "MIT"

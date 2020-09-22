@@ -1,0 +1,16 @@
+[package]
+name = "bytecode"
+description = "Pan 字节码."
+version = "0.1.0"
+authors = ["Pan Zhenxing"]
+edition = "2018"
+repository = "https://www.panfp.cn/Pan"
+license = "MIT"
+
+[dependencies]
+bincode =  "1.1"
+bitflags = "1.1"
+lz4-compress = "0.1.1"
+num-bigint = { version = "0.2", features = ["serde"] }
+num-complex = { version = "0.2", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
