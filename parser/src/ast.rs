@@ -258,6 +258,7 @@ pub enum Expression {
     AssignXor(Loc, Box<Expression>, Box<Expression>),
     AssignShiftLeft(Loc, Box<Expression>, Box<Expression>),
     AssignShiftRight(Loc, Box<Expression>, Box<Expression>),
+    ReAssign(Loc, Box<Expression>, Box<Expression>),
 
     Subscript(Loc, Box<Expression>, Option<Box<Expression>>),
     Slice(Loc, Vec<Expression>),
@@ -340,6 +341,7 @@ impl Expression {
             | AssignXor(loc, _, _)
             | AssignShiftLeft(loc, _, _)
             | AssignShiftRight(loc, _, _)
+            | ReAssign(loc, _, _)
             | AssignAdd(loc, _, _)
             | AssignSubtract(loc, _, _)
             | AssignMultiply(loc, _, _)
