@@ -110,12 +110,11 @@ pub struct DataDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
     pub name: Identifier,
-    pub fields: Vec<VariableDeclaration>,
+    pub fields: Vec<Box<StructVariableDefinition>>,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum StructPart {
-    DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     EnumDefinition(Box<EnumDefinition>),
     StructVariableDefinition(Box<StructVariableDefinition>),
@@ -175,7 +174,7 @@ pub struct StructVariableDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
     pub ty: Expression,
-    pub attrs: Vec<VariableAttribute>,
+    pub is_pub: bool,
     pub name: Identifier,
     pub initializer: Option<Expression>,
 }
@@ -444,7 +443,7 @@ pub struct FunctionDefinition {
     pub name_loc: Loc,
     pub params: Vec<(Loc, Option<Parameter>)>,
     pub is_pub: bool,
-    pub returns: Vec<(Loc, Option<Parameter>)>,
+    pub returns: Option<Expression>,
     pub body: Option<Statement>,
 }
 

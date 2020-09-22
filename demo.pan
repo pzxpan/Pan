@@ -1,26 +1,22 @@
-struct foo<B,C,D> {
-   data dddd {
-           bool exists;
-           uint keyIdx;
-           bool kkkk;
+data dddd {
+           exists: bool = 20,
+           daaa: uint,
          }
-        string __abba_$ = "ddd";
-        int64 $thing_102;
-
-
-pub function Person(uint age) (foo) {
-    let aa =  (uint x,uint y) => {
+struct foo<B,C,D> {
+        pub  __abba_ : string = "dddd",
+        aaa: uint = 10,
+pub function Person(aaa : uint) ddddd {
+let aa =  (x:uint,y:uint) => {
         x = x + y;
         return x;
     }
-
     let a :string = "32";
     let a :bool = true;
     for i in i < 200 {
         let b:int = 44;
-     for j in (0 < j < 300).step(3) {
+     for j in aa.step(3) {
                 let d :int = 30;
-            }
+          }
     }
     while i < 20 {
         let d : int = 40;
@@ -34,5 +30,6 @@ pub function Person(uint age) (foo) {
     }
     let a :int8 = 22;
     _age = 22;
-  }
+
+}
 }

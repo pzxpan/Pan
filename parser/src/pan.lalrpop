@@ -72,9 +72,9 @@ VariableDeclaration: VariableDeclaration = {
 }
 
 DataDefinition: Box<DataDefinition> = {
-    <doc:DocComments> <l:@L> "data" <name:Identifier> "{" <fields:(<VariableDeclaration> ";")*> "}" <r:@R> => {
+    <doc:DocComments> <l:@L> "data" <name:Identifier> "{" <fields:(DataVariableDefinition)*> "}" <r:@R> => {
         Box::new(DataDefinition{loc: Loc(file_no, l, r), doc, name, fields})
-    }
+     }
 }
 
 StructTy: StructTy = {
@@ -84,11 +84,9 @@ StructTy: StructTy = {
 }
 
 StructPart: StructPart = {
-    DataDefinition => StructPart::DataDefinition(<>),
     EnumDefinition => StructPart::EnumDefinition(<>),
     StructVariableDefinition => StructPart::StructVariableDefinition(<>),
     FunctionDefinition => StructPart::FunctionDefinition(<>),
-
 }
 
 Owns: Vec<Own> = {
@@ -118,11 +116,20 @@ EnumDefinition: Box<EnumDefinition> = {
 }
 
 StructVariableDefinition: Box<StructVariableDefinition> = {
-    <doc:DocComments> <l:@L> <ty:Precedence0> <attrs:VariableAttribute*> <name:Identifier> <e:("=" <Expression>)?> <r:@R>";" => {
-        Box::new(StructVariableDefinition{
-            doc, loc: Loc(file_no, l, r), ty, attrs, name, initializer: e,
+    <doc:DocComments> <l:@L> <is_pub:"pub"?>  <name:Identifier> ":" <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
+        let is_pub = is_pub.is_some();
+        Box::new(StructVariableDefinition {
+            doc, loc: Loc(file_no, l, r), ty, is_pub, name, initializer: e,
         })
-    }
+    },
+}
+
+DataVariableDefinition: Box<StructVariableDefinition> = {
+    <doc:DocComments> <l:@L>  <name:Identifier> ":" <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
+        Box::new(StructVariableDefinition {
+            doc, loc: Loc(file_no, l, r), ty, is_pub:true, name, initializer: e,
+        })
+    },
 }
 
 Visibility: Visibility = {
@@ -283,7 +290,7 @@ StringLiteral: StringLiteral = {
 // and as an added bonus we can generate error messages about missing parameters/returns
 // to functions
 Parameter: Parameter = {
-    <l:@L> <ty:Expression>  <name:Identifier?> <r:@R> => {
+    <l:@L><name:Identifier?> ":" <ty:Expression>   <r:@R> => {
         let loc = Loc(file_no, l, r);
         Parameter{loc, ty,  name}
     }
@@ -319,11 +326,9 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 FunctionDefinition: Box<FunctionDefinition> = {
     <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun" <nl:@L>  <name:Identifier?> <nr:@R> <params:ParameterList>
-    <returns:ParameterList?> <body:BlockStatementOrSemiColon> <r:@R> => {
+    <returns:Expression?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let is_pub = is_pub.is_some();
-        let returns = returns.unwrap_or(Vec::new());
-
-        Box::new(FunctionDefinition{
+        Box::new(FunctionDefinition {
             doc,
             loc: Loc(file_no, l, r),
             name,
