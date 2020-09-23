@@ -207,7 +207,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Struct => write!(f, "struct"),
             Token::Library => write!(f, "library"),
             Token::Interface => write!(f, "interface"),
-            Token::Function => write!(f, "function"),
+            Token::Function => write!(f, "fun"),
             Token::Import => write!(f, "import"),
             Token::Data => write!(f, "data"),
             Token::Enum => write!(f, "enum"),
@@ -310,7 +310,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
 
     "false" => Token::False,
     "for" => Token::For,
-    "function" => Token::Function,
+    "fun" => Token::Function,
     "if" => Token::If,
     "import" => Token::Import,
     "int8" => Token::Int(8),
