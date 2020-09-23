@@ -16,6 +16,7 @@ SourceUnitPart: SourceUnitPart = {
     ImportDirective => SourceUnitPart::ImportDirective(<>),
     EnumDefinition => SourceUnitPart::EnumDefinition(<>),
     DataDefinition => SourceUnitPart::DataDefinition(<>),
+    FunctionDefinition => SourceUnitPart::FunctionDefinition(<>),
 }
 
 ImportDirective: Import = {

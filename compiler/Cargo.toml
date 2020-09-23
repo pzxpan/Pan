@@ -1,0 +1,17 @@
+[package]
+name = "pan-compiler"
+version = "0.1.0"
+description = "Compiler for Pan code into bytecode for VM."
+authors = ["潘振兴 <panzhenxing551@gmail.com>"]
+repository = "https://www.panfp.cn/Pan"
+license = "MIT"
+edition = "2018"
+
+[dependencies]
+indexmap = "1.0"
+itertools = "0.8.0"
+pan-bytecode = { path = "../bytecode", version = "0.1.0" }
+pan-parser = { path = "../parser", version = "0.1.0" }
+num-complex = { version = "0.2", features = ["serde"] }
+log = "0.4"
+arrayvec = "0.5"

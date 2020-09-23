@@ -1,5 +1,5 @@
 [package]
-name = "parser"
+name = "pan-parser"
 version = "0.1.0"
 description = "Parser for Pan code."
 authors = [ "Pan Zhenxing" ]

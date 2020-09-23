@@ -1,8 +1,8 @@
 [package]
-name = "bytecode"
+name = "pan-bytecode"
 description = "Pan 字节码."
 version = "0.1.0"
-authors = ["Pan Zhenxing"]
+authors = ["潘振兴 <panzhenxing551@gmail.com>"]
 edition = "2018"
 repository = "https://www.panfp.cn/Pan"
 license = "MIT"
