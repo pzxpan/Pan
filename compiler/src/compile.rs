@@ -8,7 +8,8 @@ use itertools::Itertools;
 use num_complex::Complex64;
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs};
 use pan_parser::{ast, parse};
-use pan_parser::ast::Expression;
+use pan_parser::ast::{Expression, Parameter};
+use std::borrow::Borrow;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -174,10 +175,21 @@ impl<O: OutputStream> Compiler<O> {
                 ast::SourceUnitPart::ImportDirective(def) => {}
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
-                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    if let Some(name) = &def.name {
-                        self.compile_statements(&def.as_ref().body.as_ref().unwrap())?;
+                    let name = &def.name.as_ref().unwrap().name;
+                    let mut args = vec![];
+                    for para in def.params.iter() {
+                        let p = para.1.as_ref().unwrap().to_owned();
+                        args.push(p.clone());
                     }
+                    // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
+                    let body = &def.body.as_ref().unwrap();
+                    // let decorator_list = vec![];
+                    let returns = &def.returns;
+                    let is_async = false;
+                    self.compile_function_def(
+                        name, args.as_slice(), body, returns, is_async);
+
+                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                 }
                 _ => (),
             }
@@ -226,9 +238,93 @@ impl<O: OutputStream> Compiler<O> {
 
     fn compile_statement(&mut self, statement: &ast::Statement) -> Result<(), CompileError> {
         println!("Compiling {:?}", statement);
-
-        // self.set_source_location(statement.0);
+        self.set_source_location(statement.loc().borrow());
         use ast::Statement::*;
+        match &statement {
+            Block(_, statements) => {
+                for s in statements {
+                    self.compile_statement(s)?;
+                }
+            }
+            Return(_, value) => {
+                if !self.ctx.in_func() {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::InvalidReturn,
+                        location: statement.loc().clone(),
+                        source_path: None,
+                    });
+                }
+                match value {
+                    Some(v) => {
+                        self.compile_expression(v)?;
+                    }
+                    None => {
+                        self.emit(Instruction::LoadConst {
+                            value: bytecode::Constant::None,
+                        });
+                    }
+                }
+                self.emit(Instruction::ReturnValue);
+            }
+            Continue(_) => {
+                if !self.ctx.in_loop {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::InvalidContinue,
+                        location: statement.loc().clone(),
+                        source_path: None,
+                    });
+                }
+                self.emit(Instruction::Continue);
+            }
+            Break(_) => {
+                if !self.ctx.in_loop {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::InvalidBreak,
+                        location: statement.loc().clone(),
+                        source_path: None,
+                    });
+                }
+                self.emit(Instruction::Break);
+            }
+
+            If(_, test, body, orelse) => {
+                let end_label = self.new_label();
+                match orelse {
+                    None => {
+                        // Only if:
+                        self.compile_jump_if(test, false, end_label)?;
+                        self.compile_statements(body)?;
+                        self.set_label(end_label);
+                    }
+                    Some(statements) => {
+                        // if - else:
+                        let else_label = self.new_label();
+                        self.compile_jump_if(test, false, else_label)?;
+                        self.compile_statements(body)?;
+                        self.emit(Instruction::Jump { target: end_label });
+
+                        // else:
+                        self.set_label(else_label);
+                        self.compile_statements(statements)?;
+                    }
+                }
+                self.set_label(end_label);
+            }
+            Expression(_, expression) => {
+                self.compile_expression(expression)?;
+            }
+            VariableDefinition(_, decl, expression) => {
+                self.load_name(&decl.name.name);
+                if let Some(e) = &expression {
+                    self.compile_expression(e)?;
+                }
+            }
+            _ => {}
+        }
+
 
         Ok(())
     }
@@ -268,7 +364,7 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
-    fn enter_function(&mut self, name: &str, args: &ast::Parameter) -> Result<(), CompileError> {
+    fn enter_function(&mut self, name: &str, args: &[ast::Parameter]) -> Result<(), CompileError> {
         // let have_defaults = !args.defaults.is_empty();
         // if have_defaults {
         //     // Construct a tuple:
@@ -311,14 +407,14 @@ impl<O: OutputStream> Compiler<O> {
         // }
 
         let line_number = self.get_source_line_number();
-        // self.push_output(CodeObject::new(
-        //     flags,
-        //     args.iter().map(|a| a.arg.clone()).collect(),
-        //     Varargs::None,
-        //     self.source_path.clone().unwrap(),
-        //     line_number,
-        //     name.to_owned(),
-        // ));
+        self.push_output(CodeObject::new(
+            flags,
+            args.iter().map(|a| a.name.as_ref().unwrap().name.clone()).collect(),
+            Varargs::None,
+            self.source_path.clone().unwrap(),
+            line_number,
+            name.to_owned(),
+        ));
         self.enter_scope();
 
         Ok(())
@@ -347,9 +443,8 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_function_def(
         &mut self,
         name: &str,
-        args: &ast::Parameter,
-        body: &[ast::Statement],
-        decorator_list: &[ast::Expression],
+        args: &[ast::Parameter],
+        body: &ast::Statement,
         returns: &Option<ast::Expression>, // TODO: use type hint somehow..
         is_async: bool,
     ) -> Result<(), CompileError> {
@@ -370,10 +465,21 @@ impl<O: OutputStream> Compiler<O> {
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
 
-        self.prepare_decorators(decorator_list)?;
-
         self.enter_function(name, args)?;
-        //可疑加入LoadConst
+        // self.prepare_decorators(decorator_list)?;
+        self.compile_statements(body)?;
+        // Emit None at end:
+        // match body.last().map(|s| &s) {
+        //     Some(ast::Statement::Return(_, _)) => {
+        //         // the last instruction is a ReturnValue already, we don't need to emit it
+        //     }
+        //     _ => {
+        //         self.emit(Instruction::LoadConst {
+        //             value: bytecode::Constant::None,
+        //         });
+        //         self.emit(Instruction::ReturnValue);
+        //     }
+        // }
         let mut code = self.pop_code_object();
         self.leave_scope();
 
@@ -879,9 +985,87 @@ impl<O: OutputStream> Compiler<O> {
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
         trace!("Compiling {:?}", expression);
-        // self.set_source_location(expression.0);
+        self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;
+        match &expression {
+            Subscript(_, a, b) => {
+                self.compile_expression(a)?;
+                if let Some(e) = b {
+                    self.compile_expression(e)?;
+                }
+            }
+            Attribute(loc, value, _) => {
+                self.compile_expression(value)?;
+            }
+            FunctionCall(loc, name, args) => {
+                self.compile_call(name, args)?;
+            }
+            Not(loc, name) | UnaryPlus(loc, name) | UnaryMinus(loc, name)
+            => {
+                self.compile_expression(name)?;
+            }
+            Power(loc, a, b) |
+            Multiply(loc, a, b) |
+            Divide(loc, a, b) |
+            Modulo(loc, a, b) |
+            Add(loc, a, b) |
+            Subtract(loc, a, b) |
+            ShiftLeft(loc, a, b) |
+            ShiftRight(loc, a, b) |
+            BitwiseAnd(loc, a, b) |
+            BitwiseXor(loc, a, b) |
+            BitwiseOr(loc, a, b) |
+            Less(loc, a, b) |
+            More(loc, a, b) |
+            LessEqual(loc, a, b) |
+            MoreEqual(loc, a, b) |
+            Equal(loc, a, b) |
+            NotEqual(loc, a, b) |
+            And(loc, a, b) |
+            Or(loc, a, b) => {
+                self.compile_expression(a)?;
+                self.compile_expression(b)?;
+                self.compile_op(expression, false);
+            }
+            Assign(loc, a, b) |
+            AssignOr(loc, a, b) |
+            AssignAnd(loc, a, b) |
+            AssignXor(loc, a, b) |
+            AssignShiftLeft(loc, a, b) |
+            AssignShiftRight(loc, a, b) |
+            ReAssign(loc, a, b) |
+            AssignAdd(loc, a, b) |
+            AssignSubtract(loc, a, b) |
+            AssignMultiply(loc, a, b) |
+            AssignDivide(loc, a, b) |
+            AssignModulo(loc, a, b)
+            => {
+                self.compile_expression(a)?;
+                self.compile_expression(b)?;
+                self.compile_op(expression, true);
+                //TODO
+            }
+            BoolLiteral(loc, _) => {}
+            NumberLiteral(loc, _) => {}
+            ArrayLiteral(loc, _) => {}
+            List(loc, _) => {}
+            Type(loc, _) => {}
+            Variable(ast::Identifier { loc, name }) => {
+                // Determine the contextual usage of this symbol:
+                self.load_name(name);
+            }
+            Yield(loc, _) => {}
+            In(loc, _, _) => {}
+            Is(loc, _, _) => {}
+            Slice(loc, _) => {}
+            Await(loc, _) => {}
+            Tuple(loc, _) => {}
+            Dict(loc, _) => {}
+            Set(loc, _) => {}
+            Comprehension(loc, _, _) => {}
+            StringLiteral(v) => {}
+        }
         // match &expression.node {
         //     Call {
         //         function,

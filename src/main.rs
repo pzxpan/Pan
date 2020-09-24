@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::Read;
 use pan_parser::ast::*;
 use pan_parser::parse;
+use pan_bytecode::bytecode::Instruction;
 use pan_compiler::symboltable;
 use pan_compiler::symboltable::SymbolTable;
 use pan_compiler::compile::{compile_program, compile};
@@ -25,4 +26,19 @@ fn main() {
     // }
     let code_object = compile(&contents, path.to_string(), 0).unwrap();
     println!("code is: {:?}", code_object);
+    for i in code_object.instructions {
+        match &i {
+            Instruction::LoadConst { value } => {
+                match &value {
+                    pan_bytecode::bytecode::Constant::Code { code } => {
+                        for ii in &code.as_ref().instructions {
+                            println!("sub instruction {:?}", ii);
+                        }
+                    }
+                    _ => { println!("instruction {:?}", i); }
+                }
+            }
+            _ => { println!("instruction {:?}", i); }
+        }
+    }
 }

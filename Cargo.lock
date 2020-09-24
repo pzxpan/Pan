@@ -9,6 +9,7 @@ dependencies = [
  "env_logger",
  "log",
  "num-traits",
+ "pan-bytecode",
  "pan-compiler",
  "pan-parser",
 ]

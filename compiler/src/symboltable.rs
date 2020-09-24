@@ -412,18 +412,6 @@ impl SymbolTableBuilder {
             Expression(loc, expression) => {
                 self.scan_expression(expression, &ExpressionContext::Load)?;
             }
-
-
-            // VariableDefinition(Loc(1, 3, 39), VariableDeclaration { loc: Loc(1, 3, 17), ty: Variable(Identifier { loc: Loc(1, 3, 17), name: "Person" }),
-            //                        name: Identifier { loc: Loc(1, 3, 9), name: "a" } }
-            //
-            //                    , Some(FunctionCall(Loc(1, 3, 39), Attribute(Loc(1, 3, 30), Variable(Identifier { loc: Loc(1, 3, 26), name: "Person" })
-            //                                                                 , Identifier { loc: Loc(1, 3, 30), name: "new" })
-            //                                        , [StringLiteral([StringLiteral { loc: Loc(1, 3, 32), string: "pan" }]),
-            //                                        NumberLiteral(Loc(1, 3, 34), BigInt { sign: Plus, data: BigUint { data: [1000] } }),
-            //                                        NumberLiteral(Loc(1, 3, 36), BigInt { sign: Plus, data: BigUint { data: [28] } }),
-            //                                        StringLiteral([StringLiteral { loc: Loc(1, 3, 38), string: "Beijing" }])])))
-
             If(loc, test, body, orelse) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 self.scan_statement(body)?;
@@ -479,6 +467,7 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
+        use ast::Identifier;
         match &expression {
             Subscript(loc, a, b) => {
                 self.scan_expression(a, context)?;
