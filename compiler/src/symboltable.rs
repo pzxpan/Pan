@@ -10,8 +10,9 @@ Inspirational file: https://github.com/python/cpython/blob/master/Python/symtabl
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Parameter};
+use pan_parser::ast::{Loc, Identifier, Parameter, Expression};
 use std::fmt;
+use std::borrow::Borrow;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -25,7 +26,7 @@ pub fn statements_to_symbol_table(
 ) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
-    builder.scan_statements(statements)?;
+    builder.scan_statement(statements)?;
     builder.finish()
 }
 
@@ -292,6 +293,7 @@ enum ExpressionContext {
     Load,
     Store,
     Delete,
+    Unkown,
 }
 
 impl SymbolTableBuilder {
@@ -350,18 +352,13 @@ impl SymbolTableBuilder {
                         }
                         // // let params = def.as_ref().params.iter().map(|s| s.1).collect();
                         self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
-                        self.scan_statements(&def.as_ref().body.as_ref().unwrap())?;
+                        self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                         self.leave_scope();
                     }
                 }
                 _ => (),
             }
         }
-        Ok(())
-    }
-
-    fn scan_statements(&mut self, statements: &ast::Statement) -> SymbolTableResult {
-        self.scan_statement(&statements)?;
         Ok(())
     }
 
@@ -393,20 +390,75 @@ impl SymbolTableBuilder {
 
     fn scan_statement(&mut self, statement: &ast::Statement) -> SymbolTableResult {
         println!("statement is {:?}", statement);
-        // match &statement {
-        //     For(_, target, iter, body) => {
-        //         self.scan_expression(target, &ExpressionContext::Store)?;
-        //         self.scan_expression(iter, &ExpressionContext::Load)?;
-        //         self.scan_statements(body)?;
-        //     }
-        //     While(_, test, body) => {
-        //         self.scan_expression(test, &ExpressionContext::Load)?;
-        //         self.scan_statements(body)?;
-        //     }
-        //     Break(_)  => {
-        //         // No symbols here.
-        //     }
-        // }
+        use ast::Statement::*;
+        match &statement {
+            Block(loc, stmts) => {
+                for stmt in stmts {
+                    self.scan_statement(stmt)?;
+                }
+            }
+            For(_, target, iter, body) => {
+                self.scan_expression(target, &ExpressionContext::Store)?;
+                self.scan_expression(iter, &ExpressionContext::Load)?;
+                self.scan_statement(body.as_ref().unwrap())?;
+            }
+            While(_, test, body) => {
+                self.scan_expression(test, &ExpressionContext::Load)?;
+                self.scan_statement(body)?;
+            }
+            Break(_) | Continue(_) => {
+                // No symbols here.
+            }
+            Expression(loc, expression) => {
+                self.scan_expression(expression, &ExpressionContext::Load)?;
+            }
+
+
+            // VariableDefinition(Loc(1, 3, 39), VariableDeclaration { loc: Loc(1, 3, 17), ty: Variable(Identifier { loc: Loc(1, 3, 17), name: "Person" }),
+            //                        name: Identifier { loc: Loc(1, 3, 9), name: "a" } }
+            //
+            //                    , Some(FunctionCall(Loc(1, 3, 39), Attribute(Loc(1, 3, 30), Variable(Identifier { loc: Loc(1, 3, 26), name: "Person" })
+            //                                                                 , Identifier { loc: Loc(1, 3, 30), name: "new" })
+            //                                        , [StringLiteral([StringLiteral { loc: Loc(1, 3, 32), string: "pan" }]),
+            //                                        NumberLiteral(Loc(1, 3, 34), BigInt { sign: Plus, data: BigUint { data: [1000] } }),
+            //                                        NumberLiteral(Loc(1, 3, 36), BigInt { sign: Plus, data: BigUint { data: [28] } }),
+            //                                        StringLiteral([StringLiteral { loc: Loc(1, 3, 38), string: "Beijing" }])])))
+
+            If(loc, test, body, orelse) => {
+                self.scan_expression(test, &ExpressionContext::Load)?;
+                self.scan_statement(body)?;
+                if let Some(code) = orelse {
+                    self.scan_statement(code)?;
+                }
+            }
+            Args(loc, _) => {}
+            VariableDefinition(loc, decl, expression) => {
+                self.register_name(decl.name.borrow().name.borrow(), SymbolUsage::Assigned)?;
+                self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
+                if let Some(e) = expression {
+                    self.scan_expression(e, &ExpressionContext::Load)?;
+                }
+            }
+            Return(loc, expression) => {
+                if let Some(e) = expression {
+                    self.scan_expression(e, &ExpressionContext::Load)?;
+                }
+            }
+
+            ConstDefinition(loc, decl, expression) => {
+                self.register_name(decl.name.borrow().name.borrow(), SymbolUsage::Global)?;
+                self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
+                if let Some(e) = expression {
+                    self.scan_expression(e, &ExpressionContext::Load)?;
+                }
+            }
+
+            LambdaDefinition(loc, _, _, _) => {
+                // self.enter_function("lambda", args, expression.location.row())?;
+                // self.scan_expression(body, &ExpressionContext::Load)?;
+                // self.leave_scope();
+            }
+        }
         Ok(())
     }
 
@@ -426,12 +478,94 @@ impl SymbolTableBuilder {
         expression: &ast::Expression,
         context: &ExpressionContext,
     ) -> SymbolTableResult {
-        // match &expression {
-        //     // NumberLiteral(_, name) => {
-        //     //     // Determine the contextual usage of this symbol:
-        //     //     println!("name is {}", name);
-        //     // }
-        // }
+        use ast::Expression::*;
+        match &expression {
+            Subscript(loc, a, b) => {
+                self.scan_expression(a, context)?;
+                if let Some(e) = b {
+                    self.scan_expression(e, context)?;
+                }
+            }
+            Attribute(loc, value, _) => {
+                self.scan_expression(value, context)?;
+            }
+            FunctionCall(loc, name, args) => {
+                self.scan_expression(name, &ExpressionContext::Load)?;
+                self.scan_expressions(args, &ExpressionContext::Load)?;
+            }
+            Not(loc, name) | UnaryPlus(loc, name) | UnaryMinus(loc, name)
+            => {
+                self.scan_expression(name, &ExpressionContext::Load)?;
+            }
+            Power(loc, a, b) |
+            Multiply(loc, a, b) |
+            Divide(loc, a, b) |
+            Modulo(loc, a, b) |
+            Add(loc, a, b) |
+            Subtract(loc, a, b) |
+            ShiftLeft(loc, a, b) |
+            ShiftRight(loc, a, b) |
+            BitwiseAnd(loc, a, b) |
+            BitwiseXor(loc, a, b) |
+            BitwiseOr(loc, a, b) |
+            Less(loc, a, b) |
+            More(loc, a, b) |
+            LessEqual(loc, a, b) |
+            MoreEqual(loc, a, b) |
+            Equal(loc, a, b) |
+            NotEqual(loc, a, b) |
+            And(loc, a, b) |
+            Or(loc, a, b) => {
+                self.scan_expression(a, context)?;
+                self.scan_expression(b, context)?;
+            }
+            Assign(loc, a, b) |
+            AssignOr(loc, a, b) |
+            AssignAnd(loc, a, b) |
+            AssignXor(loc, a, b) |
+            AssignShiftLeft(loc, a, b) |
+            AssignShiftRight(loc, a, b) |
+            ReAssign(loc, a, b) |
+            AssignAdd(loc, a, b) |
+            AssignSubtract(loc, a, b) |
+            AssignMultiply(loc, a, b) |
+            AssignDivide(loc, a, b) |
+            AssignModulo(loc, a, b)
+            => {
+                self.scan_expression(a, &ExpressionContext::Store)?;
+                self.scan_expression(b, &ExpressionContext::Load)?;
+            }
+            BoolLiteral(loc, _) => {}
+            NumberLiteral(loc, _) => {}
+            ArrayLiteral(loc, _) => {}
+            List(loc, _) => {}
+            Type(loc, _) => {}
+            Variable(Identifier { loc, name, }) => {
+                // Determine the contextual usage of this symbol:
+                match context {
+                    ExpressionContext::Delete => {
+                        self.register_name(name, SymbolUsage::Used)?;
+                    }
+                    ExpressionContext::Load => {
+                        self.register_name(name, SymbolUsage::Used)?;
+                    }
+                    ExpressionContext::Store => {
+                        self.register_name(name, SymbolUsage::Assigned)?;
+                    }
+                    ExpressionContext::Unkown => {}
+                }
+            }
+            Yield(loc, _) => {}
+            In(loc, _, _) => {}
+            Is(loc, _, _) => {}
+            Slice(loc, _) => {}
+            Await(loc, _) => {}
+            Tuple(loc, _) => {}
+            Dict(loc, _) => {}
+            Set(loc, _) => {}
+            Comprehension(loc, _, _) => {}
+            StringLiteral(v) => {}
+        }
         Ok(())
     }
 

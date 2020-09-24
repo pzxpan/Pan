@@ -78,10 +78,10 @@ impl Label {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
 pub enum NameScope {
     Local,
     Global,
+    Free,
 }
 
 ///
