@@ -35,19 +35,19 @@ impl Scope {
         scope
     }
 
-    // pub fn with_builtins(
-    //     locals: Option<PyDictRef>,
-    //     globals: PyDictRef,
-    //     vm: &VirtualMachine,
-    // ) -> Scope {
-    //     if !globals.contains_key("__builtins__", vm) {
-    //         globals
-    //             .clone()
-    //             .set_item("__builtins__", vm.builtins.clone(), vm)
-    //             .unwrap();
-    //     }
-    //     Scope::new(locals, globals, vm)
-    // }
+    pub fn with_builtins(
+        locals: Option<PyDictRef>,
+        globals: PyDictRef,
+        vm: &VirtualMachine,
+    ) -> Scope {
+        // if !globals.contains_key("__builtins__", vm) {
+        //     globals
+        //         .clone()
+        //         .set_item("__builtins__", vm.builtins.clone(), vm)
+        //         .unwrap();
+        // }
+        Scope::new(locals, globals, vm)
+    }
 
     pub fn get_locals(&self) -> PyDictRef {
         match self.locals.first() {
@@ -78,7 +78,7 @@ impl Scope {
 pub trait NameProtocol {
     //fn load_name(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject>;
     //fn store_name(&self, vm: &VirtualMachine, name: &str, value: CodeObject);
-    // fn delete_name(&self, vm: &VirtualMachine, name: &str) -> PyResult;
+    // fn delete_name(&self, vm: &VirtualMachine, name: &str) -> PanResult;
    // fn load_local(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject>;
    // fn load_cell(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject>;
    // fn store_cell(&self, vm: &VirtualMachine, name: &str, value: CodeObject);
@@ -127,7 +127,7 @@ impl NameProtocol for Scope {
     // //     self.get_locals().set_item(key, value, vm).unwrap();
     // // }
     //
-    // fn delete_name(&self, vm: &VirtualMachine, key: &str) -> PyResult {
+    // fn delete_name(&self, vm: &VirtualMachine, key: &str) -> PanResult {
     //     self.get_locals().del_item(key, vm)
     // }
     //

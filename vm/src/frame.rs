@@ -10,6 +10,8 @@ use pan_bytecode::bytecode;
 use crate::vm::VirtualMachine;
 use crate::scope::Scope;
 use pan_bytecode::bytecode::CodeObject;
+use crate::panobject::PanObjectRef;
+use crate::value::Value;
 
 #[derive(Clone, Debug)]
 struct Block {
@@ -50,7 +52,7 @@ pub struct Frame {
     pub code: CodeObject,
     // We need 1 stack per frame
     /// The main data frame of the stack machine
-    stack: RefCell<Vec<CodeObject>>,
+    stack: RefCell<Vec<Value>>,
     /// Block frames, for controlling loops and exceptions
     blocks: RefCell<Vec<Block>>,
     /// Variables
@@ -68,8 +70,8 @@ pub enum ExecutionResult {
 pub type FrameResult = Option<ExecutionResult>;
 
 // impl ExecutionResult {
-//     /// Extract an ExecutionResult from a PyResult returned from e.g. gen.__next__() or gen.send()
-//     pub fn from_result(vm: &VirtualMachine, res: PyResult) -> PyResult<Self> {
+//     /// Extract an ExecutionResult from a PanResult returned from e.g. gen.__next__() or gen.send()
+//     pub fn from_result(vm: &VirtualMachine, res: PanResult) -> PanResult<Self> {
 //         match res {
 //             Ok(val) => Ok(ExecutionResult::Yield(val)),
 //             Err(err) => {
@@ -82,8 +84,8 @@ pub type FrameResult = Option<ExecutionResult>;
 //         }
 //     }
 //
-//     /// Turn an ExecutionResult into a PyResult that would be returned from a generator or coroutine
-//     pub fn into_result(self, vm: &VirtualMachine) -> PyResult {
+//     /// Turn an ExecutionResult into a PanResult that would be returned from a generator or coroutine
+//     pub fn into_result(self, vm: &VirtualMachine) -> PanResult {
 //         match self {
 //             ExecutionResult::Yield(value) => Ok(value),
 //             ExecutionResult::Return(value) => {
@@ -100,7 +102,7 @@ pub type FrameResult = Option<ExecutionResult>;
 // }
 
 /// A valid execution result, or an exception
-// pub type FrameResult = PyResult<Option<ExecutionResult>>;
+// pub type FrameResult = PanResult<Option<ExecutionResult>>;
 
 impl Frame {
     pub fn new(code: CodeObject, scope: Scope) -> Frame {
@@ -127,21 +129,21 @@ impl Frame {
     }
 
     // #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    pub fn run(&self, vm: &VirtualMachine) {
+    pub fn run(&self, vm: &VirtualMachine) -> FrameResult {
         // Execute until return or exception:
-        // loop {
-        //     let lineno = self.get_lineno();
-        //     let result = self.execute_instruction(vm);
-        //     match result {
-        //         None => {}
-        //         Ok(Some(value)) => {
-        //             break;
-        //             // break Some(value);
-        //         }
-        //         _ => {}
-        //         // Instruction raised an exception
-        //     }
-        // }
+        loop {
+            let lineno = self.get_lineno();
+            let result = self.execute_instruction(vm);
+            match result {
+                // None => {}
+                // Ok(Some(value)) => {
+                //     break Some(value);
+                // }
+                // _ => {}
+                // Instruction raised an exception
+                _ => {}
+            }
+        }
     }
 
     pub fn fetch_instruction(&self) -> &bytecode::Instruction {
@@ -169,11 +171,11 @@ impl Frame {
             }
 
         match instruction {
-            // bytecode::Instruction::LoadConst { ref value } => {
-            //     let obj = vm.ctx.unwrap_constant(value);
-            //     self.push_value(obj);
-            //     None
-            // }
+            bytecode::Instruction::LoadConst { ref value } => {
+                let obj = vm.unwrap_constant(value);
+                self.push_value(obj);
+                None
+            }
             bytecode::Instruction::Import {
                 ref name,
                 ref symbols,
@@ -212,7 +214,7 @@ impl Frame {
                 //     .into_iter()
                 //     .map(|pyobj| objstr::clone_value(&pyobj))
                 //     .collect::<String>();
-                // let str_obj = vm.ctx.new_str(s);
+                // let str_obj = Value::Str(s);
                 // self.push_value(str_obj);
                 None
             }
@@ -448,7 +450,7 @@ impl Frame {
     //     vm: &VirtualMachine,
     //     size: usize,
     //     unpack: bool,
-    // ) -> PyResult<Vec<CodeObject>> {
+    // ) -> PanResult<Vec<CodeObject>> {
     //     let elements = self.pop_multiple(size);
     //     if unpack {
     //         let mut result: Vec<CodeObject> = vec![];
@@ -741,7 +743,7 @@ impl Frame {
         None
     }
 
-    // fn _send(&self, coro: CodeObject, val: CodeObject, vm: &VirtualMachine) -> PyResult {
+    // fn _send(&self, coro: CodeObject, val: CodeObject, vm: &VirtualMachine) -> PanResult {
     //     // if let Some(gen) = coro.payload::<PyGenerator>() {
     //     //     gen.send(val, vm)
     //     // } else if let Some(coro) = coro.payload::<PyCoroutine>() {
@@ -911,7 +913,7 @@ impl Frame {
         let b_ref = self.pop_value();
         let a_ref = self.pop_value();
         // let value = if inplace {
-          //   match *op {
+        //   match *op {
         //         bytecode::BinaryOperator::Subtract => vm._isub(a_ref, b_ref),
         //         bytecode::BinaryOperator::Add => vm._iadd(a_ref, b_ref),
         //         bytecode::BinaryOperator::Multiply => vm._imul(a_ref, b_ref),
@@ -973,7 +975,7 @@ impl Frame {
     //     vm: &VirtualMachine,
     //     needle: CodeObject,
     //     haystack: CodeObject,
-    // ) -> PyResult<bool> {
+    // ) -> PanResult<bool> {
     //     // let found = vm._membership(haystack.clone(), needle)?;
     //     // Ok(objbool::boolval(vm, found)?)
     // }
@@ -983,7 +985,7 @@ impl Frame {
     //     vm: &VirtualMachine,
     //     needle: CodeObject,
     //     haystack: CodeObject,
-    // ) -> PyResult<bool> {
+    // ) -> PanResult<bool> {
     //     // let found = vm._membership(haystack.clone(), needle)?;
     //     // Ok(!objbool::boolval(vm, found)?)
     // }
@@ -1008,7 +1010,7 @@ impl Frame {
     // ) -> bool {
     //     // single_or_tuple_any(
     //     //     exc_type,
-    //     //     |cls: PyClassRef| vm.isinstance(&exc, &cls),
+    //     //     |cls: PanClassRef| vm.isinstance(&exc, &cls),
     //     //     |o| {
     //     //         format!(
     //     //             "isinstance() arg 2 must be a type or tuple of types, not {}",
@@ -1029,22 +1031,22 @@ impl Frame {
     ) -> FrameResult {
         let b = self.pop_value();
         let a = self.pop_value();
-       //  let value = match *op {
-       //      bytecode::ComparisonOperator::Equal => vm._eq(a, b)?,
-       //      bytecode::ComparisonOperator::NotEqual => vm._ne(a, b)?,
-       //      bytecode::ComparisonOperator::Less => vm._lt(a, b)?,
-       //      bytecode::ComparisonOperator::LessOrEqual => vm._le(a, b)?,
-       //      bytecode::ComparisonOperator::Greater => vm._gt(a, b)?,
-       //      bytecode::ComparisonOperator::GreaterOrEqual => vm._ge(a, b)?,
-       //      // bytecode::ComparisonOperator::Is => vm.new_bool(self._is(a, b)),
-       //      // bytecode::ComparisonOperator::IsNot => vm.new_bool(self._is_not(a, b)),
-       //      // bytecode::ComparisonOperator::In => vm.new_bool(self._in(vm, a, b)?),
-       //      // bytecode::ComparisonOperator::NotIn => vm.new_bool(self._not_in(vm, a, b)?),
-       // //     bytecode::ComparisonOperator::ExceptionMatch => vm.new_bool(self.exc_match(vm, a, b)?),
-       //      _ => { vm._eq(a, b)? }
-       //  };
-       //
-       //  self.push_value(value);
+        //  let value = match *op {
+        //      bytecode::ComparisonOperator::Equal => vm._eq(a, b)?,
+        //      bytecode::ComparisonOperator::NotEqual => vm._ne(a, b)?,
+        //      bytecode::ComparisonOperator::Less => vm._lt(a, b)?,
+        //      bytecode::ComparisonOperator::LessOrEqual => vm._le(a, b)?,
+        //      bytecode::ComparisonOperator::Greater => vm._gt(a, b)?,
+        //      bytecode::ComparisonOperator::GreaterOrEqual => vm._ge(a, b)?,
+        //      // bytecode::ComparisonOperator::Is => vm.new_bool(self._is(a, b)),
+        //      // bytecode::ComparisonOperator::IsNot => vm.new_bool(self._is_not(a, b)),
+        //      // bytecode::ComparisonOperator::In => vm.new_bool(self._in(vm, a, b)?),
+        //      // bytecode::ComparisonOperator::NotIn => vm.new_bool(self._not_in(vm, a, b)?),
+        // //     bytecode::ComparisonOperator::ExceptionMatch => vm.new_bool(self.exc_match(vm, a, b)?),
+        //      _ => { vm._eq(a, b)? }
+        //  };
+        //
+        //  self.push_value(value);
         None
     }
 
@@ -1064,7 +1066,7 @@ impl Frame {
 
     fn delete_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let parent = self.pop_value();
-      //  let name = vm.ctx.new_str(attr_name.to_owned());
+        //  let name = vm.ctx.new_str(attr_name.to_owned());
         //  vm.del_attr(&parent, name)?;
         None
     }
@@ -1094,28 +1096,28 @@ impl Frame {
         self.blocks.borrow().last().cloned()
     }
 
-    pub fn push_value(&self, obj: CodeObject) {
+    pub fn push_value(&self, obj: Value) {
         self.stack.borrow_mut().push(obj);
     }
 
-    fn pop_value(&self) -> CodeObject {
+    fn pop_value(&self) -> Value {
         self.stack
             .borrow_mut()
             .pop()
             .expect("Tried to pop value but there was nothing on the stack")
     }
 
-    // fn pop_multiple(&self, count: usize) -> Vec<CodeObject> {
-    //     let mut stack = self.stack.borrow_mut();
-    //     let stack_len = stack.len();
-    //     stack.drain(stack_len - count..stack_len).collect()
-    // }
+    fn pop_multiple(&self, count: usize) -> Vec<Value> {
+        let mut stack = self.stack.borrow_mut();
+        let stack_len = stack.len();
+        stack.drain(stack_len - count..stack_len).collect()
+    }
 
-    fn last_value(&self) -> CodeObject {
+    fn last_value(&self) -> Value {
         self.stack.borrow().last().unwrap().clone()
     }
 
-    fn nth_value(&self, depth: usize) -> CodeObject {
+    fn nth_value(&self, depth: usize) -> Value {
         let stack = self.stack.borrow();
         stack[stack.len() - depth - 1].clone()
     }

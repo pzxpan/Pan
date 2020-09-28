@@ -7,6 +7,9 @@ use pan_bytecode::bytecode::Instruction;
 use pan_compiler::symboltable;
 use pan_compiler::symboltable::SymbolTable;
 use pan_compiler::compile::{compile_program, compile};
+use pan_vm::vm::VirtualMachine;
+use pan_vm::scope::Scope;
+use std::collections::HashMap;
 
 fn main() {
     let path = "/Users/panzhenxing/Desktop/PanPan/Pan/demo.pan";
@@ -26,19 +29,24 @@ fn main() {
     // }
     let code_object = compile(&contents, path.to_string(), 0).unwrap();
     println!("code is: {:?}", code_object);
-    for i in code_object.instructions {
-        match &i {
-            Instruction::LoadConst { value } => {
-                match &value {
-                    pan_bytecode::bytecode::Constant::Code { code } => {
-                        for ii in &code.as_ref().instructions {
-                            println!("sub instruction {:?}", ii);
-                        }
-                    }
-                    _ => { println!("instruction {:?}", i); }
-                }
-            }
-            _ => { println!("instruction {:?}", i); }
-        }
-    }
+    // for i in code_object.instructions {
+    //     match &i {
+    //         Instruction::LoadConst { value } => {
+    //             match &value {
+    //                 pan_bytecode::bytecode::Constant::Code { code } => {
+    //                     for ii in &code.as_ref().instructions {
+    //                         println!("sub instruction {:?}", ii);
+    //                     }
+    //                 }
+    //                 _ => { println!("instruction {:?}", i); }
+    //             }
+    //         }
+    //         _ => { println!("instruction {:?}", i); }
+    //     }
+    // }
+
+    let vm = VirtualMachine::new();
+    let scope = Scope::with_builtins(None, HashMap::new(), &vm);
+
+    vm.run_code_obj(code_object, scope);
 }

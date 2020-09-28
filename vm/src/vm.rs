@@ -23,6 +23,7 @@ use pan_bytecode::bytecode;
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
 use pan_bytecode::bytecode::CodeObject;
+use crate::value::Value;
 
 // use objects::objects;
 
@@ -73,7 +74,7 @@ impl VirtualMachine {
         // // make a new module without access to the vm; doesn't
         // // set __spec__, __loader__, etc. attributes
         // let new_module =
-        //     |dict| PyObject::new(PyModule {}, ctx.types.module_type.clone(), Some(dict));
+        //     |dict| PanObject::new(PyModule {}, ctx.types.module_type.clone(), Some(dict));
         //
         // // Hard-core modules:
         // let builtins_dict = ctx.new_dict();
@@ -121,26 +122,26 @@ impl VirtualMachine {
         }
     }
 
-    // pub fn run_code_obj(&self, code: CodeObject, scope: Scope) {
-    //     println!("code is {:?}", code.code.to_string());
-    //     let frame = Frame::new(code, scope).into_ref(self);
-    //     self.run_frame_full(frame)
-    // }
+    pub fn run_code_obj(&self, code: CodeObject, scope: Scope) {
+        println!("code is {:?}", code.to_string());
+        let frame = Frame::new(code, scope);
+        self.run_frame(frame)
+    }
 
-    pub fn run_frame_full(&self, frame: FrameRef) {
+    pub fn run_frame_full(&self, frame: Frame) {
         // match self.run_frame(frame)? {
         //     ExecutionResult::Return(value) => Ok(value),
         //     _ => panic!("Got unexpected result from function"),
         // }
     }
 
-    // pub fn run_frame(&self, frame: FrameRef) -> PyResult<ExecutionResult> {
-    //     self.check_recursive_call("")?;
-    //     self.frames.borrow_mut().push(frame.clone());
-    //     let result = frame.run(self);
-    //     self.frames.borrow_mut().pop();
-    //     result
-    // }
+    pub fn run_frame(&self, frame: Frame) {
+        // self.check_recursive_call("")?;
+        self.frames.borrow_mut().push(Rc::from(frame.clone()));
+        let result = frame.run(self);
+        self.frames.borrow_mut().pop();
+        // result
+    }
 
     // fn check_recursive_call(&self, _where: &str) -> FrameResult {
     // if self.frames.borrow().len() > self.recursion_limit.get() {
@@ -174,7 +175,7 @@ impl VirtualMachine {
         // flame_guard!(format!("call_method({:?})", method_name));
 
         // This is only used in the vm for magic methods, which use a greatly simplified attribute lookup.
-      //  let cls = obj.class();
+        //  let cls = obj.class();
         // match cls.get_attr(method_name) {
         //     Some(func) => {
         //         println!(
@@ -191,7 +192,7 @@ impl VirtualMachine {
         // }
     }
 
-    // fn _invoke(&self, callable: &PyObjectRef, args: PyFuncArgs) -> PyResult {
+    // fn _invoke(&self, callable: &PanObjectRef, args: PyFuncArgs) -> PanResult {
     //     // println!("Invoke: {:?} {:?}", callable, args);
     //     let class = callable.class();
     //     let slots = class.slots.borrow();
@@ -214,13 +215,31 @@ impl VirtualMachine {
     // }
     //
     // #[inline]
-    // pub fn invoke<T>(&self, func_ref: &CodeObject, args: T) -> PyResult
+    // pub fn invoke<T>(&self, func_ref: &CodeObject, args: T) -> PanResult
     //     where
     //         T: Into<PyFuncArgs>,
     // {
     //     let res = self._invoke(func_ref, args.into());
     //     res
     // }
+    pub fn unwrap_constant(&self, value: &bytecode::Constant) -> Value {
+        match *value {
+            bytecode::Constant::Integer { ref value } => Value::Int(value.to_i64().unwrap()),
+            bytecode::Constant::Float { ref value } => Value::Float(*value),
+            bytecode::Constant::Complex { ref value } => Value::Nil,
+            bytecode::Constant::String { ref value } => Value::Str(value.clone()),
+            bytecode::Constant::Bytes { ref value } => Value::Nil,
+            bytecode::Constant::Boolean { ref value } => Value::Bool(value.clone()),
+            bytecode::Constant::Code { ref code } => {
+                Value::Nil
+            }
+            bytecode::Constant::Tuple { ref elements } => {
+                Value::Nil
+            }
+            bytecode::Constant::None => Value::Nil,
+            bytecode::Constant::Ellipsis => Value::Nil,
+        }
+    }
 }
 
 impl Default for VirtualMachine {
