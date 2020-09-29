@@ -8,9 +8,8 @@ use itertools::Itertools;
 
 use pan_bytecode::bytecode;
 use crate::vm::VirtualMachine;
-use crate::scope::Scope;
+use crate::scope::{Scope, NameProtocol};
 use pan_bytecode::bytecode::CodeObject;
-use crate::panobject::PanObjectRef;
 use crate::value::Value;
 
 #[derive(Clone, Debug)]
@@ -63,8 +62,8 @@ pub struct Frame {
 
 // Running a frame can result in one of the below:
 pub enum ExecutionResult {
-    Return(i32),
-    Yield(i32),
+    Return(Value),
+    Yield(Value),
 }
 
 pub type FrameResult = Option<ExecutionResult>;
@@ -129,18 +128,16 @@ impl Frame {
     }
 
     // #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    pub fn run(&self, vm: &VirtualMachine) -> FrameResult {
+    pub fn run(&self, vm: &mut VirtualMachine) -> FrameResult {
         // Execute until return or exception:
         loop {
             let lineno = self.get_lineno();
             let result = self.execute_instruction(vm);
             match result {
-                // None => {}
-                // Ok(Some(value)) => {
-                //     break Some(value);
-                // }
-                // _ => {}
-                // Instruction raised an exception
+                None => {}
+                Some(value) => {
+                    break Some(value);
+                }
                 _ => {}
             }
         }
@@ -153,7 +150,7 @@ impl Frame {
     }
 
     /// Execute a single instruction.
-    fn execute_instruction(&self, vm: &VirtualMachine) -> FrameResult {
+    fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         //  vm.check_signals()?;
 
         let instruction = self.fetch_instruction();
@@ -173,6 +170,7 @@ impl Frame {
         match instruction {
             bytecode::Instruction::LoadConst { ref value } => {
                 let obj = vm.unwrap_constant(value);
+                println!("{:?}", obj);
                 self.push_value(obj);
                 None
             }
@@ -571,21 +569,20 @@ impl Frame {
         name: &str,
         name_scope: &bytecode::NameScope,
     ) -> FrameResult {
-        // let optional_value = match name_scope {
-        //     bytecode::NameScope::Global => self.scope.load_global(vm, name),
-        //     bytecode::NameScope::NonLocal => self.scope.load_cell(vm, name),
-        //     bytecode::NameScope::Local => self.scope.load_local(&vm, name),
-        //     bytecode::NameScope::Free => self.scope.load_name(&vm, name),
-        // };
-        //
-        // let value = match optional_value {
-        //     Some(value) => value,
-        //     None => {
-        //         return Err(vm.new_name_error(format!("name '{}' is not defined", name)));
-        //     }
-        // };
-        //
-        // self.push_value(value);
+        let optional_value = match name_scope {
+            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
+            bytecode::NameScope::Local => self.scope.load_local(name.to_string()),
+            bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
+        };
+
+        let value = match optional_value {
+            Some(value) => value,
+            None => {
+                Value::Nil
+            }
+        };
+
+        self.push_value(value.clone());
         None
     }
 
@@ -912,39 +909,41 @@ impl Frame {
     ) -> FrameResult {
         let b_ref = self.pop_value();
         let a_ref = self.pop_value();
-        // let value = if inplace {
-        //   match *op {
-        //         bytecode::BinaryOperator::Subtract => vm._isub(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Add => vm._iadd(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Multiply => vm._imul(a_ref, b_ref),
-        //    //     bytecode::BinaryOperator::MatrixMultiply => vm._imatmul(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Power => vm._ipow(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Divide => vm._itruediv(a_ref, b_ref),
-        //         bytecode::BinaryOperator::FloorDivide => vm._ifloordiv(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Modulo => vm._imod(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Lshift => vm._ilshift(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Rshift => vm._irshift(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Xor => vm._ixor(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Or => vm._ior(a_ref, b_ref),
-        //         bytecode::BinaryOperator::And => vm._iand(a_ref, b_ref),
-        //     }?
-        // } else {
-        //     match *op {
-        //         bytecode::BinaryOperator::Subtract => vm._sub(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Add => vm._add(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Multiply => vm._mul(a_ref, b_ref),
-        //         bytecode::BinaryOperator::MatrixMultiply => vm._matmul(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Power => vm._pow(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Divide => vm._truediv(a_ref, b_ref),
-        //         bytecode::BinaryOperator::FloorDivide => vm._floordiv(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Modulo => vm._mod(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Lshift => vm._lshift(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Rshift => vm._rshift(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Xor => vm._xor(a_ref, b_ref),
-        //         bytecode::BinaryOperator::Or => vm._or(a_ref, b_ref),
-        //         bytecode::BinaryOperator::And => vm._and(a_ref, b_ref),
-        //     }?
-        // };
+        let value = if inplace {
+            match *op {
+                bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
+                // bytecode::BinaryOperator::Add => vm._iadd(a_ref, b_ref),
+                // bytecode::BinaryOperator::Multiply => vm._imul(a_ref, b_ref),
+                // //     bytecode::BinaryOperator::MatrixMultiply => vm._imatmul(a_ref, b_ref),
+                // bytecode::BinaryOperator::Power => vm._ipow(a_ref, b_ref),
+                // bytecode::BinaryOperator::Divide => vm._itruediv(a_ref, b_ref),
+                // bytecode::BinaryOperator::FloorDivide => vm._ifloordiv(a_ref, b_ref),
+                // bytecode::BinaryOperator::Modulo => vm._imod(a_ref, b_ref),
+                // bytecode::BinaryOperator::Lshift => vm._ilshift(a_ref, b_ref),
+                // bytecode::BinaryOperator::Rshift => vm._irshift(a_ref, b_ref),
+                // bytecode::BinaryOperator::Xor => vm._ixor(a_ref, b_ref),
+                // bytecode::BinaryOperator::Or => vm._ior(a_ref, b_ref),
+                // bytecode::BinaryOperator::And => vm._iand(a_ref, b_ref),
+                _ => Value::Int(0)
+            }
+        } else {
+            match *op {
+                bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
+                // bytecode::BinaryOperator::Add => vm._add(a_ref, b_ref),
+                // bytecode::BinaryOperator::Multiply => vm._mul(a_ref, b_ref),
+                // bytecode::BinaryOperator::MatrixMultiply => vm._matmul(a_ref, b_ref),
+                // bytecode::BinaryOperator::Power => vm._pow(a_ref, b_ref),
+                // bytecode::BinaryOperator::Divide => vm._truediv(a_ref, b_ref),
+                // bytecode::BinaryOperator::FloorDivide => vm._floordiv(a_ref, b_ref),
+                // bytecode::BinaryOperator::Modulo => vm._mod(a_ref, b_ref),
+                // bytecode::BinaryOperator::Lshift => vm._lshift(a_ref, b_ref),
+                // bytecode::BinaryOperator::Rshift => vm._rshift(a_ref, b_ref),
+                // bytecode::BinaryOperator::Xor => vm._xor(a_ref, b_ref),
+                // bytecode::BinaryOperator::Or => vm._or(a_ref, b_ref),
+                // bytecode::BinaryOperator::And => vm._and(a_ref, b_ref),
+                _ => Value::Int(0)
+            }
+        };
 
         //self.push_value(value);
         None

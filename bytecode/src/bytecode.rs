@@ -28,7 +28,7 @@ impl Location {
     }
 }
 
-/// Data Struct 和 Funcation 对应一个CodeObject；
+/// Data Struct 和 Function 对应一个CodeObject；
 ///
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodeObject {
@@ -43,6 +43,7 @@ pub struct CodeObject {
     pub first_line_number: usize,
     pub obj_name: String, // Name of the object that created this code object
 }
+
 
 bitflags! {
     #[derive(Serialize, Deserialize)]

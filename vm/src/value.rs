@@ -5,14 +5,15 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::sync::Arc;
-use crate::native_fns::NativeFn;
+// use crate::native_fns::NativeFn;
+use pan_bytecode::bytecode::CodeObject;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct FnValue {
     pub name: String,
     pub code: Vec<u8>,
     // pub upvalues: Vec<Upvalue>,
-    pub receiver: Option<Arc<RefCell<Obj>>>,
+    // pub receiver: Option<Arc<RefCell<Obj>>>,
     pub has_return: bool,
 }
 
@@ -21,7 +22,7 @@ pub struct ClosureValue {
     pub name: String,
     pub code: Vec<u8>,
     // pub captures: Vec<Arc<RefCell<vm::Upvalue>>>,
-    pub receiver: Option<Arc<RefCell<Obj>>>,
+    // pub receiver: Option<Arc<RefCell<Obj>>>,
     pub has_return: bool,
 }
 
@@ -32,7 +33,7 @@ pub struct TypeValue {
     pub static_fields: Vec<(String, FnValue)>,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Int(i64),
     Float(f64),
@@ -44,8 +45,9 @@ pub enum Value {
     Obj(Arc<RefCell<Obj>>),
     Fn(FnValue),
     Closure(ClosureValue),
-    NativeFn(NativeFn),
+    // NativeFn(NativeFn),
     Type(TypeValue),
+    Code(CodeObject),
     Nil,
 }
 
@@ -59,9 +61,10 @@ impl Value {
             Value::Obj(obj) => format!("{}", &obj.borrow().to_string()),
             Value::Fn(FnValue { name, .. }) |
             Value::Closure(ClosureValue { name, .. }) => format!("<func {}>", name),
-            Value::NativeFn(NativeFn { name, .. }) => format!("<func {}>", name),
+// Value::NativeFn(NativeFn { name, .. }) => format!("<func {}>", name),
             Value::Type(TypeValue { name, .. }) => format!("<type {}>", name),
             Value::Nil => format!("None"),
+            Value::Code(code) => format!("<code {}>", code),
         }
     }
 
@@ -99,14 +102,15 @@ impl Display for Value {
             }
             Value::Fn(FnValue { name, .. }) |
             Value::Closure(ClosureValue { name, .. }) => write!(f, "<func {}>", name),
-            Value::NativeFn(NativeFn { name, .. }) => write!(f, "<func {}>", name),
+// Value::NativeFn(NativeFn { name, .. }) => write!(f, "<func {}>", name),
             Value::Type(TypeValue { name, .. }) => write!(f, "<type {}>", name),
             Value::Nil => write!(f, "None"),
+            Value::Code(code) => write!(f, "<code {}>", code),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InstanceObj {
     pub typ: Box<Value>,
     pub fields: Vec<Value>,
@@ -139,27 +143,27 @@ impl Obj {
     }
 }
 
-impl PartialOrd for Obj {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (Obj::StringObj(v1), Obj::StringObj(v2)) => Some(v1.cmp(v2)),
-            (Obj::ArrayObj(v1), Obj::ArrayObj(v2)) => {
-                if v1.len() < v2.len() {
-                    Some(Ordering::Less)
-                } else if v1.len() > v2.len() {
-                    Some(Ordering::Greater)
-                } else {
-                    for (i1, i2) in v1.iter().zip(v2.iter()) {
-                        if let Some(o) = i1.partial_cmp(&i2) {
-                            if o != Ordering::Equal {
-                                return Some(o);
-                            }
-                        }
-                    }
-                    Some(Ordering::Equal)
-                }
-            }
-            (_, _) => None
-        }
-    }
-}
+// impl PartialOrd for Obj {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         match (self, other) {
+//             (Obj::StringObj(v1), Obj::StringObj(v2)) => Some(v1.cmp(v2)),
+//             (Obj::ArrayObj(v1), Obj::ArrayObj(v2)) => {
+//                 if v1.len() < v2.len() {
+//                     Some(Ordering::Less)
+//                 } else if v1.len() > v2.len() {
+//                     Some(Ordering::Greater)
+//                 } else {
+//                     for (i1, i2) in v1.iter().zip(v2.iter()) {
+//                         if let Some(o) = i1.partial_cmp(&i2) {
+//                             if o != Ordering::Equal {
+//                                 return Some(o);
+//                             }
+//                         }
+//                     }
+//                     Some(Ordering::Equal)
+//                 }
+//             }
+//             (_, _) => None
+//         }
+//     }
+// }

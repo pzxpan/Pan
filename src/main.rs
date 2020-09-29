@@ -27,8 +27,33 @@ fn main() {
     //     println!("{:?} sub_symbol is {:?}", symbols.name, a.name);
     //     println!("{:?} sub_symbol IndexMap {:?}", symbols.name, a.symbols);
     // }
+
+    // code is: <code object /Users/panzhenxing/Desktop/PanPan/Pan/demo.pan at ??? file "pan", line 1>
+    //     instruction LoadConst { value: String { value: "return" } }
+    // instruction BuildMap { size: 1, unpack: false, for_call: false }
+    // sub instruction LoadName { name: "a", scope: Free }
+    // sub instruction LoadName { name: "a", scope: Free }
+    // sub instruction BinaryOperation { op: Subtract, inplace: false }
+    // sub instruction BinaryOperation { op: Add, inplace: true }
+    // sub instruction LoadName { name: "a", scope: Free }
+    // sub instruction LoadName { name: "b", scope: Global }
+    // sub instruction BinaryOperation { op: Subtract, inplace: false }
+    // sub instruction ReturnValue
+    // instruction LoadConst { value: String { value: "other" } }
+    // instruction MakeFunction
+    // instruction StoreName { name: "other", scope: Free }
+    // sub instruction LoadName { name: "a", scope: Free }
+    // sub instruction LoadName { name: "other", scope: Global }
+    // sub instruction BuildTuple { size: 2, unpack: true }
+    // instruction LoadConst { value: String { value: "main" } }
+    // instruction MakeFunction
+    // instruction StoreName { name: "main", scope: Free }
+    // instruction LoadConst { value: None }
+    // instruction ReturnValue
+
     let code_object = compile(&contents, path.to_string(), 0).unwrap();
-    println!("code is: {:?}", code_object);
+
+
     // for i in code_object.instructions {
     //     match &i {
     //         Instruction::LoadConst { value } => {
@@ -45,7 +70,7 @@ fn main() {
     //     }
     // }
 
-    let vm = VirtualMachine::new();
+    let mut vm = VirtualMachine::new();
     let scope = Scope::with_builtins(None, HashMap::new(), &vm);
 
     vm.run_code_obj(code_object, scope);

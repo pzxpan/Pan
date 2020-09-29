@@ -32,7 +32,7 @@ use crate::value::Value;
 /// Top level container of a python virtual machine. In theory you could
 /// create more instances of this struct and have them operate fully isolated.
 pub struct VirtualMachine {
-    pub frames: RefCell<Vec<FrameRef>>,
+    pub frames: Vec<FrameRef>,
     pub initialized: bool,
 }
 
@@ -91,7 +91,7 @@ impl VirtualMachine {
         // let initialize_parameter = settings.initialization_parameter;
         let initialize_parameter = InitParameter::NoInitialize;
         let mut vm = VirtualMachine {
-            frames: RefCell::new(vec![]),
+            frames: vec![],
             initialized: false,
         };
         vm.initialize(initialize_parameter);
@@ -122,52 +122,53 @@ impl VirtualMachine {
         }
     }
 
-    pub fn run_code_obj(&self, code: CodeObject, scope: Scope) {
-        println!("code is {:?}", code.to_string());
+    pub fn run_code_obj(&mut self, code: CodeObject, scope: Scope) -> FrameResult {
+        // println!("code is {:?}", code.to_string());
         let frame = Frame::new(code, scope);
         self.run_frame(frame)
     }
 
-    pub fn run_frame_full(&self, frame: Frame) {
-        // match self.run_frame(frame)? {
-        //     ExecutionResult::Return(value) => Ok(value),
-        //     _ => panic!("Got unexpected result from function"),
-        // }
-    }
-
-    pub fn run_frame(&self, frame: Frame) {
-        // self.check_recursive_call("")?;
-        self.frames.borrow_mut().push(Rc::from(frame.clone()));
-        let result = frame.run(self);
-        self.frames.borrow_mut().pop();
-        // result
-    }
-
-    // fn check_recursive_call(&self, _where: &str) -> FrameResult {
-    // if self.frames.borrow().len() > self.recursion_limit.get() {
-    //     Err(self.new_recursion_error(format!("maximum recursion depth exceeded {}", _where)))
-    // } else {
-    //     Ok(())
-    // }
-    //  }
-
-    pub fn current_frame(&self) -> Option<Ref<FrameRef>> {
-        let frames = self.frames.borrow();
-        if frames.is_empty() {
-            None
-        } else {
-            Some(Ref::map(self.frames.borrow(), |frames| {
-                frames.last().unwrap()
-            }))
+    pub fn run_frame_full(&mut self, frame: Frame) -> FrameResult {
+        match self.run_frame(frame)? {
+            ExecutionResult::Return(value) => Some(ExecutionResult::Return(value)),
+            _ => panic!("Got unexpected result from function"),
         }
     }
 
-    pub fn current_scope(&self) -> Ref<Scope> {
-        let frame = self
-            .current_frame()
-            .expect("called current_scope but no frames on the stack");
-        Ref::map(frame, |f| &f.scope)
+    pub fn run_frame(&mut self, frame: Frame) -> FrameResult {
+        // self.check_recursive_call("")?;
+        self.frames.push(Rc::from(frame.clone()));
+        let result = frame.run(self);
+        self.frames.pop();
+        result
     }
+
+    fn check_recursive_call(&self, _where: &str) -> FrameResult {
+        None
+        // if self.frames.borrow().len() > self.recursion_limit.get() {
+        //     Err(self.new_recursion_error(format!("maximum recursion depth exceeded {}", _where)))
+        // } else {
+        //     Ok(())
+        // }
+    }
+
+    // pub fn current_frame(&self) -> Option<Ref<FrameRef>> {
+    //     let frames = self.frames.borrow();
+    //     if frames.is_empty() {
+    //         None
+    //     } else {
+    //         Some(Ref::map(self.frames.borrow(), |frames| {
+    //             frames.last().unwrap()
+    //         }))
+    //     }
+    // }
+    //
+    // pub fn current_scope(&self) -> Ref<Scope> {
+    //     let frame = self
+    //         .current_frame()
+    //         .expect("called current_scope but no frames on the stack");
+    //     Ref::map(frame, |f| &f.scope)
+    // }
 
     pub fn call_method<T>(&self, obj: &CodeObject, method_name: &str, args: T)
 
@@ -222,7 +223,16 @@ impl VirtualMachine {
     //     let res = self._invoke(func_ref, args.into());
     //     res
     // }
-    pub fn unwrap_constant(&self, value: &bytecode::Constant) -> Value {
+
+    pub fn sub(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Int(a - b)
+            }
+            _ => unreachable!()
+        }
+    }
+    pub fn unwrap_constant(&mut self, value: &bytecode::Constant) -> Value {
         match *value {
             bytecode::Constant::Integer { ref value } => Value::Int(value.to_i64().unwrap()),
             bytecode::Constant::Float { ref value } => Value::Float(*value),
@@ -231,7 +241,13 @@ impl VirtualMachine {
             bytecode::Constant::Bytes { ref value } => Value::Nil,
             bytecode::Constant::Boolean { ref value } => Value::Bool(value.clone()),
             bytecode::Constant::Code { ref code } => {
-                Value::Nil
+                let scope = Scope::with_builtins(None, HashMap::new(), self);
+                let result = self.run_code_obj(*code.to_owned(), scope);
+                match result {
+                    Some(ExecutionResult::Return(value)) => value,
+                    Some(ExecutionResult::Yield(value)) => value,
+                    _ => Value::Nil,
+                }
             }
             bytecode::Constant::Tuple { ref elements } => {
                 Value::Nil

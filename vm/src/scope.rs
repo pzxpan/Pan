@@ -3,18 +3,20 @@ use pan_bytecode::bytecode::CodeObject;
 
 use crate::vm::VirtualMachine;
 use std::collections::{hash_map::DefaultHasher, HashMap};
+use crate::value::Value;
+use crate::frame::FrameResult;
 
 /*
  * So a scope is a linked list of scopes.
  * When a name is looked up, it is check in its scope.
  */
 
-pub type PyDictRef = HashMap<i32, i32>;
+pub type PanDictRef = HashMap<String, Value>;
 
 #[derive(Clone)]
 pub struct Scope {
-    locals: Vec<PyDictRef>,
-    pub globals: PyDictRef,
+    locals: Vec<PanDictRef>,
+    pub globals: PanDictRef,
 }
 
 impl fmt::Debug for Scope {
@@ -25,7 +27,7 @@ impl fmt::Debug for Scope {
 }
 
 impl Scope {
-    pub fn new(locals: Option<PyDictRef>, globals: PyDictRef, vm: &VirtualMachine) -> Scope {
+    pub fn new(locals: Option<PanDictRef>, globals: PanDictRef, vm: &VirtualMachine) -> Scope {
         let locals = match locals {
             Some(dict) => vec![dict],
             None => vec![],
@@ -36,8 +38,8 @@ impl Scope {
     }
 
     pub fn with_builtins(
-        locals: Option<PyDictRef>,
-        globals: PyDictRef,
+        locals: Option<PanDictRef>,
+        globals: PanDictRef,
         vm: &VirtualMachine,
     ) -> Scope {
         // if !globals.contains_key("__builtins__", vm) {
@@ -49,14 +51,14 @@ impl Scope {
         Scope::new(locals, globals, vm)
     }
 
-    pub fn get_locals(&self) -> PyDictRef {
+    pub fn get_locals(&self) -> PanDictRef {
         match self.locals.first() {
             Some(dict) => dict.clone(),
             None => self.globals.clone(),
         }
     }
 
-    pub fn get_only_locals(&self) -> Option<PyDictRef> {
+    pub fn get_only_locals(&self) -> Option<PanDictRef> {
         self.locals.first().cloned()
     }
 
@@ -76,72 +78,56 @@ impl Scope {
 }
 
 pub trait NameProtocol {
-    //fn load_name(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject>;
-    //fn store_name(&self, vm: &VirtualMachine, name: &str, value: CodeObject);
-    // fn delete_name(&self, vm: &VirtualMachine, name: &str) -> PanResult;
-   // fn load_local(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject>;
-   // fn load_cell(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject>;
-   // fn store_cell(&self, vm: &VirtualMachine, name: &str, value: CodeObject);
-    //fn load_global(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject>;
-  //  fn store_global(&self, vm: &VirtualMachine, name: &str, value: CodeObject);
+    fn load_name(&self, name: String) -> Option<Value>;
+    fn store_name(&mut self, name: String, value: Value);
+    // fn delete_name(&self, name: String) -> FrameResult;
+    fn load_local(&self, name: String) -> Option<Value>;
+    // fn load_cell(&self, name: String) -> Option<Value>;
+    // fn store_cell(&self, name: String, value: Value);
+    fn load_global(&self, name: String) -> Option<Value>;
+    fn store_global(&mut self, name: String, value: Value);
 }
 
 impl NameProtocol for Scope {
-    // #[cfg_attr(feature = "flame-it", flame("Scope"))]
-    // fn load_name(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject> {
-    //     for dict in self.locals.iter() {
-    //         if let Some(value) = dict.get_item_option(name, vm).unwrap() {
-    //             return Some(value);
-    //         }
-    //     }
-    //
-    //     // Fall back to loading a global after all scopes have been searched!
-    //     self.load_global(vm, name)
+    #[cfg_attr(feature = "flame-it", flame("Scope"))]
+    fn load_name(&self, name: String) -> Option<Value> {
+        // Fall back to loading a global after all scopes have been searched!
+        if let Some(v) = self.load_global(name) {
+            return Some(v.clone());
+        }
+        None
+    }
+
+    #[cfg_attr(feature = "flame-it", flame("Scope"))]
+    /// Load a local name. Only check the local dictionary for the given name.
+    fn load_local(&self, name: String) -> Option<Value> {
+        let dict = self.get_locals();
+        let v = dict.get(&name);
+        if let Some(value) = v {
+            return Some(value.clone());
+        }
+        None
+    }
+
+
+    fn store_name(&mut self, key: String, value: Value) {
+        self.get_locals().insert(key.to_string(), value);
+    }
+
+    // fn delete_name(&self, key: String) -> Option<Value> {
+    //     self.get_locals().remove(key.as_ref())
     // }
-    //
-    // #[cfg_attr(feature = "flame-it", flame("Scope"))]
-    // /// Load a local name. Only check the local dictionary for the given name.
-    // fn load_local(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject> {
-    //     self.get_locals().get_item_option(name, vm).unwrap()
-    // }
-    //
-    // #[cfg_attr(feature = "flame-it", flame("Scope"))]
-    // fn load_cell(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject> {
-    //     for dict in self.locals.iter().skip(1) {
-    //         if let Some(value) = dict.get_item_option(name, vm).unwrap() {
-    //             return Some(value);
-    //         }
-    //     }
-    //     None
-    // }
-    //
-    // fn store_cell(&self, vm: &VirtualMachine, name: &str, value: CodeObject) {
-    //     self.locals
-    //         .get(1)
-    //         .expect("no outer scope for non-local")
-    //         .set_item(name, value, vm)
-    //         .unwrap();
-    // }
-    //
-    // // fn store_name(&self, vm: &VirtualMachine, key: &str, value: CodeObject) {
-    // //     self.get_locals().set_item(key, value, vm).unwrap();
-    // // }
-    //
-    // fn delete_name(&self, vm: &VirtualMachine, key: &str) -> PanResult {
-    //     self.get_locals().del_item(key, vm)
-    // }
-    //
-    // #[cfg_attr(feature = "flame-it", flame("Scope"))]
-    // /// Load a global name.
-    // fn load_global(&self, vm: &VirtualMachine, name: &str) -> Option<CodeObject> {
-    //     if let Some(value) = self.globals.get_item_option(name, vm).unwrap() {
-    //         Some(value)
-    //     } else {
-    //         vm.get_attribute(vm.builtins.clone(), name).ok()
-    //     }
-    // }
-    //
-    // fn store_global(&self, vm: &VirtualMachine, name: &str, value: CodeObject) {
-    //     self.globals.set_item(name, value, vm).unwrap();
-    // }
+
+    #[cfg_attr(feature = "flame-it", flame("Scope"))]
+    /// Load a global name.
+    fn load_global(&self, name: String) -> Option<Value> {
+        if let Some(v) = self.globals.get(&name) {
+            return Some(v.clone());
+        }
+        None
+    }
+
+    fn store_global(&mut self, name: String, value: Value) {
+        self.globals.insert(name, value);
+    }
 }
