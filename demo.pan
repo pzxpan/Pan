@@ -4,6 +4,7 @@ fun other(a: int, b:int) int {
 
 fun main() {
     let a : int = other(20,30);
+    return a;
 }
 
 //fun main() {

@@ -611,7 +611,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadConst {
             value: bytecode::Constant::None,
         });
-        //   self.emit(Instruction::ReturnValue);
+        self.emit(Instruction::ReturnValue);
 
         let mut code = self.pop_code_object();
         code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
@@ -1343,7 +1343,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         //
         // Ok(has_stars)
-        Ok(true)
+        Ok(false)
     }
 
     fn compile_comprehension(

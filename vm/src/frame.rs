@@ -696,11 +696,11 @@ impl Frame {
         let args = match typ {
             bytecode::CallType::Positional(count) => {
                 if *count > 0 {
-                    let args = self.pop_value();
+                    let args = self.pop_multiple(*count);
                     args
-                } else { Value::Nil }
+                } else { vec![Value::Nil] }
             }
-            _ => { Value::Nil }
+            _ => { vec![Value::Nil] }
         };
         //     bytecode::CallType::Keyword(count) => {
         //         // let kwarg_names = self.pop_value();
@@ -740,6 +740,11 @@ impl Frame {
         println!("ddd args:{:?}", args);
         let func_ref = self.pop_value();
         println!("ddd func_def:{:?}", func_ref);
+        let code = func_ref.code();
+
+        for (i, name) in code.arg_names.iter().enumerate() {
+            self.scope.store_global(name.to_string(), args.get(i).unwrap().to_owned());
+        }
         let value = vm.run_code_obj(func_ref.code().to_owned(), self.scope.clone());
         match value {
             Some(ExecutionResult::Return(v)) => self.push_value(v),
