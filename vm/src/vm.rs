@@ -232,6 +232,23 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
+    pub fn add(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Int(a + b)
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn mul(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Int(a * b)
+            }
+            _ => unreachable!()
+        }
+    }
     pub fn unwrap_constant(&mut self, value: &bytecode::Constant) -> Value {
         match *value {
             bytecode::Constant::Integer { ref value } => Value::Int(value.to_i64().unwrap()),
@@ -241,13 +258,7 @@ impl VirtualMachine {
             bytecode::Constant::Bytes { ref value } => Value::Nil,
             bytecode::Constant::Boolean { ref value } => Value::Bool(value.clone()),
             bytecode::Constant::Code { ref code } => {
-                let scope = Scope::with_builtins(None, HashMap::new(), self);
-                let result = self.run_code_obj(*code.to_owned(), scope);
-                match result {
-                    Some(ExecutionResult::Return(value)) => value,
-                    Some(ExecutionResult::Yield(value)) => value,
-                    _ => Value::Nil,
-                }
+                Value::Code(*code.to_owned())
             }
             bytecode::Constant::Tuple { ref elements } => {
                 Value::Nil

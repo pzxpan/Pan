@@ -86,6 +86,18 @@ pub struct Diagnostic {
     pub notes: Vec<Note>,
 }
 
+impl Type {
+    pub fn name(&self) -> &str {
+        match self {
+            Type::Bool => "bool",
+            Type::String => "string",
+            Type::Int(n) => "int",
+            Type::Uint(n) => "uint",
+            Type::Bytes(n) => "bytes",
+        }
+    }
+}
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

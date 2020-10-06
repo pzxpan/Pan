@@ -10,6 +10,7 @@ use pan_compiler::compile::{compile_program, compile};
 use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
 use std::collections::HashMap;
+use pan_vm::value::Value;
 
 fn main() {
     let path = "/Users/panzhenxing/Desktop/PanPan/Pan/demo.pan";
@@ -54,24 +55,14 @@ fn main() {
     let code_object = compile(&contents, path.to_string(), 0).unwrap();
 
 
-    // for i in code_object.instructions {
-    //     match &i {
-    //         Instruction::LoadConst { value } => {
-    //             match &value {
-    //                 pan_bytecode::bytecode::Constant::Code { code } => {
-    //                     for ii in &code.as_ref().instructions {
-    //                         println!("sub instruction {:?}", ii);
-    //                     }
-    //                 }
-    //                 _ => { println!("instruction {:?}", i); }
-    //             }
-    //         }
-    //         _ => { println!("instruction {:?}", i); }
-    //     }
-    // }
+    for i in code_object.instructions.clone() {
+        println!("instruction {:?}", i);
+    }
 
     let mut vm = VirtualMachine::new();
-    let scope = Scope::with_builtins(None, HashMap::new(), &vm);
+    let mut globalValue = HashMap::new();
+    globalValue.insert("int".to_string(), Value::Int(0));
+    let scope = Scope::with_builtins(None, globalValue, &vm);
 
     vm.run_code_obj(code_object, scope);
 }

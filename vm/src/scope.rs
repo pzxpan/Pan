@@ -5,6 +5,7 @@ use crate::vm::VirtualMachine;
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use crate::value::Value;
 use crate::frame::FrameResult;
+use std::cell::RefCell;
 
 /*
  * So a scope is a linked list of scopes.
@@ -15,8 +16,8 @@ pub type PanDictRef = HashMap<String, Value>;
 
 #[derive(Clone)]
 pub struct Scope {
-    locals: Vec<PanDictRef>,
-    pub globals: PanDictRef,
+    locals: RefCell<Vec<PanDictRef>>,
+    pub globals: RefCell<PanDictRef>,
 }
 
 impl fmt::Debug for Scope {
@@ -32,7 +33,7 @@ impl Scope {
             Some(dict) => vec![dict],
             None => vec![],
         };
-        let scope = Scope { locals, globals };
+        let scope = Scope { locals: RefCell::new(locals), globals: RefCell::new(globals) };
         // scope.store_name(vm, "__annotations__", vm.ctx.new_dict().into_object());
         scope
     }
@@ -48,18 +49,19 @@ impl Scope {
         //         .set_item("__builtins__", vm.builtins.clone(), vm)
         //         .unwrap();
         // }
+        // globals.insert("int".to_string(), Value::Int(0));
         Scope::new(locals, globals, vm)
     }
 
     pub fn get_locals(&self) -> PanDictRef {
-        match self.locals.first() {
+        match self.locals.borrow_mut().first() {
             Some(dict) => dict.clone(),
-            None => self.globals.clone(),
+            None => self.globals.borrow().clone(),
         }
     }
 
     pub fn get_only_locals(&self) -> Option<PanDictRef> {
-        self.locals.first().cloned()
+        self.locals.borrow_mut().first().cloned()
     }
 
     // pub fn new_child_scope_with_locals(&self, locals: PyDictRef) -> Scope {
@@ -79,13 +81,13 @@ impl Scope {
 
 pub trait NameProtocol {
     fn load_name(&self, name: String) -> Option<Value>;
-    fn store_name(&mut self, name: String, value: Value);
+    fn store_name(&self, name: String, value: Value);
     // fn delete_name(&self, name: String) -> FrameResult;
     fn load_local(&self, name: String) -> Option<Value>;
     // fn load_cell(&self, name: String) -> Option<Value>;
     // fn store_cell(&self, name: String, value: Value);
     fn load_global(&self, name: String) -> Option<Value>;
-    fn store_global(&mut self, name: String, value: Value);
+    fn store_global(&self, name: String, value: Value);
 }
 
 impl NameProtocol for Scope {
@@ -110,7 +112,7 @@ impl NameProtocol for Scope {
     }
 
 
-    fn store_name(&mut self, key: String, value: Value) {
+    fn store_name(&self, key: String, value: Value) {
         self.get_locals().insert(key.to_string(), value);
     }
 
@@ -121,13 +123,13 @@ impl NameProtocol for Scope {
     #[cfg_attr(feature = "flame-it", flame("Scope"))]
     /// Load a global name.
     fn load_global(&self, name: String) -> Option<Value> {
-        if let Some(v) = self.globals.get(&name) {
+        if let Some(v) = self.globals.borrow().get(&name) {
             return Some(v.clone());
         }
         None
     }
 
-    fn store_global(&mut self, name: String, value: Value) {
-        self.globals.insert(name, value);
+    fn store_global(&self, name: String, value: Value) {
+        self.globals.borrow_mut().insert(name, value);
     }
 }

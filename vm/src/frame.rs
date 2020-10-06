@@ -10,7 +10,8 @@ use pan_bytecode::bytecode;
 use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
 use pan_bytecode::bytecode::CodeObject;
-use crate::value::Value;
+use crate::value::{Value, FnValue, Obj};
+
 
 #[derive(Clone, Debug)]
 struct Block {
@@ -166,7 +167,7 @@ impl Frame {
                 trace!("  Executing op code: {:?}", instruction);
                 trace!("=======");
             }
-
+        println!("instruction {:?}", instruction);
         match instruction {
             bytecode::Instruction::LoadConst { ref value } => {
                 let obj = vm.unwrap_constant(value);
@@ -231,12 +232,12 @@ impl Frame {
             //     self.push_value(py_obj);
             //     None
             // }
-            // bytecode::Instruction::BuildTuple { size, unpack } => {
-            //     let elements = self.get_elements(vm, *size, *unpack)?;
-            //     let list_obj = vm.ctx.new_tuple(elements);
-            //     self.push_value(list_obj);
-            //     None
-            // }
+            bytecode::Instruction::BuildTuple { size, unpack } => {
+                let array_value = self.get_elements(vm, *size, *unpack);
+                // let list_obj = vm.ctx.new_tuple(elements);
+                self.push_value(array_value);
+                None
+            }
             // bytecode::Instruction::BuildMap {
             //     size,
             //     unpack,
@@ -270,10 +271,11 @@ impl Frame {
             bytecode::Instruction::DeleteAttr { ref name } => self.delete_attr(vm, name),
             bytecode::Instruction::UnaryOperation { ref op } => self.execute_unop(vm, op),
             bytecode::Instruction::CompareOperation { ref op } => self.execute_compare(vm, op),
-            // bytecode::Instruction::ReturnValue => {
-            //     let value = self.pop_value();
-            //     self.unwind_blocks(vm, UnwindReason::Returning { value })
-            // }
+            bytecode::Instruction::ReturnValue => {
+                let value = self.pop_value();
+                Some(ExecutionResult::Return(value))
+                // self.unwind_blocks(vm, UnwindReason::Returning { value })
+            }
             // bytecode::Instruction::YieldValue => {
             //     let value = self.pop_value();
             //     Ok(Some(ExecutionResult::Yield(value)))
@@ -443,23 +445,18 @@ impl Frame {
     }
 
     // #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    // fn get_elements(
-    //     &self,
-    //     vm: &VirtualMachine,
-    //     size: usize,
-    //     unpack: bool,
-    // ) -> PanResult<Vec<CodeObject>> {
-    //     let elements = self.pop_multiple(size);
-    //     if unpack {
-    //         let mut result: Vec<CodeObject> = vec![];
-    //         for element in elements {
-    //             result.extend(vm.extract_elements(&element)?);
-    //         }
-    //         Ok(result)
-    //     } else {
-    //         Ok(elements)
-    //     }
-    // }
+    fn get_elements(
+        &self,
+        vm: &VirtualMachine,
+        size: usize,
+        unpack: bool,
+    ) -> Value {
+        let elements = self.pop_multiple(size);
+        for e in elements.clone() {
+            println!("args : {:?}", e);
+        }
+        Value::new_array_obj(elements)
+    }
 
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     fn import(
@@ -547,15 +544,17 @@ impl Frame {
         name_scope: &bytecode::NameScope,
     ) -> FrameResult {
         let obj = self.pop_value();
+        println!("store name {:?}", obj);
+        self.scope.store_global(name.to_string(), obj);
         // match name_scope {
         //     bytecode::NameScope::Global => {
-        //         self.scope.store_global(vm, name, obj);
+        //        self.scope.store_global(name.to_string(), obj);
         //     }
         //     bytecode::NameScope::Local => {
-        //         self.scope.store_name(vm, name, obj);
+        //         self.scope.store_name(name.to_string(), obj);
         //     }
         //     bytecode::NameScope::Free => {
-        //         self.scope.store_name(vm, name, obj);
+        //         self.scope.store_name(name.to_string(), obj);
         //     }
         // }
         None
@@ -569,11 +568,12 @@ impl Frame {
         name: &str,
         name_scope: &bytecode::NameScope,
     ) -> FrameResult {
-        let optional_value = match name_scope {
-            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
-            bytecode::NameScope::Local => self.scope.load_local(name.to_string()),
-            bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
-        };
+        let optional_value = self.scope.load_global(name.to_string());
+        // let optional_value = match name_scope {
+        //     //bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
+        //     // bytecode::NameScope::Local => self.scope.load_local(name.to_string()),
+        //     // bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
+        // };
 
         let value = match optional_value {
             Some(value) => value,
@@ -581,7 +581,7 @@ impl Frame {
                 Value::Nil
             }
         };
-
+        println!("load_name value: {:?}", value);
         self.push_value(value.clone());
         None
     }
@@ -691,15 +691,17 @@ impl Frame {
     //     None
     // }
 
-    fn execute_call_function(&self, vm: &VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
-        // let args = match typ {
-        //     bytecode::CallType::Positional(count) => {
-        //         let args: Vec<CodeObject> = self.pop_multiple(*count);
-        //         PyFuncArgs {
-        //             args,
-        //             kwargs: IndexMap::new(),
-        //         }
-        //     }
+    fn execute_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
+        println!("call_function");
+        let args = match typ {
+            bytecode::CallType::Positional(count) => {
+                if *count > 0 {
+                    let args = self.pop_value();
+                    args
+                } else { Value::Nil }
+            }
+            _ => { Value::Nil }
+        };
         //     bytecode::CallType::Keyword(count) => {
         //         // let kwarg_names = self.pop_value();
         //         // let args: Vec<CodeObject> = self.pop_multiple(*count);
@@ -712,31 +714,38 @@ impl Frame {
         //         // PyFuncArgs::new(args, kwarg_names)
         //     }
         //     bytecode::CallType::Ex(has_kwargs) => {
-        //         let kwargs = if *has_kwargs {
-        //             let kw_dict: PyDictRef =
-        //                 self.pop_value().downcast().expect("Kwargs must be a dict.");
-        //             let mut kwargs = IndexMap::new();
-        //             for (key, value) in kw_dict.into_iter() {
-        //                 if let Some(key) = key.payload_if_subclass::<objstr::PyString>(vm) {
-        //                     kwargs.insert(key.as_str().to_owned(), value);
-        //                 } else {
-        //                     return Err(vm.new_type_error("keywords must be strings".to_owned()));
-        //                 }
-        //             }
-        //             kwargs
-        //         } else {
-        //             IndexMap::new()
-        //         };
-        //         let args = self.pop_value();
-        //         let args = vm.extract_elements(&args)?;
-        //         PyFuncArgs { args, kwargs }
+        //         // let kwargs = if *has_kwargs {
+        //         //     let kw_dict: PyDictRef =
+        //         //         self.pop_value().downcast().expect("Kwargs must be a dict.");
+        //         //     let mut kwargs = IndexMap::new();
+        //         //     for (key, value) in kw_dict.into_iter() {
+        //         //         if let Some(key) = key.payload_if_subclass::<objstr::PyString>(vm) {
+        //         //             kwargs.insert(key.as_str().to_owned(), value);
+        //         //         } else {
+        //         //             return Err(vm.new_type_error("keywords must be strings".to_owned()));
+        //         //         }
+        //         //     }
+        //         //     kwargs
+        //         // } else {
+        //         //     IndexMap::new()
+        //         // };
+        //         // let args = self.pop_value();
+        //         // let args = vm.extract_elements(&args)?;
+        //         // PyFuncArgs { args, kwargs }
         //     }
         // };
-        //
-        // // Call function:
-        // let func_ref = self.pop_value();
-        // let value = vm.invoke(&func_ref, args)?;
-        // self.push_value(value);
+
+        // Call function:
+        // let args = self.pop_value();
+        println!("ddd args:{:?}", args);
+        let func_ref = self.pop_value();
+        println!("ddd func_def:{:?}", func_ref);
+        let value = vm.run_code_obj(func_ref.code().to_owned(), self.scope.clone());
+        match value {
+            Some(ExecutionResult::Return(v)) => self.push_value(v),
+            _ => self.push_value(Value::Nil)
+        }
+
         None
     }
 
@@ -842,17 +851,11 @@ impl Frame {
     //     }
     // }
     fn execute_make_function(&self, vm: &VirtualMachine) -> FrameResult {
-        // let qualified_name = self
-        //     .pop_value()
-        //     .downcast::<PyString>()
-        //     .expect("qualified name to be a string");
-        // let code_obj: PyCodeRef = self
-        //     .pop_value()
-        //     .downcast()
-        //     .expect("Second to top value on the stack must be a code object");
-        //
+        let qualified_name = self.pop_value();
+        let code_obj = self.pop_value();
+
         // let flags = code_obj.flags;
-        //
+
         // let annotations = if flags.contains(bytecode::CodeFlags::HAS_ANNOTATIONS) {
         //     self.pop_value()
         // } else {
@@ -878,10 +881,11 @@ impl Frame {
         // } else {
         //     None
         // };
-        //
-        // // pop argc arguments
-        // // argument: name, args, globals
-        // let scope = self.scope.clone();
+
+        // pop argc arguments
+        // argument: name, args, globals
+        let scope = self.scope.clone();
+        let func = FnValue { name: qualified_name.name(), code: code_obj.code(), has_return: true };
         // let func_obj = vm
         //     .ctx
         //     .new_pyfunction(code_obj, scope, defaults, kw_only_defaults);
@@ -896,8 +900,8 @@ impl Frame {
         //     .unwrap_or_else(|| vm.get_none());
         // vm.set_attr(&func_obj, "__module__", module)?;
         // vm.set_attr(&func_obj, "__annotations__", annotations)?;
-        //
-        // self.push_value(func_obj);
+
+        self.push_value(Value::Fn(func));
         None
     }
 
@@ -912,8 +916,8 @@ impl Frame {
         let value = if inplace {
             match *op {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                // bytecode::BinaryOperator::Add => vm._iadd(a_ref, b_ref),
-                // bytecode::BinaryOperator::Multiply => vm._imul(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
+                bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
                 // //     bytecode::BinaryOperator::MatrixMultiply => vm._imatmul(a_ref, b_ref),
                 // bytecode::BinaryOperator::Power => vm._ipow(a_ref, b_ref),
                 // bytecode::BinaryOperator::Divide => vm._itruediv(a_ref, b_ref),
@@ -929,8 +933,8 @@ impl Frame {
         } else {
             match *op {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                // bytecode::BinaryOperator::Add => vm._add(a_ref, b_ref),
-                // bytecode::BinaryOperator::Multiply => vm._mul(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
+                bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
                 // bytecode::BinaryOperator::MatrixMultiply => vm._matmul(a_ref, b_ref),
                 // bytecode::BinaryOperator::Power => vm._pow(a_ref, b_ref),
                 // bytecode::BinaryOperator::Divide => vm._truediv(a_ref, b_ref),
@@ -945,7 +949,7 @@ impl Frame {
             }
         };
 
-        //self.push_value(value);
+        self.push_value(value);
         None
     }
 
@@ -1071,6 +1075,7 @@ impl Frame {
     }
 
     pub fn get_lineno(&self) -> bytecode::Location {
+        println!("lasti:{:?}", self.lasti.get());
         self.code.locations[self.lasti.get()].clone()
     }
 
@@ -1096,6 +1101,7 @@ impl Frame {
     }
 
     pub fn push_value(&self, obj: Value) {
+        println!("push value is : {:?}", obj);
         self.stack.borrow_mut().push(obj);
     }
 

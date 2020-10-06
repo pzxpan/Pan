@@ -6,10 +6,12 @@ use crate::symboltable::{
 };
 use itertools::Itertools;
 use num_complex::Complex64;
-use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs};
+use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope};
 use pan_parser::{ast, parse};
 use pan_parser::ast::{Expression, Parameter};
 use std::borrow::Borrow;
+use pan_bytecode::bytecode::CallType::Positional;
+use pan_bytecode::bytecode::NameScope::Global;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -186,8 +188,7 @@ impl<O: OutputStream> Compiler<O> {
                     // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_function_def(
-                        name, args.as_slice(), body, returns, is_async);
+                    self.compile_function_def(name, args.as_slice(), body, returns, is_async);
 
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                 }
@@ -198,6 +199,13 @@ impl<O: OutputStream> Compiler<O> {
 
         assert_eq!(self.output_stack.len(), size_before);
         println!("cccc after size before is {:?} ", size_before);
+        self.emit(Instruction::LoadName {
+            name: "main".to_string(),
+            scope: NameScope::Free,
+        });
+        self.emit(Instruction::CallFunction { typ: Positional(0) });
+        self.emit(Instruction::Pop);
+
         // Emit None at end:
         self.emit(Instruction::LoadConst {
             value: bytecode::Constant::None,
@@ -317,10 +325,10 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(expression)?;
             }
             VariableDefinition(_, decl, expression) => {
-                self.load_name(&decl.name.name);
                 if let Some(e) = &expression {
                     self.compile_expression(e)?;
                 }
+                self.store_name(&decl.name.name);
             }
             _ => {}
         }
@@ -469,29 +477,37 @@ impl<O: OutputStream> Compiler<O> {
         // self.prepare_decorators(decorator_list)?;
         self.compile_statements(body)?;
         // Emit None at end:
-        // match body.last().map(|s| &s) {
-        //     Some(ast::Statement::Return(_, _)) => {
-        //         // the last instruction is a ReturnValue already, we don't need to emit it
-        //     }
-        //     _ => {
-        //         self.emit(Instruction::LoadConst {
-        //             value: bytecode::Constant::None,
-        //         });
-        //         self.emit(Instruction::ReturnValue);
-        //     }
-        // }
         let mut code = self.pop_code_object();
         self.leave_scope();
+        match body {
+            ast::Statement::Block(_, statements) => {
+                let s = statements.last();
+                match s {
+                    Some(ast::Statement::Return(..)) => {
+                        // the last instruction is a ReturnValue already, we don't need to emit it
+                    }
+                    _ => {
+                        self.emit(Instruction::LoadConst {
+                            value: bytecode::Constant::None,
+                        });
+                        self.emit(Instruction::ReturnValue);
+                    }
+                }
+            }
 
+            _ => {}
+        }
         // Prepare type annotations:
-        let mut num_annotations = 0;
+        let
+            mut num_annotations =
+            0;
 
         // Return annotation:
         if let Some(annotation) = returns {
             // key:
             self.emit(Instruction::LoadConst {
                 value: bytecode::Constant::String {
-                    value: "return".to_owned(),
+                    value: "return".to_string(),
                 },
             });
             // value:
@@ -499,17 +515,15 @@ impl<O: OutputStream> Compiler<O> {
             num_annotations += 1;
         }
 
-        // for arg in args.args.iter() {
-        //     if let Some(annotation) = &arg.annotation {
-        //         self.emit(Instruction::LoadConst {
-        //             value: bytecode::Constant::String {
-        //                 value: arg.arg.to_owned(),
-        //             },
-        //         });
-        //         self.compile_expression(&annotation)?;
-        //         num_annotations += 1;
-        //     }
-        // }
+        for arg in args.iter() {
+            self.emit(Instruction::LoadConst {
+                value: bytecode::Constant::String {
+                    value: arg.name.as_ref().unwrap().name.clone()
+                },
+            });
+            self.compile_expression(&arg.ty)?;
+            num_annotations += 1;
+        }
 
         if num_annotations > 0 {
             code.flags |= bytecode::CodeFlags::HAS_ANNOTATIONS;
@@ -597,7 +611,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadConst {
             value: bytecode::Constant::None,
         });
-        self.emit(Instruction::ReturnValue);
+        //   self.emit(Instruction::ReturnValue);
 
         let mut code = self.pop_code_object();
         code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
@@ -1047,10 +1061,18 @@ impl<O: OutputStream> Compiler<O> {
                 //TODO
             }
             BoolLiteral(loc, _) => {}
-            NumberLiteral(loc, _) => {}
+            NumberLiteral(loc, value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::Integer {
+                        value: value.clone(),
+                    },
+                });
+            }
             ArrayLiteral(loc, _) => {}
             List(loc, _) => {}
-            Type(loc, _) => {}
+            Type(loc, ty) => {
+                self.load_name(&ty.name())
+            }
             Variable(ast::Identifier { loc, name }) => {
                 // Determine the contextual usage of this symbol:
                 self.load_name(name);
@@ -1316,19 +1338,9 @@ impl<O: OutputStream> Compiler<O> {
         //     }
         // });
         //
-        // for element in elements {
-        //     if let ast::ExpressionType::Starred { value } = &element.node {
-        //         self.compile_expression(value)?;
-        //     } else {
-        //         self.compile_expression(element)?;
-        //         if has_stars {
-        //             self.emit(Instruction::BuildTuple {
-        //                 size: 1,
-        //                 unpack: false,
-        //             });
-        //         }
-        //     }
-        // }
+        for element in elements {
+            self.compile_expression(element)?;
+        }
         //
         // Ok(has_stars)
         Ok(true)
@@ -1466,7 +1478,7 @@ impl<O: OutputStream> Compiler<O> {
         }
 
         // Return freshly filled list:
-        self.emit(Instruction::ReturnValue);
+        //     self.emit(Instruction::ReturnValue);
 
         // Fetch code for listcomp function:
         let code = self.pop_code_object();

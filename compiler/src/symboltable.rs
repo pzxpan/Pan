@@ -528,7 +528,7 @@ impl SymbolTableBuilder {
             NumberLiteral(loc, _) => {}
             ArrayLiteral(loc, _) => {}
             List(loc, _) => {}
-            Type(loc, _) => {}
+            Type(loc, ty) => { self.register_name(&ty.name().to_string(), SymbolUsage::Used)?; }
             Variable(Identifier { loc, name, }) => {
                 // Determine the contextual usage of this symbol:
                 match context {

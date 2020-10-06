@@ -8,16 +8,16 @@ use std::sync::Arc;
 // use crate::native_fns::NativeFn;
 use pan_bytecode::bytecode::CodeObject;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FnValue {
     pub name: String,
-    pub code: Vec<u8>,
+    pub code: CodeObject,
     // pub upvalues: Vec<Upvalue>,
     // pub receiver: Option<Arc<RefCell<Obj>>>,
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ClosureValue {
     pub name: String,
     pub code: Vec<u8>,
@@ -26,7 +26,7 @@ pub struct ClosureValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypeValue {
     pub name: String,
     pub methods: Vec<(String, FnValue)>,
@@ -49,6 +49,27 @@ pub enum Value {
     Type(TypeValue),
     Code(CodeObject),
     Nil,
+}
+
+impl Value {
+    pub fn name(&self) -> String {
+        match self {
+            Value::Str(v) => { v.to_string() }
+            _ => { "".to_string() }
+        }
+    }
+    pub fn code(&self) -> CodeObject {
+        println!("code is:{:?}", self);
+        match self {
+            Value::Fn(v) => {
+                v.code.clone()
+            }
+            Value::Code(v) => {
+                v.clone()
+            }
+            _ => unreachable!()
+        }
+    }
 }
 
 impl Value {
