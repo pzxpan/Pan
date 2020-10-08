@@ -568,12 +568,12 @@ impl Frame {
         name: &str,
         name_scope: &bytecode::NameScope,
     ) -> FrameResult {
-        let optional_value = self.scope.load_global(name.to_string());
-        // let optional_value = match name_scope {
-        //     //bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
-        //     // bytecode::NameScope::Local => self.scope.load_local(name.to_string()),
-        //     // bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
-        // };
+        // let optional_value = self.scope.load_global(name.to_string());
+        let optional_value = match name_scope {
+            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
+            bytecode::NameScope::Local => self.scope.load_local(name.to_string()),
+            bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
+        };
 
         let value = match optional_value {
             Some(value) => value,

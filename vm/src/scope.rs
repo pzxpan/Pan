@@ -84,6 +84,7 @@ pub trait NameProtocol {
     fn store_name(&self, name: String, value: Value);
     // fn delete_name(&self, name: String) -> FrameResult;
     fn load_local(&self, name: String) -> Option<Value>;
+    fn store_local(&self, name: String, value: Value);
     // fn load_cell(&self, name: String) -> Option<Value>;
     // fn store_cell(&self, name: String, value: Value);
     fn load_global(&self, name: String) -> Option<Value>;
@@ -93,8 +94,13 @@ pub trait NameProtocol {
 impl NameProtocol for Scope {
     #[cfg_attr(feature = "flame-it", flame("Scope"))]
     fn load_name(&self, name: String) -> Option<Value> {
+        for dict in self.locals.borrow_mut().iter() {
+            if let Some(value) = self.load_local(name.clone()) {
+                return Some(value);
+            }
+        }
         // Fall back to loading a global after all scopes have been searched!
-        if let Some(v) = self.load_global(name) {
+        if let Some(v) = self.load_global(name.clone()) {
             return Some(v.clone());
         }
         None
@@ -131,5 +137,9 @@ impl NameProtocol for Scope {
 
     fn store_global(&self, name: String, value: Value) {
         self.globals.borrow_mut().insert(name, value);
+    }
+
+    fn store_local(&self, name: String, value: Value) {
+        self.get_locals().insert(name, value);
     }
 }
