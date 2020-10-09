@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use pan_vm::value::Value;
 
 fn main() {
+    // let path = "/Users/panzhenxing/Desktop/PanPan/Pan/demo.pan";
     let path = "/Users/ztt/Desktop/Pan/demo.pan";
     let mut file = File::open(path).unwrap();
     let mut contents = String::new();
