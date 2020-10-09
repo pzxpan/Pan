@@ -10,13 +10,14 @@ Inspirational file: https://github.com/python/cpython/blob/master/Python/symtabl
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Parameter, Expression};
+use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType};
 use std::fmt;
 use std::borrow::Borrow;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
+
     builder.scan_program(program)?;
     builder.finish()
 }
@@ -101,10 +102,11 @@ pub struct Symbol {
     pub is_assigned: bool,
     pub is_parameter: bool,
     pub is_free: bool,
+    pub ty: ast::CType,
 }
 
 impl Symbol {
-    fn new(name: &str) -> Self {
+    fn new(name: &str, ty: ast::CType) -> Self {
         Symbol {
             name: name.to_owned(),
             // table,
@@ -114,6 +116,7 @@ impl Symbol {
             is_assigned: false,
             is_parameter: false,
             is_free: false,
+            ty,
         }
     }
 
@@ -277,6 +280,7 @@ enum SymbolUsage {
     Used,
     Assigned,
     Parameter,
+    Unknown,
 }
 
 #[derive(Default)]
@@ -298,7 +302,7 @@ enum ExpressionContext {
 
 impl SymbolTableBuilder {
     fn prepare(&mut self) {
-        self.enter_scope(&"top".to_string(), SymbolTableType::Module, 0)
+        self.enter_scope(&"top".to_string(), SymbolTableType::Module, 0);
     }
 
     fn finish(&mut self) -> Result<SymbolTable, SymbolTableError> {
@@ -320,6 +324,10 @@ impl SymbolTableBuilder {
     }
 
     fn scan_program(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
+        self.register_name(&"int".to_string(), ast::CType::Int, SymbolUsage::Used)?;
+        self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
+        self.register_name(&"string".to_string(), ast::CType::String, SymbolUsage::Used)?;
+        self.register_name(&"bool".to_string(), ast::CType::Bool, SymbolUsage::Used)?;
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
@@ -345,8 +353,12 @@ impl SymbolTableBuilder {
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
+                    let tt = def.get_type();
+                    println!("type is :{:?}", tt);
+
+                    println!("function is :{:?}", def.clone());
                     if let Some(name) = &def.name {
-                        self.register_name(&name.name, SymbolUsage::Assigned)?;
+                        self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
                         if let Some(expression) = &def.as_ref().returns {
                             self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
@@ -421,7 +433,7 @@ impl SymbolTableBuilder {
             }
             Args(loc, _) => {}
             VariableDefinition(loc, decl, expression) => {
-                self.register_name(decl.name.borrow().name.borrow(), SymbolUsage::Assigned)?;
+                self.register_name(decl.name.borrow().name.borrow(), decl.ty.get_type(), SymbolUsage::Assigned)?;
                 self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
                 if let Some(e) = expression {
                     self.scan_expression(e, &ExpressionContext::Load)?;
@@ -434,7 +446,7 @@ impl SymbolTableBuilder {
             }
 
             ConstDefinition(loc, decl, expression) => {
-                self.register_name(decl.name.borrow().name.borrow(), SymbolUsage::Global)?;
+                self.register_name(decl.name.borrow().name.borrow(), decl.ty.get_type(), SymbolUsage::Global)?;
                 self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
                 if let Some(e) = expression {
                     self.scan_expression(e, &ExpressionContext::Load)?;
@@ -528,18 +540,22 @@ impl SymbolTableBuilder {
             NumberLiteral(loc, _) => {}
             ArrayLiteral(loc, _) => {}
             List(loc, _) => {}
-            Type(loc, ty) => { self.register_name(&ty.name().to_string(), SymbolUsage::Used)?; }
+            Type(loc, ty) => {
+                println!("Fuck");
+                self.register_name(&ty.name().to_string(), ty.get_type(), SymbolUsage::Used)?;
+            }
             Variable(Identifier { loc, name, }) => {
+                println!("WTF");
                 // Determine the contextual usage of this symbol:
                 match context {
                     ExpressionContext::Delete => {
-                        self.register_name(name, SymbolUsage::Used)?;
+                        self.register_name(name, ast::CType::Unknown, SymbolUsage::Used)?;
                     }
                     ExpressionContext::Load => {
-                        self.register_name(name, SymbolUsage::Used)?;
+                        self.register_name(name, ast::CType::Unknown, SymbolUsage::Used)?;
                     }
                     ExpressionContext::Store => {
-                        self.register_name(name, SymbolUsage::Assigned)?;
+                        self.register_name(name, ast::CType::Unknown, SymbolUsage::Assigned)?;
                     }
                     ExpressionContext::Unkown => {}
                 }
@@ -583,7 +599,13 @@ impl SymbolTableBuilder {
         // }
 
         self.enter_scope(name, SymbolTableType::Function, line_number);
+        let arg_types: Vec<(String, ast::CType, bool)> = args.iter().map(|s| ast::transfer(s)).collect();
+        for s in arg_types.iter() {
+            println!("fparam={:?}", s);
+            self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
+            self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Global);
 
+        }
         // Fill scope with parameter names:
         // self.scan_parameters(&args.args)?;
         // self.scan_parameters(&args.kwonlyargs)?;
@@ -615,20 +637,22 @@ impl SymbolTableBuilder {
     // }
 
     #[allow(clippy::single_match)]
-    fn register_name(&mut self, name: &String, role: SymbolUsage) -> SymbolTableResult {
+    fn register_name(&mut self, name: &String, ty: ast::CType, role: SymbolUsage) -> SymbolTableResult {
         let scope_depth = self.tables.len();
 
         let table = self.tables.last_mut().unwrap();
         let location = Loc(0, 0, 0);
 
-
+        println!("register name={:?}, ty: {:?}", name, ty);
         // Some checks:
         let containing = table.symbols.contains_key(name);
         if containing {
+            println!("found!");
             // Role already set..
             match role {
                 SymbolUsage::Global => {
                     let symbol = table.symbols.get(name).unwrap();
+                    println!("Symbol is {:?}", symbol);
                     if let SymbolScope::Global = symbol.scope {
                         // Ok
                     } else {
@@ -667,12 +691,14 @@ impl SymbolTableBuilder {
 
         // Insert symbol when required:
         if !containing {
-            let symbol = Symbol::new(name);
+            println!("notFound");
+            let symbol = Symbol::new(name, ty.clone());
             table.symbols.insert(name.to_owned(), symbol);
         }
 
         // Set proper flags on symbol:
         let symbol = table.symbols.get_mut(name).unwrap();
+        println!("Symbol is {:?}", symbol);
         match role {
             SymbolUsage::Nonlocal => {
                 if let SymbolScope::Unknown = symbol.scope {
@@ -705,8 +731,11 @@ impl SymbolTableBuilder {
             SymbolUsage::Used => {
                 symbol.is_referenced = true;
             }
+            SymbolUsage::Unknown => {
+                symbol.ty = ast::CType::Unknown;
+            }
         }
-
+        println!("after register name={:?}, ty: {:?}", symbol.name, symbol.ty);
         Ok(())
     }
 }

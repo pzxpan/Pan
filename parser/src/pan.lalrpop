@@ -42,12 +42,11 @@ SingleDocComment: (usize, CommentType, &'input str)= {
     <l:@L> <c:DocComment> => (l, c.0, c.1)
 }
 
-Type: Type = {
-    "bool" => Type::Bool,
-    "string" => Type::String,
-    Uint => Type::Uint(<>),
-    Int => Type::Int(<>),
-    Bytes => Type::Bytes(<>),
+Type: BuiltinType = {
+    "bool" => BuiltinType::Bool,
+    "string" => BuiltinType::String,
+    "float" => BuiltinType::Float,
+    "int" => BuiltinType::Int,
 }
 
 ArrayDimension: Option<Expression> = {
@@ -255,7 +254,7 @@ Precedence0: Expression = {
     <a:@L> "false" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), false),
     <StringLiteral+> => Expression::StringLiteral(<>),
 
-    <l:@L> <ty:Type> <r:@R> => Expression::Type(Loc(file_no, l, r), ty),
+  //  <l:@L> <ty:Type> <r:@R> => Expression::Type(Loc(file_no, l, r), ty),
     <a:@L> "[" <v:CommaOne<Expression>> "]" <b:@R> => {
         Expression::ArrayLiteral(Loc(file_no, a, b), v)
     },
@@ -336,7 +335,7 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 FunctionDefinition: Box<FunctionDefinition> = {
     <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun" <nl:@L>  <name:Identifier?> <nr:@R> <params:ParameterList>
-    <returns:Expression?> <body:BlockStatementOrSemiColon> <r:@R> => {
+    <returns:(":" Expression)?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let is_pub = is_pub.is_some();
         Box::new(FunctionDefinition {
             doc,
@@ -345,7 +344,7 @@ FunctionDefinition: Box<FunctionDefinition> = {
             name_loc: Loc(file_no, nl, nr),
             params,
             is_pub,
-            returns,
+            returns:returns.map(|x|x.1),
             body,
         })
     },
@@ -486,11 +485,9 @@ extern {
         "." => Token::Member,
         "," => Token::Comma,
         DocComment => Token::DocComment(<CommentType>, <&'input str>),
-        Uint => Token::Uint(<u16>),
-        Int => Token::Int(<u16>),
-        Bytes => Token::Bytes(<u8>),
+        "float" => Token::Float,
+        "int" => Token::Int,
         "data" => Token::Data,
-
         "import" => Token::Import,
         "struct" => Token::Struct,
 
