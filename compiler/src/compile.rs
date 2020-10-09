@@ -72,11 +72,31 @@ fn with_compiler(
     let mut compiler = Compiler::new(optimize);
     compiler.source_path = Some(source_path);
     compiler.push_new_code_object("<module>".to_owned());
+
     f(&mut compiler)?;
     let code = compiler.pop_code_object();
     trace!("Compilation completed: {:?}", code);
     Ok(code)
 }
+// symbol_table IndexMap {"other": Symbol { name: "other", scope: Local, is_param: false,
+// is_referenced: false, is_assigned: true, is_parameter: false, is_free: false,
+// ty: Fn(FnType { name: "other", arg_types: [("a", Int, true), ("b", Int, true)], type_args: [],
+// ret_type: Int, is_pub: false }) },
+// "int": Symbol { name: "int", scope: Unknown, is_param: false, is_referenced: true, is_assigned: false,
+// is_parameter: false, is_free: false, ty: Int },
+// "main": Symbol { name: "main", scope: Local, is_param: false, is_referenced: false, is_assigned: true,
+// is_parameter: false, is_free: false, ty: Fn(FnType { name: "main", arg_types: [], type_args: [],
+// ret_type: Unknown, is_pub: false }) }}
+
+// {"other":
+// Symbol { name: "other", scope: Local, is_param: false, is_referenced: false, is_assigned: true,
+// is_parameter: false, is_free: false, ty: Fn(FnType { name: "other", arg_types: [("a", Int, true),
+// ("b", Int, true)], type_args: [], ret_type: Float, is_pub: false }) },
+// "float": Symbol { name: "float", scope: Unknown, is_param: false, is_referenced: true, is_assigned: false,
+// is_parameter: false, is_free: false, ty: Float }, "main":
+// Symbol { name: "main", scope: Local, is_param: false, is_referenced: false, is_assigned: true,
+// is_parameter: false, is_free: false, ty: Fn(FnType { name: "main", arg_types: [], type_args: [],
+// ret_type: Unknown, is_pub: false }) }}
 
 /// Compile a standard Python program to bytecode
 pub fn compile_program(
@@ -498,9 +518,7 @@ impl<O: OutputStream> Compiler<O> {
             _ => {}
         }
         // Prepare type annotations:
-        let
-            mut num_annotations =
-            0;
+        let mut num_annotations = 0;
 
         // Return annotation:
         if let Some(annotation) = returns {
@@ -1534,13 +1552,12 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-        // println!("Looking up {:?}", name);
+        println!("Looking up {:?}", name);
         let symbol_table = self.symbol_table_stack.last().unwrap();
         symbol_table.lookup(name).expect(
-            "The symbol must be present in the symbol table, even when it is undefined in python.",
+            "The symbol must be present in the symbol table, even when it is undefined",
         )
     }
-
     // Low level helper functions:
     fn emit(&mut self, instruction: Instruction) {
         let location = compile_location(&self.current_source_location);

@@ -42,12 +42,11 @@ SingleDocComment: (usize, CommentType, &'input str)= {
     <l:@L> <c:DocComment> => (l, c.0, c.1)
 }
 
-Type: Type = {
-    "bool" => Type::Bool,
-    "string" => Type::String,
-    Uint => Type::Uint(<>),
-    Int => Type::Int(<>),
-    Bytes => Type::Bytes(<>),
+Type: BuiltinType = {
+    "bool" => BuiltinType::Bool,
+    "string" => BuiltinType::String,
+    "float" => BuiltinType::Float,
+    "int" => BuiltinType::Int,
 }
 
 ArrayDimension: Option<Expression> = {
@@ -486,11 +485,9 @@ extern {
         "." => Token::Member,
         "," => Token::Comma,
         DocComment => Token::DocComment(<CommentType>, <&'input str>),
-        Uint => Token::Uint(<u16>),
-        Int => Token::Int(<u16>),
-        Bytes => Token::Bytes(<u8>),
+        "float" => Token::Float,
+        "int" => Token::Int,
         "data" => Token::Data,
-
         "import" => Token::Import,
         "struct" => Token::Struct,
 

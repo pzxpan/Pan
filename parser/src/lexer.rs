@@ -50,9 +50,8 @@ pub enum Token<'input> {
     Return,
     Returns,
 
-    Uint(u16),
-    Int(u16),
-    Bytes(u8),
+    Float,
+    Int,
 
     Bool,
 
@@ -151,9 +150,8 @@ impl<'input> fmt::Display for Token<'input> {
 
             Token::Number(n) => write!(f, "{}", n),
 
-            Token::Uint(w) => write!(f, "uint{}", w),
-            Token::Int(w) => write!(f, "int{}", w),
-            Token::Bytes(w) => write!(f, "bytes{}", w),
+            Token::Float => write!(f, "float"),
+            Token::Int => write!(f, "int"),
             Token::MutRef => write!(f, "ref'"),
             Token::ReadOnlyRef => write!(f, "ref"),
             Token::Semicolon => write!(f, ";"),
@@ -297,7 +295,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "bool" => Token::Bool,
     "break" => Token::Break,
 
-    "byte" => Token::Bytes(1),
+    "float" => Token::Float,
 
     "constant" => Token::Constant,
     "constructor" => Token::Constructor,
@@ -313,20 +311,9 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "fun" => Token::Function,
     "if" => Token::If,
     "import" => Token::Import,
-    "int8" => Token::Int(8),
-    "int16" => Token::Int(16),
-    "int32" => Token::Int(32),
-    "int64" => Token::Int(64),
 
-    "int128" => Token::Int(128),
-    "int256" => Token::Int(256),
-
-    "int" => Token::Int(256),
-
+    "int" => Token::Int,
     "mapping" => Token::Mapping,
-
-
-
     "private" => Token::Private,
     "public" => Token::Public,
     "pure" => Token::Pure,
@@ -336,16 +323,6 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "string" => Token::String,
     "data" => Token::Data,
     "true" => Token::True,
-    "uint8" => Token::Uint(8),
-    "uint16" => Token::Uint(16),
-
-    "uint32" => Token::Uint(32),
-
-    "uint64" => Token::Uint(64),
-
-    "uint128" => Token::Uint(128),
-    "uint256" => Token::Uint(256),
-    "uint" => Token::Uint(256),
 
     "while" => Token::While,
      "view" => Token::View,

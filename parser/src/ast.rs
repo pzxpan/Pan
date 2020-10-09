@@ -36,6 +36,55 @@ pub enum SourceUnitPart {
     FunctionDefinition(Box<FunctionDefinition>),
 }
 
+impl HasType for SourceUnitPart {
+    fn get_type(&self) -> CType {
+        match &self {
+            SourceUnitPart::FunctionDefinition(s) => { s.get_type() }
+            _ => { CType::Unknown }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum CType {
+    Unit,
+    Any,
+    Union(Vec<CType>),
+    Int,
+    Float,
+    String,
+    Bool,
+    Array(Box<CType>),
+    Fn(FnType),
+    Unknown,
+}
+
+impl CType {
+    pub fn name(&self) -> String {
+        match self {
+            CType::Unit => "unit".to_string(),
+            CType::Float => "float".to_string(),
+            CType::Int => "int".to_string(),
+            _ => "unknown".to_string()
+        }
+    }
+}
+
+pub trait HasType {
+    fn get_type(&self) -> CType;
+}
+
+pub struct TypedSourceUnitPart<U> where U: HasType {
+    pub typ: CType,
+    pub node: U,
+}
+
+impl<U> TypedSourceUnitPart<U> where U: HasType {
+    pub fn get_type(&self) -> CType {
+        self.node.get_type()
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Import {
     Plain(StringLiteral),
@@ -44,12 +93,22 @@ pub enum Import {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Type {
+pub enum BuiltinType {
     Bool,
     String,
-    Int(u16),
-    Uint(u16),
-    Bytes(u8),
+    Int,
+    Float,
+}
+
+impl HasType for BuiltinType {
+    fn get_type(&self) -> CType {
+        match self {
+            BuiltinType::Bool => CType::Bool,
+            BuiltinType::String => CType::String,
+            BuiltinType::Int => CType::Int,
+            BuiltinType::Float => CType::Float,
+        }
+    }
 }
 
 
@@ -86,26 +145,24 @@ pub struct Diagnostic {
     pub notes: Vec<Note>,
 }
 
-impl Type {
+impl BuiltinType {
     pub fn name(&self) -> &str {
         match self {
-            Type::Bool => "bool",
-            Type::String => "string",
-            Type::Int(n) => "int",
-            Type::Uint(n) => "uint",
-            Type::Bytes(n) => "bytes",
+            BuiltinType::Bool => "bool",
+            BuiltinType::String => "string",
+            BuiltinType::Int => "int",
+            BuiltinType::Float => "float",
         }
     }
 }
 
-impl fmt::Display for Type {
+impl fmt::Display for BuiltinType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Type::Bool => write!(f, "bool"),
-            Type::String => write!(f, "string"),
-            Type::Int(n) => write!(f, "int{}", n),
-            Type::Uint(n) => write!(f, "uint{}", n),
-            Type::Bytes(n) => write!(f, "bytes{}", n),
+            BuiltinType::Bool => write!(f, "bool"),
+            BuiltinType::String => write!(f, "string"),
+            BuiltinType::Int => write!(f, "int"),
+            BuiltinType::Float => write!(f, "float"),
         }
     }
 }
@@ -289,7 +346,7 @@ pub enum Expression {
     StringLiteral(Vec<StringLiteral>),
     ArrayLiteral(Loc, Vec<Expression>),
 
-    Type(Loc, Type),
+    Type(Loc, BuiltinType),
     Variable(Identifier),
 
     //新增
@@ -299,6 +356,32 @@ pub enum Expression {
     Set(Loc, Vec<(Loc, Option<Parameter>)>),
 
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
+}
+
+impl HasType for Expression {
+    fn get_type(&self) -> CType {
+        match self {
+            Expression::Add(_, left, right) => {
+                let l = left.get_type();
+                let r = right.get_type();
+                if l == r {
+                    l
+                } else {
+                    r
+                }
+            }
+            Expression::Type(_, ty) => {
+                match ty {
+                    BuiltinType::Int => CType::Int,
+                    BuiltinType::Bool => CType::Bool,
+                    BuiltinType::String => CType::String,
+                    BuiltinType::Float => CType::Float,
+                }
+            }
+
+            _ => { CType::Unknown }
+        }
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -392,6 +475,12 @@ pub struct Parameter {
     pub name: Option<Identifier>,
 }
 
+impl HasType for Parameter {
+    fn get_type(&self) -> CType {
+        self.ty.get_type()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum StateMutability {
     Pure(Loc),
@@ -462,6 +551,36 @@ pub struct FunctionDefinition {
     pub is_pub: bool,
     pub returns: Option<Expression>,
     pub body: Option<Statement>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct FnType {
+    pub name: String,
+    pub arg_types: Vec<(/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool)>,
+    pub type_args: Vec<String>,
+    pub ret_type: Box<CType>,
+    pub is_pub: bool,
+}
+
+pub fn transfer(s: &(Loc, Option<Parameter>)) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
+    let a = s.1.as_ref().unwrap().get_type().to_owned();
+    let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
+    let is_optional = true;
+    (arg_name, a, is_optional)
+}
+
+impl HasType for FunctionDefinition {
+    fn get_type(&self) -> CType {
+        let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s)).collect();
+        let type_args = Vec::new();
+        let mut ret_type = Box::new(CType::Unknown);
+        if let Some(ty) = self.returns.as_ref() {
+            ret_type = Box::new(ty.get_type());
+        }
+        // self.returns.as_ref().unwrap().get_type()
+        let name = self.name.as_ref().unwrap().name.clone();
+        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub })
+    }
 }
 
 // #[derive(Debug, Clone, PartialEq)]
