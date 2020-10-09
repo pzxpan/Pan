@@ -1,4 +1,4 @@
-fun other(a: int, b:int) int {
+fun other(a: int, b:int) : int {
    return a - b;
 }
 
@@ -8,7 +8,7 @@ fun main() {
 }
 
 //fun main() {
-  //  let a: int = 20 + 20 * 3;
+  //  let a: int = 20 + 20 * 3;s
     //let b: int = 30 + 2 * 6;
     //let c: int = a -b;
     //return c;

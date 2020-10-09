@@ -1089,7 +1089,7 @@ impl<O: OutputStream> Compiler<O> {
             ArrayLiteral(loc, _) => {}
             List(loc, _) => {}
             Type(loc, ty) => {
-                self.load_name(&ty.name())
+               // self.load_name(&ty.name())
             }
             Variable(ast::Identifier { loc, name }) => {
                 // Determine the contextual usage of this symbol:

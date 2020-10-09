@@ -292,10 +292,10 @@ impl LexicalError {
 }
 
 static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
-    "bool" => Token::Bool,
+   // "bool" => Token::Bool,
     "break" => Token::Break,
 
-    "float" => Token::Float,
+  //  "float" => Token::Float,
 
     "constant" => Token::Constant,
     "constructor" => Token::Constructor,
@@ -312,7 +312,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "if" => Token::If,
     "import" => Token::Import,
 
-    "int" => Token::Int,
+  //  "int" => Token::Int,
     "mapping" => Token::Mapping,
     "private" => Token::Private,
     "public" => Token::Public,
@@ -320,7 +320,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "payable" => Token::Payable,
     "return" => Token::Return,
     "returns" => Token::Returns,
-    "string" => Token::String,
+ //   "string" => Token::String,
     "data" => Token::Data,
     "true" => Token::True,
 

@@ -17,6 +17,7 @@ use std::borrow::Borrow;
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
+
     builder.scan_program(program)?;
     builder.finish()
 }
@@ -301,7 +302,7 @@ enum ExpressionContext {
 
 impl SymbolTableBuilder {
     fn prepare(&mut self) {
-        self.enter_scope(&"top".to_string(), SymbolTableType::Module, 0)
+        self.enter_scope(&"top".to_string(), SymbolTableType::Module, 0);
     }
 
     fn finish(&mut self) -> Result<SymbolTable, SymbolTableError> {
@@ -323,6 +324,10 @@ impl SymbolTableBuilder {
     }
 
     fn scan_program(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
+        self.register_name(&"int".to_string(), ast::CType::Int, SymbolUsage::Used)?;
+        self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
+        self.register_name(&"string".to_string(), ast::CType::String, SymbolUsage::Used)?;
+        self.register_name(&"bool".to_string(), ast::CType::Bool, SymbolUsage::Used)?;
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
