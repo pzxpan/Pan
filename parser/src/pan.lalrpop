@@ -62,10 +62,10 @@ Identifier: Identifier = {
 
 VariableDeclaration: VariableDeclaration = {
     <l:@L> <ty:Precedence0> <name:Identifier> <r:@R> => VariableDeclaration {
-        loc: Loc(file_no, l, r), ty, name
+        loc: Loc(file_no, l, r), ty:Some(ty), name
     },
-    <l:@L> "let" <name:Identifier> ":" <ty: Precedence0> <r:@R> => VariableDeclaration {
-            loc: Loc(file_no, l, r), ty, name
+    <l:@L> "let" <name:Identifier>  <ty: (":" Precedence0)?> <r:@R> => VariableDeclaration {
+            loc: Loc(file_no, l, r), ty:ty.map(|x|x.1), name
     },
 }
 
@@ -350,14 +350,14 @@ FunctionDefinition: Box<FunctionDefinition> = {
     },
 }
 
-LambdaDefinition: Statement = {
-    <l:@L> "let" <name:Identifier>  "="  <params:ParameterList> "=>" <body:BlockStatement> <r:@R> =>
-       Statement::LambdaDefinition(
-       Loc(file_no, l, r),
-       name,
-       params,
-       Box::new(body))
-}
+//LambdaDefinition: Statement = {
+ //   <l:@L> "let" <name:Identifier>  "="  <params:ParameterList> "=>" <body:BlockStatement> <r:@R> =>
+ //      Statement::LambdaDefinition(
+ //      Loc(file_no, l, r),
+   //    name,
+   //    params,
+    //   Box::new(body))
+//}
 
 BlockStatement: Statement = {
     <l:@L> "{" <s:Statement*> "}" <r:@R> => Statement::Block(Loc(file_no, l, r), s),
@@ -402,7 +402,7 @@ NonIfStatement: Statement = {
     <l:@L> "return" <e:Expression> <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), Some(e))
     },
-     LambdaDefinition => <>,
+   //  LambdaDefinition => <>,
 }
 
 Comma<T>: Vec<T> = {

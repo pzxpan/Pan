@@ -68,6 +68,19 @@ impl CType {
             _ => "unknown".to_string()
         }
     }
+    pub fn rettype(&self) -> &CType {
+        match self {
+            CType::Fn(s) => s.ret_type.as_ref(),
+            _ => self
+        }
+    }
+
+    pub fn param_type(&self) -> Vec<CType> {
+        match self {
+            CType::Fn(s) => s.arg_types.iter().map(|s| s.1.clone()).collect(),
+            _ => Vec::new()
+        }
+    }
 }
 
 pub trait HasType {
@@ -170,7 +183,7 @@ impl fmt::Display for BuiltinType {
 #[derive(Debug, PartialEq, Clone)]
 pub struct VariableDeclaration {
     pub loc: Loc,
-    pub ty: Expression,
+    pub ty: Option<Expression>,
     pub name: Identifier,
 }
 
@@ -358,6 +371,16 @@ pub enum Expression {
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
 }
 
+impl Expression {
+    pub fn expr_name(&self) -> String {
+        match self {
+            Expression::FunctionCall(_, n, _) => n.as_ref().expr_name(),
+            Expression::Variable(id) => id.clone().name,
+            _ => "".to_string()
+        }
+    }
+}
+
 impl HasType for Expression {
     fn get_type(&self) -> CType {
         match self {
@@ -377,6 +400,21 @@ impl HasType for Expression {
                     BuiltinType::String => CType::String,
                     BuiltinType::Float => CType::Float,
                 }
+            }
+            Expression::Variable(s) => {
+                match s.name.as_str() {
+                    "int" => CType::Int,
+                    "float" => CType::Float,
+                    "string" => CType::String,
+                    "bool" => CType::Bool,
+                    _ => CType::Unknown
+                }
+            }
+            // Expression::FunctionCall(_, s, _) => {
+            //     s.get_type()
+            // }
+            Expression::NumberLiteral(_, _) => {
+                CType::Int
             }
 
             _ => { CType::Unknown }
@@ -563,10 +601,10 @@ pub struct FnType {
 }
 
 pub fn transfer(s: &(Loc, Option<Parameter>)) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
-    let a = s.1.as_ref().unwrap().get_type().to_owned();
+    let ty = s.1.as_ref().unwrap().get_type().to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
     let is_optional = true;
-    (arg_name, a, is_optional)
+    (arg_name, ty, is_optional)
 }
 
 impl HasType for FunctionDefinition {
