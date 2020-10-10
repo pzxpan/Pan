@@ -1,6 +1,18 @@
+fun fib(x:int) : int {
+    if x > 3 {
+        print(1111);
+        return 1;
+    } else {
+        print(22222);
+        return 3;
+    }
+
+}
 fun main() {
-   let aaa  = other(30,20);
-   print(aaa);
+ //  let aaa  = other(30,20);
+   let fff = 10;
+   let abb = fib(2);
+   print(fff);
    return;
 }
 fun print(a:int) {

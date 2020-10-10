@@ -593,17 +593,16 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_function(name, args)?;
         // self.prepare_decorators(decorator_list)?;
         self.compile_statements(body)?;
-        // Emit None at end:
-        let mut code = self.pop_code_object();
-        self.leave_scope();
         match body {
             ast::Statement::Block(_, statements) => {
                 let s = statements.last();
                 match s {
                     Some(ast::Statement::Return(..)) => {
+                        println!("ffff returns;");
                         // the last instruction is a ReturnValue already, we don't need to emit it
                     }
                     _ => {
+                        println!("ffff nont returns;");
                         self.emit(Instruction::LoadConst {
                             value: bytecode::Constant::None,
                         });
@@ -614,6 +613,10 @@ impl<O: OutputStream> Compiler<O> {
 
             _ => {}
         }
+        // Emit None at end:
+        let mut code = self.pop_code_object();
+        self.leave_scope();
+
         // Prepare type annotations:
         let mut num_annotations = 0;
 
@@ -946,9 +949,62 @@ impl<O: OutputStream> Compiler<O> {
             ast::Expression::BitwiseOr(_, _, _) => bytecode::BinaryOperator::Or,
             ast::Expression::BitwiseXor(_, _, _) => bytecode::BinaryOperator::Xor,
             ast::Expression::BitwiseAnd(_, _, _) => bytecode::BinaryOperator::And,
-            _ => { bytecode::BinaryOperator::Add }
+            _ => unreachable!()
         };
         self.emit(Instruction::BinaryOperation { op: i, inplace });
+    }
+
+    fn compile_compare(&mut self, vals: &[ast::Expression], ops: &[ast::Expression]) -> Result<(), CompileError> {
+        let to_operator = |op: &ast::Expression| match op {
+            ast::Expression::Equal(_, _, _) => bytecode::ComparisonOperator::Equal,
+            ast::Expression::NotEqual(_, _, _) => bytecode::ComparisonOperator::NotEqual,
+            ast::Expression::More(_, _, _) => bytecode::ComparisonOperator::Greater,
+            ast::Expression::MoreEqual(_, _, _) => bytecode::ComparisonOperator::GreaterOrEqual,
+            ast::Expression::Less(_, _, _) => bytecode::ComparisonOperator::Less,
+            ast::Expression::LessEqual(_, _, _) => bytecode::ComparisonOperator::LessOrEqual,
+            ast::Expression::In(_, _, _) => bytecode::ComparisonOperator::In,
+            ast::Expression::Is(_, _, _) => bytecode::ComparisonOperator::Is,
+            _ => unreachable!()
+        };
+
+        self.compile_expression(&vals[0])?;
+
+        let break_label = self.new_label();
+        let last_label = self.new_label();
+
+        // for all comparisons except the last (as the last one doesn't need a conditional jump)
+        let ops_slice = &ops[0..ops.len()];
+        let vals_slice = &vals[1..ops.len()];
+        for (op, val) in ops_slice.iter().zip(vals_slice.iter()) {
+            self.compile_expression(val)?;
+            // store rhs for the next comparison in chain
+            self.emit(Instruction::Duplicate);
+            self.emit(Instruction::Rotate { amount: 3 });
+
+            self.emit(Instruction::CompareOperation {
+                op: to_operator(op),
+            });
+
+            // if comparison result is false, we break with this value; if true, try the next one.
+            self.emit(Instruction::JumpIfFalseOrPop {
+                target: break_label,
+            });
+        }
+
+        // handle the last comparison
+        self.compile_expression(vals.last().unwrap())?;
+        self.emit(Instruction::CompareOperation {
+            op: to_operator(ops.last().unwrap()),
+        });
+        self.emit(Instruction::Jump { target: last_label });
+
+        // early exit left us with stack: `rhs, comparison_result`. We need to clean up rhs.
+        self.set_label(break_label);
+        self.emit(Instruction::Rotate { amount: 2 });
+        self.emit(Instruction::Pop);
+
+        self.set_label(last_label);
+        Ok(())
     }
 
     /// Implement boolean short circuit evaluation logic.
@@ -965,74 +1021,56 @@ impl<O: OutputStream> Compiler<O> {
         condition: bool,
         target_label: Label,
     ) -> Result<(), CompileError> {
-        // Compile expression for test, and jump to label if false
-        // match &expression.node {
-        //     ast::ExpressionType::BoolOp { op, values } => {
-        //         match op {
-        //             ast::BooleanOperator::And => {
-        //                 if condition {
-        //                     // If all values are true.
-        //                     let end_label = self.new_label();
-        //                     let (last_value, values) = values.split_last().unwrap();
-        //
-        //                     // If any of the values is false, we can short-circuit.
-        //                     for value in values {
-        //                         self.compile_jump_if(value, false, end_label)?;
-        //                     }
-        //
-        //                     // It depends upon the last value now: will it be true?
-        //                     self.compile_jump_if(last_value, true, target_label)?;
-        //                     self.set_label(end_label);
-        //                 } else {
-        //                     // If any value is false, the whole condition is false.
-        //                     for value in values {
-        //                         self.compile_jump_if(value, false, target_label)?;
-        //                     }
-        //                 }
-        //             }
-        //             ast::BooleanOperator::Or => {
-        //                 if condition {
-        //                     // If any of the values is true.
-        //                     for value in values {
-        //                         self.compile_jump_if(value, true, target_label)?;
-        //                     }
-        //                 } else {
-        //                     // If all of the values are false.
-        //                     let end_label = self.new_label();
-        //                     let (last_value, values) = values.split_last().unwrap();
-        //
-        //                     // If any value is true, we can short-circuit:
-        //                     for value in values {
-        //                         self.compile_jump_if(value, true, end_label)?;
-        //                     }
-        //
-        //                     // It all depends upon the last value now!
-        //                     self.compile_jump_if(last_value, false, target_label)?;
-        //                     self.set_label(end_label);
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     ast::ExpressionType::Unop {
-        //         op: ast::UnaryOperator::Not,
-        //         a,
-        //     } => {
-        //         self.compile_jump_if(a, !condition, target_label)?;
-        //     }
-        //     _ => {
-        //         // Fall back case which always will work!
-        //         self.compile_expression(expression)?;
-        //         if condition {
-        //             self.emit(Instruction::JumpIfTrue {
-        //                 target: target_label,
-        //             });
-        //         } else {
-        //             self.emit(Instruction::JumpIfFalse {
-        //                 target: target_label,
-        //             });
-        //         }
-        //     }
-        // }
+        //Compile expression for test, and jump to label if false
+        match &expression {
+            Expression::And(_, a, b) => {
+                println!("what's end");
+                if condition {
+                    // If all values are true.
+                    let end_label = self.new_label();
+                    // If any of the values is false, we can short-circuit.
+                    self.compile_jump_if(b, false, end_label)?;
+                    // It depends upon the last value now: will it be true?
+                    self.compile_jump_if(a, true, target_label)?;
+                    self.set_label(end_label);
+                } else {
+                    // If any value is false, the whole condition is false.
+                    self.compile_jump_if(a, false, target_label)?;
+                    self.compile_jump_if(b, false, target_label)?;
+                }
+            }
+            Expression::Or(_, a, b) => {
+                if condition {
+                    self.compile_jump_if(a, false, target_label)?;
+                    self.compile_jump_if(b, false, target_label)?;
+                    // If all values are true.
+                } else {
+                    let end_label = self.new_label();
+                    // If any of the values is false, we can short-circuit.
+                    self.compile_jump_if(b, true, end_label)?;
+                    // It depends upon the last value now: will it be true?
+                    self.compile_jump_if(a, false, target_label)?;
+                    self.set_label(end_label);
+                }
+            }
+            Expression::Not(_, a) => {
+                self.compile_jump_if(a, !condition, target_label)?;
+            }
+            _ => {
+                // Fall back case which always will work!
+                println!("yes");
+                self.compile_expression(expression)?;
+                if condition {
+                    self.emit(Instruction::JumpIfTrue {
+                        target: target_label,
+                    });
+                } else {
+                    self.emit(Instruction::JumpIfFalse {
+                        target: target_label,
+                    });
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1145,17 +1183,27 @@ impl<O: OutputStream> Compiler<O> {
             BitwiseAnd(loc, a, b) |
             BitwiseXor(loc, a, b) |
             BitwiseOr(loc, a, b) |
+            And(loc, a, b) |
+            Or(loc, a, b) => {
+                self.compile_expression(a)?;
+                self.compile_expression(b)?;
+                self.compile_op(expression, false);
+            }
+
             Less(loc, a, b) |
             More(loc, a, b) |
             LessEqual(loc, a, b) |
             MoreEqual(loc, a, b) |
             Equal(loc, a, b) |
             NotEqual(loc, a, b) |
-            And(loc, a, b) |
-            Or(loc, a, b) => {
-                self.compile_expression(a)?;
-                self.compile_expression(b)?;
-                self.compile_op(expression, false);
+            Is(loc, a, b) |
+            In(loc, a, b) => {
+                let mut v = Vec::new();
+                v.push(a.as_ref().clone());
+                v.push(b.as_ref().clone());
+                let mut ops = Vec::new();
+                ops.push(expression.clone());
+                self.compile_compare(&*v, &*ops);
             }
             Assign(loc, a, b) |
             AssignOr(loc, a, b) |

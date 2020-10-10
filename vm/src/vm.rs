@@ -224,7 +224,7 @@ impl VirtualMachine {
     //     res
     // }
     pub fn print(&self, value: Value) {
-        println! {"{:?}", value};
+        println! {"结果为{:?}", value};
     }
     pub fn sub(&self, a: Value, b: Value) -> Value {
         match (a, b) {

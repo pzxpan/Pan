@@ -10,7 +10,7 @@ Inspirational file: https://github.com/python/cpython/blob/master/Python/symtabl
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType};
+use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType, CType};
 use std::fmt;
 use std::borrow::Borrow;
 
@@ -460,6 +460,7 @@ impl SymbolTableBuilder {
                 self.scan_expression(expression, &ExpressionContext::Load)?;
             }
             If(loc, test, body, orelse) => {
+                println!("if enter");
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 self.scan_statement(body)?;
                 if let Some(code) = orelse {
@@ -480,7 +481,11 @@ impl SymbolTableBuilder {
                 //   self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
                 if let Some(e) = expression {
                     self.scan_expression(e, &ExpressionContext::Load)?;
-                    let ty = self.get_register_type(e.expr_name());
+                    let mut ty = e.get_type();
+                    if ty == CType::Unknown {
+                         ty = self.get_register_type(e.expr_name());
+                    }
+                    // let ty = self.get_register_type(e.expr_name());
                     if decl.ty.is_none() {
                         // let ty = self.tables.get(0).unwrap().lookup(e.expr_name().as_str()).unwrap().ty.clone();
                         self.register_name(decl.name.borrow().name.borrow(), ty.rettype().clone(), SymbolUsage::Assigned)?;
@@ -556,12 +561,9 @@ impl SymbolTableBuilder {
 
                 for (i, arg) in args_type.iter().enumerate() {
                     if let Some(e) = args.get(i) {
-                        println!("eeee is {:?}", e);
                         match e.clone() {
                             Expression::Variable(s) => {
-                                println!("eeee name is {:?}", s.name);
                                 let cty = self.get_register_type(s.name);
-                                println!("eeee name type is {:?}", cty);
                                 if args_type.get(i).unwrap().clone() != cty {
                                     return Err(SymbolTableError {
                                         error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i, args_type.get(i).unwrap().clone(), cty),
@@ -622,11 +624,9 @@ impl SymbolTableBuilder {
             ArrayLiteral(loc, _) => {}
             List(loc, _) => {}
             Type(loc, ty) => {
-                println!("Fuck");
                 self.register_name(&ty.name().to_string(), ty.get_type(), SymbolUsage::Used)?;
             }
             Variable(Identifier { loc, name }) => {
-                println!("WTF");
                 let ty = self.get_register_type(name.to_string()).clone();
                 match context {
                     ExpressionContext::Delete => {
@@ -682,7 +682,6 @@ impl SymbolTableBuilder {
         self.enter_scope(name, SymbolTableType::Function, line_number);
         let arg_types: Vec<(String, ast::CType, bool)> = args.iter().map(|s| ast::transfer(s)).collect();
         for s in arg_types.iter() {
-            println!("fparam={:?}", s);
             self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Global);
         }
