@@ -17,7 +17,7 @@ use std::borrow::Borrow;
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
-
+    builder.scan_symbol_types(program)?;
     builder.scan_program(program)?;
     builder.finish()
 }
@@ -315,12 +315,12 @@ impl SymbolTableBuilder {
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    let tt = def.get_type();
-                    println!("type is :{:?}", tt);
-
-                    println!("function is :{:?}", def.clone());
+                    // let tt = def.get_type();
+                    // println!("type is :{:?}", tt);
+                    //
+                    // println!("function is :{:?}", def.clone());
                     if let Some(name) = &def.name {
-                        self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
+                        // self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
                         if let Some(expression) = &def.as_ref().returns {
                             self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
@@ -335,6 +335,58 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
+
+
+    fn scan_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
+        self.register_name(&"int".to_string(), ast::CType::Int, SymbolUsage::Used)?;
+        self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
+        self.register_name(&"string".to_string(), ast::CType::String, SymbolUsage::Used)?;
+        self.register_name(&"bool".to_string(), ast::CType::Bool, SymbolUsage::Used)?;
+        for part in &program.0 {
+            match part {
+                ast::SourceUnitPart::DataDefinition(def) => {
+                    //resolve_contract(&def, file_no, &mut delay, ns);
+                }
+                ast::SourceUnitPart::EnumDefinition(def) => {
+                    // let _ = enum_decl(&def, file_no, None, ns);
+                }
+                ast::SourceUnitPart::StructDefinition(def) => {
+                    // self.enter_scope(name, SymbolTableType::Class, statement.location.row());
+                    // self.register_name("__module__", SymbolUsage::Assigned)?;
+                    // self.register_name("__qualname__", SymbolUsage::Assigned)?;
+                    // self.scan_statements(body)?;
+                    // self.leave_scope();
+                    // self.scan_expressions(bases, &ExpressionContext::Load)?;
+                    // for keyword in keywords {
+                    //     self.scan_expression(&keyword.value, &ExpressionContext::Load)?;
+                    // }
+                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
+                    // self.register_name(name, SymbolUsage::Assigned)?;
+                }
+                ast::SourceUnitPart::ImportDirective(def) => {}
+                ast::SourceUnitPart::ConstDefinition(def) => {}
+                ast::SourceUnitPart::FunctionDefinition(def) => {
+                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
+                    let tt = def.get_type();
+                    println!("type is :{:?}", tt);
+                    println!("function is :{:?}", def.clone());
+                    if let Some(name) = &def.name {
+                        self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
+                        // if let Some(expression) = &def.as_ref().returns {
+                        //     self.scan_expression(expression, &ExpressionContext::Load)?;
+                        // }
+                        // // // let params = def.as_ref().params.iter().map(|s| s.1).collect();
+                        // self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+                        // self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                        // self.leave_scope();
+                    }
+                }
+                _ => (),
+            }
+        }
+        Ok(())
+    }
+
 
     fn scan_parameters(&mut self, parameters: &[ast::Parameter]) -> SymbolTableResult {
         for parameter in parameters {

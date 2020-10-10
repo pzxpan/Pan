@@ -1,10 +1,12 @@
-fun other(a: int, b:int) : float {
-   return a - b;
-}
+
 
 fun main() {
     let aaa  = other(20,30);
     return aaa;
+}
+
+fun other(a: int, b:int) : float {
+   return a - b;
 }
 
 //fun main() {
