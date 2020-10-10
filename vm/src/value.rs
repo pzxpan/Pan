@@ -58,6 +58,12 @@ impl Value {
             _ => { "".to_string() }
         }
     }
+    pub fn bool_value(&self) -> bool {
+        match *self {
+            Value::Bool(v) => { v }
+            _ => unreachable!()
+        }
+    }
     pub fn code(&self) -> CodeObject {
         println!("code is:{:?}", self);
         match self {

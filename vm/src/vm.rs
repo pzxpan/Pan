@@ -223,6 +223,59 @@ impl VirtualMachine {
     //     let res = self._invoke(func_ref, args.into());
     //     res
     // }
+    pub fn _eq(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Bool(a == b)
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn _ne(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Bool(a != b)
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn _le(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Bool(a <= b)
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn _ge(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Bool(a >= b)
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn _gt(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Bool(a > b)
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn _lt(&self, a: Value, b: Value) -> Value {
+        match (a, b) {
+            (Value::Int(a), Value::Int(b)) => {
+                Value::Bool(a <= b)
+            }
+            _ => unreachable!()
+        }
+    }
     pub fn print(&self, value: Value) {
         println! {"结果为{:?}", value};
     }

@@ -348,42 +348,42 @@ impl Frame {
                 None
             }
             bytecode::Instruction::JumpIfTrue { target } => {
-                // let obj = self.pop_value();
-                // let value = objbool::boolval(vm, obj)?;
-                // if value {
-                //     self.jump(*target);
-                // }
+                let obj = self.pop_value();
+                let value = obj.bool_value();
+                if value {
+                    self.jump(*target);
+                }
                 None
             }
 
             bytecode::Instruction::JumpIfFalse { target } => {
-                // let obj = self.pop_value();
-                // let value = objbool::boolval(vm, obj)?;
-                // if !value {
-                //     self.jump(*target);
-                // }
+                let obj = self.pop_value();
+                let value = obj.bool_value();
+                if !value {
+                    self.jump(*target);
+                }
                 None
             }
 
             bytecode::Instruction::JumpIfTrueOrPop { target } => {
-                // let obj = self.last_value();
-                // let value = objbool::boolval(vm, obj)?;
-                // if value {
-                //     self.jump(*target);
-                // } else {
-                //     self.pop_value();
-                // }
+                let obj = self.last_value();
+                let value = obj.bool_value();
+                if value {
+                    self.jump(*target);
+                } else {
+                    self.pop_value();
+                }
                 None
             }
 
             bytecode::Instruction::JumpIfFalseOrPop { target } => {
-                // let obj = self.last_value();
-                // let value = objbool::boolval(vm, obj)?;
-                // if !value {
-                //     self.jump(*target);
-                // } else {
-                //     self.pop_value();
-                // }
+                let obj = self.last_value();
+                let value = obj.bool_value();
+                if !value {
+                    self.jump(*target);
+                } else {
+                    self.pop_value();
+                }
                 None
             }
 
@@ -742,7 +742,7 @@ impl Frame {
 
         println!("ddd func_def:{:?}", func_ref);
         let code = func_ref.code();
-        println!("cao  function name:{:?},equal = print: {:?}",code.obj_name,code.obj_name.eq("print"));
+        println!("cao  function name:{:?},equal = print: {:?}", code.obj_name, code.obj_name.eq("print"));
         if code.obj_name.eq("print") {
             vm.print(args.get(0).unwrap().clone());
         } else {
@@ -1044,22 +1044,23 @@ impl Frame {
     ) -> FrameResult {
         let b = self.pop_value();
         let a = self.pop_value();
-        //  let value = match *op {
-        //      bytecode::ComparisonOperator::Equal => vm._eq(a, b)?,
-        //      bytecode::ComparisonOperator::NotEqual => vm._ne(a, b)?,
-        //      bytecode::ComparisonOperator::Less => vm._lt(a, b)?,
-        //      bytecode::ComparisonOperator::LessOrEqual => vm._le(a, b)?,
-        //      bytecode::ComparisonOperator::Greater => vm._gt(a, b)?,
-        //      bytecode::ComparisonOperator::GreaterOrEqual => vm._ge(a, b)?,
-        //      // bytecode::ComparisonOperator::Is => vm.new_bool(self._is(a, b)),
-        //      // bytecode::ComparisonOperator::IsNot => vm.new_bool(self._is_not(a, b)),
-        //      // bytecode::ComparisonOperator::In => vm.new_bool(self._in(vm, a, b)?),
-        //      // bytecode::ComparisonOperator::NotIn => vm.new_bool(self._not_in(vm, a, b)?),
-        // //     bytecode::ComparisonOperator::ExceptionMatch => vm.new_bool(self.exc_match(vm, a, b)?),
-        //      _ => { vm._eq(a, b)? }
-        //  };
-        //
-        //  self.push_value(value);
+        let value = match *op {
+            bytecode::ComparisonOperator::Equal => vm._eq(a, b),
+            bytecode::ComparisonOperator::NotEqual => vm._ne(a, b),
+            bytecode::ComparisonOperator::Less => vm._lt(a, b),
+            bytecode::ComparisonOperator::LessOrEqual => vm._le(a, b),
+            bytecode::ComparisonOperator::Greater => vm._gt(a, b),
+            bytecode::ComparisonOperator::GreaterOrEqual => vm._ge(a, b),
+            // bytecode::ComparisonOperator::Is => vm._is(a, b)?;
+            // bytecode::ComparisonOperator::Is => vm.new_bool(self._is(a, b)),
+            // bytecode::ComparisonOperator::IsNot => vm.new_bool(self._is_not(a, b)),
+            // bytecode::ComparisonOperator::In => vm.new_bool(self._in(vm, a, b)?),
+            // bytecode::ComparisonOperator::NotIn => vm.new_bool(self._not_in(vm, a, b)?),
+            //     bytecode::ComparisonOperator::ExceptionMatch => vm.new_bool(self.exc_match(vm, a, b)?),
+            _ => unreachable!()
+        };
+
+        self.push_value(value);
         None
     }
 

@@ -1,5 +1,5 @@
 fun fib(x:int) : int {
-    if x > 3 {
+    if x > 5 {
         print(1111);
         return 1;
     } else {
@@ -11,7 +11,7 @@ fun fib(x:int) : int {
 fun main() {
  //  let aaa  = other(30,20);
    let fff = 10;
-   let abb = fib(2);
+   let abb = fib(4);
    print(fff);
    return;
 }
