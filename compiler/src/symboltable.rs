@@ -781,7 +781,7 @@ impl SymbolTableBuilder {
         match role {
             SymbolUsage::Nonlocal => {
                 if let SymbolScope::Unknown = symbol.scope {
-                    symbol.scope = SymbolScope::Nonlocal;
+                    symbol.scope = SymbolScope::Global;
                 } else {
                     return Err(SymbolTableError {
                         error: format!("Symbol {} scope cannot be set to nonlocal, since its scope was already determined otherwise.", name),

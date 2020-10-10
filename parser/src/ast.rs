@@ -384,7 +384,8 @@ impl Expression {
 impl HasType for Expression {
     fn get_type(&self) -> CType {
         match self {
-            Expression::Add(_, left, right) => {
+            Expression::Add(_, left, right) |
+            Expression::Subtract(_, left, right) => {
                 let l = left.get_type();
                 let r = right.get_type();
                 if l == r {

@@ -271,7 +271,7 @@ impl VirtualMachine {
     pub fn _lt(&self, a: Value, b: Value) -> Value {
         match (a, b) {
             (Value::Int(a), Value::Int(b)) => {
-                Value::Bool(a <= b)
+                Value::Bool(a < b)
             }
             _ => unreachable!()
         }
