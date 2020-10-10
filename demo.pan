@@ -1,10 +1,6 @@
-
-
 fun main() {
-  // let bb:int = 10;
-  // let cc:int = 20;
-   let aaa:int  = other(30,20);
-   print(20);
+   let aaa  = other(30,20);
+   print(aaa);
    return;
 }
 fun print(a:int) {
@@ -12,7 +8,7 @@ fun print(a:int) {
 }
 
 fun other(a: int, b:int) : int {
-   return a - b;
+   return a - b*100;
 }
 
 //fun main() {

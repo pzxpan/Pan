@@ -427,7 +427,7 @@ impl SymbolTableBuilder {
     // }
     fn get_register_type(&mut self, name: String) -> ast::CType {
         let len = self.tables.len();
-        for i in (0..len - 1).rev() {
+        for i in (0..len).rev() {
             let a = self.tables.get(i).unwrap().lookup(name.as_str());
             if a.is_some() {
                 return a.unwrap().ty.clone();
@@ -555,12 +555,22 @@ impl SymbolTableBuilder {
                 let args_type = ty.param_type();
 
                 for (i, arg) in args_type.iter().enumerate() {
-                    let cty = args.get(i).unwrap().get_type();
-                    if args_type.get(i).unwrap().clone() != cty {
-                        return Err(SymbolTableError {
-                            error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i, args_type.get(i).unwrap().clone(), cty),
-                            location: loc.clone(),
-                        });
+                    if let Some(e) = args.get(i) {
+                        println!("eeee is {:?}", e);
+                        match e.clone() {
+                            Expression::Variable(s) => {
+                                println!("eeee name is {:?}", s.name);
+                                let cty = self.get_register_type(s.name);
+                                println!("eeee name type is {:?}", cty);
+                                if args_type.get(i).unwrap().clone() != cty {
+                                    return Err(SymbolTableError {
+                                        error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i, args_type.get(i).unwrap().clone(), cty),
+                                        location: loc.clone(),
+                                    });
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 self.scan_expressions(args, &ExpressionContext::Load)?;
@@ -615,7 +625,7 @@ impl SymbolTableBuilder {
                 println!("Fuck");
                 self.register_name(&ty.name().to_string(), ty.get_type(), SymbolUsage::Used)?;
             }
-            Variable(Identifier { loc, name, }) => {
+            Variable(Identifier { loc, name }) => {
                 println!("WTF");
                 let ty = self.get_register_type(name.to_string()).clone();
                 match context {
