@@ -1,18 +1,14 @@
 fun fib(x:int) : int {
-    if x > 5 {
-        print(1111);
+    if x < 3 {
         return 1;
-    } else {
-        print(22222);
-        return 3;
     }
-
+    return fib(x-1) + fib(x-2);
 }
 fun main() {
  //  let aaa  = other(30,20);
    let fff = 10;
-   let abb = fib(4);
-   print(fff);
+   let abb = fib(5);
+   print(abb);
    return;
 }
 fun print(a:int) {
