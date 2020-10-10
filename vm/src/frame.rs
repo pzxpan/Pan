@@ -739,18 +739,23 @@ impl Frame {
         // let args = self.pop_value();
         println!("ddd args:{:?}", args);
         let func_ref = self.pop_value();
+
         println!("ddd func_def:{:?}", func_ref);
         let code = func_ref.code();
+        println!("cao  function name:{:?},equal = print: {:?}",code.obj_name,code.obj_name.eq("print"));
+        if code.obj_name.eq("print") {
+            vm.print(args.get(0).unwrap().clone());
+        } else {
+            for (i, name) in code.arg_names.iter().enumerate() {
+                self.scope.store_global(name.to_string(), args.get(i).unwrap().to_owned());
+            }
 
-        for (i, name) in code.arg_names.iter().enumerate() {
-            self.scope.store_global(name.to_string(), args.get(i).unwrap().to_owned());
+            let value = vm.run_code_obj(func_ref.code().to_owned(), self.scope.clone());
+            match value {
+                Some(ExecutionResult::Return(v)) => self.push_value(v),
+                _ => self.push_value(Value::Nil)
+            }
         }
-        let value = vm.run_code_obj(func_ref.code().to_owned(), self.scope.clone());
-        match value {
-            Some(ExecutionResult::Return(v)) => self.push_value(v),
-            _ => self.push_value(Value::Nil)
-        }
-
         None
     }
 

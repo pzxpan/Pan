@@ -342,6 +342,18 @@ impl SymbolTableBuilder {
         self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
         self.register_name(&"string".to_string(), ast::CType::String, SymbolUsage::Used)?;
         self.register_name(&"bool".to_string(), ast::CType::Bool, SymbolUsage::Used)?;
+        let mut arg_types = Vec::new();
+        arg_types.push((String::from("value"), ast::CType::Int, false));
+        let tt = ast::CType::Fn(ast::FnType {
+            name: "print".to_string(),
+            arg_types,
+            type_args: Vec::new(),
+            ret_type: Box::from(ast::CType::Any),
+            is_pub: true,
+        });
+
+        self.register_name(&"print".to_string(), tt, SymbolUsage::Used)?;
+
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {

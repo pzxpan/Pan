@@ -6,7 +6,7 @@ use crate::symboltable::{
 };
 use itertools::Itertools;
 use num_complex::Complex64;
-use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope};
+use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
 use pan_parser::{ast, parse};
 use pan_parser::ast::{Expression, Parameter};
 use std::borrow::Borrow;
@@ -72,7 +72,6 @@ fn with_compiler(
     let mut compiler = Compiler::new(optimize);
     compiler.source_path = Some(source_path);
     compiler.push_new_code_object("<module>".to_owned());
-
     f(&mut compiler)?;
     let code = compiler.pop_code_object();
     trace!("Compilation completed: {:?}", code);
@@ -170,9 +169,7 @@ impl<O: OutputStream> Compiler<O> {
     ) -> Result<(), CompileError> {
         let size_before = self.output_stack.len();
         println!("size before is{:?}", size_before);
-
         self.symbol_table_stack.push(symbol_table);
-
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
@@ -209,6 +206,7 @@ impl<O: OutputStream> Compiler<O> {
                     let returns = &def.returns;
                     let is_async = false;
                     self.compile_function_def(name, args.as_slice(), body, returns, is_async);
+
 
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                 }
@@ -467,7 +465,106 @@ impl<O: OutputStream> Compiler<O> {
         }
     }
 
+    fn compile_builtin_func(
+        &mut self,
+        name: &str,
+    ) -> Result<(), CompileError> {
+        // Create bytecode for this function:
+        // remember to restore self.ctx.in_loop to the original after the function is compiled
+        let prev_ctx = self.ctx;
 
+        self.ctx = CompileContext {
+            in_loop: false,
+            func: FunctionContext::Function,
+        };
+
+        let qualified_name = self.create_qualified_name(name, "");
+
+        let a: Vec<Parameter> = Vec::new();
+        self.enter_function(name, &a)?;
+        // self.prepare_decorators(decorator_list)?;
+        // self.compile_statements(body)?;
+        // Emit None at end:
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::None,
+        });
+        self.emit(Instruction::ReturnValue);
+        let mut code = self.pop_code_object();
+        self.leave_scope();
+        // match body {
+        //     ast::Statement::Block(_, statements) => {
+        //         let s = statements.last();
+        //         match s {
+        //             Some(ast::Statement::Return(..)) => {
+        //                 // the last instruction is a ReturnValue already, we don't need to emit it
+        //             }
+        //             _ => {
+        //                 self.emit(Instruction::LoadConst {
+        //                     value: bytecode::Constant::None,
+        //                 });
+        //                 self.emit(Instruction::ReturnValue);
+        //             }
+        //         }
+        //     }
+        //
+        //     _ => {}
+        // }
+        // // Prepare type annotations:
+        // let mut num_annotations = 0;
+        //
+        // // Return annotation:
+        // if let Some(annotation) = returns {
+        //     // key:
+        //     self.emit(Instruction::LoadConst {
+        //         value: bytecode::Constant::String {
+        //             value: "return".to_string(),
+        //         },
+        //     });
+        //     // value:
+        //     self.compile_expression(annotation)?;
+        //     num_annotations += 1;
+        // }
+        //
+        // for arg in args.iter() {
+        //     self.emit(Instruction::LoadConst {
+        //         value: bytecode::Constant::String {
+        //             value: arg.name.as_ref().unwrap().name.clone()
+        //         },
+        //     });
+        //     self.compile_expression(&arg.ty)?;
+        //     num_annotations += 1;
+        // }
+        //
+        // if num_annotations > 0 {
+        //     code.flags |= bytecode::CodeFlags::HAS_ANNOTATIONS;
+        //     self.emit(Instruction::BuildMap {
+        //         size: num_annotations,
+        //         unpack: false,
+        //         for_call: false,
+        //     });
+        // }
+        //
+        // if is_async {
+        //     code.flags |= bytecode::CodeFlags::IS_COROUTINE;
+        // }
+
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::Code {
+                code: Box::new(code),
+            },
+        });
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::String {
+                value: qualified_name,
+            },
+        });
+
+        // Turn code object into function object:
+        self.emit(Instruction::MakeFunction);
+        self.store_name(name);
+        self.ctx = prev_ctx;
+        Ok(())
+    }
     fn compile_function_def(
         &mut self,
         name: &str,
@@ -1089,7 +1186,7 @@ impl<O: OutputStream> Compiler<O> {
             ArrayLiteral(loc, _) => {}
             List(loc, _) => {}
             Type(loc, ty) => {
-               // self.load_name(&ty.name())
+                // self.load_name(&ty.name())
             }
             Variable(ast::Identifier { loc, name }) => {
                 // Determine the contextual usage of this symbol:

@@ -1,11 +1,17 @@
 
 
 fun main() {
-    let aaa  = other(20,30);
-    return aaa;
+  // let bb:int = 10;
+  // let cc:int = 20;
+   let aaa:int  = other(30,20);
+   print(20);
+   return;
+}
+fun print(a:int) {
+   return;
 }
 
-fun other(a: int, b:int) : float {
+fun other(a: int, b:int) : int {
    return a - b;
 }
 

@@ -223,7 +223,9 @@ impl VirtualMachine {
     //     let res = self._invoke(func_ref, args.into());
     //     res
     // }
-
+    pub fn print(&self, value: Value) {
+        println! {"caocao{:?}", value};
+    }
     pub fn sub(&self, a: Value, b: Value) -> Value {
         match (a, b) {
             (Value::Int(a), Value::Int(b)) => {
