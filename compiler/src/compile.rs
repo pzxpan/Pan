@@ -601,11 +601,9 @@ impl<O: OutputStream> Compiler<O> {
                 let s = statements.last();
                 match s {
                     Some(ast::Statement::Return(..)) => {
-                        println!("ffff returns;");
                         // the last instruction is a ReturnValue already, we don't need to emit it
                     }
                     _ => {
-                        println!("ffff nont returns;");
                         self.emit(Instruction::LoadConst {
                             value: bytecode::Constant::None,
                         });
@@ -1253,6 +1251,7 @@ impl<O: OutputStream> Compiler<O> {
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
+            Lambda(lambda) => {}
         }
         // match &expression.node {
         //     Call {

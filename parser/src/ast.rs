@@ -56,6 +56,7 @@ pub enum CType {
     Bool,
     Array(Box<CType>),
     Fn(FnType),
+    Lambda(LambdaType),
     Unknown,
 }
 
@@ -367,6 +368,7 @@ pub enum Expression {
     Tuple(Loc, Vec<(Loc, Option<Parameter>)>),
     Dict(Loc, Vec<(Loc, Option<Parameter>, Parameter)>),
     Set(Loc, Vec<(Loc, Option<Parameter>)>),
+    Lambda(LambdaDefinition),
 
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
 }
@@ -416,6 +418,9 @@ impl HasType for Expression {
             // }
             Expression::NumberLiteral(_, _) => {
                 CType::Int
+            }
+            Expression::Lambda(e) => {
+                e.get_type()
             }
 
             _ => { CType::Unknown }
@@ -487,6 +492,7 @@ impl Expression {
             | ArrayLiteral(loc, _)
             | List(loc, _)
             | Type(loc, _)
+            | Lambda(LambdaDefinition { loc, .. })
             | Variable(Identifier { loc, .. })
             | Yield(loc, _)
             | In(loc, _, _)
@@ -601,6 +607,14 @@ pub struct FnType {
     pub is_pub: bool,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct LambdaType {
+    pub name: String,
+    pub ret_type: Box<CType>,
+    pub captures: Vec<String>,
+    pub arg_types: Vec<(/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool)>,
+}
+
 pub fn transfer(s: &(Loc, Option<Parameter>)) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
     let ty = s.1.as_ref().unwrap().get_type().to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
@@ -622,13 +636,32 @@ impl HasType for FunctionDefinition {
     }
 }
 
-// #[derive(Debug, Clone, PartialEq)]
-// pub struct LambdaDefinition {
-//     pub loc: Loc,
-//     pub params: Vec<(Loc, Option<Parameter>)>,
-//     pub name: Option<Identifier>,
-//     pub body: Option<Statement>,
-// }
+impl HasType for LambdaDefinition {
+    fn get_type(&self) -> CType {
+        let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s)).collect();
+        let name = "lambda".to_string();
+        let mut ret_type = Box::from(match *self.body.clone() {
+            Statement::Block(_, statements) => {
+                let s = statements.last();
+                match s {
+                    Some(Statement::Return(_, e)) => {
+                        e.as_ref().unwrap().get_type()
+                    }
+                    _ => { CType::Any }
+                }
+            }
+            _ => { CType::Any }
+        });
+        CType::Lambda(LambdaType { name, arg_types, ret_type, captures: vec![] })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LambdaDefinition {
+    pub loc: Loc,
+    pub params: Vec<(Loc, Option<Parameter>)>,
+    pub body: Box<Statement>,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 #[allow(clippy::large_enum_variant, clippy::type_complexity)]
@@ -649,10 +682,6 @@ pub enum Statement {
         Expression,
         Option<Box<Statement>>,
     ),
-    LambdaDefinition(Loc,
-                     Identifier,
-                     Vec<(Loc, Option<Parameter>)>,
-                     Box<Statement>),
 }
 
 
@@ -673,7 +702,6 @@ impl Statement {
             | Statement::VariableDefinition(loc, _, _)
             | Statement::For(loc, _, _, _)
             | Statement::While(loc, _, _)
-            | Statement::LambdaDefinition(loc, _, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)
             | Statement::ConstDefinition(loc, _, _)

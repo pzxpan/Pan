@@ -10,7 +10,7 @@ Inspirational file: https://github.com/python/cpython/blob/master/Python/symtabl
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType, CType};
+use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType, CType, LambdaDefinition};
 use std::fmt;
 use std::borrow::Borrow;
 
@@ -336,7 +336,12 @@ impl SymbolTableBuilder {
         Ok(())
     }
 
-
+    fn scan_lambda(&mut self, name: String, lambda: LambdaDefinition) -> SymbolTableResult {
+        self.enter_function(&name, &lambda.params, lambda.loc.1)?;
+        self.scan_statement(&lambda.body)?;
+        self.leave_scope();
+        Ok(())
+    }
     fn scan_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
         self.register_name(&"int".to_string(), ast::CType::Int, SymbolUsage::Used)?;
         self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
@@ -481,14 +486,24 @@ impl SymbolTableBuilder {
                 //   self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
                 if let Some(e) = expression {
                     self.scan_expression(e, &ExpressionContext::Load)?;
+                    //获取右侧表达式的返回类型,注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
                     let mut ty = e.get_type();
                     if ty == CType::Unknown {
+                        //如果式方法调用就获取注册方法的返回类型，
                         ty = self.get_register_type(e.expr_name());
                     }
                     // let ty = self.get_register_type(e.expr_name());
                     if decl.ty.is_none() {
+                        match ty {
+                            CType::Lambda(_) => {
+                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned)?;
+                            }
+                            CType::Fn(_) => {
+                                self.register_name(decl.name.borrow().name.borrow(), ty.rettype().clone(), SymbolUsage::Assigned)?;
+                            }
+                            _ => {}
+                        }
                         // let ty = self.tables.get(0).unwrap().lookup(e.expr_name().as_str()).unwrap().ty.clone();
-                        self.register_name(decl.name.borrow().name.borrow(), ty.rettype().clone(), SymbolUsage::Assigned)?;
                     } else {
                         println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(), ty.rettype().clone());
                         if decl.ty.as_ref().unwrap().get_type() != ty.rettype().clone() {
@@ -515,12 +530,6 @@ impl SymbolTableBuilder {
                 // if let Some(e) = expression {
                 //     self.scan_expression(e, &ExpressionContext::Load)?;
                 // }
-            }
-
-            LambdaDefinition(loc, _, _, _) => {
-                // self.enter_function("lambda", args, expression.location.row())?;
-                // self.scan_expression(body, &ExpressionContext::Load)?;
-                // self.leave_scope();
             }
         }
         Ok(())
@@ -651,6 +660,9 @@ impl SymbolTableBuilder {
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
+            Lambda(lambda) => {
+                self.scan_lambda("lambda".to_string(), lambda.clone());
+            }
         }
         Ok(())
     }

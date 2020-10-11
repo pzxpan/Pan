@@ -13,9 +13,9 @@ fun fib1(x:int) : int {
 }
 
 fun main() {
-  // let a = 20;
-  // let aaa = other(a+120,20);
-   //print(aaa);
+  // let add = (a:int,b:int) => {
+    //   print(20);
+   //};
   let abb = fib(9);
    print(abb);
    return;

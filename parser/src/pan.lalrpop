@@ -274,6 +274,8 @@ Precedence0: Expression = {
 
         Expression::List(Loc(file_no, l, r), a)
     },
+
+    <LambdaDefinition> => <>
 }
 
 
@@ -350,13 +352,16 @@ FunctionDefinition: Box<FunctionDefinition> = {
     },
 }
 
-LambdaDefinition: Statement = {
-   <l:@L> "let" <name:Identifier>  "="   <params:ParameterList>  "=>" <body:BlockStatement> <r:@R> =>
-       Statement::LambdaDefinition(
-       Loc(file_no, l, r),
-       name,
-       params,
-       Box::new(body))
+LambdaDefinition: Expression = {
+   <l:@L> <params:ParameterList>  "=>" <body:BlockStatement> <r:@R> =>
+    {
+       Expression::Lambda(LambdaDefinition
+       {
+            loc:Loc(file_no, l, r),
+            params,
+            body: Box::new(body),
+       })
+    }
 }
 
 BlockStatement: Statement = {
@@ -405,7 +410,6 @@ NonIfStatement: Statement = {
     <l:@L> "return" <e:Expression> <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), Some(e))
     },
-     LambdaDefinition => <>,
 }
 
 Comma<T>: Vec<T> = {
