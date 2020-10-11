@@ -124,6 +124,12 @@ impl VirtualMachine {
 
     pub fn run_code_obj(&mut self, code: CodeObject, scope: Scope) -> FrameResult {
         // println!("code is {:?}", code.to_string());
+        for a in scope.globals.borrow_mut().iter() {
+            println!("globals: {:?}", a);
+        }
+        for a in scope.locals.borrow_mut().iter() {
+            println!("locals: {:?}", a);
+        }
         let frame = Frame::new(code, scope);
         self.run_frame(frame)
     }

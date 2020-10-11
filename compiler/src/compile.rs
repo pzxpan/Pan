@@ -238,6 +238,9 @@ impl<O: OutputStream> Compiler<O> {
 
     fn scope_for_name(&self, name: &str) -> bytecode::NameScope {
         let symbol = self.lookup_name(name);
+        if symbol.is_parameter {
+            return bytecode::NameScope::Local;
+        }
         match symbol.scope {
             SymbolScope::Global => bytecode::NameScope::Global,
             SymbolScope::Nonlocal => bytecode::NameScope::Local,

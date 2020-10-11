@@ -483,7 +483,7 @@ impl SymbolTableBuilder {
                     self.scan_expression(e, &ExpressionContext::Load)?;
                     let mut ty = e.get_type();
                     if ty == CType::Unknown {
-                         ty = self.get_register_type(e.expr_name());
+                        ty = self.get_register_type(e.expr_name());
                     }
                     // let ty = self.get_register_type(e.expr_name());
                     if decl.ty.is_none() {
@@ -683,7 +683,7 @@ impl SymbolTableBuilder {
         let arg_types: Vec<(String, ast::CType, bool)> = args.iter().map(|s| ast::transfer(s)).collect();
         for s in arg_types.iter() {
             self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
-            self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Global);
+            self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter);
         }
         // Fill scope with parameter names:
         // self.scan_parameters(&args.args)?;

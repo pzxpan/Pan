@@ -6,6 +6,7 @@ use std::collections::{hash_map::DefaultHasher, HashMap};
 use crate::value::Value;
 use crate::frame::FrameResult;
 use std::cell::RefCell;
+use std::borrow::BorrowMut;
 
 /*
  * So a scope is a linked list of scopes.
@@ -16,7 +17,7 @@ pub type PanDictRef = HashMap<String, Value>;
 
 #[derive(Clone)]
 pub struct Scope {
-    locals: RefCell<Vec<PanDictRef>>,
+    pub(crate) locals: RefCell<Vec<RefCell<PanDictRef>>>,
     pub globals: RefCell<PanDictRef>,
 }
 
@@ -28,18 +29,22 @@ impl fmt::Debug for Scope {
 }
 
 impl Scope {
-    pub fn new(locals: Option<PanDictRef>, globals: PanDictRef, vm: &VirtualMachine) -> Scope {
-        let locals = match locals {
-            Some(dict) => vec![dict],
-            None => vec![],
-        };
-        let scope = Scope { locals: RefCell::new(locals), globals: RefCell::new(globals) };
+    pub fn new(locals: Vec<PanDictRef>, globals: PanDictRef, vm: &VirtualMachine) -> Scope {
+        // let locals = match locals {
+        //     Some(dict) => vec![dict],
+        //     None => vec![],
+        // };
+        let mut v = Vec::new();
+        for a in locals {
+            v.push(RefCell::new(a));
+        }
+        let scope = Scope { locals: RefCell::new(v), globals: RefCell::new(globals) };
         // scope.store_name(vm, "__annotations__", vm.ctx.new_dict().into_object());
         scope
     }
 
     pub fn with_builtins(
-        locals: Option<PanDictRef>,
+        locals: Vec<PanDictRef>,
         globals: PanDictRef,
         vm: &VirtualMachine,
     ) -> Scope {
@@ -54,25 +59,30 @@ impl Scope {
     }
 
     pub fn get_locals(&self) -> PanDictRef {
+        println!("self.locals:{:?}", self.locals);
         match self.locals.borrow_mut().first() {
-            Some(dict) => dict.clone(),
-            None => self.globals.borrow().clone(),
+            Some(dict) => dict.borrow().clone(),
+            None => unreachable!(),
         }
     }
 
-    pub fn get_only_locals(&self) -> Option<PanDictRef> {
-        self.locals.borrow_mut().first().cloned()
-    }
-
-    // pub fn new_child_scope_with_locals(&self, locals: PyDictRef) -> Scope {
-    //     let mut new_locals = Vec::with_capacity(self.locals.len() + 1);
-    //     new_locals.push(locals);
-    //     new_locals.extend_from_slice(&self.locals);
-    //     Scope {
-    //         locals: new_locals,
-    //         globals: self.globals.clone(),
-    //     }
+    // pub fn get_only_locals(&self) -> Option<PanDictRef> {
+    //     self.locals.borrow_mut().first().cloned()
     // }
+
+    pub fn new_child_scope_with_locals(&self) -> Scope {
+        let mut new_locals = Vec::with_capacity(self.locals.borrow_mut().len() + 1);
+        let mut v = HashMap::new();
+        new_locals.push(RefCell::new(v));
+        for a in self.locals.borrow_mut().iter() {
+            new_locals.push(a.clone());
+        }
+        //     new_locals.extend_from_slice(&self.locals);
+        Scope {
+            locals: RefCell::new(new_locals),
+            globals: self.globals.clone(),
+        }
+    }
     //
     // pub fn new_child_scope(&self, ctx: &PyContext) -> Scope {
     //     self.new_child_scope_with_locals(ctx.new_dict())
@@ -94,9 +104,11 @@ pub trait NameProtocol {
 impl NameProtocol for Scope {
     #[cfg_attr(feature = "flame-it", flame("Scope"))]
     fn load_name(&self, name: String) -> Option<Value> {
-        for dict in self.locals.borrow_mut().iter() {
-            if let Some(value) = self.load_local(name.clone()) {
-                return Some(value);
+        for dict in self.locals.borrow().iter() {
+            let v = dict.borrow_mut();
+            let v = v.get(&name);
+            if let Some(value) = v {
+                return Some(value.clone());
             }
         }
         // Fall back to loading a global after all scopes have been searched!
@@ -119,7 +131,11 @@ impl NameProtocol for Scope {
 
 
     fn store_name(&self, key: String, value: Value) {
-        self.get_locals().insert(key.to_string(), value);
+        let mut a = self.locals.borrow_mut();
+        println!("dddd name:{:?}", key);
+        a.first().unwrap().borrow_mut().insert(key.to_string(), value);
+        // a.insert(key.to_string(), value);
+        println!("222dictddd2:{:?}", a);
     }
 
     // fn delete_name(&self, key: String) -> Option<Value> {

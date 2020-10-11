@@ -11,6 +11,7 @@ use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
 use pan_bytecode::bytecode::CodeObject;
 use crate::value::{Value, FnValue, Obj};
+use std::borrow::{Borrow, BorrowMut};
 
 
 #[derive(Clone, Debug)]
@@ -544,19 +545,19 @@ impl Frame {
         name_scope: &bytecode::NameScope,
     ) -> FrameResult {
         let obj = self.pop_value();
-        println!("store name {:?}", obj);
-        self.scope.store_global(name.to_string(), obj);
-        // match name_scope {
-        //     bytecode::NameScope::Global => {
-        //        self.scope.store_global(name.to_string(), obj);
-        //     }
-        //     bytecode::NameScope::Local => {
-        //         self.scope.store_name(name.to_string(), obj);
-        //     }
-        //     bytecode::NameScope::Free => {
-        //         self.scope.store_name(name.to_string(), obj);
-        //     }
-        // }
+
+        match name_scope {
+            bytecode::NameScope::Global => {
+                self.scope.store_global(name.to_string(), obj);
+            }
+            bytecode::NameScope::Local => {
+                println!("store name {:?},value:{:?},{:p}", name, obj, self);
+                self.scope.store_name(name.to_string(), obj);
+            }
+            bytecode::NameScope::Free => {
+                self.scope.store_global(name.to_string(), obj);
+            }
+        }
         None
     }
 
@@ -571,7 +572,7 @@ impl Frame {
         // let optional_value = self.scope.load_global(name.to_string());
         let optional_value = match name_scope {
             bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
-            bytecode::NameScope::Local => self.scope.load_local(name.to_string()),
+            bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
             bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
         };
 
@@ -581,7 +582,7 @@ impl Frame {
                 Value::Nil
             }
         };
-        println!("load_name value: {:?}", value);
+        println!("load_name value: {:?},栈名:{:p}", value, self);
         self.push_value(value.clone());
         None
     }
@@ -746,11 +747,11 @@ impl Frame {
         if code.obj_name.eq("print") {
             vm.print(args.get(0).unwrap().clone());
         } else {
+            let mut s = self.scope.new_child_scope_with_locals();
             for (i, name) in code.arg_names.iter().enumerate() {
-                self.scope.store_global(name.to_string(), args.get(i).unwrap().to_owned());
+                s.store_name(name.to_string(), args.get(i).unwrap().to_owned());
             }
-
-            let value = vm.run_code_obj(func_ref.code().to_owned(), self.scope.clone());
+            let value = vm.run_code_obj(func_ref.code().to_owned(), s);
             match value {
                 Some(ExecutionResult::Return(v)) => self.push_value(v),
                 _ => self.push_value(Value::Nil)
@@ -894,7 +895,7 @@ impl Frame {
 
         // pop argc arguments
         // argument: name, args, globals
-        let scope = self.scope.clone();
+
         let func = FnValue { name: qualified_name.name(), code: code_obj.code(), has_return: true };
         // let func_obj = vm
         //     .ctx
@@ -1112,11 +1113,17 @@ impl Frame {
     }
 
     pub fn push_value(&self, obj: Value) {
-        println!("push value is : {:?}", obj);
+        for (i, a) in self.stack.clone().borrow_mut().iter().enumerate() {
+            println!("when push value: No:{:?}, value{:?} 栈地址:{:p}", i, a, self);
+        }
+
         self.stack.borrow_mut().push(obj);
     }
 
     fn pop_value(&self) -> Value {
+        for (i, a) in self.stack.clone().borrow_mut().iter().enumerate() {
+            println!("when pop value: No:{:?}, value{:?} 栈地址:{:p}", i, a, self);
+        }
         self.stack
             .borrow_mut()
             .pop()

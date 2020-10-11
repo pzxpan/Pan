@@ -11,6 +11,7 @@ use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
 use std::collections::HashMap;
 use pan_vm::value::Value;
+use std::cell::RefCell;
 
 fn main() {
     let path = "/Users/panzhenxing/Desktop/PanPan/Pan/demo.pan";
@@ -62,9 +63,11 @@ fn main() {
 
     let mut vm = VirtualMachine::new();
     let mut globalValue = HashMap::new();
-    // let mut localValue = HashMap::new();
-    globalValue.insert("int".to_string(), Value::Int(0));
-    let scope = Scope::with_builtins(None, globalValue, &vm);
+    let mut localValue: HashMap<String, Value> = HashMap::new();
+    let mut v = Vec::new();
+    v.push(localValue);
+    // globalValue.insert("int".to_string(), Value::Int(0));
+    let scope = Scope::with_builtins(v, globalValue, &vm);
 
     vm.run_code_obj(code_object, scope);
 }
