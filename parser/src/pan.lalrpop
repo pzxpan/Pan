@@ -350,14 +350,14 @@ FunctionDefinition: Box<FunctionDefinition> = {
     },
 }
 
-//LambdaDefinition: Statement = {
- //   <l:@L> "let" <name:Identifier>  "="  <params:ParameterList> "=>" <body:BlockStatement> <r:@R> =>
- //      Statement::LambdaDefinition(
- //      Loc(file_no, l, r),
-   //    name,
-   //    params,
-    //   Box::new(body))
-//}
+LambdaDefinition: Statement = {
+   <l:@L> "let" <name:Identifier>  "="   <params:ParameterList>  "=>" <body:BlockStatement> <r:@R> =>
+       Statement::LambdaDefinition(
+       Loc(file_no, l, r),
+       name,
+       params,
+       Box::new(body))
+}
 
 BlockStatement: Statement = {
     <l:@L> "{" <s:Statement*> "}" <r:@R> => Statement::Block(Loc(file_no, l, r), s),
@@ -405,7 +405,7 @@ NonIfStatement: Statement = {
     <l:@L> "return" <e:Expression> <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), Some(e))
     },
-   //  LambdaDefinition => <>,
+     LambdaDefinition => <>,
 }
 
 Comma<T>: Vec<T> = {
