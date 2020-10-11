@@ -355,12 +355,12 @@ FunctionDefinition: Box<FunctionDefinition> = {
 LambdaDefinition: Expression = {
    <l:@L> <params:ParameterList>  "=>" <body:BlockStatement> <r:@R> =>
     {
-       Expression::Lambda(LambdaDefinition
-       {
+       Expression::Lambda(Loc(file_no, l, r),
+       Box::new(LambdaDefinition{
             loc:Loc(file_no, l, r),
             params,
             body: Box::new(body),
-       })
+       }))
     }
 }
 

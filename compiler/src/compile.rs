@@ -8,10 +8,11 @@ use itertools::Itertools;
 use num_complex::Complex64;
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
 use pan_parser::{ast, parse};
-use pan_parser::ast::{Expression, Parameter};
+use pan_parser::ast::{Expression, Parameter, HasType};
 use std::borrow::Borrow;
 use pan_bytecode::bytecode::CallType::Positional;
 use pan_bytecode::bytecode::NameScope::Global;
+use std::process::exit;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -25,11 +26,13 @@ struct Compiler<O: OutputStream = BasicOutputStream> {
     current_qualified_path: Option<String>,
     ctx: CompileContext,
     optimize: u8,
+    lambda_name: String,
 }
 
 #[derive(Clone, Copy)]
 struct CompileContext {
     in_loop: bool,
+    in_lambda: bool,
     func: FunctionContext,
 }
 
@@ -134,10 +137,12 @@ impl<O: OutputStream> Compiler<O> {
             current_source_location: ast::Loc(1, 0, 0),
             current_qualified_path: None,
             ctx: CompileContext {
+                in_lambda: false,
                 in_loop: false,
                 func: FunctionContext::NoFunction,
             },
             optimize,
+            lambda_name: "".to_string(),
         }
     }
 
@@ -205,9 +210,7 @@ impl<O: OutputStream> Compiler<O> {
                     // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_function_def(name, args.as_slice(), body, returns, is_async);
-
-
+                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                 }
                 _ => (),
@@ -347,6 +350,15 @@ impl<O: OutputStream> Compiler<O> {
             }
             VariableDefinition(_, decl, expression) => {
                 if let Some(e) = &expression {
+                    let mut ty = expression.as_ref().unwrap().get_type();
+                    match ty {
+                        ast::CType::Lambda(_) => {
+                            self.lambda_name = decl.name.borrow().name.clone();
+                            self.compile_expression(e)?;
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
                     self.compile_expression(e)?;
                 }
                 self.store_name(&decl.name.name);
@@ -477,6 +489,7 @@ impl<O: OutputStream> Compiler<O> {
         let prev_ctx = self.ctx;
 
         self.ctx = CompileContext {
+            in_lambda: false,
             in_loop: false,
             func: FunctionContext::Function,
         };
@@ -575,12 +588,14 @@ impl<O: OutputStream> Compiler<O> {
         body: &ast::Statement,
         returns: &Option<ast::Expression>, // TODO: use type hint somehow..
         is_async: bool,
+        in_lambda: bool,
     ) -> Result<(), CompileError> {
         // Create bytecode for this function:
         // remember to restore self.ctx.in_loop to the original after the function is compiled
         let prev_ctx = self.ctx;
 
         self.ctx = CompileContext {
+            in_lambda,
             in_loop: false,
             func: if is_async {
                 FunctionContext::AsyncFunction
@@ -689,6 +704,7 @@ impl<O: OutputStream> Compiler<O> {
         self.ctx = CompileContext {
             func: FunctionContext::NoFunction,
             in_loop: false,
+            in_lambda: false,
         };
 
         let qualified_name = self.create_qualified_name(name, "");
@@ -1251,7 +1267,19 @@ impl<O: OutputStream> Compiler<O> {
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
-            Lambda(lambda) => {}
+            Lambda(_, lambda) => {
+                let name = self.lambda_name.clone();
+                let mut args = vec![];
+                for para in lambda.params.iter() {
+                    let p = para.1.as_ref().unwrap().to_owned();
+                    args.push(p.clone());
+                }
+                // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
+                let body = &lambda.body.as_ref();
+                // let decorator_list = vec![];
+                let is_async = false;
+                self.compile_function_def(&name, args.as_slice(), body, &None, is_async, true);
+            }
         }
         // match &expression.node {
         //     Call {
@@ -1695,15 +1723,26 @@ impl<O: OutputStream> Compiler<O> {
     fn leave_scope(&mut self) {
         // println!("Leave scope {:?}", self.symbol_table_stack);
         let table = self.symbol_table_stack.pop().unwrap();
-        assert!(table.sub_tables.is_empty());
+        // assert!(table.sub_tables.is_empty());
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
         println!("Looking up {:?}", name);
-        let symbol_table = self.symbol_table_stack.last().unwrap();
-        symbol_table.lookup(name).expect(
-            "The symbol must be present in the symbol table, even when it is undefined",
-        )
+        if self.ctx.in_lambda {
+            let len: usize = self.symbol_table_stack.len();
+            for i in (len - 2..len).rev() {
+                let symbol = self.symbol_table_stack[i].lookup(name);
+                if symbol.is_some() {
+                    return symbol.unwrap();
+                }
+            }
+            unreachable!();
+        } else {
+            let symbol_table = self.symbol_table_stack.last().unwrap();
+            symbol_table.lookup(name).expect(
+                "The symbol must be present in the symbol table, even when it is undefined",
+            )
+        }
     }
     // Low level helper functions:
     fn emit(&mut self, instruction: Instruction) {

@@ -1113,16 +1113,14 @@ impl Frame {
     }
 
     pub fn push_value(&self, obj: Value) {
-        for (i, a) in self.stack.clone().borrow_mut().iter().enumerate() {
-            println!("when push value: No:{:?}, value{:?} 栈地址:{:p}", i, a, self);
-        }
+        println!("when push value:{:?} 栈地址:{:p}", obj, self);
 
         self.stack.borrow_mut().push(obj);
     }
 
     fn pop_value(&self) -> Value {
         for (i, a) in self.stack.clone().borrow_mut().iter().enumerate() {
-            println!("when pop value: No:{:?}, value{:?} 栈地址:{:p}", i, a, self);
+            println!("when pop value: No:{:?}, value:{:?} 栈地址:{:p}", i, a, self);
         }
         self.stack
             .borrow_mut()

@@ -249,6 +249,7 @@ enum SymbolUsage {
 struct SymbolTableBuilder {
     // Scope stack.
     tables: Vec<SymbolTable>,
+    lambda_name: String,
 }
 
 /// Enum to indicate in what mode an expression
@@ -480,13 +481,28 @@ impl SymbolTableBuilder {
 
             Args(loc, _) => {}
             VariableDefinition(location, decl, expression) => {
+                if expression.is_some() {
+                    //注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
+                    let mut ty = expression.as_ref().unwrap().get_type();
+                    match ty {
+                        CType::Lambda(_) => {
+                            self.lambda_name = decl.name.borrow().name.clone();
+                            self.register_name(decl.name.borrow().name.borrow(), ty, SymbolUsage::Assigned)?;
+                            if let Some(e) = expression {
+                                self.scan_expression(e, &ExpressionContext::Load);
+                            }
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
+                }
                 if decl.ty.is_some() {
                     self.register_name(decl.name.borrow().name.borrow(), decl.ty.as_ref().unwrap().get_type(), SymbolUsage::Assigned)?;
                 }
                 //   self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
                 if let Some(e) = expression {
                     self.scan_expression(e, &ExpressionContext::Load)?;
-                    //获取右侧表达式的返回类型,注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
+                    //获取右侧表达式的返回类型,
                     let mut ty = e.get_type();
                     if ty == CType::Unknown {
                         //如果式方法调用就获取注册方法的返回类型，
@@ -494,16 +510,7 @@ impl SymbolTableBuilder {
                     }
                     // let ty = self.get_register_type(e.expr_name());
                     if decl.ty.is_none() {
-                        match ty {
-                            CType::Lambda(_) => {
-                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned)?;
-                            }
-                            CType::Fn(_) => {
-                                self.register_name(decl.name.borrow().name.borrow(), ty.rettype().clone(), SymbolUsage::Assigned)?;
-                            }
-                            _ => {}
-                        }
-                        // let ty = self.tables.get(0).unwrap().lookup(e.expr_name().as_str()).unwrap().ty.clone();
+                        self.register_name(decl.name.borrow().name.borrow(), ty.rettype().clone(), SymbolUsage::Assigned)?;
                     } else {
                         println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(), ty.rettype().clone());
                         if decl.ty.as_ref().unwrap().get_type() != ty.rettype().clone() {
@@ -513,9 +520,8 @@ impl SymbolTableBuilder {
                             });
                         }
                     }
-                    println!("expression type is {:?}", e.get_type());
-                    // println!("otheris :{:?}",);
                 }
+                // println!("otheris :{:?}",);
             }
             Return(loc, expression) => {
                 if let Some(e) = expression {
@@ -660,8 +666,8 @@ impl SymbolTableBuilder {
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
-            Lambda(lambda) => {
-                self.scan_lambda("lambda".to_string(), lambda.clone());
+            Lambda(_, lambda) => {
+                self.scan_lambda(self.lambda_name.to_string(), *lambda.clone());
             }
         }
         Ok(())
@@ -694,6 +700,7 @@ impl SymbolTableBuilder {
         self.enter_scope(name, SymbolTableType::Function, line_number);
         let arg_types: Vec<(String, ast::CType, bool)> = args.iter().map(|s| ast::transfer(s)).collect();
         for s in arg_types.iter() {
+            println!("paramis{:?},",s);
             self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter);
         }

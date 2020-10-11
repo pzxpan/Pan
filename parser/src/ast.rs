@@ -368,7 +368,7 @@ pub enum Expression {
     Tuple(Loc, Vec<(Loc, Option<Parameter>)>),
     Dict(Loc, Vec<(Loc, Option<Parameter>, Parameter)>),
     Set(Loc, Vec<(Loc, Option<Parameter>)>),
-    Lambda(LambdaDefinition),
+    Lambda(Loc, Box<LambdaDefinition>),
 
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
 }
@@ -419,7 +419,7 @@ impl HasType for Expression {
             Expression::NumberLiteral(_, _) => {
                 CType::Int
             }
-            Expression::Lambda(e) => {
+            Expression::Lambda(_, e) => {
                 e.get_type()
             }
 
@@ -492,7 +492,7 @@ impl Expression {
             | ArrayLiteral(loc, _)
             | List(loc, _)
             | Type(loc, _)
-            | Lambda(LambdaDefinition { loc, .. })
+            | Lambda(loc, _)
             | Variable(Identifier { loc, .. })
             | Yield(loc, _)
             | In(loc, _, _)
