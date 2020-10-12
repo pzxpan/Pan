@@ -450,9 +450,19 @@ impl SymbolTableBuilder {
                     self.scan_statement(stmt)?;
                 }
             }
-            For(_, target, iter, body) => {
-                self.scan_expression(target, &ExpressionContext::Store)?;
+            // For(Loc(1, 4, 3), Variable(Identifier { loc: Loc(1, 4, 7), name: "i" }),
+            //     NumberLiteral(Loc(1, 4, 12), BigInt { sign: NoSign, data: BigUint { data: [] } }),
+            //     Some(NumberLiteral(Loc(1, 4, 14), BigInt { sign: Plus, data: BigUint { data: [100] } })),
+            For(_, target, iter, end, body) => {
+                let ty = iter.get_type();
+                if let ast::Expression::Variable(Identifier{loc, name}) = target {
+                    self.register_name(name, ty, SymbolUsage::Assigned)?;
+                }
+              //  self.scan_expression(target, &ExpressionContext::Store)?;
                 self.scan_expression(iter, &ExpressionContext::Load)?;
+                if let Some(e) = end {
+                    self.scan_expression(e, &ExpressionContext::Load)?;
+                }
                 self.scan_statement(body.as_ref().unwrap())?;
             }
             While(_, test, body) => {
@@ -700,7 +710,7 @@ impl SymbolTableBuilder {
         self.enter_scope(name, SymbolTableType::Function, line_number);
         let arg_types: Vec<(String, ast::CType, bool)> = args.iter().map(|s| ast::transfer(s)).collect();
         for s in arg_types.iter() {
-            println!("paramis{:?},",s);
+            println!("paramis{:?},", s);
             self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter);
         }

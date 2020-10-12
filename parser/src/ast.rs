@@ -369,7 +369,6 @@ pub enum Expression {
     Dict(Loc, Vec<(Loc, Option<Parameter>, Parameter)>),
     Set(Loc, Vec<(Loc, Option<Parameter>)>),
     Lambda(Loc, Box<LambdaDefinition>),
-
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
 }
 
@@ -502,7 +501,6 @@ impl Expression {
             | Tuple(loc, _)
             | Dict(loc, _)
             | Set(loc, _)
-
             | Comprehension(loc, _, _)
 
             => *loc,
@@ -680,6 +678,7 @@ pub enum Statement {
         Loc,
         Expression,
         Expression,
+        Option<Expression>,
         Option<Box<Statement>>,
     ),
 }
@@ -700,7 +699,7 @@ impl Statement {
             | Statement::While(loc, _, _)
             | Statement::Expression(loc, _)
             | Statement::VariableDefinition(loc, _, _)
-            | Statement::For(loc, _, _, _)
+            | Statement::For(loc, _,_, _, _)
             | Statement::While(loc, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)

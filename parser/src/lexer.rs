@@ -58,6 +58,7 @@ pub enum Token<'input> {
     String,
 
     Semicolon,
+    TwoDot,
     MutRef,
     ReadOnlyRef,
     Comma,
@@ -153,6 +154,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Float => write!(f, "float"),
             Token::Int => write!(f, "int"),
             Token::MutRef => write!(f, "ref'"),
+            Token::TwoDot => write!(f, ".."),
             Token::ReadOnlyRef => write!(f, "ref"),
             Token::Semicolon => write!(f, ";"),
             Token::Comma => write!(f, ","),
@@ -336,6 +338,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "in" => Token::In,
     "pub" => Token::Pub,
     "ref'" => Token::MutRef,
+    ".." => Token::TwoDot,
     "ref" => Token::ReadOnlyRef,
 
 };
@@ -678,6 +681,10 @@ impl<'input> Lexer<'input> {
                         '^' => {
                             self.chars.next();
                             return Some(Ok((self.row, Token::BitwiseXorAssign, self.column)));
+                        }
+                        '.' => {
+                            self.chars.next();
+                            return Some(Ok((self.row, Token::TwoDot, self.column)));
                         }
                         '>' => {
                             self.chars.next();

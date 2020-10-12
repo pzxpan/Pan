@@ -381,8 +381,8 @@ Statement: Statement = {
    <l:@L> "while"  <e:Expression>  <b:BlockStatement> <r:@R> => {
       Statement::While(Loc(file_no, l, r), e, Box::new(b))
     },
-   <l:@L> "for"  <b:Expression>  "in"  <c:Expression>  <block:BlockStatement> <r:@R> => {
-      Statement::For(Loc(file_no, l, r), b, c,  Some(Box::new(block)))
+   <l:@L> "for"  <b:Expression>  "in"  <c:Expression> <d: (".." <Expression>)?> <block:BlockStatement> <r:@R> => {
+      Statement::For(Loc(file_no, l, r), b, c, d,Some(Box::new(block)))
    },
 }
 
@@ -442,6 +442,7 @@ extern {
         LexStringLiteral => Token::StringLiteral(<&'input str>),
         LexNumber => Token::Number(<&'input str>),
         ";" => Token::Semicolon,
+        ".." => Token::TwoDot,
         "ref'" => Token::MutRef,
         "ref" => Token::ReadOnlyRef,
         "{" => Token::OpenCurlyBrace,
