@@ -453,10 +453,29 @@ impl SymbolTableBuilder {
             // For(Loc(1, 4, 3), Variable(Identifier { loc: Loc(1, 4, 7), name: "i" }),
             //     NumberLiteral(Loc(1, 4, 12), BigInt { sign: NoSign, data: BigUint { data: [] } }),
             //     Some(NumberLiteral(Loc(1, 4, 14), BigInt { sign: Plus, data: BigUint { data: [100] } })),
-            For(_, target, iter, end, body) => {
+            //For(Loc(1, 3, 3), Variable(Identifier { loc: Loc(1, 3, 7), name: "a" }),
+            // Variable(Identifier { loc: Loc(1, 3, 14), name: "arr" }), None, Some(Block(Loc(1, 3, 3),
+            // [Expression(Loc(1, 4, 12), FunctionCall(Loc(1, 4, 12), Variable(Identifier { loc: Loc(1, 4, 9), name: "print" }),
+            // [Variable(Identifier { loc: Loc(1, 4, 11), name: "a" })]))])))
+            For(loc, target, iter, end, body) => {
                 let ty = iter.get_type();
+                let mut symbol_name = String::new();
                 if let ast::Expression::Variable(Identifier { loc, name }) = target {
-                    self.register_name(name, ty, SymbolUsage::Assigned)?;
+                    symbol_name = name.clone();
+                }
+                //如果iter是基本的数据类型，能被推断，否则就是Variable(Identifier)，需要获取已注册到symboltable的类型;
+                if ty != CType::Unknown {
+                    self.register_name(symbol_name.borrow(), ty, SymbolUsage::Assigned)?;
+                } else {
+                    let ty = self.get_register_type(iter.expr_name());
+                    if let CType::Array(cty) = ty {
+                        self.register_name(symbol_name.borrow(), cty.as_ref().clone(), SymbolUsage::Assigned)?;
+                    } else {
+                        return Err(SymbolTableError {
+                            error: format!("{:?}类型不正确,只有数组类型才能生成迭代器", iter.expr_name()),
+                            location: loc.clone(),
+                        });
+                    }
                 }
                 //  self.scan_expression(target, &ExpressionContext::Store)?;
                 self.scan_expression(iter, &ExpressionContext::Load)?;

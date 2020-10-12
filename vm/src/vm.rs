@@ -246,14 +246,28 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
-    // Value::Obj(mut e) = v {
-    // match *e.borrow_mut() {
+
     pub fn get_item(&self, a: Value, b: Value) -> Option<Value> {
         match (a, b) {
             (Value::Obj(e), Value::Int(sub)) => {
                 match &*e.borrow_mut() {
                     Obj::ArrayObj(arr) => {
                         arr.get(sub as usize).cloned()
+                    }
+                    _ => unreachable!()
+                }
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn set_item(&self, obj: Value, idx: Value, value: Value) {
+        match (obj, idx) {
+            (Value::Obj(e), Value::Int(sub)) => {
+                match *e.borrow_mut() {
+                    Obj::ArrayObj(ref mut arr) => {
+                        arr.swap_remove(sub as usize);
+                        arr.insert(sub as usize, value);
                     }
                     _ => unreachable!()
                 }

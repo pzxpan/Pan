@@ -1231,10 +1231,7 @@ impl<O: OutputStream> Compiler<O> {
             }
             Assign(loc, a, b) => {
                 self.compile_expression(b)?;
-                //多值的还没弄，需要解构
-                if let Variable(ast::Identifier { loc, name }) = a.as_ref() {
-                    self.store_name(name);
-                }
+                self.compile_store(a)?;
             }
             AssignOr(loc, a, b) |
             AssignAnd(loc, a, b) |

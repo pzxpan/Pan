@@ -315,6 +315,17 @@ impl Frame {
                         self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
                     }
                 }
+                // else if let Value::Obj(mut obj) = end {
+                //     match &*obj.borrow_mut() {
+                //         Obj::ArrayObj(arr) => {
+                //             if Some(value) = arr.iter().next() {
+                //                 self.push_value(value);
+                //             }
+                //
+                //         }
+                //         _ => unreachable!()
+                //     }
+                // }
 
 
                 // let iter_obj = objiter::get_iter(vm, &iterated_obj)?;
@@ -631,8 +642,8 @@ impl Frame {
     fn execute_store_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let idx = self.pop_value();
         let obj = self.pop_value();
-        // let value = self.pop_value();
-        // obj.set_item(&idx, value, vm)?;
+        let value = self.pop_value();
+        vm.set_item(obj, idx, value);
         None
     }
 
