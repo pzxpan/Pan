@@ -418,6 +418,18 @@ impl HasType for Expression {
             Expression::NumberLiteral(_, _) => {
                 CType::Int
             }
+            Expression::ArrayLiteral(_, elements) => {
+                if elements.len() > 0 {
+                    let ty = elements.get(0).unwrap().get_type();
+                    for e in elements {
+                        if e.get_type() != ty {
+                            return CType::Unknown;
+                        }
+                    }
+                    return CType::Array(Box::new(ty));
+                }
+                return CType::Array(Box::new(CType::Unknown));
+            }
             Expression::Lambda(_, e) => {
                 e.get_type()
             }
@@ -699,7 +711,7 @@ impl Statement {
             | Statement::While(loc, _, _)
             | Statement::Expression(loc, _)
             | Statement::VariableDefinition(loc, _, _)
-            | Statement::For(loc, _,_, _, _)
+            | Statement::For(loc, _, _, _, _)
             | Statement::While(loc, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)

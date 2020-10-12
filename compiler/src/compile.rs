@@ -1254,7 +1254,14 @@ impl<O: OutputStream> Compiler<O> {
                     },
                 });
             }
-            ArrayLiteral(loc, _) => {}
+            ArrayLiteral(loc, elements) => {
+                let size = elements.len();
+                let must_unpack = self.gather_elements(elements)?;
+                self.emit(Instruction::BuildList {
+                    size,
+                    unpack: must_unpack,
+                });
+            }
             List(loc, _) => {}
             Type(loc, ty) => {
                 // self.load_name(&ty.name())

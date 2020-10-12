@@ -15,7 +15,7 @@ use std::cell::RefCell;
 
 fn main() {
     // let path = "/Users/panzhenxing/Desktop/PanPan/Pan/demo.pan";
-    let path = "/Users/ztt/Desktop/Pan/for.pan";
+    let path = "/Users/ztt/Desktop/Pan/array.pan";
     let mut file = File::open(path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
@@ -62,12 +62,12 @@ fn main() {
     }
 
     let mut vm = VirtualMachine::new();
-    let mut globalValue = HashMap::new();
-    let mut localValue: HashMap<String, Value> = HashMap::new();
+    let mut global_value = HashMap::new();
+    let mut local_value: HashMap<String, Value> = HashMap::new();
     let mut v = Vec::new();
-    v.push(localValue);
+    v.push(local_value);
     // globalValue.insert("int".to_string(), Value::Int(0));
-    let scope = Scope::with_builtins(v, globalValue, &vm);
+    let scope = Scope::with_builtins(v, global_value, &vm);
 
     vm.run_code_obj(code_object, scope);
 }

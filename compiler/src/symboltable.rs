@@ -455,10 +455,10 @@ impl SymbolTableBuilder {
             //     Some(NumberLiteral(Loc(1, 4, 14), BigInt { sign: Plus, data: BigUint { data: [100] } })),
             For(_, target, iter, end, body) => {
                 let ty = iter.get_type();
-                if let ast::Expression::Variable(Identifier{loc, name}) = target {
+                if let ast::Expression::Variable(Identifier { loc, name }) = target {
                     self.register_name(name, ty, SymbolUsage::Assigned)?;
                 }
-              //  self.scan_expression(target, &ExpressionContext::Store)?;
+                //  self.scan_expression(target, &ExpressionContext::Store)?;
                 self.scan_expression(iter, &ExpressionContext::Load)?;
                 if let Some(e) = end {
                     self.scan_expression(e, &ExpressionContext::Load)?;
@@ -646,7 +646,13 @@ impl SymbolTableBuilder {
             }
             BoolLiteral(loc, _) => {}
             NumberLiteral(loc, _) => {}
-            ArrayLiteral(loc, _) => {}
+
+            //statement is Block(Loc(1, 1, 1), [VariableDefinition(Loc(1, 2, 19), VariableDeclaration { loc: Loc(1, 2, 9), ty: None, name: Identifier { loc: Loc(1, 2, 9), name: "sum" } }, Some(ArrayLiteral(Loc(1, 2, 19), [NumberLiteral(Loc(1, 2, 14), BigInt { sign: Plus, data: BigUint { data: [1] } }), NumberLiteral(Loc(1, 2, 16), BigInt { sign: Plus, data: BigUint { data: [2] } }), NumberLiteral(Loc(1, 2, 18), BigInt { sign: Plus, data: BigUint { data: [3] } })]))), Expression(Loc(1, 4, 12), FunctionCall(Loc(1, 4, 12), Variable(Identifier { loc: Loc(1, 4, 7), name: "print" }), [Variable(Identifier { loc: Loc(1, 4, 11), name: "sum" })])), Return(Loc(1, 5, 8), None)])
+            //statement is VariableDefinition(Loc(1, 2, 19), VariableDeclaration { loc: Loc(1, 2, 9), ty: None, name: Identifier { loc: Loc(1, 2, 9), name: "sum" } }, Some(ArrayLiteral(Loc(1, 2, 19), [NumberLiteral(Loc(1, 2, 14), BigInt { sign: Plus, data: BigUint { data: [1] } }), NumberLiteral(Loc(1, 2, 16), BigInt { sign: Plus, data: BigUint { data: [2] } }), NumberLiteral(Loc(1, 2, 18), BigInt { sign: Plus, data: BigUint { data: [3] } })])))
+
+            ArrayLiteral(loc, elements) => {
+                self.scan_expressions(elements, context)?;
+            }
             List(loc, _) => {}
             Type(loc, ty) => {
                 self.register_name(&ty.name().to_string(), ty.get_type(), SymbolUsage::Used)?;

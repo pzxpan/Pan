@@ -218,12 +218,11 @@ impl Frame {
                 // self.push_value(str_obj);
                 None
             }
-            // bytecode::Instruction::BuildList { size, unpack } => {
-            //     let elements = self.get_elements(vm, *size, *unpack)?;
-            //     let list_obj = vm.ctx.new_list(elements);
-            //     self.push_value(list_obj);
-            //     None
-            // }
+            bytecode::Instruction::BuildList { size, unpack } => {
+                let list_value = self.get_elements(vm, *size, *unpack);
+                self.push_value(list_value);
+                None
+            }
             // bytecode::Instruction::BuildSet { size, unpack } => {
             //     let elements = self.get_elements(vm, *size, *unpack)?;
             //     let py_obj = vm.ctx.new_set();
