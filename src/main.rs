@@ -12,11 +12,14 @@ use pan_vm::scope::Scope;
 use std::collections::HashMap;
 use pan_vm::value::Value;
 use std::cell::RefCell;
+use std::env;
 
 fn main() {
+    let home_path = env::current_dir().unwrap().join("array.pan");
+    println!("当前目录是：{:?}", home_path);
     // let path = "/Users/panzhenxing/Desktop/PanPan/Pan/demo.pan";
-    let path = "/Users/ztt/Desktop/Pan/array.pan";
-    let mut file = File::open(path).unwrap();
+    // let path = "/Users/ztt/Desktop/Pan/array.pan";
+    let mut file = File::open(home_path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     // let result = parse(&contents, 1);
@@ -54,7 +57,7 @@ fn main() {
     // instruction LoadConst { value: None }
     // instruction ReturnValue
 
-    let code_object = compile(&contents, path.to_string(), 0).unwrap();
+    let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0).unwrap();
 
 
     for i in code_object.instructions.clone() {

@@ -572,9 +572,7 @@ impl SymbolTableBuilder {
         match &expression {
             Subscript(loc, a, b) => {
                 self.scan_expression(a, context)?;
-                if let Some(e) = b {
-                    self.scan_expression(e, context)?;
-                }
+                self.scan_expression(b, context)?;
             }
             Attribute(loc, value, _) => {
                 self.scan_expression(value, context)?;

@@ -344,7 +344,7 @@ pub enum Expression {
     AssignShiftRight(Loc, Box<Expression>, Box<Expression>),
     ReAssign(Loc, Box<Expression>, Box<Expression>),
 
-    Subscript(Loc, Box<Expression>, Option<Box<Expression>>),
+    Subscript(Loc, Box<Expression>, Box<Expression>),
     Slice(Loc, Vec<Expression>),
     Attribute(Loc, Box<Expression>, Identifier),
 
@@ -433,7 +433,9 @@ impl HasType for Expression {
             Expression::Lambda(_, e) => {
                 e.get_type()
             }
-
+            Expression::UnaryMinus(_, e) => {
+                e.get_type()
+            }
             _ => { CType::Unknown }
         }
     }

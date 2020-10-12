@@ -246,7 +246,7 @@ FunctionCall: Expression = {
 
 Precedence0: Expression = {
     <FunctionCall> => <>,
-    <a:@L> <e:Precedence0> "[" <i:Expression?> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), box_option(i)),
+    <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),
     <a:@L> <e:Precedence0> "." <i:Identifier> <b:@R> => Expression::Attribute(Loc(file_no, a, b), Box::new(e), i),
     // Solidity has ".address" members on external function types. Address is a keyword, so special casing needed
 

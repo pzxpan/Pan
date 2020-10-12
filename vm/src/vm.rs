@@ -246,6 +246,21 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
+    // Value::Obj(mut e) = v {
+    // match *e.borrow_mut() {
+    pub fn get_item(&self, a: Value, b: Value) -> Option<Value> {
+        match (a, b) {
+            (Value::Obj(e), Value::Int(sub)) => {
+                match &*e.borrow_mut() {
+                    Obj::ArrayObj(arr) => {
+                        arr.get(sub as usize).cloned()
+                    }
+                    _ => unreachable!()
+                }
+            }
+            _ => unreachable!()
+        }
+    }
 
     pub fn _le(&self, a: Value, b: Value) -> Value {
         match (a, b) {
@@ -286,11 +301,11 @@ impl VirtualMachine {
         let mut ret = Value::Nil;
         if let Value::Obj(mut e) = v {
             match *e.borrow_mut() {
-            //     match *obj.borrow_mut() {
-            //     Obj::MapObj(ref mut values) => values.insert(idx, value),
-            //     _ => unreachable!()
-            // };
-                Obj::RangObj(ref mut start, ref mut end, ref mut up) =>  {
+                //     match *obj.borrow_mut() {
+                //     Obj::MapObj(ref mut values) => values.insert(idx, value),
+                //     _ => unreachable!()
+                // };
+                Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
                     if up.bool_value() {
                         let a = start.int_value() + 1;
                         let b = end.int_value();
@@ -340,6 +355,35 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
+
+    pub fn neg(&self, value: Value) -> Value {
+        match value {
+            Value::Int(i) => Value::Int(-i),
+            Value::Float(i) => Value::Float(-i),
+            _ => unreachable!()
+        }
+    }
+    pub fn plus(&self, value: Value) -> Value {
+        match value {
+            Value::Int(i) => Value::Int(i),
+            Value::Float(i) => Value::Float(i),
+            _ => unreachable!()
+        }
+    }
+    pub fn not(&self, value: Value) -> Value {
+        match value {
+            Value::Bool(i) => Value::Bool(!i),
+            _ => unreachable!()
+        }
+    }
+
+    pub fn invert(&self, value: Value) -> Value {
+        match value {
+            Value::Int(i) => Value::Int(!i),
+            _ => unreachable!()
+        }
+    }
+
     pub fn unwrap_constant(&mut self, value: &bytecode::Constant) -> Value {
         match *value {
             bytecode::Constant::Integer { ref value } => Value::Int(value.to_i64().unwrap()),

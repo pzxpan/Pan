@@ -893,7 +893,7 @@ impl<O: OutputStream> Compiler<O> {
             }
             ast::Expression::Subscript(_, a, b) => {
                 self.compile_expression(a)?;
-                self.compile_expression(b.as_ref().unwrap())?;
+                self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
             }
             ast::Expression::Attribute(_, value, ast::Identifier { loc, name }) => {
@@ -1175,9 +1175,8 @@ impl<O: OutputStream> Compiler<O> {
         match &expression {
             Subscript(_, a, b) => {
                 self.compile_expression(a)?;
-                if let Some(e) = b {
-                    self.compile_expression(e)?;
-                }
+                self.compile_expression(b)?;
+                self.emit(Instruction::Subscript);
             }
             Attribute(loc, value, _) => {
                 self.compile_expression(value)?;
@@ -1185,9 +1184,17 @@ impl<O: OutputStream> Compiler<O> {
             FunctionCall(loc, name, args) => {
                 self.compile_call(name, args)?;
             }
-            Not(loc, name) | UnaryPlus(loc, name) | UnaryMinus(loc, name)
-            => {
+            Not(loc, name) => {
                 self.compile_expression(name)?;
+                self.emit(Instruction::UnaryOperation { op: bytecode::UnaryOperator::Not });
+            }
+            UnaryPlus(loc, name) => {
+                self.compile_expression(name)?;
+                self.emit(Instruction::UnaryOperation { op: bytecode::UnaryOperator::Plus });
+            }
+            UnaryMinus(loc, name) => {
+                self.compile_expression(name)?;
+                self.emit(Instruction::UnaryOperation { op: bytecode::UnaryOperator::Minus });
             }
             Power(loc, a, b) |
             Multiply(loc, a, b) |

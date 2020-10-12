@@ -621,10 +621,10 @@ impl Frame {
     // }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
-        let b_ref = self.pop_value();
-        let a_ref = self.pop_value();
-        // let value = a_ref.get_item(&b_ref, vm)?;
-        // self.push_value(value);
+        let subscript = self.pop_value();
+        let arr = self.pop_value();
+        let value = vm.get_item(arr, subscript).unwrap();
+        self.push_value(value);
         None
     }
 
@@ -992,17 +992,14 @@ impl Frame {
 
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     fn execute_unop(&self, vm: &VirtualMachine, op: &bytecode::UnaryOperator) -> FrameResult {
-        // let a = self.pop_value();
-        // let value = match *op {
-        //     bytecode::UnaryOperator::Minus => vm.call_method(&a, "__neg__", vec![])?,
-        //     bytecode::UnaryOperator::Plus => vm.call_method(&a, "__pos__", vec![])?,
-        //     bytecode::UnaryOperator::Invert => vm.call_method(&a, "__invert__", vec![])?,
-        //     bytecode::UnaryOperator::Not => {
-        //         let value = objbool::boolval(vm, a)?;
-        //         vm.ctx.new_bool(!value)
-        //     }
-        // };
-        // self.push_value(value);
+        let a = self.pop_value();
+        let value = match *op {
+            bytecode::UnaryOperator::Minus => vm.neg(a),
+            bytecode::UnaryOperator::Plus => vm.plus(a),
+            bytecode::UnaryOperator::Invert => vm.invert(a),
+            bytecode::UnaryOperator::Not => vm.not(a),
+        };
+        self.push_value(value);
         None
     }
 
