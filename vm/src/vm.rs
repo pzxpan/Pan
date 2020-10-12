@@ -23,7 +23,7 @@ use pan_bytecode::bytecode;
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
 use pan_bytecode::bytecode::CodeObject;
-use crate::value::Value;
+use crate::value::{Value, Obj};
 
 // use objects::objects;
 
@@ -281,6 +281,36 @@ impl VirtualMachine {
             }
             _ => unreachable!()
         }
+    }
+    pub fn get_next_iter(&self, v: Value) -> Value {
+        let mut ret = Value::Nil;
+        if let Value::Obj(mut e) = v {
+            match *e.borrow_mut() {
+            //     match *obj.borrow_mut() {
+            //     Obj::MapObj(ref mut values) => values.insert(idx, value),
+            //     _ => unreachable!()
+            // };
+                Obj::RangObj(ref mut start, ref mut end, ref mut up) =>  {
+                    if up.bool_value() {
+                        let a = start.int_value() + 1;
+                        let b = end.int_value();
+                        if a < b {
+                            *start = Value::Int(a);
+                            ret = Value::Int(a);
+                        }
+                    } else {
+                        let a = start.int_value() - 1;
+                        let b = end.int_value();
+                        if a > b {
+                            *start = Value::Int(a);
+                            ret = Value::Int(a);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        ret
     }
     pub fn print(&self, value: Value) {
         println! {"结果为{:?}", value};

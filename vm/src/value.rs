@@ -64,6 +64,14 @@ impl Value {
             _ => unreachable!()
         }
     }
+
+    pub fn int_value(&self) -> i64 {
+        match *self {
+            Value::Int(v) => { v }
+            Value::Float(v) => { v as i64 }
+            _ => unreachable!()
+        }
+    }
     pub fn code(&self) -> CodeObject {
         println!("code is:{:?}", self);
         match self {
@@ -103,6 +111,11 @@ impl Value {
     pub fn new_array_obj(values: Vec<Value>) -> Value {
         let arr = Obj::ArrayObj(values);
         Value::Obj(Arc::new(RefCell::new(arr)))
+    }
+
+    pub fn new_range_obj(start: Value, end: Value, up: Value) -> Value {
+        let range = Obj::RangObj(start, end, up);
+        Value::Obj(Arc::new(RefCell::new(range)))
     }
 
     pub fn new_map_obj(items: HashMap<String, Value>) -> Value {
@@ -147,6 +160,7 @@ pub struct InstanceObj {
 pub enum Obj {
     StringObj(String),
     ArrayObj(Vec<Value>),
+    RangObj(Value, Value, Value),
     MapObj(HashMap<String, Value>),
     InstanceObj(InstanceObj),
 }
@@ -158,6 +172,9 @@ impl Obj {
             Obj::StringObj(value) => value.clone(),
             Obj::ArrayObj(value) => {
                 value.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(",")
+            }
+            Obj::RangObj(start, end, up) => {
+                format!("<{},{},{}>", start, end, up)
             }
             Obj::MapObj(_) => "<map>".to_string(),
             Obj::InstanceObj(inst) => {

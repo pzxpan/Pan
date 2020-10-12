@@ -307,7 +307,17 @@ impl Frame {
                 None
             }
             bytecode::Instruction::GetIter => {
-                // let iterated_obj = self.pop_value();
+                let end = self.pop_value();
+                if let Value::Int(value) = end {
+                    let start = self.pop_value();
+                    if vm._gt(end.clone(), start.clone()).bool_value() {
+                        self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(true)));
+                    } else {
+                        self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
+                    }
+                }
+
+
                 // let iter_obj = objiter::get_iter(vm, &iterated_obj)?;
                 // self.push_value(iter_obj);
                 None
@@ -341,7 +351,7 @@ impl Frame {
                 // self.push_value(awaitable);
                 None
             }
-            // bytecode::Instruction::ForIter { target } => self.execute_for_iter(vm, *target),
+            bytecode::Instruction::ForIter { target } => self.execute_for_iter(vm, *target),
             bytecode::Instruction::MakeFunction => self.execute_make_function(vm),
             bytecode::Instruction::CallFunction { typ } => self.execute_call_function(vm, typ),
             bytecode::Instruction::Jump { target } => {
@@ -836,31 +846,46 @@ impl Frame {
     }
 
     /// The top of stack contains the iterator, lets push it forward
-    // fn execute_for_iter(&self, vm: &VirtualMachine, target: bytecode::Label) -> FrameResult {
-    //     let top_of_stack = self.last_value();
-    //     let next_obj = objiter::get_next_object(vm, &top_of_stack);
-    //
-    //     // Check the next object:
-    //     match next_obj {
-    //         Ok(Some(value)) => {
-    //             self.push_value(value);
-    //             None
-    //         }
-    //         None => {
-    //             // Pop iterator from stack:
-    //             self.pop_value();
-    //
-    //             // End of for loop
-    //             self.jump(target);
-    //             None
-    //         }
-    //         Err(next_error) => {
-    //             // Pop iterator from stack:
-    //             self.pop_value();
-    //             Err(next_error)
-    //         }
-    //     }
-    // }
+    fn execute_for_iter(&self, vm: &VirtualMachine, target: bytecode::Label) -> FrameResult {
+        let top_of_stack = self.last_value();
+        let next_obj = vm.get_next_iter(top_of_stack);
+
+        // Check the next object:
+        if let Value::Int(a) = next_obj {
+            self.push_value(next_obj);
+            None
+        } else {
+            self.pop_value();
+            // End of for loop
+            self.jump(target);
+            None
+        }
+
+
+        // if let Value::Nil() = next_obj {
+        //     self.push_value(next_obj);
+        //     None
+        // }
+        // match next_obj {
+        //     Ok(Some(value)) => {
+        //         self.push_value(value);
+        //         None
+        //     }
+        //     None => {
+        //         // Pop iterator from stack:
+        //         self.pop_value();
+        //
+        //         // End of for loop
+        //         self.jump(target);
+        //         None
+        //     }
+        //     Err(next_error) => {
+        //         // Pop iterator from stack:
+        //         self.pop_value();
+        //         Err(next_error)
+        //     }
+        // }
+    }
     fn execute_make_function(&self, vm: &VirtualMachine) -> FrameResult {
         let qualified_name = self.pop_value();
         let code_obj = self.pop_value();
@@ -922,6 +947,7 @@ impl Frame {
         op: &bytecode::BinaryOperator,
         inplace: bool,
     ) -> FrameResult {
+        println!("iii in ");
         let b_ref = self.pop_value();
         let a_ref = self.pop_value();
         let value = if inplace {
@@ -961,6 +987,7 @@ impl Frame {
         };
 
         self.push_value(value);
+
         None
     }
 
@@ -1113,15 +1140,10 @@ impl Frame {
     }
 
     pub fn push_value(&self, obj: Value) {
-        println!("when push value:{:?} 栈地址:{:p}", obj, self);
-
         self.stack.borrow_mut().push(obj);
     }
 
     fn pop_value(&self) -> Value {
-        for (i, a) in self.stack.clone().borrow_mut().iter().enumerate() {
-            println!("when pop value: No:{:?}, value:{:?} 栈地址:{:p}", i, a, self);
-        }
         self.stack
             .borrow_mut()
             .pop()

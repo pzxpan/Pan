@@ -363,6 +363,10 @@ impl<O: OutputStream> Compiler<O> {
                 }
                 self.store_name(&decl.name.name);
             }
+
+            For(_, target, iter, end, body) => {
+                self.compile_for(target, iter, end, body.as_ref().unwrap());
+            }
             _ => {}
         }
 
@@ -840,10 +844,9 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_for(
         &mut self,
         target: &ast::Expression,
-        iter: &ast::Expression,
-        body: &[ast::Statement],
-        orelse: &Option<Vec<ast::Statement>>,
-        is_async: bool,
+        start: &ast::Expression,
+        end: &Option<ast::Expression>,
+        body: &ast::Statement,
     ) -> Result<(), CompileError> {
         // Start loop
         let start_label = self.new_label();
@@ -856,8 +859,10 @@ impl<O: OutputStream> Compiler<O> {
         });
 
         // The thing iterated:
-        self.compile_expression(iter)?;
-
+        self.compile_expression(start)?;
+        if let Some(e) = end {
+            self.compile_expression(e)?;
+        }
         // Retrieve Iterator
         self.emit(Instruction::GetIter);
 
@@ -869,7 +874,7 @@ impl<O: OutputStream> Compiler<O> {
 
         let was_in_loop = self.ctx.in_loop;
         self.ctx.in_loop = true;
-        // self.compile_statements(body)?;
+        self.compile_statement(body)?;
         self.ctx.in_loop = was_in_loop;
 
         self.emit(Instruction::Jump {
@@ -877,78 +882,74 @@ impl<O: OutputStream> Compiler<O> {
         });
         self.set_label(else_label);
         self.emit(Instruction::PopBlock);
-        if let Some(orelse) = orelse {
-            // self.compile_statements(orelse)?;
-        }
         self.set_label(end_label);
-        if is_async {
-            self.emit(Instruction::Pop);
-        }
         Ok(())
     }
 
     fn compile_store(&mut self, target: &ast::Expression) -> Result<(), CompileError> {
-        // match &target.node {
-        //     ast::ExpressionType::Identifier { name } => {
-        //         self.store_name(name);
-        //     }
-        //     ast::ExpressionType::Subscript { a, b } => {
-        //         self.compile_expression(a)?;
-        //         self.compile_expression(b)?;
-        //         self.emit(Instruction::StoreSubscript);
-        //     }
-        //     ast::ExpressionType::Attribute { value, name } => {
-        //         self.compile_expression(value)?;
-        //         self.emit(Instruction::StoreAttr {
-        //             name: name.to_owned(),
-        //         });
-        //     }
-        //     ast::ExpressionType::List { elements } | ast::ExpressionType::Tuple { elements } => {
-        //         let mut seen_star = false;
-        //
-        //         // Scan for star args:
-        //         for (i, element) in elements.iter().enumerate() {
-        //             if let ast::ExpressionType::Starred { .. } = &element.node {
-        //                 if seen_star {
-        //                     return Err(CompileError {
-        //                         statement: None,
-        //                         error: CompileErrorType::StarArgs,
-        //                         location: self.current_source_location.clone(),
-        //                         source_path: None,
-        //                     });
-        //                 } else {
-        //                     seen_star = true;
-        //                     self.emit(Instruction::UnpackEx {
-        //                         before: i,
-        //                         after: elements.len() - i - 1,
-        //                     });
-        //                 }
-        //             }
-        //         }
-        //
-        //         if !seen_star {
-        //             self.emit(Instruction::UnpackSequence {
-        //                 size: elements.len(),
-        //             });
-        //         }
-        //
-        //         for element in elements {
-        //             if let ast::ExpressionType::Starred { value } = &element.node {
-        //                 self.compile_store(value)?;
-        //             } else {
-        //                 self.compile_store(element)?;
-        //             }
-        //         }
-        //     }
-        //     _ => {
-        //         return Err(CompileError {
-        //             statement: None,
-        //             error: CompileErrorType::Assign(target.name()),
-        //             location: self.current_source_location.clone(),
-        //             source_path: None,
-        //         });
-        //     }
-        // }
+        match &target {
+            ast::Expression::Variable(ast::Identifier { loc, name }) => {
+                self.store_name(name);
+            }
+            ast::Expression::Subscript(_, a, b) => {
+                self.compile_expression(a)?;
+                self.compile_expression(b.as_ref().unwrap())?;
+                self.emit(Instruction::StoreSubscript);
+            }
+            ast::Expression::Attribute(_, value, ast::Identifier { loc, name }) => {
+                self.compile_expression(value)?;
+                self.emit(Instruction::StoreAttr {
+                    name: name.to_owned(),
+                });
+            }
+            ast::Expression::List(_, elements) | ast::Expression::Tuple(_, elements) => {
+                let mut seen_star = false;
+
+                // Scan for star args:
+                // for (i, element) in elements.iter().enumerate() {
+                //     if let ast::Expression::Starred { .. } = &element.node {
+                //         if seen_star {
+                //             return Err(CompileError {
+                //                 statement: None,
+                //                 error: CompileErrorType::StarArgs,
+                //                 location: self.current_source_location.clone(),
+                //                 source_path: None,
+                //             });
+                //         } else {
+                //             seen_star = true;
+                //             self.emit(Instruction::UnpackEx {
+                //                 before: i,
+                //                 after: elements.len() - i - 1,
+                //             });
+                //         }
+                //     }
+                // }
+
+                if !seen_star {
+                    self.emit(Instruction::UnpackSequence {
+                        size: elements.len(),
+                    });
+                }
+
+                for (_, element) in elements {
+                    // if let ast::ExpressionType::Starred { value } = &element.node {
+                    //     self.compile_store(value)?;
+                    // } else {
+                    //     self.compile_store(element)?;
+                    // }
+
+                    //  self.compile_store(&element.unwrap())?;
+                }
+            }
+            _ => {
+                return Err(CompileError {
+                    statement: None,
+                    error: CompileErrorType::Assign("迭代器出错"),
+                    location: self.current_source_location.clone(),
+                    source_path: None,
+                });
+            }
+        }
 
         Ok(())
     }
@@ -1075,7 +1076,6 @@ impl<O: OutputStream> Compiler<O> {
             }
             _ => {
                 // Fall back case which always will work!
-                println!("yes");
                 self.compile_expression(expression)?;
                 if condition {
                     self.emit(Instruction::JumpIfTrue {
@@ -1222,7 +1222,13 @@ impl<O: OutputStream> Compiler<O> {
                 ops.push(expression.clone());
                 self.compile_compare(&*v, &*ops);
             }
-            Assign(loc, a, b) |
+            Assign(loc, a, b) => {
+                self.compile_expression(b)?;
+                //多值的还没弄，需要解构
+                if let Variable(ast::Identifier { loc, name }) = a.as_ref() {
+                    self.store_name(name);
+                }
+            }
             AssignOr(loc, a, b) |
             AssignAnd(loc, a, b) |
             AssignXor(loc, a, b) |
@@ -1235,9 +1241,9 @@ impl<O: OutputStream> Compiler<O> {
             AssignDivide(loc, a, b) |
             AssignModulo(loc, a, b)
             => {
-                self.compile_expression(a)?;
                 self.compile_expression(b)?;
-                self.compile_op(expression, true);
+                self.compile_expression(a)?;
+                println!("aaaaa:{:?},bbbbbb:{:?}", a.get_type(), b.get_type());
                 //TODO
             }
             BoolLiteral(loc, _) => {}
