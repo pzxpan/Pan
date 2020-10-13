@@ -315,24 +315,34 @@ impl VirtualMachine {
         let mut ret = Value::Nil;
         if let Value::Obj(mut e) = v {
             match *e.borrow_mut() {
-                //     match *obj.borrow_mut() {
-                //     Obj::MapObj(ref mut values) => values.insert(idx, value),
-                //     _ => unreachable!()
-                // };
                 Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
-                    if up.bool_value() {
-                        let a = start.int_value() + 1;
-                        let b = end.int_value();
-                        if a < b {
-                            *start = Value::Int(a);
-                            ret = Value::Int(a);
+                    if let Value::Int(_) = start {
+                        if up.bool_value() {
+                            let a = start.int_value() + 1;
+                            let b = end.int_value();
+                            if a < b {
+                                *start = Value::Int(a);
+                                ret = Value::Int(a);
+                            }
+                        } else {
+                            let a = start.int_value() - 1;
+                            let b = end.int_value();
+                            if a > b {
+                                *start = Value::Int(a);
+                                ret = Value::Int(a);
+                            }
                         }
-                    } else {
-                        let a = start.int_value() - 1;
-                        let b = end.int_value();
-                        if a > b {
-                            *start = Value::Int(a);
-                            ret = Value::Int(a);
+                    }
+                    if let Value::Obj(iter) = start {
+                        match *iter.borrow_mut() {
+                            Obj::ArrayObj(ref mut array) => {
+                                let idx = end.int_value() as usize;
+                                if idx < array.len() {
+                                    ret = array.get(idx).unwrap().clone();
+                                    *end = Value::Int(idx as i64 + 1);
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }

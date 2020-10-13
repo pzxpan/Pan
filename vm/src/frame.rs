@@ -314,18 +314,9 @@ impl Frame {
                     } else {
                         self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
                     }
+                } else {
+                    self.push_value(Value::new_range_obj(end.clone(), Value::Int(0), Value::Bool(false)));
                 }
-                // else if let Value::Obj(mut obj) = end {
-                //     match &*obj.borrow_mut() {
-                //         Obj::ArrayObj(arr) => {
-                //             if Some(value) = arr.iter().next() {
-                //                 self.push_value(value);
-                //             }
-                //
-                //         }
-                //         _ => unreachable!()
-                //     }
-                // }
 
 
                 // let iter_obj = objiter::get_iter(vm, &iterated_obj)?;

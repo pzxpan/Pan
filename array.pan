@@ -3,7 +3,10 @@ fun main() {
   for a in arr {
     print(a);
   }
-
+  arr[3] = 100;
+  for a in arr {
+      print(a);
+  }
   return;
 }
 fun print(a:int) {
