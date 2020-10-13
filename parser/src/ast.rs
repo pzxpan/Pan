@@ -191,10 +191,24 @@ impl fmt::Display for BuiltinType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum DestructType {
+    Array,
+    Tuple,
+    Struct,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct VariableDeclaration {
     pub loc: Loc,
     pub ty: Option<Expression>,
     pub name: Identifier,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct MultiVariableDeclaration {
+    pub loc: Loc,
+    pub result: Vec<Identifier>,
+    pub destruct_ty: DestructType,
 }
 
 #[derive(Debug, PartialEq)]
@@ -704,6 +718,7 @@ pub enum Statement {
     If(Loc, Expression, Box<Statement>, Option<Box<Statement>>),
     Expression(Loc, Expression),
     VariableDefinition(Loc, VariableDeclaration, Option<Expression>),
+    MultiVariableDefinition(Loc, MultiVariableDeclaration, Expression),
     ConstDefinition(Loc, VariableDeclaration, Option<Expression>),
     While(Loc, Expression, Box<Statement>),
     For(
@@ -731,6 +746,7 @@ impl Statement {
             | Statement::While(loc, _, _)
             | Statement::Expression(loc, _)
             | Statement::VariableDefinition(loc, _, _)
+            | Statement::MultiVariableDefinition(loc, _, _)
             | Statement::For(loc, _, _, _, _)
             | Statement::While(loc, _, _)
             | Statement::Continue(loc)

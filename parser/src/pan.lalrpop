@@ -69,6 +69,18 @@ VariableDeclaration: VariableDeclaration = {
     },
 }
 
+MultiVariableDeclaration: MultiVariableDeclaration = {
+    <l:@L> "let" "[" <result:Comma<Identifier>> "]"  <r:@R> => MultiVariableDeclaration {
+         loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Array,
+    },
+    <l:@L> "let" "(" <result:Comma<Identifier>> ")"  <r:@R> => MultiVariableDeclaration {
+         loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Tuple,
+     },
+   //  <l:@L> "let" "{" <result:Expression*> "}"  <r:@R> => MultiVariableDeclaration {
+   //      loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Struct,
+  //  },
+}
+
 DataDefinition: Box<DataDefinition> = {
     <doc:DocComments> <l:@L> "data" <name:Identifier> "{" <fields:(DataVariableDefinition)*> "}" <r:@R> => {
         Box::new(DataDefinition{loc: Loc(file_no, l, r), doc, name, fields})
@@ -405,6 +417,9 @@ SimpleStatement: Statement = {
     <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)?> <r:@R> => {
         Statement::VariableDefinition(Loc(file_no, l, r), v, e)
     },
+     <l:@L>  <v:MultiVariableDeclaration> "=" <e:Expression> <r:@R> => {
+            Statement::MultiVariableDefinition(Loc(file_no, l, r), v, e)
+        },
     <l:@L> <e:Expression> <r:@R> => {
         Statement::Expression(Loc(file_no, l, r), e)
     }

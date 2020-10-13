@@ -15,7 +15,7 @@ use std::cell::RefCell;
 use std::env;
 
 fn main() {
-    let home_path = env::current_dir().unwrap().join("tuple.pan");
+    let home_path = env::current_dir().unwrap().join("multiassign.pan");
     println!("当前目录是：{:?}", home_path);
     // let path = "/Users/panzhenxing/Desktop/PanPan/Pan/demo.pan";
     // let path = "/Users/ztt/Desktop/Pan/array.pan";

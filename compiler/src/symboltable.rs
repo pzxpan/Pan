@@ -584,6 +584,7 @@ impl SymbolTableBuilder {
                 //     self.scan_expression(e, &ExpressionContext::Load)?;
                 // }
             }
+            _ => {}
         }
         Ok(())
     }
