@@ -205,9 +205,16 @@ pub struct VariableDeclaration {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum MultiDeclarationPart {
+    Single(Identifier),
+    TupleOrArray(MultiVariableDeclaration),
+    Struct(Identifier, MultiVariableDeclaration),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct MultiVariableDeclaration {
     pub loc: Loc,
-    pub result: Vec<Identifier>,
+    pub result: Vec<MultiDeclarationPart>,
     pub destruct_ty: DestructType,
 }
 

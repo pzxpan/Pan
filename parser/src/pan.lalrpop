@@ -69,16 +69,22 @@ VariableDeclaration: VariableDeclaration = {
     },
 }
 
+MultiDeclarationPart: MultiDeclarationPart = {
+       <i:Identifier> ":" <m:MultiVariableDeclaration> => MultiDeclarationPart::Struct(i,m),
+      <m:MultiVariableDeclaration>  => MultiDeclarationPart::TupleOrArray(m),
+       <i:Identifier> => MultiDeclarationPart::Single(i),
+
+}
 MultiVariableDeclaration: MultiVariableDeclaration = {
-    <l:@L> "let" "[" <result:Comma<Identifier>> "]"  <r:@R> => MultiVariableDeclaration {
+    <l:@L>  "[" <result:Comma<MultiDeclarationPart>> "]"  <r:@R> => MultiVariableDeclaration {
          loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Array,
     },
-    <l:@L> "let" "(" <result:Comma<Identifier>> ")"  <r:@R> => MultiVariableDeclaration {
+    <l:@L>  "(" <result:Comma<MultiDeclarationPart>> ")"  <r:@R> => MultiVariableDeclaration {
          loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Tuple,
      },
-   //  <l:@L> "let" "{" <result:Expression*> "}"  <r:@R> => MultiVariableDeclaration {
-   //      loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Struct,
-  //  },
+     <l:@L>  "{" <result:Comma<MultiDeclarationPart>> "}"  <r:@R> => MultiVariableDeclaration {
+         loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Struct,
+    },
 }
 
 DataDefinition: Box<DataDefinition> = {
@@ -417,7 +423,7 @@ SimpleStatement: Statement = {
     <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)?> <r:@R> => {
         Statement::VariableDefinition(Loc(file_no, l, r), v, e)
     },
-     <l:@L>  <v:MultiVariableDeclaration> "=" <e:Expression> <r:@R> => {
+     <l:@L> "let" <v:MultiVariableDeclaration> "=" <e:Expression> <r:@R> => {
             Statement::MultiVariableDefinition(Loc(file_no, l, r), v, e)
         },
     <l:@L> <e:Expression> <r:@R> => {
