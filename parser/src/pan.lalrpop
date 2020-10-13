@@ -76,14 +76,14 @@ MultiDeclarationPart: MultiDeclarationPart = {
 
 }
 MultiVariableDeclaration: MultiVariableDeclaration = {
-    <l:@L>  "[" <result:Comma<MultiDeclarationPart>> "]"  <r:@R> => MultiVariableDeclaration {
-         loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Array,
+    <l:@L>  "[" <variables:Comma<MultiDeclarationPart>> "]"  <r:@R> => MultiVariableDeclaration {
+         loc: Loc(file_no, l, r), variables,destruct_ty: DestructType::Array,
     },
-    <l:@L>  "(" <result:Comma<MultiDeclarationPart>> ")"  <r:@R> => MultiVariableDeclaration {
-         loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Tuple,
+    <l:@L>  "(" <variables:Comma<MultiDeclarationPart>> ")"  <r:@R> => MultiVariableDeclaration {
+         loc: Loc(file_no, l, r), variables,destruct_ty: DestructType::Tuple,
      },
-     <l:@L>  "{" <result:Comma<MultiDeclarationPart>> "}"  <r:@R> => MultiVariableDeclaration {
-         loc: Loc(file_no, l, r), result,destruct_ty: DestructType::Struct,
+     <l:@L>  "{" <variables:Comma<MultiDeclarationPart>> "}"  <r:@R> => MultiVariableDeclaration {
+         loc: Loc(file_no, l, r), variables,destruct_ty: DestructType::Struct,
     },
 }
 

@@ -10,7 +10,7 @@ Inspirational file: https://github.com/python/cpython/blob/master/Python/symtabl
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType, CType, LambdaDefinition};
+use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType, CType, LambdaDefinition, MultiVariableDeclaration, MultiDeclarationPart};
 use std::fmt;
 use std::borrow::Borrow;
 use num_bigint::BigInt;
@@ -540,10 +540,11 @@ impl SymbolTableBuilder {
                         //如果是函数或获取属性，就获取注册了的函数和返回类型，
                         ty = self.get_register_type(e.expr_name());
                     }
-                    println!("tttty{:?}", ty);
-                    // let ty = self.get_register_type(e.expr_name());
+
                     if decl.ty.is_none() {
                         if lookup_symbol {
+                            //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
+                            // 那右侧表示符应该是变量，需要从表中查找到的类型进行推断
                             if let Some(ast::Expression::Attribute(_, _, name, idx)) = expression {
                                 if name.is_some() {
                                     ty = ty.attri_type(0, name.as_ref().unwrap().borrow().name.clone()).clone();
@@ -584,11 +585,51 @@ impl SymbolTableBuilder {
                 //     self.scan_expression(e, &ExpressionContext::Load)?;
                 // }
             }
+            MultiVariableDefinition(loc, decls, e) => {
+                let ty = self.get_register_type(e.expr_name());
+                if ty == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("无法推断右侧表达式类型"),
+                        location: loc.clone(),
+                    });
+                }
+                self.scan_multi_value_def(decls, &ty);
+            }
+        }
+        Ok(())
+    }
+
+    fn scan_multi_value_def(&mut self, decls: &MultiVariableDeclaration, ty: &CType) -> SymbolTableResult {
+        match ty {
+            CType::Array(item_ty) => {
+                for part in &decls.variables {
+                    self.scan_multi_value_part(&part, item_ty);
+                }
+            }
+            CType::Tuple(item_ty) => {
+                for (part, cty) in decls.variables.iter().zip(item_ty.iter()) {
+                    self.scan_multi_value_part(part, cty);
+                }
+            }
+            //struct暂无
             _ => {}
         }
         Ok(())
     }
 
+    fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> SymbolTableResult {
+        match part {
+            MultiDeclarationPart::Single(ident) => {
+                self.register_name(ident.name.borrow(), ty.clone(), SymbolUsage::Assigned)?;
+            }
+            MultiDeclarationPart::TupleOrArray(decl) => {
+                self.scan_multi_value_def(decl, ty);
+            }
+            //暂无
+            _ => {}
+        }
+        Ok(())
+    }
     fn scan_expressions(
         &mut self,
         expressions: &[ast::Expression],

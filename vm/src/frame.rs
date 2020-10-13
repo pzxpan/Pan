@@ -203,8 +203,8 @@ impl Frame {
             bytecode::Instruction::Duplicate => {
                 // Duplicate top of stack
                 let value = self.pop_value();
-                // self.push_value(value.clone());
-                // self.push_value(value);
+                self.push_value(value.clone());
+                self.push_value(value);
                 None
             }
             // bytecode::Instruction::Rotate { amount } => self.execute_rotate(*amount),

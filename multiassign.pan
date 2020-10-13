@@ -1,13 +1,9 @@
 fun main() {
-  let (aa,bb) = (20,30);
-  let [cc,dd] = [10,20];
-  let {dd:{cc,bb}} = a;
-  let [cc,[dd,ee]] = b;
-  let (a,(aa,bb),cc) = a;
+  let tuple = (10,(20,30));
+  let (aa,(bb,cc)) = tuple;
   print(bb);
- // for dd in aa {
- //   print(dd);
- // }
+  //let [cc,dd] = [10,20];
+  //print(cc);
   return;
 }
 fun print(a:int) {

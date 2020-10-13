@@ -214,7 +214,7 @@ pub enum MultiDeclarationPart {
 #[derive(Debug, PartialEq, Clone)]
 pub struct MultiVariableDeclaration {
     pub loc: Loc,
-    pub result: Vec<MultiDeclarationPart>,
+    pub variables: Vec<MultiDeclarationPart>,
     pub destruct_ty: DestructType,
 }
 

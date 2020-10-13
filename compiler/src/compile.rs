@@ -8,11 +8,14 @@ use itertools::Itertools;
 use num_complex::Complex64;
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
 use pan_parser::{ast, parse};
-use pan_parser::ast::{Expression, Parameter, HasType};
+use pan_parser::ast::{Expression, Parameter, HasType, MultiDeclarationPart, MultiVariableDeclaration, CType, DestructType};
 use std::borrow::Borrow;
 use pan_bytecode::bytecode::CallType::Positional;
 use pan_bytecode::bytecode::NameScope::Global;
 use std::process::exit;
+use num_bigint::BigInt;
+use num_traits::FromPrimitive;
+use pan_bytecode::bytecode::ComparisonOperator::In;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -351,13 +354,11 @@ impl<O: OutputStream> Compiler<O> {
             VariableDefinition(_, decl, expression) => {
                 if let Some(e) = &expression {
                     let mut ty = expression.as_ref().unwrap().get_type();
-                    match ty {
-                        ast::CType::Lambda(_) => {
-                            self.lambda_name = decl.name.borrow().name.clone();
-                            self.compile_expression(e)?;
-                            return Ok(());
-                        }
-                        _ => {}
+                    if let ast::CType::Lambda(_) = ty {
+                        //如果是lambda，就直接返回，不需要存储，因为lambda作为函数类型存储，只要将名称传递过去
+                        self.lambda_name = decl.name.borrow().name.clone();
+                        self.compile_expression(e)?;
+                        return Ok(());
                     }
                     self.compile_expression(e)?;
                 }
@@ -367,10 +368,59 @@ impl<O: OutputStream> Compiler<O> {
             For(_, target, iter, end, body) => {
                 self.compile_for(target, iter, end, body.as_ref().unwrap());
             }
+            MultiVariableDefinition(_, decl, expression) => {
+                self.compile_expression(expression)?;
+
+                self.compile_store_multi_value_def(decl)?;
+                // self.emit(Instruction::Pop);
+            }
             _ => {}
         }
-
-
+        Ok(())
+    }
+    fn compile_store_multi_value_def(&mut self, decl: &MultiVariableDeclaration) -> Result<(), CompileError> {
+        for (i, parts) in decl.variables.iter().enumerate() {
+            self.emit(Instruction::Duplicate);
+            self.compile_store_multi_value_part(i, parts, decl.clone().destruct_ty.borrow());
+        }
+        Ok(())
+    }
+    fn compile_store_multi_value_part(&mut self, index: usize, part: &MultiDeclarationPart, ty: &DestructType) -> Result<(), CompileError> {
+        match part {
+            MultiDeclarationPart::Single(ident) => {
+                match ty {
+                    DestructType::Array => {
+                        self.emit(Instruction::LoadConst {
+                            value: bytecode::Constant::Integer {
+                                value: BigInt::from_usize(index).unwrap(),
+                            },
+                        });
+                        self.emit(Instruction::Subscript);
+                        self.store_name(ident.name.clone().as_ref());
+                    }
+                    DestructType::Tuple => {
+                        self.emit(Instruction::LoadConst {
+                            value: bytecode::Constant::Integer {
+                                value: BigInt::from_usize(index).unwrap(),
+                            },
+                        });
+                        self.emit(Instruction::Subscript);
+                        self.store_name(ident.name.clone().as_ref());
+                    }
+                    _ => {}
+                }
+            }
+            MultiDeclarationPart::TupleOrArray(decl) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::Integer {
+                        value: BigInt::from_usize(index).unwrap(),
+                    },
+                });
+                self.emit(Instruction::Subscript);
+                self.compile_store_multi_value_def(decl)?;
+            }
+            _ => {}
+        }
         Ok(())
     }
 
@@ -1190,7 +1240,7 @@ impl<O: OutputStream> Compiler<O> {
             }
             Attribute(loc, value, name, idx) => {
                 self.compile_expression(value)?;
-
+                //按名字取，还是下标取
                 if name.is_some() {
                     self.emit(Instruction::LoadAttr {
                         name: name.as_ref().unwrap().name.clone(),
