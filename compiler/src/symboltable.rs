@@ -609,7 +609,7 @@ impl SymbolTableBuilder {
         match &expression {
             Subscript(loc, a, b) => {
                 self.scan_expression(a, context)?;
-                self.scan_expression(b, context)?;
+                // self.scan_expression(b, context)?;
             }
             Attribute(loc, obj, name, idx) => {
                 self.scan_expression(obj, context)?;

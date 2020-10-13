@@ -903,9 +903,12 @@ impl<O: OutputStream> Compiler<O> {
                         name: attr.as_ref().unwrap().name.clone(),
                     });
                 } else {
-                    // self.emit(Instruction::StoreList {
-                    //     name: name.to_owned(),
-                    // });
+                    self.emit(Instruction::LoadConst {
+                        value: bytecode::Constant::Integer {
+                            value: idx.as_ref().unwrap().clone(),
+                        },
+                    });
+                    self.emit(Instruction::StoreSubscript);
                 }
             }
             ast::Expression::List(_, elements) => {}
