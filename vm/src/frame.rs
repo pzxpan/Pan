@@ -234,7 +234,6 @@ impl Frame {
             // }
             bytecode::Instruction::BuildTuple { size, unpack } => {
                 let array_value = self.get_elements(vm, *size, *unpack);
-                // let list_obj = vm.ctx.new_tuple(elements);
                 self.push_value(array_value);
                 None
             }

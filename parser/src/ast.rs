@@ -54,6 +54,7 @@ pub enum CType {
     Float,
     String,
     Bool,
+    Tuple(Box<Vec<CType>>),
     Array(Box<CType>),
     Fn(FnType),
     Lambda(LambdaType),
@@ -69,9 +70,17 @@ impl CType {
             _ => "unknown".to_string()
         }
     }
-    pub fn rettype(&self) -> &CType {
+    pub fn ret_type(&self) -> &CType {
         match self {
             CType::Fn(s) => s.ret_type.as_ref(),
+            _ => self
+        }
+    }
+
+    pub fn attri_type(&self, index: usize, name: String) -> &CType {
+        //struct的属性类型需要名称，而tuple需要索引值;
+        match self {
+            CType::Tuple(s) => s.as_ref().get(index).unwrap(),
             _ => self
         }
     }
@@ -346,7 +355,7 @@ pub enum Expression {
 
     Subscript(Loc, Box<Expression>, Box<Expression>),
     Slice(Loc, Vec<Expression>),
-    Attribute(Loc, Box<Expression>, Identifier),
+    Attribute(Loc, Box<Expression>, Option<Identifier>, Option<BigInt>),
 
     FunctionCall(Loc, Box<Expression>, Vec<Expression>),
 
@@ -365,7 +374,7 @@ pub enum Expression {
 
     //新增
     List(Loc, Vec<(Loc, Option<Parameter>)>),
-    Tuple(Loc, Vec<(Loc, Option<Parameter>)>),
+    Tuple(Loc, Vec<Expression>),
     Dict(Loc, Vec<(Loc, Option<Parameter>, Parameter)>),
     Set(Loc, Vec<(Loc, Option<Parameter>)>),
     Lambda(Loc, Box<LambdaDefinition>),
@@ -377,6 +386,7 @@ impl Expression {
         match self {
             Expression::FunctionCall(_, n, _) => n.as_ref().expr_name(),
             Expression::Variable(id) => id.clone().name,
+            Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
             _ => "".to_string()
         }
     }
@@ -430,12 +440,21 @@ impl HasType for Expression {
                 }
                 return CType::Array(Box::new(CType::Unknown));
             }
+
+            Expression::Tuple(_, elements) => {
+                let v: Vec<CType> = elements.iter().map(|s| s.get_type()).collect();
+                return CType::Tuple(Box::new(v));
+            }
             Expression::Lambda(_, e) => {
                 e.get_type()
             }
             Expression::UnaryMinus(_, e) => {
                 e.get_type()
             }
+
+            // Expression::Attribute(_, obj_name, attri, idx) {
+            //
+            // }
             _ => { CType::Unknown }
         }
     }
@@ -464,7 +483,7 @@ impl Expression {
         use Expression::*;
         match self {
             | Subscript(loc, _, _)
-            | Attribute(loc, _, _)
+            | Attribute(loc, _, _, _)
             | FunctionCall(loc, _, _)
             | Not(loc, _)
             | UnaryPlus(loc, _)
@@ -516,7 +535,6 @@ impl Expression {
             | Dict(loc, _)
             | Set(loc, _)
             | Comprehension(loc, _, _)
-
             => *loc,
             StringLiteral(v) => v[0].loc,
         }

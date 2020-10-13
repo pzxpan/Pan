@@ -801,7 +801,9 @@ dependencies = [
  "indexmap",
  "itertools 0.8.2",
  "log",
+ "num-bigint",
  "num-complex",
+ "num-traits",
  "pan-bytecode",
  "pan-parser",
 ]

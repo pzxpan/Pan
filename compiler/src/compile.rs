@@ -896,13 +896,20 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
             }
-            ast::Expression::Attribute(_, value, ast::Identifier { loc, name }) => {
-                self.compile_expression(value)?;
-                self.emit(Instruction::StoreAttr {
-                    name: name.to_owned(),
-                });
+            ast::Expression::Attribute(_, obj, attr, idx) => {
+                self.compile_expression(obj)?;
+                if attr.is_some() {
+                    self.emit(Instruction::StoreAttr {
+                        name: attr.as_ref().unwrap().name.clone(),
+                    });
+                } else {
+                    // self.emit(Instruction::StoreList {
+                    //     name: name.to_owned(),
+                    // });
+                }
             }
-            ast::Expression::List(_, elements) | ast::Expression::Tuple(_, elements) => {
+            ast::Expression::List(_, elements) => {}
+            ast::Expression::Tuple(_, elements) => {
                 let mut seen_star = false;
 
                 // Scan for star args:
@@ -931,7 +938,7 @@ impl<O: OutputStream> Compiler<O> {
                     });
                 }
 
-                for (_, element) in elements {
+                for element in elements {
                     // if let ast::ExpressionType::Starred { value } = &element.node {
                     //     self.compile_store(value)?;
                     // } else {
@@ -1178,8 +1185,21 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(b)?;
                 self.emit(Instruction::Subscript);
             }
-            Attribute(loc, value, _) => {
+            Attribute(loc, value, name, idx) => {
                 self.compile_expression(value)?;
+
+                if name.is_some() {
+                    self.emit(Instruction::LoadAttr {
+                        name: name.as_ref().unwrap().name.clone(),
+                    });
+                } else {
+                    self.emit(Instruction::LoadConst {
+                        value: bytecode::Constant::Integer {
+                            value: idx.as_ref().unwrap().clone(),
+                        },
+                    });
+                    self.emit(Instruction::Subscript);
+                }
             }
             FunctionCall(loc, name, args) => {
                 self.compile_call(name, args)?;
@@ -1279,7 +1299,14 @@ impl<O: OutputStream> Compiler<O> {
             Is(loc, _, _) => {}
             Slice(loc, _) => {}
             Await(loc, _) => {}
-            Tuple(loc, _) => {}
+            Tuple(loc, elements) => {
+                let size = elements.len();
+                let must_unpack = self.gather_elements(elements)?;
+                self.emit(Instruction::BuildTuple {
+                    size,
+                    unpack: must_unpack,
+                });
+            }
             Dict(loc, _) => {}
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}

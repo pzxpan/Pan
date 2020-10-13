@@ -13,6 +13,8 @@ use pan_parser::ast;
 use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType, CType, LambdaDefinition};
 use std::fmt;
 use std::borrow::Borrow;
+use num_bigint::BigInt;
+use num_traits::cast::ToPrimitive;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -528,21 +530,37 @@ impl SymbolTableBuilder {
                 if decl.ty.is_some() {
                     self.register_name(decl.name.borrow().name.borrow(), decl.ty.as_ref().unwrap().get_type(), SymbolUsage::Assigned)?;
                 }
-                //   self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
+                //这里的内容太多，需要好好整理归纳;确定变量的类型是重中之重;现在只能慢慢往里加，
                 if let Some(e) = expression {
                     self.scan_expression(e, &ExpressionContext::Load)?;
                     //获取右侧表达式的返回类型,
                     let mut ty = e.get_type();
+                    let lookup_symbol = ty == CType::Unknown;
                     if ty == CType::Unknown {
-                        //如果式方法调用就获取注册方法的返回类型，
+                        //如果是函数或获取属性，就获取注册了的函数和返回类型，
                         ty = self.get_register_type(e.expr_name());
                     }
+                    println!("tttty{:?}", ty);
                     // let ty = self.get_register_type(e.expr_name());
                     if decl.ty.is_none() {
-                        self.register_name(decl.name.borrow().name.borrow(), ty.rettype().clone(), SymbolUsage::Assigned)?;
+                        if lookup_symbol {
+                            if let Some(ast::Expression::Attribute(_, _, name, idx)) = expression {
+                                if name.is_some() {
+                                    ty = ty.attri_type(0, name.as_ref().unwrap().borrow().name.clone()).clone();
+                                    println!("attri _tttty{:?}", ty);
+                                    self.register_name(decl.name.borrow().name.borrow(), ty, SymbolUsage::Assigned)?;
+                                } else if idx.is_some() {
+                                    ty = ty.attri_type(idx.as_ref().unwrap().to_usize().unwrap(), "".to_string()).clone();
+                                    println!("attri _tttty{:?}", ty);
+                                    self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned)?;
+                                }
+                            }
+                        } else {
+                            self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned)?;
+                        }
                     } else {
-                        println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(), ty.rettype().clone());
-                        if decl.ty.as_ref().unwrap().get_type() != ty.rettype().clone() {
+                        println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(), ty.ret_type().clone());
+                        if decl.ty.as_ref().unwrap().get_type() != ty.ret_type().clone() {
                             return Err(SymbolTableError {
                                 error: format!("类型不匹配"),
                                 location: location.clone(),
@@ -593,8 +611,8 @@ impl SymbolTableBuilder {
                 self.scan_expression(a, context)?;
                 self.scan_expression(b, context)?;
             }
-            Attribute(loc, value, _) => {
-                self.scan_expression(value, context)?;
+            Attribute(loc, obj, name, idx) => {
+                self.scan_expression(obj, context)?;
             }
             FunctionCall(loc, name, args) => {
                 let ty = self.get_register_type(name.expr_name());
@@ -694,7 +712,9 @@ impl SymbolTableBuilder {
             Is(loc, _, _) => {}
             Slice(loc, _) => {}
             Await(loc, _) => {}
-            Tuple(loc, _) => {}
+            Tuple(loc, elements) => {
+                self.scan_expressions(elements, context)?;
+            }
             Dict(loc, _) => {}
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}
