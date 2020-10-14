@@ -586,7 +586,10 @@ impl SymbolTableBuilder {
                 // }
             }
             MultiVariableDefinition(loc, decls, e) => {
-                let ty = self.get_register_type(e.expr_name());
+                let mut ty = self.get_register_type(e.expr_name());
+                if ty == CType::Unknown {
+                    ty = e.get_type();
+                }
                 if ty == CType::Unknown {
                     return Err(SymbolTableError {
                         error: format!("无法推断右侧表达式类型"),
