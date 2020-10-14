@@ -449,6 +449,9 @@ impl HasType for Expression {
             Expression::NumberLiteral(_, _) => {
                 CType::Int
             }
+            Expression::StringLiteral(s) => {
+                CType::String
+            }
             Expression::ArrayLiteral(_, elements) => {
                 if elements.len() > 0 {
                     let ty = elements.get(0).unwrap().get_type();

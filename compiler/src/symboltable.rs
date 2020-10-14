@@ -350,8 +350,9 @@ impl SymbolTableBuilder {
         self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
         self.register_name(&"string".to_string(), ast::CType::String, SymbolUsage::Used)?;
         self.register_name(&"bool".to_string(), ast::CType::Bool, SymbolUsage::Used)?;
+        self.register_name(&"Any".to_string(), ast::CType::Any, SymbolUsage::Used)?;
         let mut arg_types = Vec::new();
-        arg_types.push((String::from("value"), ast::CType::Int, false));
+        arg_types.push((String::from("value"), ast::CType::Any, false));
         let tt = ast::CType::Fn(ast::FnType {
             name: "print".to_string(),
             arg_types,
@@ -669,11 +670,14 @@ impl SymbolTableBuilder {
                         match e.clone() {
                             Expression::Variable(s) => {
                                 let cty = self.get_register_type(s.name);
-                                if args_type.get(i).unwrap().clone() != cty {
-                                    return Err(SymbolTableError {
-                                        error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i, args_type.get(i).unwrap().clone(), cty),
-                                        location: loc.clone(),
-                                    });
+                                let expect_ty = args_type.get(i).unwrap().clone();
+                                if expect_ty != cty {
+                                    if expect_ty != CType::Any {
+                                        return Err(SymbolTableError {
+                                            error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i, expect_ty, cty),
+                                            location: loc.clone(),
+                                        });
+                                    }
                                 }
                             }
                             _ => {}

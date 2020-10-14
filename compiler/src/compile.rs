@@ -1331,6 +1331,17 @@ impl<O: OutputStream> Compiler<O> {
                     },
                 });
             }
+            StringLiteral(values) => {
+                let mut value = values.iter().fold(String::new(), |mut s, x| {
+                    s.push_str(&x.string);
+                    s
+                });
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::String {
+                        value
+                    },
+                })
+            }
             ArrayLiteral(loc, elements) => {
                 let size = elements.len();
                 let must_unpack = self.gather_elements(elements)?;
