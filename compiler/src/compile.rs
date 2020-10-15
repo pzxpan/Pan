@@ -1388,6 +1388,7 @@ impl<O: OutputStream> Compiler<O> {
                 let is_async = false;
                 self.compile_function_def(&name, args.as_slice(), body, &None, is_async, true);
             }
+            Number(loc, number) => { self.compile_load_constant_number(number.clone()); }
         }
         // match &expression.node {
         //     Call {
@@ -1597,6 +1598,86 @@ impl<O: OutputStream> Compiler<O> {
         //         self.set_label(end_label);
         //     }
         // }
+        Ok(())
+    }
+
+    fn compile_load_constant_number(&mut self, number: ast::Number) -> Result<(), CompileError> {
+        use ast::Number::*;
+        match number {
+            I8(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::I8 { value },
+                });
+            }
+            I16(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::I16 { value },
+                });
+            }
+            I32(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::I32 { value },
+                });
+            }
+            I64(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::I64 { value },
+                });
+            }
+            I128(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::I128 { value },
+                });
+            }
+            ISize(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::ISize { value },
+                });
+            }
+
+            U8(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::U8 { value },
+                });
+            }
+            U16(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::U16 { value },
+                });
+            }
+            U32(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::U32 { value },
+                });
+            }
+            U64(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::U64 { value },
+                });
+            }
+            U128(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::U128 { value },
+                });
+            }
+            USize(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::USize { value },
+                });
+            }
+            Int(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::Integer {
+                        value: value.clone(),
+                    },
+                });
+            }
+            Float(value) => {
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::Float { value },
+                });
+            }
+        }
         Ok(())
     }
 

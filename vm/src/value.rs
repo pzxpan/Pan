@@ -35,6 +35,19 @@ pub struct TypeValue {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    ISize(isize),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
+    USize(usize),
+
     Int(i64),
     Float(f64),
     Bool(bool),
@@ -89,6 +102,20 @@ impl Value {
 impl Value {
     pub fn to_string(&self) -> String {
         match self {
+            Value::I8(val) => format!("{}", val),
+            Value::I16(val) => format!("{}", val),
+            Value::I32(val) => format!("{}", val),
+            Value::I64(val) => format!("{}", val),
+            Value::I128(val) => format!("{}", val),
+            Value::ISize(val) => format!("{}", val),
+
+            Value::U8(val) => format!("{}", val),
+            Value::U16(val) => format!("{}", val),
+            Value::U32(val) => format!("{}", val),
+            Value::U64(val) => format!("{}", val),
+            Value::U128(val) => format!("{}", val),
+            Value::USize(val) => format!("{}", val),
+
             Value::Int(val) => format!("{}", val),
             Value::Float(val) => format!("{}", val),
             Value::Bool(val) => format!("{}", val),
@@ -132,6 +159,20 @@ impl Value {
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
+            Value::I8(val) => write!(f, "{}", val),
+            Value::I16(val) => write!(f, "{}", val),
+            Value::I32(val) => write!(f, "{}", val),
+            Value::I64(val) => write!(f, "{}", val),
+            Value::I128(val) => write!(f, "{}", val),
+            Value::ISize(val) => write!(f, "{}", val),
+
+            Value::U8(val) => write!(f, "{}", val),
+            Value::U16(val) => write!(f, "{}", val),
+            Value::U32(val) => write!(f, "{}", val),
+            Value::U64(val) => write!(f, "{}", val),
+            Value::U128(val) => write!(f, "{}", val),
+            Value::USize(val) => write!(f, "{}", val),
+
             Value::Int(v) => write!(f, "{}", v),
             Value::Float(v) => write!(f, "{}", v),
             Value::Bool(v) => write!(f, "{}", v),

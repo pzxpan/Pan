@@ -512,6 +512,8 @@ impl SymbolTableBuilder {
             //                    Some(FunctionCall(Loc(1, 6, 25), Variable(Identifier { loc: Loc(1, 6, 20), name: "other" }), [NumberLiteral(Loc(1, 6, 22), BigInt { sign: Plus, data: BigUint { data: [20] } }), NumberLiteral(Loc(1, 6, 24), BigInt { sign: Plus, data: BigUint { data: [30] } })])))
 
             Args(loc, _) => {}
+           // VariableDeclaration { loc: Loc(1, 2, 11), ty: None,
+            // name: Identifier { loc: Loc(1, 2, 11), name: "dd" } }, Some(Number(Loc(1, 61, 68), U32(888)))
             VariableDefinition(location, decl, expression) => {
                 if expression.is_some() {
                     //注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
@@ -770,6 +772,8 @@ impl SymbolTableBuilder {
             StringLiteral(v) => {}
             Lambda(_, lambda) => {
                 self.scan_lambda(self.lambda_name.to_string(), *lambda.clone());
+            }
+            Number(loc, number) => {
             }
         }
         Ok(())

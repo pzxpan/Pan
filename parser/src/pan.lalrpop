@@ -42,12 +42,6 @@ SingleDocComment: (usize, CommentType, &'input str)= {
     <l:@L> <c:DocComment> => (l, c.0, c.1)
 }
 
-Type: BuiltinType = {
-    "bool" => BuiltinType::Bool,
-    "string" => BuiltinType::String,
-    "float" => BuiltinType::Float,
-    "int" => BuiltinType::Int,
-}
 
 ArrayDimension: Option<Expression> = {
     "[" "]" => None,
@@ -292,6 +286,7 @@ Precedence0: Expression = {
         Expression::Tuple(Loc(file_no, a, b), v)
      },
     <Identifier> => Expression::Variable(<>),
+   <a:@L> <n:Number>  <b:@R> => Expression::Number(Loc(file_no, a, b),n),
     <l:@L> <n:LexNumber> <r:@R> => {
         let s: String = n.chars().filter(|v| *v != '_').collect();
 
@@ -311,7 +306,22 @@ Precedence0: Expression = {
     <LambdaDefinition> => <>
 }
 
-
+Number: Number = {
+    <value:i8> => { Number::I8(value)  },
+    <value:i16> => { Number::I16(value)  },
+    <value:i32> => { Number::I32(value)  },
+    <value:i64> => { Number::I64(value)  },
+    <value:i128> => { Number::I128(value)  },
+    <value:isize> => { Number::ISize(value)  },
+    <value:u8> => { Number::U8(value)  },
+    <value:u16> => { Number::U16(value)  },
+    <value:u32> => { Number::U32(value)  },
+    <value:u64> => { Number::U64(value)  },
+    <value:u128> => { Number::U128(value)  },
+    <value:usize> => { Number::USize(value)  },
+    <value:float> => { Number::Float( value ) },
+   // <s:complex> => { Number::Complex { real: s.0, imag: s.1 } },
+};
 
 StringLiteral: StringLiteral = {
     <l:@L> <s:LexStringLiteral> <r:@R> => {
@@ -529,8 +539,19 @@ extern {
         "." => Token::Member,
         "," => Token::Comma,
         DocComment => Token::DocComment(<CommentType>, <&'input str>),
-        "float" => Token::Float,
-        "int" => Token::Int,
+        float => Token::Float(<f64>),
+        i8 => Token::I8(<i8>),
+        i16 => Token::I16(<i16>),
+        i32 => Token::I32(<i32>),
+        i64 => Token::I64(<i64>),
+        i128 => Token::I128(<i128>),
+        isize => Token::ISize(<isize>),
+         u8 => Token::U8(<u8>),
+        u16 => Token::U16(<u16>),
+        u32 => Token::U32(<u32>),
+        u64 => Token::U64(<u64>),
+        u128 => Token::U128(<u128>),
+        usize => Token::USize(<usize>),
         "data" => Token::Data,
         "import" => Token::Import,
         "struct" => Token::Struct,

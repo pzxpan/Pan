@@ -252,6 +252,19 @@ pub enum CallType {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Constant {
+    I8 { value: i8 },
+    I16 { value: i16 },
+    I32 { value: i32 },
+    I64 { value: i64 },
+    I128 { value: i128 },
+    ISize { value: isize },
+    U8 { value: u8 },
+    U16 { value: u16 },
+    U32 { value: u32 },
+    U64 { value: u64 },
+    U128 { value: u128 },
+    USize { value: usize },
+
     Integer { value: BigInt },
     Float { value: f64 },
     Complex { value: Complex64 },
@@ -505,6 +518,19 @@ impl Instruction {
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Constant::I8 { value } => write!(f, "{}", value),
+            Constant::I16 { value } => write!(f, "{}", value),
+            Constant::I32 { value } => write!(f, "{}", value),
+            Constant::I64 { value } => write!(f, "{}", value),
+            Constant::I128 { value } => write!(f, "{}", value),
+            Constant::ISize { value } => write!(f, "{}", value),
+            Constant::U8 { value } => write!(f, "{}", value),
+            Constant::U16 { value } => write!(f, "{}", value),
+            Constant::U32 { value } => write!(f, "{}", value),
+            Constant::U64 { value } => write!(f, "{}", value),
+            Constant::U128 { value } => write!(f, "{}", value),
+            Constant::USize { value } => write!(f, "{}", value),
+
             Constant::Integer { value } => write!(f, "{}", value),
             Constant::Float { value } => write!(f, "{}", value),
             Constant::Complex { value } => write!(f, "{}", value),

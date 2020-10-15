@@ -50,6 +50,19 @@ pub enum CType {
     Unit,
     Any,
     Union(Vec<CType>),
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    ISize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    USize,
+
     Int,
     Float,
     String,
@@ -321,6 +334,26 @@ pub struct NamedArgument {
     pub expr: Expression,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Number {
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    ISize(isize),
+
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
+    USize(usize),
+
+    Int(BigInt),
+    Float(f64),
+}
+
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -389,6 +422,7 @@ pub enum Expression {
     NumberLiteral(Loc, BigInt),
     StringLiteral(Vec<StringLiteral>),
     ArrayLiteral(Loc, Vec<Expression>),
+    Number(Loc, Number),
 
     Type(Loc, BuiltinType),
     Variable(Identifier),
@@ -476,6 +510,26 @@ impl HasType for Expression {
                 e.get_type()
             }
 
+            Expression::Number(_, e) => {
+                use Number::*;
+                match e {
+                    I8(_) => CType::I8,
+                    I16(_) => CType::I16,
+                    I32(_) => CType::I32,
+                    I64(_) => CType::I64,
+                    I128(_) => CType::I128,
+                    ISize(_) => CType::ISize,
+                    U8(_) => CType::U8,
+                    U16(_) => CType::U16,
+                    U32(_) => CType::U32,
+                    U64(_) => CType::U64,
+                    U128(_) => CType::U128,
+                    USize(_) => CType::USize,
+                    Int(e) => CType::Int,
+                    Float(f64) => CType::Float,
+                }
+            }
+
             // Expression::Attribute(_, obj_name, attri, idx) {
             //
             // }
@@ -559,6 +613,7 @@ impl Expression {
             | Dict(loc, _)
             | Set(loc, _)
             | Comprehension(loc, _, _)
+            | Number(loc, _)
             => *loc,
             StringLiteral(v) => v[0].loc,
         }

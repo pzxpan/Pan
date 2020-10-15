@@ -10,6 +10,11 @@ use std::str::CharIndices;
 use unicode_xid::UnicodeXID;
 
 use crate::ast::Loc;
+use std::ops::Deref;
+use num_bigint::BigInt;
+use num_traits::identities::Zero;
+use num_traits::{Num, ToPrimitive};
+use std::str::FromStr;
 
 pub type Spanned<Token, Loc, Error> = Result<(Loc, Token, Loc), Error>;
 
@@ -50,8 +55,19 @@ pub enum Token<'input> {
     Return,
     Returns,
 
-    Float,
-    Int,
+    Float(f64),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    ISize(isize),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
+    USize(usize),
 
     Bool,
 
@@ -151,8 +167,21 @@ impl<'input> fmt::Display for Token<'input> {
 
             Token::Number(n) => write!(f, "{}", n),
 
-            Token::Float => write!(f, "float"),
-            Token::Int => write!(f, "int"),
+            Token::Float(ff) => write!(f, "{:?}", ff),
+            // Token::Int(n) => write!(f, "{:?}", n),
+            Token::I8(n) => write!(f, "{:?}", n),
+            Token::I16(n) => write!(f, "{:?}", n),
+            Token::I32(n) => write!(f, "{:?}", n),
+            Token::I64(n) => write!(f, "{:?}", n),
+            Token::I128(n) => write!(f, "{:?}", n),
+            Token::ISize(n) => write!(f, "{:?}", n),
+
+            Token::U8(n) => write!(f, "{:?}", n),
+            Token::U16(n) => write!(f, "{:?}", n),
+            Token::U32(n) => write!(f, "{:?}", n),
+            Token::U64(n) => write!(f, "{:?}", n),
+            Token::U128(n) => write!(f, "{:?}", n),
+            Token::USize(n) => write!(f, "{:?}", n),
             Token::MutRef => write!(f, "ref'"),
             Token::TwoDot => write!(f, ".."),
             Token::ReadOnlyRef => write!(f, "ref"),
@@ -376,26 +405,296 @@ impl<'input> Lexer<'input> {
 
     fn parse_number(
         &mut self,
-        start: usize,
+        start_pos: usize,
         end: usize,
         ch: char,
     ) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
-        if ch == '0' {}
-
-        let mut end = end;
-        while let Some((i, ch)) = self.chars.peek() {
-            if !ch.is_ascii_digit() && *ch != '_' {
-                break;
+        // if ch == '0' {}
+        //
+        // let mut end = end;
+        // while let Some((i, ch)) = self.chars.peek() {
+        //     //添加浮点
+        //     println!("num char is {:?}", ch);
+        //     if !ch.is_ascii_digit() && (*ch != '_' || *ch != '.') {
+        //         break;
+        //     }
+        //     end = *i;
+        //     self.chars.next();
+        // }
+        if ch == '0' {
+            match self.chars.peek() {
+                Some((_, 'x')) | Some((_, 'X')) => {
+                    self.chars.next();
+                    self.lex_number_radix(start_pos, 16)
+                }
+                Some((_, 'o')) | Some((_, 'O')) => {
+                    self.chars.next();
+                    self.lex_number_radix(start_pos, 8)
+                }
+                Some((_, 'b')) | Some((_, 'B')) => {
+                    self.chars.next();
+                    self.lex_number_radix(start_pos, 2)
+                }
+                _ => {
+                    self.parse_normal_number(start_pos, end, ch)
+                }
             }
-            end = *i;
+        } else {
+            self.parse_normal_number(start_pos, end, ch)
+        }
+        // println!("result is {:?}", &self.input[start_pos..=end]);
+        // Some(Ok((
+        //     self.row,
+        //     Token::Number(&self.input[start_pos..=end]),
+        //     self.column,
+        // )))
+    }
+
+    fn lex_number_radix(&mut self, start_pos: usize, radix: u32) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
+        let value_text = self.radix_run(radix);
+        let end_pos = start_pos + 2 + value_text.len();
+        let a = 0x233444;
+        let value = BigInt::from_str_radix(&value_text, radix);
+        if value.is_ok() {
+            Some(Ok((start_pos, Token::I32(value.unwrap().to_i32().unwrap()), end_pos)))
+        } else {
+            return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned())));
+        }
+    }
+    fn parse_normal_number(&mut self,
+                           start_pos: usize,
+                           end: usize,
+                           ch0: char, ) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
+        // let start_pos = self.get_pos();
+        let mut end_pos = end;
+        let mut start_is_zero = ch0 == '0';
+        // Normal number:
+        let mut value_text = String::new();
+        value_text.push(ch0);
+        value_text.push_str(&self.radix_run(10));
+        let mut ch1 = '_';
+        end_pos = start_pos + value_text.len();
+
+        if let Some((pos, ch)) = self.chars.peek() {
+            ch1 = *ch;
+        }
+        // If float:
+        if ch1 == '.' || self.at_exponent() {
+            // Take '.':
+            if ch1 == '.' {
+                self.chars.next();
+                if let Some((_, '_')) = self.chars.peek() {
+                    return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos + 2].to_owned())));
+                }
+                value_text.push(ch1);
+                value_text.push_str(&self.radix_run(10));
+            }
+
+            // 1e6 for example:
+            if ch1 == 'e' || ch1 == 'E' {
+                value_text.push(ch1.to_ascii_lowercase());
+
+                // Optional +/-
+                if ch1 == '-' || ch1 == '+' {
+                    value_text.push(ch1);
+                }
+                value_text.push_str(&self.radix_run(10));
+            }
+
+            let value = f64::from_str(&value_text).unwrap();
+            end_pos = start_pos + value_text.len();
+            // Parse trailing 'j':
+            if ch1 == 'j' || ch1 == 'J' {
+                self.chars.next();
+                end_pos = end_pos + 1;
+                return Some(Ok((start_pos, Token::Float(value), end_pos)));
+                // Ok((
+                //     start_pos,
+                //     Token::Complex {
+                //         real: 0.0,
+                //         imag: value,
+                //     },
+                //     end_pos,
+                // ))
+            } else {
+                return Some(Ok((start_pos, Token::Float(value), end_pos)));
+            }
+        } else if ch1 == 'u' || ch1 == 'i' {
+            end_pos = start_pos + value_text.len();
+            let value = value_text.parse::<BigInt>().unwrap();
+            if start_is_zero && !value.is_zero() {
+                return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                )));
+            }
             self.chars.next();
+            let signed = ch1 == 'i';
+            if let Some((_, 's')) = self.chars.peek() {
+                self.next();
+                end_pos = end_pos + 2;
+                if signed {
+                    return Some(Ok((start_pos, Token::ISize(value.to_isize().unwrap()), end_pos)));
+                } else {
+                    return Some(Ok((start_pos, Token::USize(value.to_usize().unwrap()), end_pos)));
+                }
+            } else {
+                let ty = self.radix_run(10);
+                let ty_value = ty.parse::<BigInt>().unwrap().to_u32().unwrap();
+                if signed {
+                    match ty_value {
+                        8 => {
+                            end_pos = end_pos + ty.len() + 1;
+                            return Some(Ok((start_pos, Token::I8(value.to_i8().unwrap()), end_pos)));
+                        }
+                        16 => {
+                            end_pos = end_pos + ty.len() + 2;
+                            return Some(Ok((start_pos, Token::I16(value.to_i16().unwrap()), end_pos)));
+                        }
+                        32 => {
+                            end_pos = end_pos + ty.len() + 2;
+                            return Some(Ok((start_pos, Token::I32(value.to_i32().unwrap()), end_pos)));
+                        }
+                        64 => {
+                            end_pos = end_pos + ty.len() + 2;
+                            return Some(Ok((start_pos, Token::I64(value.to_i64().unwrap()), end_pos)));
+                        }
+                        128 => {
+                            end_pos = end_pos + ty.len() + 3;
+                            return Some(Ok((start_pos, Token::I128(value.to_i128().unwrap()), end_pos)));
+                        }
+                        _ => {
+                            return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                            )));
+                        }
+                    }
+                } else {
+                    match ty_value {
+                        8 => {
+                            end_pos = end_pos + ty.len() + 1;
+                            return Some(Ok((start_pos, Token::U8(value.to_u8().unwrap()), end_pos)));
+                        }
+                        16 => {
+                            end_pos = end_pos + ty.len() + 2;
+                            return Some(Ok((start_pos, Token::U16(value.to_u16().unwrap()), end_pos)));
+                        }
+                        32 => {
+                            end_pos = end_pos + ty.len() + 2;
+                            return Some(Ok((start_pos, Token::U32(value.to_u32().unwrap()), end_pos)));
+                        }
+                        64 => {
+                            end_pos = end_pos + ty.len() + 2;
+                            return Some(Ok((start_pos, Token::U64(value.to_u64().unwrap()), end_pos)));
+                        }
+                        128 => {
+                            end_pos = end_pos + ty.len() + 3;
+                            return Some(Ok((start_pos, Token::U128(value.to_u128().unwrap()), end_pos)));
+                        }
+                        _ => {
+                            return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                            )));
+                        }
+                    }
+                }
+            }
+            // Parse trailing 'j':
+            // if self.chr0 == Some('j') || self.chr0 == Some('J') {
+            //     self.next_char();
+            //     let end_pos = self.get_pos();
+            //     let imag = f64::from_str(&value_text).unwrap();
+            //     Ok((start_pos, Tok::Complex { real: 0.0, imag }, end_pos))
+            // } else {
+            //     let end_pos = self.get_pos();
+
+            // let value = value_text.parse::<BigInt>().unwrap();
+            // if start_is_zero && !value.is_zero() {
+            //     return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+            //     )));
+            // }
+            // // }
+            // return Some(Ok((start_pos, Token::Int(value.to_i64().unwrap()), end_pos)));
+        } else {
+            let value = value_text.parse::<BigInt>().unwrap();
+            if start_is_zero && !value.is_zero() {
+                return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                )));
+            }
+            // }
+            return Some(Ok((start_pos, Token::Number(&self.input[start_pos..end_pos]), end_pos)));
         }
 
-        Some(Ok((
-            self.row,
-            Token::Number(&self.input[start..=end]),
-            self.column,
-        )))
+        // return Some(Ok((
+        //     self.row,
+        //     Token::Int,
+        //     self.column,
+        // )));
+    }
+
+    /// Consume a sequence of numbers with the given radix,
+   /// the digits can be decorated with underscores
+   /// like this: '1_2_3_4' == '1234'
+    fn radix_run(&mut self, radix: u32) -> String {
+        let mut value_text = String::new();
+        loop {
+            if let Some((pos, ch)) = self.chars.peek() {
+                if Lexer::<'_>::is_digit_of_radix(*ch, radix) {
+                    value_text.push(*ch);
+                    self.chars.next();
+                } else if *ch == '_' {
+                    self.chars.next();
+                } else {
+                    break;
+                }
+            }
+            // if let Some(c) = self.take_number(radix) {
+            //     value_text.push(c);
+            // } else if self.chr0 == Some('_') && self.is_digit_of_radix(self.chr1, radix) {
+            //     self.chars.next();
+            // } else {
+            //     break;
+            // }
+        }
+        value_text
+    }
+
+    fn at_exponent(&mut self) -> bool {
+        match self.chars.peek() {
+            Some((_, 'e')) | Some((_, 'E')) => {
+                self.chars.next();
+                match self.chars.peek() {
+                    Some((_, '+')) | Some((_, '-')) => {
+                        self.chars.next();
+                        match self.chars.peek() {
+                            Some((_, ch))  if ch.is_ascii_digit() => true,
+                            _ => false,
+                        }
+                    }
+                    Some((_, ch)) if ch.is_ascii_digit() => true,
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn is_digit_of_radix(c: char, radix: u32) -> bool {
+        match radix {
+            2 => match c {
+                '0'..='1' => true,
+                _ => false,
+            },
+            8 => match c {
+                '0'..='7' => true,
+                _ => false,
+            },
+            10 => match c {
+                '0'..='9' => true,
+                _ => false,
+            },
+            16 => match c {
+                '0'..='9' | 'a'..='f' | 'A'..='F' => true,
+                _ => false,
+            },
+            x => unimplemented!("Radix not implemented: {}", x),
+        }
     }
 
     fn next(&mut self) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
