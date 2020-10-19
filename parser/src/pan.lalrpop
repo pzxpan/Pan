@@ -250,6 +250,14 @@ NamedArgument: NamedArgument = {
     }
 }
 
+DictEntry: DictEntry = {
+    <l:@L> <name:StringLiteral> ":" <expr:Expression> <r:@R> => {
+        DictEntry{ loc: Loc(file_no, l, r),name, expr }
+    }
+
+}
+
+
 FunctionCall: Expression = {
     <a:@L> <i:Precedence0> "(" <v:Comma<Expression>> ")" <b:@R> => {
         Expression::FunctionCall(Loc(file_no, a, b), Box::new(i), v)
@@ -302,6 +310,8 @@ Precedence0: Expression = {
 
         Expression::List(Loc(file_no, l, r), a)
     },
+
+     <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
 
     <LambdaDefinition> => <>
 }

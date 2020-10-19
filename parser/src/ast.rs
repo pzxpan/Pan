@@ -335,6 +335,13 @@ pub struct NamedArgument {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct DictEntry {
+    pub loc: Loc,
+    pub name: StringLiteral,
+    pub expr: Expression,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Number {
     I8(i8),
     I16(i16),
@@ -430,7 +437,7 @@ pub enum Expression {
     //新增
     List(Loc, Vec<(Loc, Option<Parameter>)>),
     Tuple(Loc, Vec<Expression>),
-    Dict(Loc, Vec<(Loc, Option<Parameter>, Parameter)>),
+    Dict(Loc, Vec<DictEntry>),
     Set(Loc, Vec<(Loc, Option<Parameter>)>),
     Lambda(Loc, Box<LambdaDefinition>),
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
