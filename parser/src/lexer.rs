@@ -453,7 +453,6 @@ impl<'input> Lexer<'input> {
     fn lex_number_radix(&mut self, start_pos: usize, radix: u32) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
         let value_text = self.radix_run(radix);
         let end_pos = start_pos + 2 + value_text.len();
-        let a = 0x233444;
         let value = BigInt::from_str_radix(&value_text, radix);
         if value.is_ok() {
             Some(Ok((start_pos, Token::I32(value.unwrap().to_i32().unwrap()), end_pos)))
@@ -479,7 +478,8 @@ impl<'input> Lexer<'input> {
             ch1 = *ch;
         }
         // If float:
-        if ch1 == '.' || self.at_exponent() {
+
+        if (ch1 == '.' && !self.in_range((end_pos + 1) as usize)) || self.at_exponent() {
             // Take '.':
             if ch1 == '.' {
                 self.chars.next();
@@ -673,6 +673,10 @@ impl<'input> Lexer<'input> {
             }
             _ => false,
         }
+    }
+    fn in_range(&mut self, end_pos: usize) -> bool {
+        //需要往前看两个字符，不知道有啥方法，peek和next会改变迭代器状态，且无法回退;
+        return self.input[end_pos - 1..end_pos + 1].to_owned() == "..";
     }
 
     fn is_digit_of_radix(c: char, radix: u32) -> bool {

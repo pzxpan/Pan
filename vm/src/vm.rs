@@ -24,6 +24,7 @@ use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
 use pan_bytecode::bytecode::CodeObject;
 use crate::value::{Value, Obj};
+use std::ops::Add;
 
 // use objects::objects;
 
@@ -366,6 +367,9 @@ impl VirtualMachine {
         match (a, b) {
             (Value::Int(a), Value::Int(b)) => {
                 Value::Int(a + b)
+            }
+            (Value::Str(s1), Value::Str(s2)) => {
+                Value::Str(s1.add(s2.as_str()))
             }
             _ => unreachable!()
         }

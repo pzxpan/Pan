@@ -452,6 +452,7 @@ impl HasType for Expression {
         match self {
             Expression::Add(_, left, right) |
             Expression::Subtract(_, left, right) => {
+                //TODO 需要处理两个变量的四则运算的返回类型，需要在利用注册了的symbol进行处理;
                 let l = left.get_type();
                 let r = right.get_type();
                 if l == r {
