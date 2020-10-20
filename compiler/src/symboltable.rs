@@ -473,6 +473,8 @@ impl SymbolTableBuilder {
                     let ty = self.get_register_type(iter.expr_name());
                     if let CType::Array(cty) = ty {
                         self.register_name(symbol_name.borrow(), cty.as_ref().clone(), SymbolUsage::Assigned)?;
+                    } else if let CType::Dict(key, value) = ty {
+                        self.register_name(symbol_name.borrow(), CType::Tuple(Box::new(vec![key.as_ref().clone(), value.as_ref().clone()])), SymbolUsage::Assigned)?;
                     } else {
                         return Err(SymbolTableError {
                             error: format!("{:?}类型不正确,只有数组类型才能生成迭代器", iter.expr_name()),
@@ -512,7 +514,7 @@ impl SymbolTableBuilder {
             //                    Some(FunctionCall(Loc(1, 6, 25), Variable(Identifier { loc: Loc(1, 6, 20), name: "other" }), [NumberLiteral(Loc(1, 6, 22), BigInt { sign: Plus, data: BigUint { data: [20] } }), NumberLiteral(Loc(1, 6, 24), BigInt { sign: Plus, data: BigUint { data: [30] } })])))
 
             Args(loc, _) => {}
-           // VariableDeclaration { loc: Loc(1, 2, 11), ty: None,
+            // VariableDeclaration { loc: Loc(1, 2, 11), ty: None,
             // name: Identifier { loc: Loc(1, 2, 11), name: "dd" } }, Some(Number(Loc(1, 61, 68), U32(888)))
             VariableDefinition(location, decl, expression) => {
                 if expression.is_some() {
@@ -766,15 +768,19 @@ impl SymbolTableBuilder {
             Tuple(loc, elements) => {
                 self.scan_expressions(elements, context)?;
             }
-            Dict(loc, _) => {}
+            Dict(loc, entries) => {
+                for entry in entries {
+                    self.scan_expression(&entry.key, context)?;
+                    self.scan_expression(&entry.value, context)?;
+                }
+            }
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
             Lambda(_, lambda) => {
                 self.scan_lambda(self.lambda_name.to_string(), *lambda.clone());
             }
-            Number(loc, number) => {
-            }
+            Number(loc, number) => {}
         }
         Ok(())
     }

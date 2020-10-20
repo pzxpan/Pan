@@ -69,6 +69,7 @@ pub enum CType {
     Bool,
     Tuple(Box<Vec<CType>>),
     Array(Box<CType>),
+    Dict(Box<CType>, Box<CType>),
     Fn(FnType),
     Lambda(LambdaType),
     Unknown,
@@ -337,8 +338,8 @@ pub struct NamedArgument {
 #[derive(Debug, PartialEq, Clone)]
 pub struct DictEntry {
     pub loc: Loc,
-    pub name: StringLiteral,
-    pub expr: Expression,
+    pub key: Expression,
+    pub value: Expression,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -505,6 +506,21 @@ impl HasType for Expression {
                     return CType::Array(Box::new(ty));
                 }
                 return CType::Array(Box::new(CType::Unknown));
+            }
+
+            Expression::Dict(_, dicts) => {
+                if dicts.len() > 0 {
+                    let key_ty = dicts.get(0).unwrap().key.get_type();
+                    let value_ty = dicts.get(0).unwrap().value.get_type();
+                    for e in dicts {
+                        //TODO 是现在抛出错误提示，还是等到analyzer时抛出
+                        if e.key.get_type() != key_ty || e.value.get_type() != value_ty {
+                            return CType::Unknown;
+                        }
+                    }
+                    return CType::Dict(Box::new(key_ty), Box::new(value_ty));
+                }
+                return CType::Dict(Box::new(CType::Unknown), Box::new(CType::Unknown));
             }
 
             Expression::Tuple(_, elements) => {

@@ -12,6 +12,7 @@ use crate::scope::{Scope, NameProtocol};
 use pan_bytecode::bytecode::CodeObject;
 use crate::value::{Value, FnValue, Obj};
 use std::borrow::{Borrow, BorrowMut};
+use std::collections::HashMap;
 
 
 #[derive(Clone, Debug)]
@@ -237,11 +238,11 @@ impl Frame {
                 self.push_value(array_value);
                 None
             }
-            // bytecode::Instruction::BuildMap {
-            //     size,
-            //     unpack,
-            //     for_call,
-            // } => self.execute_build_map(vm, *size, *unpack, *for_call),
+            bytecode::Instruction::BuildMap {
+                size,
+                unpack,
+                for_call,
+            } => self.execute_build_map(vm, *size, *unpack, *for_call),
             // bytecode::Instruction::BuildSlice { size } => self.execute_build_slice(vm, *size),
             // bytecode::Instruction::ListAppend { i } => {
             //     let list_obj = self.nth_value(*i);
@@ -633,7 +634,7 @@ impl Frame {
         let idx = self.pop_value();
         let obj = self.pop_value();
         let value = self.pop_value();
-        vm.set_item(obj, idx, value);
+        vm.set_item(&obj, idx, value);
         None
     }
 
@@ -645,41 +646,46 @@ impl Frame {
     }
 
     // #[allow(clippy::collapsible_if)]
-    // fn execute_build_map(
-    //     &self,
-    //     vm: &VirtualMachine,
-    //     size: usize,
-    //     unpack: bool,
-    //     for_call: bool,
-    // ) -> FrameResult {
-    //     let map_obj = vm.ctx.new_dict();
-    //     if unpack {
-    //         for obj in self.pop_multiple(size) {
-    //             // Take all key-value pairs from the dict:
-    //             let dict: PyDictRef = obj.downcast().expect("Need a dictionary to build a map.");
-    //             for (key, value) in dict {
-    //                 if for_call {
-    //                     if map_obj.contains_key(&key, vm) {
-    //                         let key_repr = vm.to_repr(&key)?;
-    //                         let msg = format!(
-    //                             "got multiple values for keyword argument {}",
-    //                             key_repr.as_str()
-    //                         );
-    //                         return Err(vm.new_type_error(msg));
-    //                     }
-    //                 }
-    //                 map_obj.set_item(&key, value, vm).unwrap();
-    //             }
-    //         }
-    //     } else {
-    //         for (key, value) in self.pop_multiple(2 * size).into_iter().tuples() {
-    //             map_obj.set_item(&key, value, vm).unwrap();
-    //         }
-    //     }
-    //
-    //     self.push_value(map_obj.into_object());
-    //     None
-    // }
+    fn execute_build_map(
+        &self,
+        vm: &VirtualMachine,
+        size: usize,
+        unpack: bool,
+        for_call: bool,
+    ) -> FrameResult {
+        let mut hash_map: HashMap<String, Value> = HashMap::new();
+        let mut map_obj = Value::new_map_obj(hash_map);
+        // if unpack {
+        //     for obj in self.pop_multiple(size) {
+        //         // Take all key-value pairs from the dict:
+        //         let dict: PyDictRef = obj.downcast().expect("Need a dictionary to build a map.");
+        //         for (key, value) in dict {
+        //             if for_call {
+        //                 if map_obj.contains_key(&key, vm) {
+        //                     let key_repr = vm.to_repr(&key)?;
+        //                     let msg = format!(
+        //                         "got multiple values for keyword argument {}",
+        //                         key_repr.as_str()
+        //                     );
+        //                     return Err(vm.new_type_error(msg));
+        //                 }
+        //             }
+        //             map_obj.set_item(&key, value, vm).unwrap();
+        //         }
+        //     }
+        // } else {
+        //     for (key, value) in self.pop_multiple(2 * size).into_iter().tuples() {
+        //         map_obj.set_item(&key, value, vm).unwrap();
+        //     }
+        // }
+
+        for (key, value) in self.pop_multiple(2 * size).into_iter().tuples() {
+            vm.set_item(&map_obj, key, value);
+        }
+
+        self.push_value(map_obj);
+        None
+    }
 
     // fn execute_build_slice(&self, vm: &VirtualMachine, size: usize) -> FrameResult {
     //     assert!(size == 2 || size == 3);
@@ -851,7 +857,7 @@ impl Frame {
         let next_obj = vm.get_next_iter(top_of_stack);
 
         // Check the next object:
-        if let Value::Int(a) = next_obj {
+        if Value::Nil != next_obj {
             self.push_value(next_obj);
             None
         } else {

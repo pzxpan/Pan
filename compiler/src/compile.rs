@@ -1182,48 +1182,61 @@ impl<O: OutputStream> Compiler<O> {
 
     fn compile_dict(
         &mut self,
-        pairs: &[(Option<ast::Expression>, ast::Expression)],
+        pairs: &Vec<ast::DictEntry>,
     ) -> Result<(), CompileError> {
         let mut size = 0;
-        let mut has_unpacking = false;
-        for (is_unpacking, subpairs) in &pairs.iter().group_by(|e| e.0.is_none()) {
-            if is_unpacking {
-                for (_, value) in subpairs {
-                    self.compile_expression(value)?;
-                    size += 1;
-                }
-                has_unpacking = true;
-            } else {
-                let mut subsize = 0;
-                for (key, value) in subpairs {
-                    if let Some(key) = key {
-                        self.compile_expression(key)?;
-                        self.compile_expression(value)?;
-                        subsize += 1;
-                    }
-                }
-                self.emit(Instruction::BuildMap {
-                    size: subsize,
-                    unpack: false,
-                    for_call: false,
-                });
-                size += 1;
-            }
+
+        let mut subsize = 0;
+        for entry in pairs {
+            self.compile_expression(&entry.key)?;
+            self.compile_expression(&entry.value)?;
+            subsize += 1;
         }
-        if size == 0 {
-            self.emit(Instruction::BuildMap {
-                size,
-                unpack: false,
-                for_call: false,
-            });
-        }
-        if size > 1 || has_unpacking {
-            self.emit(Instruction::BuildMap {
-                size,
-                unpack: true,
-                for_call: false,
-            });
-        }
+        self.emit(Instruction::BuildMap {
+            size: subsize,
+            unpack: false,
+            for_call: false,
+        });
+        size += 1;
+        // let mut has_unpacking = false;
+        // for (is_unpacking, subpairs) in &pairs.iter().group_by(|e| e.key.is_none()) {
+        //     if is_unpacking {
+        //         for (_, value) in subpairs {
+        //             self.compile_expression(value)?;
+        //             size += 1;
+        //         }
+        //         has_unpacking = true;
+        //     } else {
+        //         let mut subsize = 0;
+        //         for (key, value) in subpairs {
+        //             if let Some(key) = key {
+        //                 self.compile_expression(key)?;
+        //                 self.compile_expression(value)?;
+        //                 subsize += 1;
+        //             }
+        //         }
+        //         self.emit(Instruction::BuildMap {
+        //             size: subsize,
+        //             unpack: false,
+        //             for_call: false,
+        //         });
+        //         size += 1;
+        //     }
+        // }
+        // if size == 0 {
+        //     self.emit(Instruction::BuildMap {
+        //         size,
+        //         unpack: false,
+        //         for_call: false,
+        //     });
+        // }
+        // if size > 1 || has_unpacking {
+        //     self.emit(Instruction::BuildMap {
+        //         size,
+        //         unpack: true,
+        //         for_call: false,
+        //     });
+        // }
         Ok(())
     }
 
@@ -1371,7 +1384,9 @@ impl<O: OutputStream> Compiler<O> {
                     unpack: must_unpack,
                 });
             }
-            Dict(loc, _) => {}
+            Dict(loc, entries) => {
+                self.compile_dict(entries);
+            }
             Set(loc, _) => {}
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}

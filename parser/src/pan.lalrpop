@@ -251,9 +251,14 @@ NamedArgument: NamedArgument = {
 }
 
 DictEntry: DictEntry = {
-    <l:@L> <name:StringLiteral> ":" <expr:Expression> <r:@R> => {
-        DictEntry{ loc: Loc(file_no, l, r),name, expr }
-    }
+    <l:@L> <key:StringLiteral+> ":" <value:Expression> <r:@R> => {
+        DictEntry{ loc: Loc(file_no, l, r),key:Expression::StringLiteral(key), value }
+    },
+    <l:@L> <n:LexNumber> ":" <value:Expression> <r:@R> => {
+        let s: String = n.chars().filter(|v| *v != '_').collect();
+        let key = Expression::NumberLiteral(Loc(file_no, l, r), BigInt::from_str(&s).unwrap());
+        DictEntry{ loc: Loc(file_no, l, r),key, value }
+     }
 
 }
 
@@ -294,7 +299,7 @@ Precedence0: Expression = {
         Expression::Tuple(Loc(file_no, a, b), v)
      },
     <Identifier> => Expression::Variable(<>),
-   <a:@L> <n:Number>  <b:@R> => Expression::Number(Loc(file_no, a, b),n),
+    <a:@L> <n:Number>  <b:@R> => Expression::Number(Loc(file_no, a, b),n),
     <l:@L> <n:LexNumber> <r:@R> => {
         let s: String = n.chars().filter(|v| *v != '_').collect();
 

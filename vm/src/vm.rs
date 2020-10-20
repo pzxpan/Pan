@@ -255,20 +255,17 @@ impl VirtualMachine {
                     Obj::ArrayObj(arr) => {
                         arr.get(sub as usize).cloned()
                     }
+                    Obj::MapObj(map) => {
+                        map.get(&sub.to_string()).cloned()
+                    }
                     _ => unreachable!()
                 }
             }
-            _ => unreachable!()
-        }
-    }
 
-    pub fn set_item(&self, obj: Value, idx: Value, value: Value) {
-        match (obj, idx) {
-            (Value::Obj(e), Value::Int(sub)) => {
+            (Value::Obj(e), Value::Str(sub)) => {
                 match *e.borrow_mut() {
-                    Obj::ArrayObj(ref mut arr) => {
-                        arr.swap_remove(sub as usize);
-                        arr.insert(sub as usize, value);
+                    Obj::MapObj(ref mut map) => {
+                        map.get(sub.as_str()).cloned()
                     }
                     _ => unreachable!()
                 }
@@ -276,6 +273,50 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
+
+    pub fn set_item(&self, obj: &Value, idx: Value, value: Value) {
+        match (obj, idx) {
+            (Value::Obj(e), Value::Int(sub)) => {
+                match *e.borrow_mut() {
+                    Obj::ArrayObj(ref mut arr) => {
+                        arr.swap_remove(sub as usize);
+                        arr.insert(sub as usize, value);
+                    }
+                    Obj::MapObj(ref mut map) => {
+                        println!("before map is {:?}", map);
+                        map.insert(sub.to_string(), value);
+                        println!("after map is {:?}", map);
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            (Value::Obj(e), Value::Str(ref sub)) => {
+                match *e.borrow_mut() {
+                    Obj::MapObj(ref mut map) => {
+                        map.insert(sub.to_string(), value);
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            _ => unreachable!()
+        }
+    }
+
+    // pub fn set_hash_map_item(&self, key: Value, value: Value) {
+    //     match key {
+    //         Value::Obj(e) => {
+    //             match *e.borrow_mut() {
+    //                 Obj::MapObj(ref mut map) => {
+    //                   map.borrow_mut().insert()
+    //                 }
+    //                 _ => unreachable!()
+    //             }
+    //         }
+    //         _ => unreachable!()
+    //     }
+    // }
 
     pub fn _le(&self, a: Value, b: Value) -> Value {
         match (a, b) {
@@ -343,6 +384,15 @@ impl VirtualMachine {
                                     *end = Value::Int(idx as i64 + 1);
                                 }
                             }
+                            Obj::MapObj(ref mut map) => {
+                                let idx = end.int_value() as usize;
+                                if idx < map.len() {
+                                    let t = map.iter().nth(idx).unwrap();
+                                    ret = Value::new_array_obj(vec![Value::Str(t.0.clone()), t.1.clone()]);
+                                    *end = Value::Int(idx as i64 + 1);
+                                }
+                            }
+
                             _ => {}
                         }
                     }
