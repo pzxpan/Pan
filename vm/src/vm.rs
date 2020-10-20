@@ -387,8 +387,9 @@ impl VirtualMachine {
                             Obj::MapObj(ref mut map) => {
                                 let idx = end.int_value() as usize;
                                 if idx < map.len() {
-                                    let t = map.iter().nth(idx).unwrap();
+                                    let t = map.iter().next().unwrap();
                                     ret = Value::new_array_obj(vec![Value::Str(t.0.clone()), t.1.clone()]);
+                                    println!("iter is {:?}", t);
                                     *end = Value::Int(idx as i64 + 1);
                                 }
                             }

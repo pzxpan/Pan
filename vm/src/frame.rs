@@ -224,15 +224,15 @@ impl Frame {
                 self.push_value(list_value);
                 None
             }
-            // bytecode::Instruction::BuildSet { size, unpack } => {
-            //     let elements = self.get_elements(vm, *size, *unpack)?;
-            //     let py_obj = vm.ctx.new_set();
-            //     for item in elements {
-            //         vm.call_method(&py_obj, "add", vec![item])?;
-            //     }
-            //     self.push_value(py_obj);
-            //     None
-            // }
+            bytecode::Instruction::BuildSet { size, unpack } => {
+                let mut hash_map: HashMap<String, Value> = HashMap::new();
+                let mut map_obj = Value::new_map_obj(hash_map);
+                for key in self.pop_multiple(*size).into_iter() {
+                    vm.set_item(&map_obj, key, Value::Nil);
+                }
+                self.push_value(map_obj);
+                None
+            }
             bytecode::Instruction::BuildTuple { size, unpack } => {
                 let array_value = self.get_elements(vm, *size, *unpack);
                 self.push_value(array_value);

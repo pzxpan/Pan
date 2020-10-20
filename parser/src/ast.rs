@@ -439,7 +439,7 @@ pub enum Expression {
     List(Loc, Vec<(Loc, Option<Parameter>)>),
     Tuple(Loc, Vec<Expression>),
     Dict(Loc, Vec<DictEntry>),
-    Set(Loc, Vec<(Loc, Option<Parameter>)>),
+    Set(Loc, Vec<Expression>),
     Lambda(Loc, Box<LambdaDefinition>),
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
 }
@@ -495,7 +495,7 @@ impl HasType for Expression {
             Expression::StringLiteral(s) => {
                 CType::String
             }
-            Expression::ArrayLiteral(_, elements) => {
+            Expression::ArrayLiteral(_, elements) | Expression::Set(_, elements) => {
                 if elements.len() > 0 {
                     let ty = elements.get(0).unwrap().get_type();
                     for e in elements {

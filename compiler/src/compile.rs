@@ -1387,7 +1387,14 @@ impl<O: OutputStream> Compiler<O> {
             Dict(loc, entries) => {
                 self.compile_dict(entries);
             }
-            Set(loc, _) => {}
+            Set(loc, elements) => {
+                let size = elements.len();
+                let must_unpack = self.gather_elements(elements)?;
+                self.emit(Instruction::BuildSet {
+                    size,
+                    unpack: must_unpack,
+                });
+            }
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
             Lambda(_, lambda) => {

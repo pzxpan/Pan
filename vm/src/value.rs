@@ -3,6 +3,7 @@ use crate::vm;
 use std::fmt::{Display, Formatter, Error};
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::cell::RefCell;
 use std::sync::Arc;
 // use crate::native_fns::NativeFn;
@@ -203,6 +204,7 @@ pub enum Obj {
     ArrayObj(Vec<Value>),
     RangObj(Value, Value, Value),
     MapObj(HashMap<String, Value>),
+    // SetObj(HashSet<Value>),
     InstanceObj(InstanceObj),
 }
 

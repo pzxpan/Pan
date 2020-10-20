@@ -14,6 +14,11 @@ fun main() {
 
   print(dict["Alice"]);
   print(dict2[4]);
+
+  let set = {"Alice","Adasd"};
+    for a in set {
+      print(a);
+    }
   return;
 }
 fun print(a:int) {

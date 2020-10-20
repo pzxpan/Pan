@@ -774,7 +774,11 @@ impl SymbolTableBuilder {
                     self.scan_expression(&entry.value, context)?;
                 }
             }
-            Set(loc, _) => {}
+            Set(loc, elements) => {
+                for e in elements {
+                    self.scan_expression(&e, context)?;
+                }
+            }
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
             Lambda(_, lambda) => {
