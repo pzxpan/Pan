@@ -13,7 +13,7 @@ pub struct Person {
     }
 }
 fun main() {
- // let a = Person {age:30,name:"dddd",address:"okkk"};
+  let aaaa = Person({age:20}) ;
  // print(a.is_older());
   return;
 }

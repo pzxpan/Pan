@@ -804,6 +804,8 @@ impl SymbolTableBuilder {
                 self.scan_lambda(self.lambda_name.to_string(), *lambda.clone());
             }
             Number(loc, number) => {}
+
+            _ => {}
         }
         Ok(())
     }

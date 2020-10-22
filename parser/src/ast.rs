@@ -425,6 +425,7 @@ pub enum Expression {
     Attribute(Loc, Box<Expression>, Option<Identifier>, Option<BigInt>),
 
     FunctionCall(Loc, Box<Expression>, Vec<Expression>),
+    NamedFunctionCall(Loc, Box<Expression>, Vec<NamedArgument>),
 
     //新加
     //异步 迭代器
@@ -643,6 +644,7 @@ impl Expression {
             | Set(loc, _)
             | Comprehension(loc, _, _)
             | Number(loc, _)
+            | NamedFunctionCall(loc, _, _)
             => *loc,
             StringLiteral(v) => v[0].loc,
         }

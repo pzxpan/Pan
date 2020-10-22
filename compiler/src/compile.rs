@@ -1411,6 +1411,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_function_def(&name, args.as_slice(), body, &None, is_async, true);
             }
             Number(loc, number) => { self.compile_load_constant_number(number.clone()); }
+            _ => {}
         }
         // match &expression.node {
         //     Call {
