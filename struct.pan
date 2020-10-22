@@ -7,8 +7,8 @@ pub struct Person {
     }
 }
 fun main() {
-    let bbbb = 10;
- // let aaaa = Person({age:30,name:"pan"});
+   let dddd = 20;
+   //let aaaa:Person = Person({age:30,name:"pan"});
  // print(a.is_older());
   return;
 }

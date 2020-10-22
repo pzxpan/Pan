@@ -412,10 +412,11 @@ impl Frame {
             //     }
             //     None
             // }
-            // bytecode::Instruction::LoadBuildClass => {
-            //     self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
-            //     None
-            // }
+            bytecode::Instruction::LoadBuildClass => {
+                self.excute_make_struct(vm);
+                // self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
+                None
+            }
             // bytecode::Instruction::UnpackSequence { size } => {
             //     let value = self.pop_value();
             //     let elements = vm.extract_elements(&value)?;
@@ -944,6 +945,15 @@ impl Frame {
         // vm.set_attr(&func_obj, "__annotations__", annotations)?;
 
         self.push_value(Value::Fn(func));
+        None
+    }
+    fn excute_make_struct(&self, vm: &VirtualMachine) -> FrameResult {
+        let qualified_name = self.pop_value();
+        let code_obj = self.pop_value();
+
+        let v = Value::new_instance_obj(qualified_name, vec![code_obj]);
+        //  let func = Obj { name: qualified_name.name(), code: code_obj.code(), has_return: true };
+        self.push_value(v);
         None
     }
 

@@ -309,7 +309,8 @@ impl SymbolTableBuilder {
                         match part {
                             ast::StructPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
-                                    // self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
+                                    let tt = def.get_type();
+                                    self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
                                     if let Some(expression) = &def.as_ref().returns {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
                                     }
@@ -404,19 +405,19 @@ impl SymbolTableBuilder {
                     // self.register_name(name, SymbolUsage::Assigned)?;
                     let tt = def.get_type();
                     self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
-                    for part in &def.parts {
-                        match part {
-                            ast::StructPart::FunctionDefinition(def) => {
-                                let tt = def.get_type();
-                                self.register_name(&def.name.as_ref().unwrap().name, tt, SymbolUsage::Assigned)?;
-                            }
-                            ast::StructPart::StructVariableDefinition(def) => {
-                                let tt = def.ty.get_type();
-                                self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
-                            }
-                            _ => {}
-                        }
-                    }
+                    // for part in &def.parts {
+                    //     match part {
+                    //         ast::StructPart::FunctionDefinition(def) => {
+                    //             let tt = def.get_type();
+                    //             self.register_name(&def.name.as_ref().unwrap().name, tt, SymbolUsage::Assigned)?;
+                    //         }
+                    //         ast::StructPart::StructVariableDefinition(def) => {
+                    //             let tt = def.ty.get_type();
+                    //             self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
+                    //         }
+                    //         _ => {}
+                    //     }
+                    // }
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {}
                 ast::SourceUnitPart::ConstDefinition(def) => {}
@@ -550,6 +551,7 @@ impl SymbolTableBuilder {
             // VariableDeclaration { loc: Loc(1, 2, 11), ty: None,
             // name: Identifier { loc: Loc(1, 2, 11), name: "dd" } }, Some(Number(Loc(1, 61, 68), U32(888)))
             VariableDefinition(location, decl, expression) => {
+                println!("dddddregister symbol: {:?}",decl.name.borrow().name.clone());
                 if expression.is_some() {
                     //注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
                     let mut ty = expression.as_ref().unwrap().get_type();
@@ -570,6 +572,7 @@ impl SymbolTableBuilder {
                 }
                 //这里的内容太多，需要好好整理归纳;确定变量的类型是重中之重;现在只能慢慢往里加，
                 if let Some(e) = expression {
+                    println!("bbbbbb symbol: {:?}",decl.name.borrow().name.clone());
                     self.scan_expression(e, &ExpressionContext::Load)?;
                     //获取右侧表达式的返回类型,
                     let mut ty = e.get_type();

@@ -768,7 +768,7 @@ impl<O: OutputStream> Compiler<O> {
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(qualified_name.clone());
 
-        self.emit(Instruction::LoadBuildClass);
+
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             Default::default(),
@@ -853,18 +853,7 @@ impl<O: OutputStream> Compiler<O> {
         });
 
         // Turn code object into function object:
-        self.emit(Instruction::MakeFunction);
-
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String {
-                value: qualified_name,
-            },
-        });
-
-
-        self.emit(Instruction::CallFunction {
-            typ: CallType::Positional(2),
-        });
+        self.emit(Instruction::LoadBuildClass);
 
 
         self.store_name(name);
@@ -1971,7 +1960,14 @@ impl<O: OutputStream> Compiler<O> {
 
     fn lookup_name(&self, name: &str) -> &Symbol {
         println!("Looking up {:?}", name);
-        if self.ctx.in_lambda || !self.ctx.in_func() {
+        let len: usize = self.symbol_table_stack.len();
+        for i in 0..len {
+            println!("aaaSymboltable {:?},{:?}", i, self.symbol_table_stack[i]);
+            for a in self.symbol_table_stack[i].symbols.iter() {
+                println!("Symbol is ,{:?}", a);
+            }
+        }
+        if self.ctx.in_lambda {
             let len: usize = self.symbol_table_stack.len();
             for i in (len - 2..len).rev() {
                 let symbol = self.symbol_table_stack[i].lookup(name);
