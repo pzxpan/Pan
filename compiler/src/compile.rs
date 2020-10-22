@@ -39,7 +39,7 @@ struct CompileContext {
     func: FunctionContext,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum FunctionContext {
     NoFunction,
     Function,
@@ -198,6 +198,10 @@ impl<O: OutputStream> Compiler<O> {
                     // }
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                     // self.register_name(name, SymbolUsage::Assigned)?;
+                    let name = &def.name.name;
+                    let body = &def.parts;
+                    let generics = &def.generics;
+                    self.compile_class_def(name.as_str(), &body, &generics);
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {}
                 ast::SourceUnitPart::ConstDefinition(def) => {}
@@ -750,9 +754,8 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_class_def(
         &mut self,
         name: &str,
-        body: &[ast::Statement],
-        bases: &[ast::Expression],
-        decorator_list: &[ast::Expression],
+        body: &[ast::StructPart],
+        generics: &[ast::Generic],
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
@@ -765,7 +768,6 @@ impl<O: OutputStream> Compiler<O> {
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(qualified_name.clone());
 
-        self.prepare_decorators(decorator_list)?;
         self.emit(Instruction::LoadBuildClass);
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
@@ -796,6 +798,39 @@ impl<O: OutputStream> Compiler<O> {
             name: "__qualname__".to_owned(),
             scope: bytecode::NameScope::Free,
         });
+        let mut fields = vec![];
+        for part in body {
+            match part {
+                ast::StructPart::StructVariableDefinition(v) => {
+                    fields.push(Parameter { name: Some(v.name.clone()), loc: v.loc, ty: v.ty.clone(), is_mut: true, is_ref: false });
+                }
+                _ => {}
+            }
+        }
+        //  Compiling Block(Loc(1, 5, 5), [Return(Loc(1, 6, 139), Some(More(Loc(1, 6, 20), Variable(Identifier { loc: Loc(1, 6, 18), name: "age" }), NumberLiteral(Loc(1, 137, 139), BigInt { sign: Plus, data: BigUint { data: [40] } }))))])
+        // let returns = &def.returns;
+        // let is_async = false;
+        // self.compile_function_def(name, fields.as_slice(), None, returns, is_async, false);
+        for part in body {
+            match part {
+                ast::StructPart::FunctionDefinition(def) => {
+                    let name = &def.name.as_ref().unwrap().name;
+                    let mut args = vec![];
+                    for para in def.params.iter() {
+                        let p = para.1.as_ref().unwrap().to_owned();
+                        args.push(p.clone());
+                    }
+                    // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
+                    let body = &def.body.as_ref().unwrap();
+                    // let decorator_list = vec![];
+                    let returns = &def.returns;
+                    let is_async = false;
+                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
+                }
+                _ => {}
+            }
+        }
+
 
         self.emit(Instruction::LoadConst {
             value: bytecode::Constant::None,
@@ -826,13 +861,9 @@ impl<O: OutputStream> Compiler<O> {
             },
         });
 
-        for base in bases {
-            self.compile_expression(base)?;
-        }
-
 
         self.emit(Instruction::CallFunction {
-            typ: CallType::Positional(2 + bases.len()),
+            typ: CallType::Positional(2),
         });
 
 
@@ -1940,7 +1971,7 @@ impl<O: OutputStream> Compiler<O> {
 
     fn lookup_name(&self, name: &str) -> &Symbol {
         println!("Looking up {:?}", name);
-        if self.ctx.in_lambda {
+        if self.ctx.in_lambda || !self.ctx.in_func() {
             let len: usize = self.symbol_table_stack.len();
             for i in (len - 2..len).rev() {
                 let symbol = self.symbol_table_stack[i].lookup(name);

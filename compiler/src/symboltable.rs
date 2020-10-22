@@ -402,6 +402,21 @@ impl SymbolTableBuilder {
                     // }
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                     // self.register_name(name, SymbolUsage::Assigned)?;
+                    let tt = def.get_type();
+                    self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
+                    for part in &def.parts {
+                        match part {
+                            ast::StructPart::FunctionDefinition(def) => {
+                                let tt = def.get_type();
+                                self.register_name(&def.name.as_ref().unwrap().name, tt, SymbolUsage::Assigned)?;
+                            }
+                            ast::StructPart::StructVariableDefinition(def) => {
+                                let tt = def.ty.get_type();
+                                self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
+                            }
+                            _ => {}
+                        }
+                    }
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {}
                 ast::SourceUnitPart::ConstDefinition(def) => {}
@@ -426,7 +441,6 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
-
 
     fn scan_parameters(&mut self, parameters: &[ast::Parameter]) -> SymbolTableResult {
         for parameter in parameters {

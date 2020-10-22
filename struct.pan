@@ -1,9 +1,3 @@
-pub struct House {
-    pub size: float,
-    pub price: float,
-    pub address: string,
-}
-
 pub struct Person {
     pub age: int,
     pub name: string,
@@ -13,7 +7,8 @@ pub struct Person {
     }
 }
 fun main() {
-  let aaaa = Person({age:20}) ;
+    let bbbb = 10;
+ // let aaaa = Person({age:30,name:"pan"});
  // print(a.is_older());
   return;
 }
