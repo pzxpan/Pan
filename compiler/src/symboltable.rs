@@ -302,17 +302,36 @@ impl SymbolTableBuilder {
                     // let _ = enum_decl(&def, file_no, None, ns);
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
-                    // self.enter_scope(name, SymbolTableType::Class, statement.location.row());
-                    // self.register_name("__module__", SymbolUsage::Assigned)?;
-                    // self.register_name("__qualname__", SymbolUsage::Assigned)?;
-                    // self.scan_statements(body)?;
-                    // self.leave_scope();
+                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
+                    self.register_name(&"__module__".to_string(), CType::String, SymbolUsage::Assigned)?;
+                    self.register_name(&"__qualname__".to_string(), CType::String, SymbolUsage::Assigned)?;
+                    for part in &def.parts {
+                        match part {
+                            ast::StructPart::FunctionDefinition(def) => {
+                                if let Some(name) = &def.name {
+                                    // self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
+                                    if let Some(expression) = &def.as_ref().returns {
+                                        self.scan_expression(expression, &ExpressionContext::Load)?;
+                                    }
+                                    // // let params = def.as_ref().params.iter().map(|s| s.1).collect();
+                                    self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+                                    self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                                    self.leave_scope();
+                                }
+                            }
+                            ast::StructPart::StructVariableDefinition(def) => {
+                                self.register_name(&def.name.name, def.ty.get_type(), SymbolUsage::Assigned);
+                            }
+                            _ => {}
+                        }
+                    }
+                    self.leave_scope();
                     // self.scan_expressions(bases, &ExpressionContext::Load)?;
                     // for keyword in keywords {
                     //     self.scan_expression(&keyword.value, &ExpressionContext::Load)?;
                     // }
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    // self.register_name(name, SymbolUsage::Assigned)?;
+                    self.register_name(&def.name.name.clone(), def.get_type(), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {}
                 ast::SourceUnitPart::ConstDefinition(def) => {}

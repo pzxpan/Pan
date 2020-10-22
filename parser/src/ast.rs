@@ -40,6 +40,7 @@ impl HasType for SourceUnitPart {
     fn get_type(&self) -> CType {
         match &self {
             SourceUnitPart::FunctionDefinition(s) => { s.get_type() }
+            SourceUnitPart::StructDefinition(s) => { s.get_type() }
             _ => { CType::Unknown }
         }
     }
@@ -71,7 +72,10 @@ pub enum CType {
     Array(Box<CType>),
     Dict(Box<CType>, Box<CType>),
     Fn(FnType),
+    Struct(StructType),
+    Enum(EnumType),
     Lambda(LambdaType),
+    Generic(/* name: */ String),
     Unknown,
 }
 
@@ -267,7 +271,7 @@ impl fmt::Display for StructTy {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Own {
+pub struct Generic {
     pub loc: Loc,
     pub name: Identifier,
     pub args: Option<Vec<Expression>>,
@@ -279,7 +283,8 @@ pub struct StructDefinition {
     pub loc: Loc,
     pub ty: StructTy,
     pub name: Identifier,
-    pub own: Vec<Own>,
+    pub generics: Vec<Generic>,
+    pub is_pub: bool,
     pub parts: Vec<StructPart>,
 }
 
@@ -716,7 +721,7 @@ pub enum FunctionAttribute {
     Visibility(Visibility),
     Virtual(Loc),
     Override(Loc, Vec<Identifier>),
-    OwnOrModifier(Loc, Own),
+    OwnOrModifier(Loc, Generic),
 }
 
 #[derive(Debug, PartialEq)]
@@ -748,6 +753,24 @@ pub struct LambdaType {
     pub arg_types: Vec<(/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool)>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct StructType {
+    pub name: String,
+    pub type_args: Vec<(String, CType)>,
+    pub fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
+    pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
+    pub methods: Vec<(String, CType)>,
+    pub is_pub: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct EnumType {
+    pub name: String,
+    pub variants: Vec<(/* name: */ String, /* type: */ CType)>,
+    pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
+    pub methods: Vec<(String, CType)>,
+}
+
 pub fn transfer(s: &(Loc, Option<Parameter>)) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
     let ty = s.1.as_ref().unwrap().get_type().to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
@@ -766,6 +789,32 @@ impl HasType for FunctionDefinition {
         // self.returns.as_ref().unwrap().get_type()
         let name = self.name.as_ref().unwrap().name.clone();
         CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub })
+    }
+}
+
+impl HasType for StructDefinition {
+    fn get_type(&self) -> CType {
+        let mut type_args = Vec::new();
+        for ty in &self.generics {
+            //TODO
+            type_args.push((ty.name.name.clone(), CType::Any))
+        }
+        let mut fields: Vec<(String, CType, bool)> = Vec::new();
+        let mut methods: Vec<(String, CType)> = Vec::new();
+        for field in &self.parts {
+            match field {
+                StructPart::FunctionDefinition(f) => {
+                    methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type()));
+                }
+                StructPart::StructVariableDefinition(v) => {
+                    fields.push((v.name.name.clone(), v.ty.get_type(), v.initializer.is_some()))
+                }
+                _ => {}
+            }
+        }
+
+        let name = self.name.name.clone();
+        CType::Struct(StructType { name, type_args, fields, static_fields: vec![], is_pub: self.is_pub, methods })
     }
 }
 

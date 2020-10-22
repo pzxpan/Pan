@@ -99,13 +99,13 @@ StructPart: StructPart = {
     FunctionDefinition => StructPart::FunctionDefinition(<>),
 }
 
-Owns: Vec<Own> = {
+Generics: Vec<Generic> = {
     => Vec::new(),
-    "<" <CommaOne<Own>> ">" => <>,
+    "<" <CommaOne<Generic>> ">" => <>,
 }
 
-Own: Own = {
-    <l:@L> <name:Identifier> <args:("(" <Comma<Expression>> ")")?> <r:@R> => Own {
+Generic: Generic = {
+    <l:@L> <name:Identifier> <args:("(" <Comma<Expression>> ")")?> <r:@R> => Generic {
         loc: Loc(file_no, l, r),
         name,
         args
@@ -113,9 +113,10 @@ Own: Own = {
 }
 
 StructDefinition: Box<StructDefinition> = {
-    <doc:DocComments> <l:@L> <ty:StructTy> <name:Identifier> <own:Owns>
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> <ty:StructTy> <name:Identifier> <generics:Generics>
     "{" <parts:(<StructPart>)*> "}" <r:@R> => {
-        Box::new(StructDefinition{doc, loc: Loc(file_no, l, r), ty, name, own, parts})
+        let is_pub = is_pub.is_some();
+        Box::new(StructDefinition{doc, loc: Loc(file_no, l, r), ty, name, is_pub,generics, parts})
     }
 }
 
