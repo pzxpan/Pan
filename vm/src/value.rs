@@ -170,8 +170,8 @@ impl Value {
         Value::Obj(Arc::new(RefCell::new(map)))
     }
 
-    pub fn new_instance_obj(typ: Value, fields: Vec<Value>) -> Value {
-        let inst = Obj::InstanceObj(InstanceObj { typ: Box::new(typ), fields });
+    pub fn new_instance_obj(typ: Value, fields: Value) -> Value {
+        let inst = Obj::InstanceObj(InstanceObj { typ: Box::new(typ), field_map: fields });
         Value::Obj(Arc::new(RefCell::new(inst)))
     }
 }
@@ -214,7 +214,7 @@ impl Display for Value {
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstanceObj {
     pub typ: Box<Value>,
-    pub fields: Vec<Value>,
+    pub field_map: Value,
 }
 
 #[derive(Debug, Clone, PartialEq)]

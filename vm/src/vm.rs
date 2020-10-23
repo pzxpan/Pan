@@ -235,7 +235,7 @@ impl VirtualMachine {
         match obj {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
-                    Obj::InstanceObj(InstanceObj { typ, fields }) => {
+                    Obj::InstanceObj(InstanceObj { typ, field_map: fields }) => {
                         if let Value::Type(TypeValue { methods, .. }) = typ.as_ref() {
                             for method in methods {
                                 if method.0.eq(&attr.to_string()) {

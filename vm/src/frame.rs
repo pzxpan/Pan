@@ -727,9 +727,9 @@ impl Frame {
             }
             bytecode::CallType::Keyword(count) => {
                 let kwarg_names = self.pop_value();
-                let args = self.pop_multiple(*count);
+                let args = self.pop_value();
                 println!("kwarg_names{:?},args:{:?}", kwarg_names, args);
-                args
+                vec![args]
             }
             _ => { vec![Value::Nil] }
         };
@@ -773,7 +773,7 @@ impl Frame {
 
         println!("ddd func_def:{:?}", func_ref);
         if let Value::Type(ty) = func_ref {
-            self.push_value(Value::new_instance_obj(Value::Type(ty), args.clone()));
+            self.push_value(Value::new_instance_obj(Value::Type(ty), args[0].clone()));
             // let mut s = self.scope.new_child_scope_with_locals();
             for value in args.iter() {
                 println!("value is {:?}", value.clone());
@@ -781,14 +781,6 @@ impl Frame {
                 for (k, v) in map.iter() {
                     self.scope.store_global(k.to_string(), v.clone());
                 }
-                //
-                // if let Value::Obj(mut e) = value.clone() {
-                //     if let Arc<RefCell<Obj::MapObj(map)>> = &*e.borrow_mut() {
-                //         for (key, value) in map.iter() {
-                //
-                //         }
-                //     }
-                // }
             }
 
             return None;
@@ -993,7 +985,7 @@ impl Frame {
         let qualified_name = self.pop_value();
         let code_obj = self.pop_value();
 
-        let v = Value::new_instance_obj(qualified_name, vec![code_obj]);
+        let v = Value::new_instance_obj(qualified_name, code_obj);
         //  let func = Obj { name: qualified_name.name(), code: code_obj.code(), has_return: true };
         self.push_value(v);
         None
