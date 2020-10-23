@@ -727,9 +727,9 @@ impl Frame {
             }
             bytecode::CallType::Keyword(count) => {
                 let kwarg_names = self.pop_value();
-                let args = self.pop_value();
+                let args = self.pop_multiple(*count);
                 println!("kwarg_names{:?},args:{:?}", kwarg_names, args);
-                vec![args]
+                args
             }
             _ => { vec![Value::Nil] }
         };
@@ -774,15 +774,6 @@ impl Frame {
         println!("ddd func_def:{:?}", func_ref);
         if let Value::Type(ty) = func_ref {
             self.push_value(Value::new_instance_obj(Value::Type(ty), args[0].clone()));
-            let mut s = self.scope.new_child_scope_with_locals();
-            for value in args.iter() {
-                println!("value is {:?}", value.clone());
-                let map = value.hash_map_value();
-                for (k, v) in map.iter() {
-                    self.scope.store_name(k.to_string(), v.clone());
-                }
-            }
-
             return None;
         }
         let code = func_ref.code();
@@ -790,15 +781,48 @@ impl Frame {
         if code.obj_name.eq("print") {
             vm.print(args.get(0).unwrap().clone());
         } else {
+
+            let last_value = self.last_value();
+            if last_value.is_obj_instant() {
+                let mut s = self.scope.new_child_scope_with_locals();
+                let map = last_value.hash_map_value();
+                for (k, v) in map {
+                    self.scope.store_name(k, v);
+                }
+                self.pop_value();
+            }
+            // match last_value {
+            //     Value::Obj(e) => {
+            //         match &*e.borrow_mut() {
+            //             Obj::InstanceObj(InstanceObj { typ, field_map }) => {
+            //                 let map = last_value.hash_map_value();
+            //                 self.scope.update_local(&mut RefCell::new(map));
+            //                 self.pop_value();
+            //             }
+            //             _ => {}
+            //         }
+            //     }
+            //     _ => {}
+            // }
+
             let mut s = self.scope.new_child_scope_with_locals();
             for (i, name) in code.arg_names.iter().enumerate() {
                 s.store_name(name.to_string(), args.get(i).unwrap().to_owned());
             }
             let value = vm.run_code_obj(func_ref.code().to_owned(), s);
             match value {
-                Some(ExecutionResult::Return(v)) => self.push_value(v),
+                Some(ExecutionResult::Return(v)) => {
+                    self.push_value(v);
+                }
                 _ => self.push_value(Value::Nil)
             }
+        }
+
+        for a in self.scope.globals.borrow_mut().iter() {
+            println!("aaaaglobals: {:?}", a);
+        }
+        for a in self.scope.locals.borrow_mut().iter() {
+            println!("bbbbblocals: {:?}", a);
         }
         None
     }
@@ -1140,7 +1164,7 @@ impl Frame {
     }
 
     fn load_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
-        let parent = self.pop_value();
+        let parent = self.last_value();
         let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
         // if let Value::Obj(mut e) = obj {
         //     match &*e.borrow_mut() {
@@ -1153,7 +1177,11 @@ impl Frame {
         //         _ => unreachable!()
         //     }
         // }
-        self.push_value(obj.clone());
+        //true 是struct方法， false 为属性
+        if !obj.0 {
+            self.pop_value();
+        }
+        self.push_value(obj.1);
         None
     }
 

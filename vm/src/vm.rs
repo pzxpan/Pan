@@ -231,7 +231,7 @@ impl VirtualMachine {
     //     res
     // }
 
-    pub fn get_attribute(&self, obj: Value, attr: String) -> Value {
+    pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
         match obj {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
@@ -239,14 +239,14 @@ impl VirtualMachine {
                         if let Value::Type(TypeValue { methods, .. }) = typ.as_ref() {
                             for method in methods {
                                 if method.0.eq(&attr.to_string()) {
-                                    return Value::Code(method.1.clone());
+                                    return (true, Value::Code(method.1.clone()));
                                 }
                             }
                         }
                         if let Value::Obj(map) = field_map {
                             match &*map.borrow_mut() {
                                 Obj::MapObj(m) => {
-                                    return m.get(attr.as_str()).unwrap().clone();
+                                    return (false, m.get(attr.as_str()).unwrap().clone());
                                 }
                                 _ => unreachable!()
                             }

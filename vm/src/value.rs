@@ -87,12 +87,29 @@ impl Value {
             _ => unreachable!()
         }
     }
+
+    pub fn is_obj_instant(&self) -> bool {
+        return match &*self {
+            Value::Obj(v) => {
+                match &*v.borrow() {
+                    Obj::InstanceObj(map) => {
+                        true
+                    }
+                    _ => { false }
+                }
+            }
+            _ => { false }
+        };
+    }
     pub fn hash_map_value(&self) -> HashMap<String, Value> {
         match &*self {
             Value::Obj(v) => {
                 match &*v.borrow() {
                     Obj::MapObj(map) => {
                         return map.clone();
+                    }
+                    Obj::InstanceObj(obj) => {
+                        return obj.field_map.hash_map_value();
                     }
                     _ => unreachable!()
                 }

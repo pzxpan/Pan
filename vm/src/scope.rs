@@ -157,6 +157,9 @@ impl NameProtocol for Scope {
     }
 
     fn update_local(&self, hash_map: &mut RefCell<HashMap<String, Value>>) {
-        self.locals.borrow_mut().first_mut().replace(hash_map);
+        let mut a = self.locals.borrow_mut();
+        println!("eeeeeee:{:?}", a.clone());
+        a.first_mut().replace(hash_map);
+        println!("ddddd:{:?}", a.clone());
     }
 }
