@@ -21,7 +21,7 @@ use rustpython_compiler::{compile, error::CompileError};
 
 use pan_bytecode::bytecode;
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
-use crate::scope::Scope;
+use crate::scope::{Scope, NameProtocol};
 use pan_bytecode::bytecode::{CodeObject, TypeValue};
 use crate::value::{Value, Obj, InstanceObj};
 use std::ops::Add;
@@ -235,23 +235,26 @@ impl VirtualMachine {
         match obj {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
-                    Obj::InstanceObj(InstanceObj { typ, field_map: fields }) => {
+                    Obj::InstanceObj(InstanceObj { typ, field_map }) => {
                         if let Value::Type(TypeValue { methods, .. }) = typ.as_ref() {
                             for method in methods {
                                 if method.0.eq(&attr.to_string()) {
+                                    let map = field_map.hash_map_value();
+                                    for (k, v) in map.iter() {
+                                        self.frames.first().unwrap().scope.store_name(k.to_string(), v.clone());
+                                    }
                                     return Value::Code(method.1.clone());
                                 }
                             }
                         }
-                        // for code in &o.typ {
-                        //     println!("code value is {:?}", code);
-                        //     if code.name().eq(&attr.to_string()) {
-                        //         return code.clone();
-                        //     }
-                        // }
-                    }
-                    Obj::MapObj(map) => {
-                        //  map.get(&sub.to_string()).cloned()
+                        if let Value::Obj(map) = field_map {
+                            match &*map.borrow_mut() {
+                                Obj::MapObj(m) => {
+                                    return m.get(attr.as_str()).unwrap().clone();
+                                }
+                                _ => unreachable!()
+                            }
+                        }
                     }
                     _ => unreachable!()
                 }

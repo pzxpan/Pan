@@ -94,7 +94,7 @@ pub trait NameProtocol {
     fn store_name(&self, name: String, value: Value);
     // fn delete_name(&self, name: String) -> FrameResult;
     fn load_local(&self, name: String) -> Option<Value>;
-    fn store_local(&self, name: String, value: Value);
+    // fn store_local(&self, name: String, value: Value);
     // fn load_cell(&self, name: String) -> Option<Value>;
     // fn store_cell(&self, name: String, value: Value);
     fn load_global(&self, name: String) -> Option<Value>;
@@ -153,9 +153,5 @@ impl NameProtocol for Scope {
 
     fn store_global(&self, name: String, value: Value) {
         self.globals.borrow_mut().insert(name, value);
-    }
-
-    fn store_local(&self, name: String, value: Value) {
-        self.get_locals().insert(name, value);
     }
 }

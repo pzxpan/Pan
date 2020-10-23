@@ -779,7 +779,7 @@ impl Frame {
                 println!("value is {:?}", value.clone());
                 let map = value.hash_map_value();
                 for (k, v) in map.iter() {
-                    self.scope.store_global(k.to_string(), v.clone());
+                    self.scope.store_name(k.to_string(), v.clone());
                 }
             }
 
@@ -1142,7 +1142,18 @@ impl Frame {
     fn load_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let parent = self.pop_value();
         let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
-        self.push_value(obj);
+        // if let Value::Obj(mut e) = obj {
+        //     match &*e.borrow_mut() {
+        //         Obj::InstanceObj(InstanceObj { typ, field_map }) => {
+        //             let map = field_map.hash_map_value();
+        //             for (k, v) in map.iter() {
+        //                 self.scope.store_name(k.to_string(), v.clone());
+        //             }
+        //         }
+        //         _ => unreachable!()
+        //     }
+        // }
+        self.push_value(obj.clone());
         None
     }
 
