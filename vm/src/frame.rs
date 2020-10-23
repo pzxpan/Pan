@@ -774,7 +774,7 @@ impl Frame {
         println!("ddd func_def:{:?}", func_ref);
         if let Value::Type(ty) = func_ref {
             self.push_value(Value::new_instance_obj(Value::Type(ty), args[0].clone()));
-            // let mut s = self.scope.new_child_scope_with_locals();
+            let mut s = self.scope.new_child_scope_with_locals();
             for value in args.iter() {
                 println!("value is {:?}", value.clone());
                 let map = value.hash_map_value();
@@ -1160,7 +1160,7 @@ impl Frame {
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let parent = self.pop_value();
         let value = self.pop_value();
-        //    vm.set_attr(&parent, vm.new_str(attr_name.to_owned()), value)?;
+        vm.set_attribute(parent, attr_name.to_owned(), value);
         None
     }
 

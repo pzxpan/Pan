@@ -239,10 +239,6 @@ impl VirtualMachine {
                         if let Value::Type(TypeValue { methods, .. }) = typ.as_ref() {
                             for method in methods {
                                 if method.0.eq(&attr.to_string()) {
-                                    let map = field_map.hash_map_value();
-                                    for (k, v) in map.iter() {
-                                        self.frames.first().unwrap().scope.store_name(k.to_string(), v.clone());
-                                    }
                                     return Value::Code(method.1.clone());
                                 }
                             }
@@ -262,6 +258,38 @@ impl VirtualMachine {
             _ => unreachable!()
         }
         unreachable!()
+    }
+
+    pub fn set_attribute(&self, obj: Value, attr: String, value: Value) {
+        match obj {
+            Value::Obj(mut e) => {
+                match &*e.borrow_mut() {
+                    Obj::InstanceObj(o) => {
+                        if let InstanceObj { typ, field_map } = o {
+                            if let Value::Obj(map) = field_map {
+                                let mut cc = field_map.hash_map_value();
+                                cc.insert(attr, value);
+                                map.replace(Obj::MapObj(cc));
+                            }
+                        }
+
+                        // if let Value::Type(TypeValue { methods, .. }) = typ.as_ref() {
+                        //     for method in methods {
+                        //         if method.0.eq(&attr.to_string()) {
+                        //             let map = field_map.hash_map_value();
+                        //             for (k, v) in map.iter() {
+                        //                 self.frames.first().unwrap().scope.store_name(k.to_string(), v.clone());
+                        //             }
+                        //             return Value::Code(method.1.clone());
+                        //         }
+                        //     }
+                        // }
+                    }
+                    _ => unreachable!()
+                }
+            }
+            _ => unreachable!()
+        }
     }
     pub fn _eq(&self, a: Value, b: Value) -> Value {
         match (a, b) {

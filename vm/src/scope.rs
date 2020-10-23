@@ -5,7 +5,7 @@ use crate::vm::VirtualMachine;
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use crate::value::Value;
 use crate::frame::FrameResult;
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref};
 use std::borrow::BorrowMut;
 
 /*
@@ -99,6 +99,7 @@ pub trait NameProtocol {
     // fn store_cell(&self, name: String, value: Value);
     fn load_global(&self, name: String) -> Option<Value>;
     fn store_global(&self, name: String, value: Value);
+    fn update_local(&self, hash_map: &mut RefCell<HashMap<String, Value>>);
 }
 
 impl NameProtocol for Scope {
@@ -118,6 +119,15 @@ impl NameProtocol for Scope {
         None
     }
 
+    fn store_name(&self, key: String, value: Value) {
+        let mut a = self.locals.borrow_mut();
+        println!("dddd name:{:?}", key);
+        a.first().unwrap().borrow_mut().insert(key.to_string(), value);
+        // a.insert(key.to_string(), value);
+        println!("222dictddd2:{:?}", a);
+    }
+
+
     #[cfg_attr(feature = "flame-it", flame("Scope"))]
     /// Load a local name. Only check the local dictionary for the given name.
     fn load_local(&self, name: String) -> Option<Value> {
@@ -127,15 +137,6 @@ impl NameProtocol for Scope {
             return Some(value.clone());
         }
         None
-    }
-
-
-    fn store_name(&self, key: String, value: Value) {
-        let mut a = self.locals.borrow_mut();
-        println!("dddd name:{:?}", key);
-        a.first().unwrap().borrow_mut().insert(key.to_string(), value);
-        // a.insert(key.to_string(), value);
-        println!("222dictddd2:{:?}", a);
     }
 
     // fn delete_name(&self, key: String) -> Option<Value> {
@@ -153,5 +154,9 @@ impl NameProtocol for Scope {
 
     fn store_global(&self, name: String, value: Value) {
         self.globals.borrow_mut().insert(name, value);
+    }
+
+    fn update_local(&self, hash_map: &mut RefCell<HashMap<String, Value>>) {
+        self.locals.borrow_mut().first_mut().replace(hash_map);
     }
 }
