@@ -22,8 +22,8 @@ use rustpython_compiler::{compile, error::CompileError};
 use pan_bytecode::bytecode;
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
-use pan_bytecode::bytecode::CodeObject;
-use crate::value::{Value, Obj};
+use pan_bytecode::bytecode::{CodeObject, TypeValue};
+use crate::value::{Value, Obj, InstanceObj};
 use std::ops::Add;
 
 // use objects::objects;
@@ -230,6 +230,36 @@ impl VirtualMachine {
     //     let res = self._invoke(func_ref, args.into());
     //     res
     // }
+
+    pub fn get_attribute(&self, obj: Value, attr: String) -> Value {
+        match obj {
+            Value::Obj(e) => {
+                match &*e.borrow_mut() {
+                    Obj::InstanceObj(InstanceObj { typ, fields }) => {
+                        if let Value::Type(TypeValue { methods, .. }) = typ.as_ref() {
+                            for method in methods {
+                                if method.0.eq(&attr.to_string()) {
+                                    return Value::Code(method.1.clone());
+                                }
+                            }
+                        }
+                        // for code in &o.typ {
+                        //     println!("code value is {:?}", code);
+                        //     if code.name().eq(&attr.to_string()) {
+                        //         return code.clone();
+                        //     }
+                        // }
+                    }
+                    Obj::MapObj(map) => {
+                        //  map.get(&sub.to_string()).cloned()
+                    }
+                    _ => unreachable!()
+                }
+            }
+            _ => unreachable!()
+        }
+        unreachable!()
+    }
     pub fn _eq(&self, a: Value, b: Value) -> Value {
         match (a, b) {
             (Value::Int(a), Value::Int(b)) => {

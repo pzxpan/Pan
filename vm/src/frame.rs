@@ -10,9 +10,10 @@ use pan_bytecode::bytecode;
 use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
 use pan_bytecode::bytecode::{CodeObject, TypeValue};
-use crate::value::{Value, FnValue, Obj};
+use crate::value::{Value, FnValue, Obj, InstanceObj};
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 
 #[derive(Clone, Debug)]
@@ -772,7 +773,24 @@ impl Frame {
 
         println!("ddd func_def:{:?}", func_ref);
         if let Value::Type(ty) = func_ref {
-            self.push_value(Value::new_instance_obj(Value::Type(ty), args));
+            self.push_value(Value::new_instance_obj(Value::Type(ty), args.clone()));
+            // let mut s = self.scope.new_child_scope_with_locals();
+            for value in args.iter() {
+                println!("value is {:?}", value.clone());
+                let map = value.hash_map_value();
+                for (k, v) in map.iter() {
+                    self.scope.store_global(k.to_string(), v.clone());
+                }
+                //
+                // if let Value::Obj(mut e) = value.clone() {
+                //     if let Arc<RefCell<Obj::MapObj(map)>> = &*e.borrow_mut() {
+                //         for (key, value) in map.iter() {
+                //
+                //         }
+                //     }
+                // }
+            }
+
             return None;
         }
         let code = func_ref.code();
@@ -1131,8 +1149,8 @@ impl Frame {
 
     fn load_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let parent = self.pop_value();
-        // let obj = vm.get_attribute(parent, attr_name)?;
-        // self.push_value(obj);
+        let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
+        self.push_value(obj);
         None
     }
 

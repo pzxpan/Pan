@@ -5,15 +5,12 @@ pub struct Person {
     pub fun is_older(): bool {
         return age > 40;
     }
-     pub fun dddd(): bool {
-            return age > 40;
-        }
 }
 fun main() {
-  // let dddd = 20;
-   let aaaa = Person({age:30,name:"pan"});
-   print(aaaa);
-  return;
+   let aaaa = Person({age:50,name:"pan"});
+   let bb = aaaa.is_older();
+   print(bb);
+   return;
 }
 fun print(a:int) {
 }

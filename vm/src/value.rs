@@ -87,6 +87,21 @@ impl Value {
             _ => unreachable!()
         }
     }
+    pub fn hash_map_value(&self) -> HashMap<String, Value> {
+        match &*self {
+            Value::Obj(v) => {
+                match &*v.borrow() {
+                    Obj::MapObj(map) => {
+                        return map.clone();
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            _ => unreachable!()
+        }
+    }
+
     pub fn code(&self) -> CodeObject {
         println!("code is:{:?}", self);
         match self {
