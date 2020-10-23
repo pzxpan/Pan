@@ -6,7 +6,7 @@ use crate::symboltable::{
 };
 use itertools::Itertools;
 use num_complex::Complex64;
-use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
+use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags, TypeValue};
 use pan_parser::{ast, parse};
 use pan_parser::ast::{Expression, Parameter, HasType, MultiDeclarationPart, MultiVariableDeclaration, CType, DestructType};
 use std::borrow::Borrow;
@@ -16,6 +16,7 @@ use std::process::exit;
 use num_bigint::BigInt;
 use num_traits::FromPrimitive;
 use pan_bytecode::bytecode::ComparisonOperator::In;
+use pan_parser::lexer::Token::Identifier;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -751,6 +752,120 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
+    fn compile_struct_function_def(
+        &mut self,
+        methods: &mut Vec<(String, CodeObject)>,
+        name: &str,
+        args: &[ast::Parameter],
+        body: &ast::Statement,
+        returns: &Option<ast::Expression>, // TODO: use type hint somehow..
+        is_async: bool,
+        in_lambda: bool,
+    ) -> Result<(), CompileError> {
+        // Create bytecode for this function:
+        // remember to restore self.ctx.in_loop to the original after the function is compiled
+        let prev_ctx = self.ctx;
+
+        self.ctx = CompileContext {
+            in_lambda,
+            in_loop: false,
+            func: if is_async {
+                FunctionContext::AsyncFunction
+            } else {
+                FunctionContext::Function
+            },
+        };
+
+        let qualified_name = self.create_qualified_name(name, "");
+        let old_qualified_path = self.current_qualified_path.take();
+        self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
+
+        self.enter_function(name, args)?;
+        // self.prepare_decorators(decorator_list)?;
+        self.compile_statements(body)?;
+        match body {
+            ast::Statement::Block(_, statements) => {
+                let s = statements.last();
+                match s {
+                    Some(ast::Statement::Return(..)) => {
+                        // the last instruction is a ReturnValue already, we don't need to emit it
+                    }
+                    _ => {
+                        self.emit(Instruction::LoadConst {
+                            value: bytecode::Constant::None,
+                        });
+                        self.emit(Instruction::ReturnValue);
+                    }
+                }
+            }
+
+            _ => {}
+        }
+        // Emit None at end:
+        let mut code = self.pop_code_object();
+        self.leave_scope();
+
+        // Prepare type annotations:
+        let mut num_annotations = 0;
+
+        // Return annotation:
+        if let Some(annotation) = returns {
+            // key:
+            self.emit(Instruction::LoadConst {
+                value: bytecode::Constant::String {
+                    value: "return".to_string(),
+                },
+            });
+            // value:
+            self.compile_expression(annotation)?;
+            num_annotations += 1;
+        }
+
+        for arg in args.iter() {
+            self.emit(Instruction::LoadConst {
+                value: bytecode::Constant::String {
+                    value: arg.name.as_ref().unwrap().name.clone()
+                },
+            });
+            self.compile_expression(&arg.ty)?;
+            num_annotations += 1;
+        }
+
+        if num_annotations > 0 {
+            code.flags |= bytecode::CodeFlags::HAS_ANNOTATIONS;
+            self.emit(Instruction::BuildMap {
+                size: num_annotations,
+                unpack: false,
+                for_call: false,
+            });
+        }
+
+        if is_async {
+            code.flags |= bytecode::CodeFlags::IS_COROUTINE;
+        }
+
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::Code {
+                code: Box::new(code.clone()),
+            },
+        });
+        methods.push((name.to_string(), code.clone()));
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::String {
+                value: qualified_name,
+            },
+        });
+
+        // Turn code object into function object:
+        self.emit(Instruction::MakeFunction);
+
+        self.store_name(name);
+
+        self.current_qualified_path = old_qualified_path;
+        self.ctx = prev_ctx;
+        Ok(())
+    }
+
     fn compile_class_def(
         &mut self,
         name: &str,
@@ -768,7 +883,7 @@ impl<O: OutputStream> Compiler<O> {
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(qualified_name.clone());
 
-
+        self.emit(Instruction::LoadBuildClass);
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             Default::default(),
@@ -811,6 +926,10 @@ impl<O: OutputStream> Compiler<O> {
         // let returns = &def.returns;
         // let is_async = false;
         // self.compile_function_def(name, fields.as_slice(), None, returns, is_async, false);
+        //let name = qualified_name;
+        let mut methods: Vec<(String, CodeObject)> = Vec::new();
+        let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
+        let mut size = 0;
         for part in body {
             match part {
                 ast::StructPart::FunctionDefinition(def) => {
@@ -825,12 +944,12 @@ impl<O: OutputStream> Compiler<O> {
                     // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
+                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                    size += 1;
                 }
                 _ => {}
             }
         }
-
 
         self.emit(Instruction::LoadConst {
             value: bytecode::Constant::None,
@@ -840,20 +959,18 @@ impl<O: OutputStream> Compiler<O> {
         let mut code = self.pop_code_object();
         code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
         self.leave_scope();
-
+        let ty = TypeValue { name: qualified_name, methods, static_fields: vec![] };
         self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Code {
-                code: Box::new(code),
-            },
+            value: bytecode::Constant::Struct(ty)
         });
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String {
-                value: name.to_owned(),
-            },
-        });
+        // self.emit(Instruction::LoadConst {
+        //     value: bytecode::Constant::String {
+        //         value: name.to_owned(),
+        //     },
+        // });
 
         // Turn code object into function object:
-        self.emit(Instruction::LoadBuildClass);
+      //  self.emit(Instruction::BuildTypeValue { size });
 
 
         self.store_name(name);
@@ -1289,6 +1406,9 @@ impl<O: OutputStream> Compiler<O> {
             }
             FunctionCall(loc, name, args) => {
                 self.compile_call(name, args)?;
+            }
+            NamedFunctionCall(loc, name, args) => {
+                self.compile_named_call(name, args)?;
             }
             Not(loc, name) => {
                 self.compile_expression(name)?;
@@ -1751,6 +1871,47 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
+    fn compile_named_call(
+        &mut self,
+        function: &ast::Expression,
+        args: &[ast::NamedArgument],
+    ) -> Result<(), CompileError> {
+
+        //  Compiling VariableDefinition(Loc(1, 10, 39), VariableDeclaration { loc: Loc(1, 10, 14), ty: None,
+        // name: Identifier { loc: Loc(1, 10, 14), name: "aaaa" } }, Some(NamedFunctionCall(Loc(1, 10, 39),
+        // Variable(Identifier { loc: Loc(1, 10, 23), name: "Person" }), [NamedArgument { loc: Loc(1, 10, 210),
+        // name: Identifier { loc: Loc(1, 10, 28), name: "age" }, expr: NumberLiteral(Loc(1, 208, 210),
+        // BigInt { sign: Plus, data: BigUint { data: [30] } }) }, NamedArgument { loc: Loc(1, 10, 37),
+        // name: Identifier { loc: Loc(1, 10, 35), name: "name" }, expr: StringLiteral([StringLiteral { loc: Loc(1, 10, 37),
+        // string: "pan" }]) }])))
+
+        self.compile_expression(function)?;
+        let count = args.len();
+
+        // Named arguments:
+
+        // let mut kwarg_names = vec![];
+        for keyword in args {
+            self.emit(Instruction::LoadConst {
+                value: bytecode::Constant::String {
+                    value: keyword.name.name.clone()
+                },
+            });
+            self.compile_expression(&keyword.expr)?;
+        }
+
+        self.emit(Instruction::BuildMap {
+            size: args.len(),
+            unpack: false,
+            for_call: false,
+        });
+
+        self.emit(Instruction::CallFunction {
+            typ: CallType::Positional(1),
+        });
+        Ok(())
+    }
+
     // Given a vector of expr / star expr generate code which gives either
 // a list of expressions on the stack, or a list of tuples.
     fn gather_elements(&mut self, elements: &[ast::Expression]) -> Result<bool, CompileError> {
@@ -1967,21 +2128,29 @@ impl<O: OutputStream> Compiler<O> {
                 println!("Symbol is ,{:?}", a);
             }
         }
-        if self.ctx.in_lambda {
-            let len: usize = self.symbol_table_stack.len();
-            for i in (len - 2..len).rev() {
-                let symbol = self.symbol_table_stack[i].lookup(name);
-                if symbol.is_some() {
-                    return symbol.unwrap();
-                }
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if symbol.is_some() {
+                return symbol.unwrap();
             }
-            unreachable!();
-        } else {
-            let symbol_table = self.symbol_table_stack.last().unwrap();
-            symbol_table.lookup(name).expect(
-                "The symbol must be present in the symbol table, even when it is undefined",
-            )
         }
+        unreachable!()
+        // if self.ctx.in_lambda {
+        //     let len: usize = self.symbol_table_stack.len();
+        //     for i in (len - 2..len).rev() {
+        //         let symbol = self.symbol_table_stack[i].lookup(name);
+        //         if symbol.is_some() {
+        //             return symbol.unwrap();
+        //         }
+        //     }
+        //     unreachable!();
+        // } else {
+        //     let symbol_table = self.symbol_table_stack.last().unwrap();
+        //     symbol_table.lookup(name).expect(
+        //         "The symbol must be present in the symbol table, even when it is undefined",
+        //     )
+        // }
     }
     // Low level helper functions:
     fn emit(&mut self, instruction: Instruction) {

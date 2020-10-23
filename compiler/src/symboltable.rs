@@ -15,6 +15,8 @@ use std::fmt;
 use std::borrow::Borrow;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
+use pan_bytecode::bytecode::Constant::Struct;
+use pan_bytecode::bytecode::TypeValue;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -551,7 +553,7 @@ impl SymbolTableBuilder {
             // VariableDeclaration { loc: Loc(1, 2, 11), ty: None,
             // name: Identifier { loc: Loc(1, 2, 11), name: "dd" } }, Some(Number(Loc(1, 61, 68), U32(888)))
             VariableDefinition(location, decl, expression) => {
-                println!("dddddregister symbol: {:?}",decl.name.borrow().name.clone());
+                println!("dddddregister symbol: {:?}", decl.name.borrow().name.clone());
                 if expression.is_some() {
                     //注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
                     let mut ty = expression.as_ref().unwrap().get_type();
@@ -572,9 +574,10 @@ impl SymbolTableBuilder {
                 }
                 //这里的内容太多，需要好好整理归纳;确定变量的类型是重中之重;现在只能慢慢往里加，
                 if let Some(e) = expression {
-                    println!("bbbbbb symbol: {:?}",decl.name.borrow().name.clone());
+                    println!("bbbbbb symbol: {:?}", decl.name.borrow().name.clone());
                     self.scan_expression(e, &ExpressionContext::Load)?;
                     //获取右侧表达式的返回类型,
+                    println!("right expression is {:?}", e);
                     let mut ty = e.get_type();
                     let lookup_symbol = ty == CType::Unknown;
                     if ty == CType::Unknown {
@@ -596,9 +599,13 @@ impl SymbolTableBuilder {
                                     println!("attri _tttty{:?}", ty);
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned)?;
                                 }
+                            } else {
+                                self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned)?;
                             }
+
+
                         } else {
-                            self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned)?;
+                            self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned)?;
                         }
                     } else {
                         println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(), ty.ret_type().clone());

@@ -9,7 +9,7 @@ use itertools::Itertools;
 use pan_bytecode::bytecode;
 use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
-use pan_bytecode::bytecode::CodeObject;
+use pan_bytecode::bytecode::{CodeObject, TypeValue};
 use crate::value::{Value, FnValue, Obj};
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
@@ -243,6 +243,12 @@ impl Frame {
                 unpack,
                 for_call,
             } => self.execute_build_map(vm, *size, *unpack, *for_call),
+            bytecode::Instruction::BuildTypeValue {
+                size
+            } => {
+                self.build_struct(vm, *size);
+                None
+            }
             // bytecode::Instruction::BuildSlice { size } => self.execute_build_slice(vm, *size),
             // bytecode::Instruction::ListAppend { i } => {
             //     let list_obj = self.nth_value(*i);
@@ -413,7 +419,7 @@ impl Frame {
             //     None
             // }
             bytecode::Instruction::LoadBuildClass => {
-                self.excute_make_struct(vm);
+                //  self.excute_make_struct_instance(vm);
                 // self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
                 None
             }
@@ -718,6 +724,12 @@ impl Frame {
                     args
                 } else { vec![Value::Nil] }
             }
+            bytecode::CallType::Keyword(count) => {
+                let kwarg_names = self.pop_value();
+                let args = self.pop_multiple(*count);
+                println!("kwarg_names{:?},args:{:?}", kwarg_names, args);
+                args
+            }
             _ => { vec![Value::Nil] }
         };
         //     bytecode::CallType::Keyword(count) => {
@@ -759,6 +771,10 @@ impl Frame {
         let func_ref = self.pop_value();
 
         println!("ddd func_def:{:?}", func_ref);
+        if let Value::Type(ty) = func_ref {
+            self.push_value(Value::new_instance_obj(Value::Type(ty), args));
+            return None;
+        }
         let code = func_ref.code();
         println!("cao  function name:{:?},equal = print: {:?}", code.obj_name, code.obj_name.eq("print"));
         if code.obj_name.eq("print") {
@@ -850,6 +866,14 @@ impl Frame {
         #[cfg(feature = "vm-tracing-logging")]
         trace!("jump from {:?} to {:?}", self.lasti, target_pc);
         self.lasti.set(target_pc);
+    }
+
+    fn build_struct(&self, vm: &VirtualMachine, size: usize) -> FrameResult {
+        // let name = self.pop_value();
+        // let ty = self.pop_value();
+        // let type_value = TypeValue { name: name.name(), methods: vec![ty.code()], static_fields: vec![] };
+        // self.push_value(Value::Type(type_value));
+        None
     }
 
     /// The top of stack contains the iterator, lets push it forward
@@ -947,7 +971,7 @@ impl Frame {
         self.push_value(Value::Fn(func));
         None
     }
-    fn excute_make_struct(&self, vm: &VirtualMachine) -> FrameResult {
+    fn excute_make_struct_instance(&self, vm: &VirtualMachine) -> FrameResult {
         let qualified_name = self.pop_value();
         let code_obj = self.pop_value();
 

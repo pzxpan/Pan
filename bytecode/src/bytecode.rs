@@ -219,6 +219,7 @@ pub enum Instruction {
     },
     PrintExpr,
     LoadBuildClass,
+    BuildTypeValue { size: usize },
     UnpackSequence {
         size: usize,
     },
@@ -273,8 +274,16 @@ pub enum Constant {
     Bytes { value: Vec<u8> },
     Code { code: Box<CodeObject> },
     Tuple { elements: Vec<Constant> },
+    Struct(TypeValue),
     None,
     Ellipsis,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypeValue {
+    pub name: String,
+    pub methods: Vec<(String, CodeObject)>,
+    pub static_fields: Vec<(String, CodeObject)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -511,6 +520,7 @@ impl Instruction {
             GetAwaitable => w!(GetAwaitable),
             GetAIter => w!(GetAIter),
             GetANext => w!(GetANext),
+            BuildTypeValue { size } => w!(BuildTypeValue,size)
         }
     }
 }
@@ -549,6 +559,7 @@ impl fmt::Display for Constant {
             ),
             Constant::None => write!(f, "None"),
             Constant::Ellipsis => write!(f, "Ellipsis"),
+            Constant::Struct(ty) => write!(f, "Struct{:?}", ty)
         }
     }
 }

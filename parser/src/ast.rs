@@ -454,6 +454,7 @@ impl Expression {
     pub fn expr_name(&self) -> String {
         match self {
             Expression::FunctionCall(_, n, _) => n.as_ref().expr_name(),
+            Expression::NamedFunctionCall(_, n, _) => n.as_ref().expr_name(),
             Expression::Variable(id) => id.clone().name,
             Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
             _ => "".to_string()

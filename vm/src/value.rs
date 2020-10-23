@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 // use crate::native_fns::NativeFn;
 use pan_bytecode::bytecode::CodeObject;
+use pan_bytecode::bytecode::TypeValue;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FnValue {
@@ -27,12 +28,12 @@ pub struct ClosureValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct TypeValue {
-    pub name: String,
-    pub methods: Vec<(String, FnValue)>,
-    pub static_fields: Vec<(String, FnValue)>,
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct TypeValue {
+//     pub name: String,
+//     pub methods: Vec<(String, FnValue)>,
+//     pub static_fields: Vec<(String, FnValue)>,
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -95,6 +96,9 @@ impl Value {
             Value::Code(v) => {
                 v.clone()
             }
+            // Value::Type(ty) => {
+            //
+            // }
             _ => unreachable!()
         }
     }
