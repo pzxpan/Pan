@@ -137,6 +137,7 @@ pub enum Token<'input> {
 
     Member,
     Colon,
+    TwoColon,
     OpenBracket,
     CloseBracket,
     Complement,
@@ -222,6 +223,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::More => write!(f, ">"),
             Token::MoreEqual => write!(f, ">="),
             Token::Member => write!(f, "."),
+            Token::TwoColon => write!(f, "::"),
             Token::Colon => write!(f, ":"),
             Token::OpenBracket => write!(f, "["),
             Token::CloseBracket => write!(f, "]"),
@@ -1013,7 +1015,13 @@ impl<'input> Lexer<'input> {
 
                 Some((i, '[')) => return Some(Ok((self.row, Token::OpenBracket, self.column))),
                 Some((i, ']')) => return Some(Ok((self.row, Token::CloseBracket, self.column))),
-                Some((i, ':')) => return Some(Ok((self.row, Token::Colon, self.column))),
+                Some((i, ':')) => {
+                    if let Some((i, ':')) = self.chars.peek() {
+                        self.chars.next();
+                        return Some(Ok((self.row, Token::TwoColon, self.column)));
+                    }
+                    return Some(Ok((self.row, Token::Colon, self.column)));
+                }
                 Some((i, '?')) => return Some(Ok((self.row, Token::Question, self.column))),
                 Some((_, ch)) if ch.is_whitespace() => (),
                 Some((start, _)) => {

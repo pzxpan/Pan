@@ -316,7 +316,6 @@ impl SymbolTableBuilder {
                                     if let Some(expression) = &def.as_ref().returns {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
                                     }
-                                    // // let params = def.as_ref().params.iter().map(|s| s.1).collect();
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                                     self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                                     self.leave_scope();
@@ -381,6 +380,7 @@ impl SymbolTableBuilder {
             type_args: Vec::new(),
             ret_type: Box::from(ast::CType::Any),
             is_pub: true,
+            is_static:false,
         });
 
         self.register_name(&"print".to_string(), tt, SymbolUsage::Used)?;

@@ -735,6 +735,7 @@ pub struct FunctionDefinition {
     pub name_loc: Loc,
     pub params: Vec<(Loc, Option<Parameter>)>,
     pub is_pub: bool,
+    pub is_static: bool,
     pub returns: Option<Expression>,
     pub body: Option<Statement>,
 }
@@ -746,6 +747,7 @@ pub struct FnType {
     pub type_args: Vec<String>,
     pub ret_type: Box<CType>,
     pub is_pub: bool,
+    pub is_static: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -791,7 +793,7 @@ impl HasType for FunctionDefinition {
         }
         // self.returns.as_ref().unwrap().get_type()
         let name = self.name.as_ref().unwrap().name.clone();
-        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub })
+        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static })
     }
 }
 

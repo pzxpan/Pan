@@ -398,9 +398,10 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 
 FunctionDefinition: Box<FunctionDefinition> = {
-    <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun" <nl:@L>  <name:Identifier?> <nr:@R> <params:ParameterList>
+    <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun"  <nl:@L> <is_static: "::"?> <name:Identifier?> <nr:@R> <params:ParameterList>
     <returns:(":" Expression)?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let is_pub = is_pub.is_some();
+        let is_static = is_static.is_some();
         Box::new(FunctionDefinition {
             doc,
             loc: Loc(file_no, l, r),
@@ -408,6 +409,7 @@ FunctionDefinition: Box<FunctionDefinition> = {
             name_loc: Loc(file_no, nl, nr),
             params,
             is_pub,
+            is_static,
             returns:returns.map(|x|x.1),
             body,
         })
@@ -508,6 +510,7 @@ extern {
         LexNumber => Token::Number(<&'input str>),
         ";" => Token::Semicolon,
         ".." => Token::TwoDot,
+        "::" => Token::TwoColon,
         "ref'" => Token::MutRef,
         "ref" => Token::ReadOnlyRef,
         "{" => Token::OpenCurlyBrace,

@@ -5,7 +5,7 @@ pub struct House {
         return price / size > 10000;
     }
 
-    fun ::static() :bool {
+    fun ::aastatic() :bool {
         return true;
     }
 }
@@ -32,6 +32,7 @@ fun main() {
    let bb = person.is_older();
    let house = House({size:111.0,price:1_000_000.0});
    print(house.idea());
+   let aaa = house.aastatic();
    let aaa = name_call(50,"addd");
    print(aaa);
    let bbb = name_call({age:50,name:"addd"});
