@@ -279,7 +279,10 @@ ObjAttribute: Expression = {
         let s: String = n.chars().filter(|v| *v != '_').collect();
         let num = BigInt::from_str(&s).unwrap();
         Expression::Attribute(Loc(file_no, a, b), Box::new(e), None, Some(num))
-     }
+     },
+     <a:@L> <e:Precedence0> "::"  <i:Identifier> <b:@R> => {
+        Expression::Attribute(Loc(file_no, a, b), Box::new(e),Some(i), None)
+     },
 }
 
 Precedence0: Expression = {

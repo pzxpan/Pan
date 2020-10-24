@@ -10,7 +10,7 @@ pub struct House {
         }
 
     fun ::astatic(): bool {
-        return size > 0;
+        return 100 > 0;
     }
 }
 
@@ -20,8 +20,9 @@ fun main() {
    //私有的，无法通过生成sybmol;
    //house.close();
    //公开的，可生成;
-   house.open();
-  // let ddd = House::astatic();
+  // house.open();
+   let ddd = House::astatic();
+   print(ddd);
    return;
 }
 fun print(a:int) {

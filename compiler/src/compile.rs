@@ -929,7 +929,6 @@ impl<O: OutputStream> Compiler<O> {
         //let name = qualified_name;
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
-        let mut size = 0;
         for part in body {
             match part {
                 ast::StructPart::FunctionDefinition(def) => {
@@ -944,8 +943,11 @@ impl<O: OutputStream> Compiler<O> {
                     // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
-                    size += 1;
+                    if *&def.is_static {
+                        self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                    } else {
+                        self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                    }
                 }
                 _ => {}
             }
@@ -959,7 +961,7 @@ impl<O: OutputStream> Compiler<O> {
         let mut code = self.pop_code_object();
         code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
         self.leave_scope();
-        let ty = TypeValue { name: qualified_name, methods, static_fields: vec![] };
+        let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst {
             value: bytecode::Constant::Struct(ty)
         });

@@ -1,5 +1,6 @@
 use num_bigint::BigInt;
 use std::fmt;
+use crate::lexer::Lexer;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Loc(pub usize, pub usize, pub usize);

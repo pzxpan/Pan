@@ -254,6 +254,13 @@ impl VirtualMachine {
                     }
                     _ => unreachable!()
                 }
+            },
+            Value::Type(ty) => {
+                for (k, v) in ty.static_fields.iter() {
+                    if k.eq(&attr.to_string()) {
+                        return (true, Value::Code(v.clone()));
+                    }
+                }
             }
             _ => unreachable!()
         }

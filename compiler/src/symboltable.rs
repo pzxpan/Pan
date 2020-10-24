@@ -890,7 +890,7 @@ impl SymbolTableBuilder {
                 for (method_name, ftype) in ty.methods.iter() {
                     if method_name.eq(&method) {
                         if let CType::Fn(fntype) = ftype {
-                            if fntype.is_pub {
+                            if fntype.is_pub || fntype.is_static {
                                 return Ok(());
                             } else {
                                 return Err(SymbolTableError {
