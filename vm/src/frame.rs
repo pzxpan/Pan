@@ -718,6 +718,7 @@ impl Frame {
 
     fn execute_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
         println!("call_function");
+        let mut named_call = false;
         let args = match typ {
             bytecode::CallType::Positional(count) => {
                 if *count > 0 {
@@ -726,9 +727,10 @@ impl Frame {
                 } else { vec![Value::Nil] }
             }
             bytecode::CallType::Keyword(count) => {
-                let kwarg_names = self.pop_value();
+                // let kwarg_names = self.pop_value();
+                named_call = true;
                 let args = self.pop_multiple(*count);
-                println!("kwarg_names{:?},args:{:?}", kwarg_names, args);
+                // println!("kwarg_names{:?},args:{:?}", kwarg_names, args);
                 args
             }
             _ => { vec![Value::Nil] }
@@ -780,16 +782,18 @@ impl Frame {
         println!("cao  function name:{:?},equal = print: {:?}", code.obj_name, code.obj_name.eq("print"));
         if code.obj_name.eq("print") {
             vm.print(args.get(0).unwrap().clone());
-        } else {
 
-            let last_value = self.last_value();
-            if last_value.is_obj_instant() {
-                let mut s = self.scope.new_child_scope_with_locals();
-                let map = last_value.hash_map_value();
-                for (k, v) in map {
-                    self.scope.store_name(k, v);
+        } else {
+            self.scope.new_child_scope_with_locals();
+            if self.stack.borrow_mut().len() > 0 {
+                let last_value = self.last_value();
+                if last_value.is_obj_instant() {
+                    let map = last_value.hash_map_value();
+                    for (k, v) in map {
+                        self.scope.store_name(k, v);
+                    }
+                    self.pop_value();
                 }
-                self.pop_value();
             }
             // match last_value {
             //     Value::Obj(e) => {
@@ -806,9 +810,16 @@ impl Frame {
             // }
 
             let mut s = self.scope.new_child_scope_with_locals();
-            for (i, name) in code.arg_names.iter().enumerate() {
-                s.store_name(name.to_string(), args.get(i).unwrap().to_owned());
+            if named_call {
+                for (name, value) in args[0].hash_map_value().iter() {
+                    s.store_name(name.to_string(), value.clone());
+                }
+            } else {
+                for (i, name) in code.arg_names.iter().enumerate() {
+                    s.store_name(name.to_string(), args.get(i).unwrap().to_owned());
+                }
             }
+
             let value = vm.run_code_obj(func_ref.code().to_owned(), s);
             match value {
                 Some(ExecutionResult::Return(v)) => {

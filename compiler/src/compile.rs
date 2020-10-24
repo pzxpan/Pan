@@ -970,7 +970,7 @@ impl<O: OutputStream> Compiler<O> {
         // });
 
         // Turn code object into function object:
-      //  self.emit(Instruction::BuildTypeValue { size });
+        //  self.emit(Instruction::BuildTypeValue { size });
 
 
         self.store_name(name);
@@ -1907,7 +1907,7 @@ impl<O: OutputStream> Compiler<O> {
         });
 
         self.emit(Instruction::CallFunction {
-            typ: CallType::Positional(1),
+            typ: CallType::Keyword(1),
         });
         Ok(())
     }
