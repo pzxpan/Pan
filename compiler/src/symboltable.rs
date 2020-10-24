@@ -380,7 +380,7 @@ impl SymbolTableBuilder {
             type_args: Vec::new(),
             ret_type: Box::from(ast::CType::Any),
             is_pub: true,
-            is_static:false,
+            is_static: false,
         });
 
         self.register_name(&"print".to_string(), tt, SymbolUsage::Used)?;
@@ -602,8 +602,6 @@ impl SymbolTableBuilder {
                             } else {
                                 self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned)?;
                             }
-
-
                         } else {
                             self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned)?;
                         }
@@ -707,8 +705,18 @@ impl SymbolTableBuilder {
             Attribute(loc, obj, name, idx) => {
                 self.scan_expression(obj, context)?;
             }
+            //
+            // Expression(Loc(1, 16, 18),
+            //            FunctionCall(Loc(1, 16, 18),
+            //                         Attribute(Loc(1, 16, 16),
+            //                                   Variable(Identifier { loc: Loc(1, 16, 9), name: "aaaaaa" }),
+            //                                   Some(Identifier { loc: Loc(1, 16, 16), name: "normal" }), None), []))
             FunctionCall(loc, name, args) => {
                 let ty = self.get_register_type(name.expr_name());
+                if let Attribute(_, name, Some(ident), _) = name.as_ref() {
+                    self.verify_visible(&ty, name.expr_name(), ident.name.clone())?;
+                    println!("需要验证可见性");
+                }
                 self.scan_expression(name, &ExpressionContext::Load)?;
                 let args_type = ty.param_type();
 
@@ -876,7 +884,32 @@ impl SymbolTableBuilder {
         // }
         Ok(())
     }
-
+    pub fn verify_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+        match ty {
+            CType::Struct(ty) => {
+                for (method_name, ftype) in ty.methods.iter() {
+                    if method_name.eq(&method) {
+                        if let CType::Fn(fntype) = ftype {
+                            if fntype.is_pub {
+                                return Ok(());
+                            } else {
+                                return Err(SymbolTableError {
+                                    error: format!("{} 中的{}函数的可见性是私有的", name, method),
+                                    location: Loc(0, 0, 0),
+                                });
+                            }
+                        }
+                    }
+                }
+                return Err(SymbolTableError {
+                    error: format!("{} 中找不到{}函数", name, method),
+                    location: Loc(0, 0, 0),
+                });
+            }
+            _ => unreachable!()
+        }
+        Ok(())
+    }
     // fn scan_string_group(&mut self, group: &ast::StringGroup) -> SymbolTableResult {
     //     match group {
     //         ast::StringGroup::Constant { .. } => {}
