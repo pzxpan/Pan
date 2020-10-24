@@ -236,10 +236,15 @@ impl VirtualMachine {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
                     Obj::InstanceObj(InstanceObj { typ, field_map }) => {
-                        if let Value::Type(TypeValue { methods, .. }) = typ.as_ref() {
+                        if let Value::Type(TypeValue { methods, static_fields, .. }) = typ.as_ref() {
                             for method in methods {
                                 if method.0.eq(&attr.to_string()) {
                                     return (true, Value::Code(method.1.clone()));
+                                }
+                            }
+                            for (k, v) in static_fields.iter() {
+                                if k.eq(&attr.to_string()) {
+                                    return (true, Value::Code(v.clone()));
                                 }
                             }
                         }
@@ -254,7 +259,7 @@ impl VirtualMachine {
                     }
                     _ => unreachable!()
                 }
-            },
+            }
             Value::Type(ty) => {
                 for (k, v) in ty.static_fields.iter() {
                     if k.eq(&attr.to_string()) {

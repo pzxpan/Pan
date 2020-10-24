@@ -22,6 +22,7 @@ fun main() {
    //公开的，可生成;
   // house.open();
    let ddd = House::astatic();
+   house.astatic();
    print(ddd);
    return;
 }
