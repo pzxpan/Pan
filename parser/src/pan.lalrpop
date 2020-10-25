@@ -462,7 +462,7 @@ SimpleStatement: Statement = {
     <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)?> <r:@R> => {
         Statement::VariableDefinition(Loc(file_no, l, r), v, e)
     },
-    //Set放在这里就没法嵌套定义，只能在"="的右边推导出一个Set;放在Expression的话，与NameArgument有规约冲突
+    //Set放在这里就没法嵌套定义，只能在"="的右边推导出一个Set;放在Expression的话，与NamedArgument有规约冲突
     <l:@L>  <v:VariableDeclaration> "="  <ll:@L> "{" <vv:CommaOne<Expression>> "}" <rr:@R> <r:@R> => {
          Statement::VariableDefinition(Loc(file_no, l, r), v, Some(Expression::Set(Loc(file_no, ll, rr), vv)))
      },

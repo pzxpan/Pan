@@ -116,17 +116,6 @@ pub trait HasType {
     fn get_type(&self) -> CType;
 }
 
-pub struct TypedSourceUnitPart<U> where U: HasType {
-    pub typ: CType,
-    pub node: U,
-}
-
-impl<U> TypedSourceUnitPart<U> where U: HasType {
-    pub fn get_type(&self) -> CType {
-        self.node.get_type()
-    }
-}
-
 #[derive(Debug, PartialEq)]
 pub enum Import {
     Plain(StringLiteral),
