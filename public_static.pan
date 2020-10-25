@@ -25,8 +25,8 @@ pub struct House {
 }
 
 fun main() {
-   //let house = House::new();
-   let house2 = House({size:111,price:1_000_000.0,inner:20});
+   let house2 = House::new();
+   //let house2 = House({size:111,price:1_000_000.0,inner:20});
    //私有的，无法通过生成sybmol;
    //house.close();
    //house2.inner = 100;
@@ -34,7 +34,7 @@ fun main() {
 
    print(house2.open());
 
- //  print(house.open_out());
+   print(house2.open_out());
  //  print(house.open());
   // let ddd = House::astatic();
  //  house.astatic();

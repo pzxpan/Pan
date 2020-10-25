@@ -17,6 +17,7 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use pan_bytecode::bytecode::Constant::Struct;
 use pan_bytecode::bytecode::TypeValue;
+use std::collections::HashSet;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -482,6 +483,15 @@ impl SymbolTableBuilder {
         }
         ast::CType::Unknown
     }
+
+    fn in_current_scope(&mut self, name: String) -> bool {
+        let len = self.tables.len();
+        let a = self.tables.get(len - 2).unwrap().lookup(name.as_str());
+        if a.is_some() {
+            return true;
+        }
+        return false;
+    }
     fn scan_statement(&mut self, statement: &ast::Statement) -> SymbolTableResult {
         println!("statement is {:?}", statement);
         use ast::Statement::*;
@@ -857,7 +867,28 @@ impl SymbolTableBuilder {
             }
             Number(loc, number) => {}
 
-            _ => {}
+            NamedFunctionCall(loc, exp, args) => {
+                let ty = self.get_register_type(exp.as_ref().expr_name());
+                if let CType::Struct(_) = ty {
+                    for arg in args {
+                        //不在struct当前作用域，则需要检查Named参数的可见性
+                        if !self.in_current_scope(arg.name.name.clone()) {
+                            let result = self.verify_field_visible(ty.borrow(), exp.as_ref().expr_name(), arg.name.name.clone());
+                            if result.is_err() {
+                                return Err(SymbolTableError {
+                                    error: format!("{} 中的{}字段的可见性是私有的,请尝试调用struct的静态构造方法", exp.as_ref().expr_name(), arg.name.name.clone()),
+                                    location: Loc(0, 0, 0),
+                                });
+                            }
+                        }
+                        //验证参数是否足够
+                        let hash_set: HashSet<String> = args.iter().map(|s| s.name.name.clone()).collect();
+                        self.verify_param_enough(ty.borrow(), exp.as_ref().expr_name(), hash_set)?;
+                    }
+                }
+
+                println!("namedfun type  {:?}", ty);
+            }
         }
         Ok(())
     }
@@ -950,6 +981,24 @@ impl SymbolTableBuilder {
                     error: format!("{} 中找不到{}属性", name, method),
                     location: Loc(0, 0, 0),
                 });
+            }
+            _ => unreachable!()
+        }
+        Ok(())
+    }
+
+    pub fn verify_param_enough(&self, ty: &CType, name: String, methods: HashSet<String>) -> SymbolTableResult {
+        match ty {
+            CType::Struct(ty) => {
+                for (field_name, _, is_pub) in ty.fields.iter() {
+                    if !methods.contains(field_name) {
+                        return Err(SymbolTableError {
+                            error: format!("命名参数缺少{}", field_name),
+                            location: Loc(0, 0, 0),
+                        });
+                    }
+                }
+                return Ok(());
             }
             _ => unreachable!()
         }
