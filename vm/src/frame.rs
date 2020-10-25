@@ -782,7 +782,6 @@ impl Frame {
         println!("cao  function name:{:?},equal = print: {:?}", code.obj_name, code.obj_name.eq("print"));
         if code.obj_name.eq("print") {
             vm.print(args.get(0).unwrap().clone());
-
         } else {
             self.scope.new_child_scope_with_locals();
             if self.stack.borrow_mut().len() > 0 {
@@ -792,6 +791,7 @@ impl Frame {
                     for (k, v) in map {
                         self.scope.store_name(k, v);
                     }
+                    self.scope.store_name("self".to_string(), last_value);
                     self.pop_value();
                 }
             }

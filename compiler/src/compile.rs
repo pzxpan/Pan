@@ -45,6 +45,7 @@ enum FunctionContext {
     NoFunction,
     Function,
     AsyncFunction,
+    StructFunction,
 }
 
 impl CompileContext {
@@ -769,11 +770,7 @@ impl<O: OutputStream> Compiler<O> {
         self.ctx = CompileContext {
             in_lambda,
             in_loop: false,
-            func: if is_async {
-                FunctionContext::AsyncFunction
-            } else {
-                FunctionContext::Function
-            },
+            func: FunctionContext::StructFunction,
         };
 
         let qualified_name = self.create_qualified_name(name, "");
@@ -1851,7 +1848,23 @@ impl<O: OutputStream> Compiler<O> {
         function: &ast::Expression,
         args: &[ast::Expression],
     ) -> Result<(), CompileError> {
-        self.compile_expression(function)?;
+        // [Return(Loc(1, 9, 22), Some(FunctionCall(Loc(1, 9, 22), Variable(Identifier { loc: Loc(1, 9, 20), name: "close" })
+        if self.ctx.func == FunctionContext::StructFunction {
+            if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
+                self.emit(Instruction::LoadName {
+                    name: "self".to_string(),
+                    scope: bytecode::NameScope::Local,
+                });
+                self.emit(Instruction::LoadAttr {
+                    name: name.clone(),
+                });
+            } else {
+                self.compile_expression(function)?;
+            }
+        } else {
+            self.compile_expression(function)?;
+        }
+
         let count = args.len();
 
         // Normal arguments:
