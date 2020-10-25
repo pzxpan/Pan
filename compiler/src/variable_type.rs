@@ -1,5 +1,6 @@
 use pan_parser::ast::*;
 use crate::symboltable::*;
+use crate::ctype::*;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -15,7 +16,7 @@ impl HasType for BuiltinType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match self {
             BuiltinType::Bool => CType::Bool,
-            BuiltinType::String => CType::String,
+            BuiltinType::String => CType::Str,
             BuiltinType::Int => CType::Int,
             BuiltinType::Float => CType::Float,
         }
@@ -87,7 +88,7 @@ impl HasType for Expression {
                 match ty {
                     BuiltinType::Int => CType::Int,
                     BuiltinType::Bool => CType::Bool,
-                    BuiltinType::String => CType::String,
+                    BuiltinType::String => CType::Str,
                     BuiltinType::Float => CType::Float,
                 }
             }
@@ -95,7 +96,7 @@ impl HasType for Expression {
                 match s.name.as_str() {
                     "int" => CType::Int,
                     "float" => CType::Float,
-                    "string" => CType::String,
+                    "string" => CType::Str,
                     "bool" => CType::Bool,
                     _ => CType::Unknown
                 }
@@ -107,7 +108,7 @@ impl HasType for Expression {
                 CType::Int
             }
             Expression::StringLiteral(s) => {
-                CType::String
+                CType::Str
             }
             Expression::ArrayLiteral(_, elements) | Expression::Set(_, elements) => {
                 if elements.len() > 0 {

@@ -10,13 +10,16 @@ Inspirational file: https://github.com/python/cpython/blob/master/Python/symtabl
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Parameter, Expression, HasType, CType, LambdaDefinition, MultiVariableDeclaration, MultiDeclarationPart};
+use pan_parser::ast::{Loc, Identifier, Parameter, Expression, LambdaDefinition, MultiVariableDeclaration, MultiDeclarationPart};
 use std::fmt;
 use std::borrow::Borrow;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use pan_bytecode::bytecode::TypeValue;
 use std::collections::HashSet;
+use crate::ctype::CType::*;
+use crate::ctype::*;
+use crate::variable_type::*;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -106,11 +109,11 @@ pub struct Symbol {
     pub is_assigned: bool,
     pub is_parameter: bool,
     pub is_free: bool,
-    pub ty: ast::CType,
+    pub ty: CType,
 }
 
 impl Symbol {
-    fn new(name: &str, ty: ast::CType) -> Self {
+    fn new(name: &str, ty: CType) -> Self {
         Symbol {
             name: name.to_owned(),
             // table,
@@ -218,16 +221,7 @@ impl<'a> SymbolTableAnalyzer<'a> {
 
     fn analyze_symbol(&mut self, symbol: &mut Symbol) -> SymbolTableResult {
         match symbol.ty {
-            ast::CType::Unknown => {
-                // let ty = self.get_register_type(symbol.clone().name);
-                // if ty != ast::CType::Unknown {
-                //     symbol.ty = ty;
-                // } else {
-                //     return Err(SymbolTableError {
-                //         error: format!("{:?}类型不能推断", symbol.name),
-                //         location: Loc(0, 0, 0),
-                //     });
-                // }
+            CType::Unknown => {
                 return Err(SymbolTableError {
                     error: format!("{:?}类型不能推断", symbol.name),
                     location: Loc(0, 0, 0),
@@ -292,10 +286,10 @@ impl SymbolTableBuilder {
     }
 
     fn scan_program(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
-        self.register_name(&"int".to_string(), ast::CType::Int, SymbolUsage::Used)?;
-        self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
-        self.register_name(&"string".to_string(), ast::CType::String, SymbolUsage::Used)?;
-        self.register_name(&"bool".to_string(), ast::CType::Bool, SymbolUsage::Used)?;
+        self.register_name(&"int".to_string(), CType::Int, SymbolUsage::Used)?;
+        self.register_name(&"float".to_string(), CType::Float, SymbolUsage::Used)?;
+        self.register_name(&"string".to_string(), CType::Str, SymbolUsage::Used)?;
+        self.register_name(&"bool".to_string(), CType::Bool, SymbolUsage::Used)?;
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
@@ -306,14 +300,14 @@ impl SymbolTableBuilder {
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
-                    self.register_name(&"__module__".to_string(), CType::String, SymbolUsage::Assigned)?;
-                    self.register_name(&"__qualname__".to_string(), CType::String, SymbolUsage::Assigned)?;
-                    self.register_name(&"self".to_string(), ast::CType::String, SymbolUsage::Used)?;
+                    self.register_name(&"__module__".to_string(), CType::Str, SymbolUsage::Assigned)?;
+                    self.register_name(&"__qualname__".to_string(), CType::Str, SymbolUsage::Assigned)?;
+                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Used)?;
                     for part in &def.parts {
                         match part {
                             ast::StructPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
-                                    let tt = def.get_type();
+                                    let tt = def.get_type(&self.tables);
                                     self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
                                     if let Some(expression) = &def.as_ref().returns {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
@@ -324,7 +318,7 @@ impl SymbolTableBuilder {
                                 }
                             }
                             ast::StructPart::StructVariableDefinition(def) => {
-                                self.register_name(&def.name.name, def.ty.get_type(), SymbolUsage::Assigned);
+                                self.register_name(&def.name.name, def.ty.get_type(&self.tables), SymbolUsage::Assigned);
                             }
                             _ => {}
                         }
@@ -335,7 +329,7 @@ impl SymbolTableBuilder {
                     //     self.scan_expression(&keyword.value, &ExpressionContext::Load)?;
                     // }
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    self.register_name(&def.name.name.clone(), def.get_type(), SymbolUsage::Assigned)?;
+                    self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {}
                 ast::SourceUnitPart::ConstDefinition(def) => {}
@@ -369,18 +363,18 @@ impl SymbolTableBuilder {
         Ok(())
     }
     fn scan_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
-        self.register_name(&"int".to_string(), ast::CType::Int, SymbolUsage::Used)?;
-        self.register_name(&"float".to_string(), ast::CType::Float, SymbolUsage::Used)?;
-        self.register_name(&"string".to_string(), ast::CType::String, SymbolUsage::Used)?;
-        self.register_name(&"bool".to_string(), ast::CType::Bool, SymbolUsage::Used)?;
-        self.register_name(&"Any".to_string(), ast::CType::Any, SymbolUsage::Used)?;
+        self.register_name(&"int".to_string(), CType::Int, SymbolUsage::Used)?;
+        self.register_name(&"float".to_string(), CType::Float, SymbolUsage::Used)?;
+        self.register_name(&"string".to_string(), CType::Str, SymbolUsage::Used)?;
+        self.register_name(&"bool".to_string(), CType::Bool, SymbolUsage::Used)?;
+        self.register_name(&"Any".to_string(), CType::Any, SymbolUsage::Used)?;
         let mut arg_types = Vec::new();
-        arg_types.push((String::from("value"), ast::CType::Any, false));
-        let tt = ast::CType::Fn(ast::FnType {
+        arg_types.push((String::from("value"), CType::Any, false));
+        let tt = CType::Fn(FnType {
             name: "print".to_string(),
             arg_types,
             type_args: Vec::new(),
-            ret_type: Box::from(ast::CType::Any),
+            ret_type: Box::from(CType::Any),
             is_pub: true,
             is_static: false,
         });
@@ -407,7 +401,7 @@ impl SymbolTableBuilder {
                     // }
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                     // self.register_name(name, SymbolUsage::Assigned)?;
-                    let tt = def.get_type();
+                    let tt = def.get_type(&self.tables);
                     self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
                     // for part in &def.parts {
                     //     match part {
@@ -427,7 +421,7 @@ impl SymbolTableBuilder {
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    let tt = def.get_type();
+                    let tt = def.get_type(&self.tables);
                     println!("type is :{:?}", tt);
                     println!("function is :{:?}", def.clone());
                     if let Some(name) = &def.name {
@@ -472,7 +466,7 @@ impl SymbolTableBuilder {
     //     }
     //     Ok(())
     // }
-    fn get_register_type(&mut self, name: String) -> ast::CType {
+    fn get_register_type(&mut self, name: String) -> CType {
         let len = self.tables.len();
         for i in (0..len).rev() {
             let a = self.tables.get(i).unwrap().lookup(name.as_str());
@@ -480,7 +474,7 @@ impl SymbolTableBuilder {
                 return a.unwrap().ty.clone();
             }
         }
-        ast::CType::Unknown
+        CType::Unknown
     }
 
     fn in_current_scope(&mut self, name: String) -> bool {
@@ -508,7 +502,7 @@ impl SymbolTableBuilder {
             // [Expression(Loc(1, 4, 12), FunctionCall(Loc(1, 4, 12), Variable(Identifier { loc: Loc(1, 4, 9), name: "print" }),
             // [Variable(Identifier { loc: Loc(1, 4, 11), name: "a" })]))])))
             For(loc, target, iter, end, body) => {
-                let ty = iter.get_type();
+                let ty = iter.get_type(&self.tables);
                 let mut symbol_name = String::new();
                 if let ast::Expression::Variable(Identifier { loc, name }) = target {
                     symbol_name = name.clone();
@@ -567,7 +561,7 @@ impl SymbolTableBuilder {
                 println!("dddddregister symbol: {:?}", decl.name.borrow().name.clone());
                 if expression.is_some() {
                     //注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
-                    let mut ty = expression.as_ref().unwrap().get_type();
+                    let mut ty = expression.as_ref().unwrap().get_type(&self.tables);
                     match ty {
                         CType::Lambda(_) => {
                             self.lambda_name = decl.name.borrow().name.clone();
@@ -581,7 +575,9 @@ impl SymbolTableBuilder {
                     }
                 }
                 if decl.ty.is_some() {
-                    self.register_name(decl.name.borrow().name.borrow(), decl.ty.as_ref().unwrap().get_type(), SymbolUsage::Assigned)?;
+                    self.register_name(decl.name.borrow().name.borrow(),
+                                       decl.ty.as_ref().unwrap().get_type(&self.tables),
+                                       SymbolUsage::Assigned)?;
                 }
                 //这里的内容太多，需要好好整理归纳;确定变量的类型是重中之重;现在只能慢慢往里加，
                 if let Some(e) = expression {
@@ -589,7 +585,7 @@ impl SymbolTableBuilder {
                     self.scan_expression(e, &ExpressionContext::Load)?;
                     //获取右侧表达式的返回类型,
                     println!("right expression is {:?}", e);
-                    let mut ty = e.get_type();
+                    let mut ty = e.get_type(&self.tables);
                     let lookup_symbol = ty == CType::Unknown;
                     if ty == CType::Unknown {
                         //如果是函数或获取属性，就获取注册了的函数和返回类型，
@@ -617,8 +613,8 @@ impl SymbolTableBuilder {
                             self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned)?;
                         }
                     } else {
-                        println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(), ty.ret_type().clone());
-                        if decl.ty.as_ref().unwrap().get_type() != ty.ret_type().clone() {
+                        println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(&self.tables), ty.ret_type().clone());
+                        if decl.ty.as_ref().unwrap().get_type(&self.tables) != ty.ret_type().clone() {
                             return Err(SymbolTableError {
                                 error: format!("类型不匹配"),
                                 location: location.clone(),
@@ -645,7 +641,7 @@ impl SymbolTableBuilder {
             MultiVariableDefinition(loc, decls, e) => {
                 let mut ty = self.get_register_type(e.expr_name());
                 if ty == CType::Unknown {
-                    ty = e.get_type();
+                    ty = e.get_type(&self.tables);
                 }
                 if ty == CType::Unknown {
                     return Err(SymbolTableError {
@@ -823,7 +819,7 @@ impl SymbolTableBuilder {
             }
             List(loc, _) => {}
             Type(loc, ty) => {
-                self.register_name(&ty.name().to_string(), ty.get_type(), SymbolUsage::Used)?;
+                self.register_name(&ty.name().to_string(), ty.get_type(&self.tables), SymbolUsage::Used)?;
             }
             Variable(Identifier { loc, name }) => {
                 let ty = self.get_register_type(name.to_string()).clone();
@@ -917,7 +913,7 @@ impl SymbolTableBuilder {
         // }
 
         self.enter_scope(name, SymbolTableType::Function, line_number);
-        let arg_types: Vec<(String, ast::CType, bool)> = args.iter().map(|s| ast::transfer(s)).collect();
+        let arg_types: Vec<(String, CType, bool)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
             println!("paramis{:?},", s);
             self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
@@ -1022,7 +1018,7 @@ impl SymbolTableBuilder {
     // }
 
     #[allow(clippy::single_match)]
-    fn register_name(&mut self, name: &String, ty: ast::CType, role: SymbolUsage) -> SymbolTableResult {
+    fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage) -> SymbolTableResult {
         let scope_depth = self.tables.len();
 
         let table = self.tables.last_mut().unwrap();
@@ -1117,7 +1113,7 @@ impl SymbolTableBuilder {
                 symbol.is_referenced = true;
             }
             SymbolUsage::Unknown => {
-                symbol.ty = ast::CType::Unknown;
+                symbol.ty = CType::Unknown;
             }
         }
         println!("after register name={:?}, ty: {:?}", symbol.name, symbol.ty);

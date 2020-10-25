@@ -18,7 +18,7 @@ pub enum CType {
 
     Int,
     Float,
-    String,
+    Str,
     Bool,
     Tuple(Box<Vec<CType>>),
     Array(Box<CType>),

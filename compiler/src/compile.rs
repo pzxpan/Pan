@@ -8,7 +8,7 @@ use itertools::Itertools;
 use num_complex::Complex64;
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags, TypeValue};
 use pan_parser::{ast, parse};
-use pan_parser::ast::{Expression, Parameter, HasType, MultiDeclarationPart, MultiVariableDeclaration, CType, DestructType};
+use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType};
 use std::borrow::Borrow;
 use pan_bytecode::bytecode::CallType::Positional;
 use pan_bytecode::bytecode::NameScope::Global;
@@ -17,6 +17,7 @@ use num_bigint::BigInt;
 use num_traits::FromPrimitive;
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_parser::lexer::Token::Identifier;
+use crate::ctype::CType;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -359,8 +360,10 @@ impl<O: OutputStream> Compiler<O> {
             }
             VariableDefinition(_, decl, expression) => {
                 if let Some(e) = &expression {
-                    let mut ty = expression.as_ref().unwrap().get_type();
-                    if let ast::CType::Lambda(_) = ty {
+                    //绝大部分的类型都会在symbol分析阶段完成;
+                    //let mut ty = expression.as_ref().unwrap().get_type();
+                    let mut ty = CType::Unknown;
+                    if let CType::Lambda(_) = ty {
                         //如果是lambda，就直接返回，不需要存储，因为lambda作为函数类型存储，只要将名称传递过去
                         self.lambda_name = decl.name.borrow().name.clone();
                         self.compile_expression(e)?;
@@ -1476,7 +1479,6 @@ impl<O: OutputStream> Compiler<O> {
             => {
                 self.compile_expression(b)?;
                 self.compile_expression(a)?;
-                println!("aaaaa:{:?},bbbbbb:{:?}", a.get_type(), b.get_type());
                 //TODO
             }
             BoolLiteral(loc, _) => {}

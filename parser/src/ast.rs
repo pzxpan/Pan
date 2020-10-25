@@ -37,85 +37,6 @@ pub enum SourceUnitPart {
     FunctionDefinition(Box<FunctionDefinition>),
 }
 
-impl HasType for SourceUnitPart {
-    fn get_type(&self) -> CType {
-        match &self {
-            SourceUnitPart::FunctionDefinition(s) => { s.get_type() }
-            SourceUnitPart::StructDefinition(s) => { s.get_type() }
-            _ => { CType::Unknown }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum CType {
-    Unit,
-    Any,
-    Union(Vec<CType>),
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    ISize,
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    USize,
-
-    Int,
-    Float,
-    String,
-    Bool,
-    Tuple(Box<Vec<CType>>),
-    Array(Box<CType>),
-    Dict(Box<CType>, Box<CType>),
-    Fn(FnType),
-    Struct(StructType),
-    Enum(EnumType),
-    Lambda(LambdaType),
-    Generic(/* name: */ String),
-    Unknown,
-}
-
-impl CType {
-    pub fn name(&self) -> String {
-        match self {
-            CType::Unit => "unit".to_string(),
-            CType::Float => "float".to_string(),
-            CType::Int => "int".to_string(),
-            _ => "unknown".to_string()
-        }
-    }
-    pub fn ret_type(&self) -> &CType {
-        match self {
-            CType::Fn(s) => s.ret_type.as_ref(),
-            _ => self
-        }
-    }
-
-    pub fn attri_type(&self, index: usize, name: String) -> &CType {
-        //struct的属性类型需要名称，而tuple需要索引值;
-        match self {
-            CType::Tuple(s) => s.as_ref().get(index).unwrap(),
-            _ => self
-        }
-    }
-
-    pub fn param_type(&self) -> Vec<CType> {
-        match self {
-            CType::Fn(s) => s.arg_types.iter().map(|s| s.1.clone()).collect(),
-            _ => Vec::new()
-        }
-    }
-}
-
-pub trait HasType {
-    fn get_type(&self) -> CType;
-}
-
 #[derive(Debug, PartialEq)]
 pub enum Import {
     Plain(StringLiteral),
@@ -130,18 +51,6 @@ pub enum BuiltinType {
     Int,
     Float,
 }
-
-impl HasType for BuiltinType {
-    fn get_type(&self) -> CType {
-        match self {
-            BuiltinType::Bool => CType::Bool,
-            BuiltinType::String => CType::String,
-            BuiltinType::Int => CType::Int,
-            BuiltinType::Float => CType::Float,
-        }
-    }
-}
-
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Level {
@@ -357,7 +266,6 @@ pub enum Number {
     Float(f64),
 }
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     //逻辑表达式
@@ -448,113 +356,6 @@ impl Expression {
             Expression::Variable(id) => id.clone().name,
             Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
             _ => "".to_string()
-        }
-    }
-}
-
-impl HasType for Expression {
-    fn get_type(&self) -> CType {
-        match self {
-            Expression::Add(_, left, right) |
-            Expression::Subtract(_, left, right) => {
-                //TODO 需要处理两个变量的四则运算的返回类型，需要在利用注册了的symbol进行处理;
-                let l = left.get_type();
-                let r = right.get_type();
-                if l == r {
-                    l
-                } else {
-                    r
-                }
-            }
-            Expression::Type(_, ty) => {
-                match ty {
-                    BuiltinType::Int => CType::Int,
-                    BuiltinType::Bool => CType::Bool,
-                    BuiltinType::String => CType::String,
-                    BuiltinType::Float => CType::Float,
-                }
-            }
-            Expression::Variable(s) => {
-                match s.name.as_str() {
-                    "int" => CType::Int,
-                    "float" => CType::Float,
-                    "string" => CType::String,
-                    "bool" => CType::Bool,
-                    _ => CType::Unknown
-                }
-            }
-            // Expression::FunctionCall(_, s, _) => {
-            //     s.get_type()
-            // }
-            Expression::NumberLiteral(_, _) => {
-                CType::Int
-            }
-            Expression::StringLiteral(s) => {
-                CType::String
-            }
-            Expression::ArrayLiteral(_, elements) | Expression::Set(_, elements) => {
-                if elements.len() > 0 {
-                    let ty = elements.get(0).unwrap().get_type();
-                    for e in elements {
-                        if e.get_type() != ty {
-                            return CType::Unknown;
-                        }
-                    }
-                    return CType::Array(Box::new(ty));
-                }
-                return CType::Array(Box::new(CType::Unknown));
-            }
-
-            Expression::Dict(_, dicts) => {
-                if dicts.len() > 0 {
-                    let key_ty = dicts.get(0).unwrap().key.get_type();
-                    let value_ty = dicts.get(0).unwrap().value.get_type();
-                    for e in dicts {
-                        //TODO 是现在抛出错误提示，还是等到analyzer时抛出
-                        if e.key.get_type() != key_ty || e.value.get_type() != value_ty {
-                            return CType::Unknown;
-                        }
-                    }
-                    return CType::Dict(Box::new(key_ty), Box::new(value_ty));
-                }
-                return CType::Dict(Box::new(CType::Unknown), Box::new(CType::Unknown));
-            }
-
-            Expression::Tuple(_, elements) => {
-                let v: Vec<CType> = elements.iter().map(|s| s.get_type()).collect();
-                return CType::Tuple(Box::new(v));
-            }
-            Expression::Lambda(_, e) => {
-                e.get_type()
-            }
-            Expression::UnaryMinus(_, e) => {
-                e.get_type()
-            }
-
-            Expression::Number(_, e) => {
-                use Number::*;
-                match e {
-                    I8(_) => CType::I8,
-                    I16(_) => CType::I16,
-                    I32(_) => CType::I32,
-                    I64(_) => CType::I64,
-                    I128(_) => CType::I128,
-                    ISize(_) => CType::ISize,
-                    U8(_) => CType::U8,
-                    U16(_) => CType::U16,
-                    U32(_) => CType::U32,
-                    U64(_) => CType::U64,
-                    U128(_) => CType::U128,
-                    USize(_) => CType::USize,
-                    Int(e) => CType::Int,
-                    Float(f64) => CType::Float,
-                }
-            }
-
-            // Expression::Attribute(_, obj_name, attri, idx) {
-            //
-            // }
-            _ => { CType::Unknown }
         }
     }
 }
@@ -651,12 +452,6 @@ pub struct Parameter {
     pub name: Option<Identifier>,
 }
 
-impl HasType for Parameter {
-    fn get_type(&self) -> CType {
-        self.ty.get_type()
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum StateMutability {
     Pure(Loc),
@@ -728,109 +523,6 @@ pub struct FunctionDefinition {
     pub is_static: bool,
     pub returns: Option<Expression>,
     pub body: Option<Statement>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct FnType {
-    pub name: String,
-    pub arg_types: Vec<(/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool)>,
-    pub type_args: Vec<String>,
-    pub ret_type: Box<CType>,
-    pub is_pub: bool,
-    pub is_static: bool,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct LambdaType {
-    pub name: String,
-    pub ret_type: Box<CType>,
-    pub captures: Vec<String>,
-    pub arg_types: Vec<(/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool)>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct StructType {
-    pub name: String,
-    pub type_args: Vec<(String, CType)>,
-    pub fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
-    pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
-    pub methods: Vec<(String, CType)>,
-    pub is_pub: bool,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct EnumType {
-    pub name: String,
-    pub variants: Vec<(/* name: */ String, /* type: */ CType)>,
-    pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
-    pub methods: Vec<(String, CType)>,
-}
-
-pub fn transfer(s: &(Loc, Option<Parameter>)) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
-    let ty = s.1.as_ref().unwrap().get_type().to_owned();
-    let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
-    let is_optional = true;
-    (arg_name, ty, is_optional)
-}
-
-impl HasType for FunctionDefinition {
-    fn get_type(&self) -> CType {
-        let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s)).collect();
-        let type_args = Vec::new();
-        let mut ret_type = Box::new(CType::Unknown);
-        if let Some(ty) = self.returns.as_ref() {
-            ret_type = Box::new(ty.get_type());
-        }
-        // self.returns.as_ref().unwrap().get_type()
-        let name = self.name.as_ref().unwrap().name.clone();
-        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static })
-    }
-}
-
-impl HasType for StructDefinition {
-    fn get_type(&self) -> CType {
-        let mut type_args = Vec::new();
-        for ty in &self.generics {
-            //TODO
-            type_args.push((ty.name.name.clone(), CType::Any))
-        }
-        let mut fields: Vec<(String, CType, bool)> = Vec::new();
-        let mut methods: Vec<(String, CType)> = Vec::new();
-        for field in &self.parts {
-            match field {
-                StructPart::FunctionDefinition(f) => {
-                    methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type()));
-                }
-                StructPart::StructVariableDefinition(v) => {
-                    fields.push((v.name.name.clone(), v.ty.get_type(), v.is_pub))
-                }
-                _ => {}
-            }
-        }
-
-        let name = self.name.name.clone();
-        CType::Struct(StructType { name, type_args, fields, static_fields: vec![], is_pub: self.is_pub, methods })
-    }
-}
-
-impl HasType for LambdaDefinition {
-    fn get_type(&self) -> CType {
-        let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s)).collect();
-        let name = "lambda".to_string();
-        let mut ret_type = Box::from(match *self.body.clone() {
-            Statement::Block(_, statements) => {
-                let s = statements.last();
-                match s {
-                    Some(Statement::Return(_, e)) => {
-                        e.as_ref().unwrap().get_type()
-                    }
-                    _ => { CType::Any }
-                }
-            }
-            _ => { CType::Any }
-        });
-        CType::Lambda(LambdaType { name, arg_types, ret_type, captures: vec![] })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
