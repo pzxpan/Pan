@@ -307,6 +307,7 @@ impl SymbolTableBuilder {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
                     self.register_name(&"__module__".to_string(), CType::String, SymbolUsage::Assigned)?;
                     self.register_name(&"__qualname__".to_string(), CType::String, SymbolUsage::Assigned)?;
+                    self.register_name(&"self".to_string(), ast::CType::String, SymbolUsage::Used)?;
                     for part in &def.parts {
                         match part {
                             ast::StructPart::FunctionDefinition(def) => {
@@ -714,7 +715,9 @@ impl SymbolTableBuilder {
             FunctionCall(loc, name, args) => {
                 let ty = self.get_register_type(name.expr_name());
                 if let Attribute(_, name, Some(ident), _) = name.as_ref() {
-                    self.verify_visible(&ty, name.expr_name(), ident.name.clone())?;
+                    if name.expr_name().ne("self".clone()) {
+                        self.verify_visible(&ty, name.expr_name(), ident.name.clone())?;
+                    }
                     println!("需要验证可见性");
                 }
                 self.scan_expression(name, &ExpressionContext::Load)?;

@@ -1,13 +1,20 @@
+pub fun outfun(): bool {
+    return 100 > 0;
+}
 pub struct House {
     pub size: int,
     pub price: float,
     inner: int,
     fun close(): bool {
-        return size < 1000;
+        return 100 >0 ;
     }
     pub fun open(): bool {
-       return close();
+       return self.close();
     }
+
+     pub fun open_out(): bool {
+           return outfun();
+        }
 
     fun ::astatic(): bool {
         return 100 > 0;
@@ -24,6 +31,7 @@ fun main() {
    //私有的，无法通过生成sybmol;
    //house.close();
    //公开的，可生成;
+   print(house.open_out());
    print(house.open());
   // let ddd = House::astatic();
  //  house.astatic();

@@ -910,6 +910,10 @@ impl<O: OutputStream> Compiler<O> {
             name: "__qualname__".to_owned(),
             scope: bytecode::NameScope::Free,
         });
+        self.emit(Instruction::StoreName {
+            name: "self".to_owned(),
+            scope: bytecode::NameScope::Local,
+        });
         let mut fields = vec![];
         for part in body {
             match part {
@@ -1851,13 +1855,17 @@ impl<O: OutputStream> Compiler<O> {
         // [Return(Loc(1, 9, 22), Some(FunctionCall(Loc(1, 9, 22), Variable(Identifier { loc: Loc(1, 9, 20), name: "close" })
         if self.ctx.func == FunctionContext::StructFunction {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                self.emit(Instruction::LoadName {
-                    name: "self".to_string(),
-                    scope: bytecode::NameScope::Local,
-                });
-                self.emit(Instruction::LoadAttr {
-                    name: name.clone(),
-                });
+                if self.is_out_symbol(name.as_str()) {
+                    self.compile_expression(function)?;
+                } else {
+                    self.emit(Instruction::LoadName {
+                        name: "self".to_string(),
+                        scope: bytecode::NameScope::Local,
+                    });
+                    self.emit(Instruction::LoadAttr {
+                        name: name.clone(),
+                    });
+                }
             } else {
                 self.compile_expression(function)?;
             }
@@ -2138,9 +2146,9 @@ impl<O: OutputStream> Compiler<O> {
         println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in 0..len {
-            println!("aaaSymboltable {:?},{:?}", i, self.symbol_table_stack[i]);
+            println!("aaaaa {:?},{:?}", i, self.symbol_table_stack[i]);
             for a in self.symbol_table_stack[i].symbols.iter() {
-                println!("Symbol is ,{:?}", a);
+                println!("dddddd  sub Symbol is ,{:?}", a);
             }
         }
         let len: usize = self.symbol_table_stack.len();
@@ -2151,21 +2159,17 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         unreachable!()
-        // if self.ctx.in_lambda {
-        //     let len: usize = self.symbol_table_stack.len();
-        //     for i in (len - 2..len).rev() {
-        //         let symbol = self.symbol_table_stack[i].lookup(name);
-        //         if symbol.is_some() {
-        //             return symbol.unwrap();
-        //         }
-        //     }
-        //     unreachable!();
-        // } else {
-        //     let symbol_table = self.symbol_table_stack.last().unwrap();
-        //     symbol_table.lookup(name).expect(
-        //         "The symbol must be present in the symbol table, even when it is undefined",
-        //     )
-        // }
+    }
+
+    fn is_out_symbol(&self, name: &str) -> bool {
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len - 2).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if symbol.is_some() {
+                return true;
+            }
+        }
+        return false;
     }
     // Low level helper functions:
     fn emit(&mut self, instruction: Instruction) {
