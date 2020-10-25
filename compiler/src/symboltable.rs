@@ -733,9 +733,10 @@ impl SymbolTableBuilder {
                     if name.expr_name().ne("self".clone()) {
                         self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
                     }
-                    println!("需要验证可见性");
+                    //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分
+                    self.fun_call = true;
                 }
-                self.fun_call = true;
+
                 self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                 let args_type = ty.param_type();
 
