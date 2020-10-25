@@ -866,7 +866,7 @@ impl SymbolTableBuilder {
                 self.scan_lambda(self.lambda_name.to_string(), *lambda.clone());
             }
             Number(loc, number) => {}
-
+            // [Set(Loc(1, 12, 36), [Variable(Identifier { loc: Loc(1, 12, 27), name: "age" }), Variable(Identifier { loc: Loc(1, 12, 35), name: "namemmm" })]
             NamedFunctionCall(loc, exp, args) => {
                 let ty = self.get_register_type(exp.as_ref().expr_name());
                 if let CType::Struct(_) = ty {

@@ -61,6 +61,7 @@ VariableDeclaration: VariableDeclaration = {
     <l:@L> "let" <name:Identifier>  <ty: (":" Precedence0)?> <r:@R> => VariableDeclaration {
             loc: Loc(file_no, l, r), ty:ty.map(|x|x.1), name
     },
+
 }
 
 MultiDeclarationPart: MultiDeclarationPart = {
@@ -246,9 +247,13 @@ Precedence2: Expression = {
 }
 
 NamedArgument: NamedArgument = {
-    <l:@L> <name:Identifier> ":" <expr:Expression> <r:@R> => {
-        NamedArgument{ loc: Loc(file_no, l, r), name, expr }
-    }
+    <l:@L> <name:Identifier> <expr: (":" <Expression>)?> <r:@R> => {
+        if expr.is_some() {
+            NamedArgument{ loc: Loc(file_no, l, r), name, expr: expr.unwrap() }
+        } else {
+            NamedArgument{ loc: Loc(file_no, l, r), name: name.clone(), expr: Expression::Variable(name.clone()) }
+        }
+    },
 }
 
 DictEntry: DictEntry = {
@@ -324,7 +329,7 @@ Precedence0: Expression = {
     },
 
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
-   <l:@L> "{" <v:CommaOne<Expression>> "}" <r:@R> => Expression::Set(Loc(file_no, l, r), v),
+ //  <l:@L> "{" <v:CommaOne<Expression>> "}" <r:@R> => Expression::Set(Loc(file_no, l, r), v),
     <LambdaDefinition> => <>
 }
 
@@ -457,6 +462,10 @@ SimpleStatement: Statement = {
     <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)?> <r:@R> => {
         Statement::VariableDefinition(Loc(file_no, l, r), v, e)
     },
+    //Set放在这里就没法嵌套定义，只能在"="的右边推导出一个Set;放在Expression的话，与NameArgument有规约冲突
+    <l:@L>  <v:VariableDeclaration> "="  <ll:@L> "{" <vv:CommaOne<Expression>> "}" <rr:@R> <r:@R> => {
+         Statement::VariableDefinition(Loc(file_no, l, r), v, Some(Expression::Set(Loc(file_no, ll, rr), vv)))
+     },
      <l:@L> "let" <v:MultiVariableDeclaration> "=" <e:Expression> <r:@R> => {
             Statement::MultiVariableDefinition(Loc(file_no, l, r), v, e)
         },
