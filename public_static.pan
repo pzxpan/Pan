@@ -6,7 +6,7 @@ pub struct House {
     pub price: float,
     inner: int,
     fun close(): bool {
-        return 100 >0 ;
+        return inner >10 ;
     }
     pub fun open(): bool {
        return self.close();
@@ -30,7 +30,8 @@ fun main() {
 //   let house2 = House({size:111,price:1_000_000.0,inner:20});
    //私有的，无法通过生成sybmol;
    //house.close();
-   //公开的，可生成;
+    // house.inner = 100;
+  // print(house.inner);
    print(house.open_out());
    print(house.open());
   // let ddd = House::astatic();

@@ -254,6 +254,7 @@ struct SymbolTableBuilder {
     // Scope stack.
     tables: Vec<SymbolTable>,
     lambda_name: String,
+    fun_call: bool,
 }
 
 /// Enum to indicate in what mode an expression
@@ -703,7 +704,21 @@ impl SymbolTableBuilder {
                 self.scan_expression(a, context)?;
                 // self.scan_expression(b, context)?;
             }
+
+            // Expression(Loc(1, 30, 681),
+            // Assign(Loc(1, 30, 29),
+            // Attribute(Loc(1, 30, 27),
+            //           Variable(Identifier { loc: Loc(1, 30, 21), name: "house" }),
+            //           Some(Identifier { loc: Loc(1, 30, 27), name: "inner" }), None)
             Attribute(loc, obj, name, idx) => {
+                if self.fun_call {
+                    self.fun_call = false;
+                } else {
+                    if name.is_some() && obj.expr_name().ne("self".clone()) {
+                        let ty = self.get_register_type(obj.expr_name());
+                        self.verify_field_visible(ty.borrow(), obj.expr_name(), name.as_ref().unwrap().clone().name)?
+                    }
+                }
                 self.scan_expression(obj, context)?;
             }
             //
@@ -716,11 +731,12 @@ impl SymbolTableBuilder {
                 let ty = self.get_register_type(name.expr_name());
                 if let Attribute(_, name, Some(ident), _) = name.as_ref() {
                     if name.expr_name().ne("self".clone()) {
-                        self.verify_visible(&ty, name.expr_name(), ident.name.clone())?;
+                        self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
                     }
                     println!("需要验证可见性");
                 }
-                self.scan_expression(name, &ExpressionContext::Load)?;
+                self.fun_call = true;
+                self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                 let args_type = ty.param_type();
 
                 for (i, arg) in args_type.iter().enumerate() {
@@ -887,7 +903,7 @@ impl SymbolTableBuilder {
         // }
         Ok(())
     }
-    pub fn verify_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+    pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
         match ty {
             CType::Struct(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {
@@ -906,6 +922,31 @@ impl SymbolTableBuilder {
                 }
                 return Err(SymbolTableError {
                     error: format!("{} 中找不到{}函数", name, method),
+                    location: Loc(0, 0, 0),
+                });
+            }
+            _ => unreachable!()
+        }
+        Ok(())
+    }
+
+    pub fn verify_field_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+        match ty {
+            CType::Struct(ty) => {
+                for (method_name, _, is_pub) in ty.fields.iter() {
+                    if method_name.eq(&method) {
+                        if *is_pub {
+                            return Ok(());
+                        } else {
+                            return Err(SymbolTableError {
+                                error: format!("{} 中的{}字段的可见性是私有的", name, method),
+                                location: Loc(0, 0, 0),
+                            });
+                        }
+                    }
+                }
+                return Err(SymbolTableError {
+                    error: format!("{} 中找不到{}属性", name, method),
                     location: Loc(0, 0, 0),
                 });
             }

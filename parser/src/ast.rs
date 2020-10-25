@@ -813,7 +813,7 @@ impl HasType for StructDefinition {
                     methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type()));
                 }
                 StructPart::StructVariableDefinition(v) => {
-                    fields.push((v.name.name.clone(), v.ty.get_type(), v.initializer.is_some()))
+                    fields.push((v.name.name.clone(), v.ty.get_type(), v.is_pub))
                 }
                 _ => {}
             }
