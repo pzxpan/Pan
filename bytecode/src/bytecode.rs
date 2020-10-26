@@ -268,7 +268,12 @@ pub enum Constant {
     U64 { value: u64 },
     U128 { value: u128 },
     USize { value: usize },
-
+    // Enum(EnumType { name: "Color", type_args: [],
+    // variants: [("Red", Reference("Red", [Int])),
+    // ("Green", Reference("Green", [Float])),
+    // ("Blue", Reference("Blue", [Int, Int, Int])),
+    // ("Black", Reference("Black", [])),
+    // ("White", Reference("White", []))],
     Integer { value: BigInt },
     Float { value: f64 },
     Complex { value: Complex64 },

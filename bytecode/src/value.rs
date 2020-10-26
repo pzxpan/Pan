@@ -6,10 +6,11 @@ use std::collections::HashSet;
 use std::cell::RefCell;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use serde::ser::Serializer;
 // use crate::native_fns::NativeFn;
 use crate::bytecode::CodeObject;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FnValue {
     pub name: String,
     pub code: CodeObject,
@@ -18,7 +19,7 @@ pub struct FnValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ClosureValue {
     pub name: String,
     pub code: Vec<u8>,
@@ -80,14 +81,14 @@ pub struct EnumValue {
     pub static_fields: Vec<(String, CodeObject)>,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct EnumVariantValue {
     pub enum_name: String,
     pub name: String,
     pub idx: usize,
     pub methods: Vec<CodeObject>,
     pub arity: usize,
-    pub values: Option<Vec<Value>>,
+    // pub values: Option<Vec<Value>>,
 }
 
 impl Value {
