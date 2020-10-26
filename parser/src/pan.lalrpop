@@ -109,10 +109,20 @@ Generics: Vec<Generic> = {
 }
 
 Generic: Generic = {
-    <l:@L> <name:Identifier> <args:("(" <Comma<Expression>> ")")?> <r:@R> => Generic {
-        loc: Loc(file_no, l, r),
-        name,
-        args
+    <l:@L> <name:Identifier> <args: (":" <Identifier>)?> <r:@R> => {
+        if args.is_some() {
+            Generic {
+                loc: Loc(file_no, l, r),
+                name,
+                args:Some(Expression::Variable(args.unwrap()))
+            }
+        } else {
+             Generic {
+                loc: Loc(file_no, l, r),
+                name,
+                args:None
+             }
+       }
     }
 }
 

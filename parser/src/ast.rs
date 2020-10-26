@@ -178,7 +178,7 @@ impl fmt::Display for StructTy {
 pub struct Generic {
     pub loc: Loc,
     pub name: Identifier,
-    pub args: Option<Vec<Expression>>,
+    pub args: Option<Expression>,
 }
 
 #[derive(Debug, PartialEq)]
