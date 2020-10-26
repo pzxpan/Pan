@@ -947,7 +947,7 @@ impl<O: OutputStream> Compiler<O> {
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::StructEnum(ty)
+            value: bytecode::Constant::Struct(ty)
         });
         // self.emit(Instruction::LoadConst {
         //     value: bytecode::Constant::String {
@@ -1051,7 +1051,7 @@ impl<O: OutputStream> Compiler<O> {
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::StructEnum(ty)
+            value: bytecode::Constant::Struct(ty)
         });
 
         self.store_name(name);

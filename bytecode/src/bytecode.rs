@@ -245,6 +245,7 @@ pub enum Instruction {
 }
 
 use self::Instruction::*;
+use std::cmp::Ordering;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CallType {
@@ -276,9 +277,16 @@ pub enum Constant {
     Bytes { value: Vec<u8> },
     Code { code: Box<CodeObject> },
     Tuple { elements: Vec<Constant> },
-    StructEnum(TypeValue),
+    Struct(TypeValue),
+    Enum(EnumValue),
     None,
     Ellipsis,
+}
+
+impl PartialOrd for CodeObject {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.obj_name.partial_cmp(&other.obj_name)
+    }
 }
 
 
@@ -556,7 +564,8 @@ impl fmt::Display for Constant {
             ),
             Constant::None => write!(f, "None"),
             Constant::Ellipsis => write!(f, "Ellipsis"),
-            Constant::StructEnum(ty) => write!(f, "Struct{:?}", ty)
+            Constant::Struct(ty) => write!(f, "Struct{:?}", ty),
+            Constant::Enum(ty) => write!(f, "Enum{:?}", ty),
         }
     }
 }

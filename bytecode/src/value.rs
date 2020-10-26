@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 // use crate::native_fns::NativeFn;
 use crate::bytecode::CodeObject;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct FnValue {
     pub name: String,
     pub code: CodeObject,
@@ -18,7 +18,7 @@ pub struct FnValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct ClosureValue {
     pub name: String,
     pub code: Vec<u8>,
@@ -34,7 +34,7 @@ pub struct ClosureValue {
 //     pub static_fields: Vec<(String, FnValue)>,
 // }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
     I8(i8),
     I16(i16),
@@ -61,15 +61,33 @@ pub enum Value {
     Closure(ClosureValue),
     // NativeFn(NativeFn),
     Type(TypeValue),
+    Enum(EnumValue),
     Code(CodeObject),
     Nil,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TypeValue {
     pub name: String,
     pub methods: Vec<(String, CodeObject)>,
     pub static_fields: Vec<(String, CodeObject)>,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct EnumValue {
+    pub name: String,
+    pub methods: Vec<(String, CodeObject)>,
+    pub static_fields: Vec<(String, CodeObject)>,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct EnumVariantValue {
+    pub enum_name: String,
+    pub name: String,
+    pub idx: usize,
+    pub methods: Vec<CodeObject>,
+    pub arity: usize,
+    pub values: Option<Vec<Value>>,
 }
 
 impl Value {
@@ -171,6 +189,7 @@ impl Value {
             Value::Type(TypeValue { name, .. }) => format!("<type {}>", name),
             Value::Nil => format!("None"),
             Value::Code(code) => format!("<code {}>", code),
+            Value::Enum(EnumValue { name, .. }) => format!("<enum {}>", name),
         }
     }
 
@@ -231,6 +250,7 @@ impl Display for Value {
             Value::Type(TypeValue { name, .. }) => write!(f, "<type {}>", name),
             Value::Nil => write!(f, "None"),
             Value::Code(code) => write!(f, "<code {}>", code),
+            Value::Enum(EnumValue { name, .. }) => write!(f, "<enum {}>", name),
         }
     }
 }
@@ -273,27 +293,27 @@ impl Obj {
     }
 }
 
-// impl PartialOrd for Obj {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         match (self, other) {
-//             (Obj::StringObj(v1), Obj::StringObj(v2)) => Some(v1.cmp(v2)),
-//             (Obj::ArrayObj(v1), Obj::ArrayObj(v2)) => {
-//                 if v1.len() < v2.len() {
-//                     Some(Ordering::Less)
-//                 } else if v1.len() > v2.len() {
-//                     Some(Ordering::Greater)
-//                 } else {
-//                     for (i1, i2) in v1.iter().zip(v2.iter()) {
-//                         if let Some(o) = i1.partial_cmp(&i2) {
-//                             if o != Ordering::Equal {
-//                                 return Some(o);
-//                             }
-//                         }
-//                     }
-//                     Some(Ordering::Equal)
-//                 }
-//             }
-//             (_, _) => None
-//         }
-//     }
-// }
+impl PartialOrd for Obj {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Obj::StringObj(v1), Obj::StringObj(v2)) => Some(v1.cmp(v2)),
+            (Obj::ArrayObj(v1), Obj::ArrayObj(v2)) => {
+                if v1.len() < v2.len() {
+                    Some(Ordering::Less)
+                } else if v1.len() > v2.len() {
+                    Some(Ordering::Greater)
+                } else {
+                    for (i1, i2) in v1.iter().zip(v2.iter()) {
+                        if let Some(o) = i1.partial_cmp(&i2) {
+                            if o != Ordering::Equal {
+                                return Some(o);
+                            }
+                        }
+                    }
+                    Some(Ordering::Equal)
+                }
+            }
+            (_, _) => None
+        }
+    }
+}
