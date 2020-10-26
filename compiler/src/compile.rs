@@ -187,20 +187,12 @@ impl<O: OutputStream> Compiler<O> {
                     //resolve_contract(&def, file_no, &mut delay, ns);
                 }
                 ast::SourceUnitPart::EnumDefinition(def) => {
-                    // let _ = enum_decl(&def, file_no, None, ns);
+                    let name = &def.name.name;
+                    let body = &def.parts;
+                    let generics = &def.generics;
+                    self.compile_enum_def(name.as_str(), &body, &generics);
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
-                    // self.enter_scope(name, SymbolTableType::Class, statement.location.row());
-                    // self.register_name("__module__", SymbolUsage::Assigned)?;
-                    // self.register_name("__qualname__", SymbolUsage::Assigned)?;
-                    // self.scan_statements(body)?;
-                    // self.leave_scope();
-                    // self.scan_expressions(bases, &ExpressionContext::Load)?;
-                    // for keyword in keywords {
-                    //     self.scan_expression(&keyword.value, &ExpressionContext::Load)?;
-                    // }
-                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    // self.register_name(name, SymbolUsage::Assigned)?;
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
@@ -917,20 +909,7 @@ impl<O: OutputStream> Compiler<O> {
             name: "self".to_owned(),
             scope: bytecode::NameScope::Local,
         });
-        let mut fields = vec![];
-        for part in body {
-            match part {
-                ast::StructPart::StructVariableDefinition(v) => {
-                    fields.push(Parameter { name: Some(v.name.clone()), loc: v.loc, ty: v.ty.clone(), is_mut: true, is_ref: false });
-                }
-                _ => {}
-            }
-        }
-        //  Compiling Block(Loc(1, 5, 5), [Return(Loc(1, 6, 139), Some(More(Loc(1, 6, 20), Variable(Identifier { loc: Loc(1, 6, 18), name: "age" }), NumberLiteral(Loc(1, 137, 139), BigInt { sign: Plus, data: BigUint { data: [40] } }))))])
-        // let returns = &def.returns;
-        // let is_async = false;
-        // self.compile_function_def(name, fields.as_slice(), None, returns, is_async, false);
-        //let name = qualified_name;
+
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
         for part in body {
@@ -967,7 +946,7 @@ impl<O: OutputStream> Compiler<O> {
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Struct(ty)
+            value: bytecode::Constant::StructEnum(ty)
         });
         // self.emit(Instruction::LoadConst {
         //     value: bytecode::Constant::String {
@@ -978,6 +957,101 @@ impl<O: OutputStream> Compiler<O> {
         // Turn code object into function object:
         //  self.emit(Instruction::BuildTypeValue { size });
 
+
+        self.store_name(name);
+        self.current_qualified_path = old_qualified_path;
+        self.ctx = prev_ctx;
+        Ok(())
+    }
+
+    fn compile_enum_def(
+        &mut self,
+        name: &str,
+        body: &[ast::EnumPart],
+        generics: &[ast::Generic],
+    ) -> Result<(), CompileError> {
+        let prev_ctx = self.ctx;
+        self.ctx = CompileContext {
+            func: FunctionContext::NoFunction,
+            in_loop: false,
+            in_lambda: false,
+        };
+
+        let qualified_name = self.create_qualified_name(name, "");
+        let old_qualified_path = self.current_qualified_path.take();
+        self.current_qualified_path = Some(qualified_name.clone());
+
+        self.emit(Instruction::LoadBuildEnum);
+        let line_number = self.get_source_line_number();
+        self.push_output(CodeObject::new(
+            Default::default(),
+            vec![],
+            Varargs::None,
+            "".to_string(),
+            line_number,
+            name.to_owned(),
+        ));
+        self.enter_scope();
+
+
+        self.emit(Instruction::LoadName {
+            name: "__name__".to_owned(),
+            scope: bytecode::NameScope::Global,
+        });
+        self.emit(Instruction::StoreName {
+            name: "__module__".to_owned(),
+            scope: bytecode::NameScope::Free,
+        });
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::String {
+                value: qualified_name.clone(),
+            },
+        });
+        self.emit(Instruction::StoreName {
+            name: "__qualname__".to_owned(),
+            scope: bytecode::NameScope::Free,
+        });
+        self.emit(Instruction::StoreName {
+            name: "self".to_owned(),
+            scope: bytecode::NameScope::Local,
+        });
+
+        let mut methods: Vec<(String, CodeObject)> = Vec::new();
+        let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
+        for part in body {
+            match part {
+                ast::EnumPart::FunctionDefinition(def) => {
+                    let name = &def.name.as_ref().unwrap().name;
+                    let mut args = vec![];
+                    for para in def.params.iter() {
+                        let p = para.1.as_ref().unwrap().to_owned();
+                        args.push(p.clone());
+                    }
+                    // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
+                    let body = &def.body.as_ref().unwrap();
+                    // let decorator_list = vec![];
+                    let returns = &def.returns;
+                    let is_async = false;
+                    if *&def.is_static {
+                        self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                    } else {
+                        self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                    }
+                }
+                _ => {}
+            }
+        }
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::None,
+        });
+        self.emit(Instruction::ReturnValue);
+        let mut code = self.pop_code_object();
+        code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
+        self.leave_scope();
+        let ty = TypeValue { name: qualified_name, methods, static_fields };
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::StructEnum(ty)
+        });
 
         self.store_name(name);
         self.current_qualified_path = old_qualified_path;

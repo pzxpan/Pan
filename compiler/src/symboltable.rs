@@ -104,7 +104,6 @@ pub enum SymbolScope {
 #[derive(Debug, Clone)]
 pub struct Symbol {
     pub name: String,
-    // pub table: SymbolTableRef,
     pub scope: SymbolScope,
     pub is_param: bool,
     pub is_referenced: bool,
@@ -202,10 +201,6 @@ impl<'a> SymbolTableAnalyzer<'a> {
     fn analyze_symbol_table(&mut self, symbol_table: &'a mut SymbolTable) -> SymbolTableResult {
         let symbols = &mut symbol_table.symbols;
         let sub_tables = &mut symbol_table.sub_tables;
-
-        // println!("analyze_symbol  symbols is {:?}",symbols);
-        // println!("analyze_symbol  sub_tables is {:?}",sub_tables);
-
         self.tables.push((symbols, symbol_table.typ));
         // Analyze sub scopes:
         for sub_table in sub_tables {
@@ -299,14 +294,36 @@ impl SymbolTableBuilder {
                 }
                 ast::SourceUnitPart::EnumDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Enum, def.loc.1);
-                 //   self.scan_expressions(&def.values, &ExpressionContext::Load);
+                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Used)?;
+                    for part in &def.parts {
+                        match part {
+                            ast::EnumPart::FunctionDefinition(def) => {
+                                if let Some(name) = &def.name {
+                                    let tt = def.get_type(&self.tables);
+                                    self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
+                                    if let Some(expression) = &def.as_ref().returns {
+                                        self.scan_expression(expression, &ExpressionContext::Load)?;
+                                    }
+                                    self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+                                    self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                                    self.leave_scope();
+                                }
+                            }
+                            ast::EnumPart::EnumVariableDefinition(def) => {
+                                let mut ref_type: Vec<CType> = Vec::new();
+                                if let Some(tys) = &def.tys {
+                                    tys.iter().map(|s| ref_type.push(s.get_type(&self.tables)));
+                                }
+                                self.register_name(&def.name.name, CType::Reference(def.name.name.clone(), ref_type), SymbolUsage::Assigned);
+                            }
+                            _ => {}
+                        }
+                    }
                     self.leave_scope();
-                    //self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
+                    self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
-                    self.register_name(&"__module__".to_string(), CType::Str, SymbolUsage::Assigned)?;
-                    self.register_name(&"__qualname__".to_string(), CType::Str, SymbolUsage::Assigned)?;
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Used)?;
                     for part in &def.parts {
                         match part {
@@ -390,10 +407,10 @@ impl SymbolTableBuilder {
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
-                  //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
+                    //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::EnumDefinition(def) => {
-                   // self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
+                    self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
                     self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
@@ -717,7 +734,9 @@ impl SymbolTableBuilder {
                 let ty = self.get_register_type(name.expr_name());
                 if let Attribute(_, name, Some(ident), _) = name.as_ref() {
                     if name.expr_name().ne("self".clone()) {
-                        self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
+                        if !self.is_enum_variant(&ty, name.expr_name(), ident.name.clone()) {
+                            self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
+                        }
                     }
                     //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分
                     self.fun_call = true;
@@ -933,10 +952,32 @@ impl SymbolTableBuilder {
                     location: Loc(0, 0, 0),
                 });
             }
+            CType::Enum(ty) => {
+                for (method_name, ftype) in ty.methods.iter() {
+                    if method_name.eq(&method) {
+                        if let CType::Fn(fntype) = ftype {
+                            if fntype.is_pub || fntype.is_static {
+                                return Ok(());
+                            } else {
+                                return Err(SymbolTableError {
+                                    error: format!("{} 中的{}函数的可见性是私有的", name, method),
+                                    location: Loc(0, 0, 0),
+                                });
+                            }
+                        }
+                    }
+                }
+                return Err(SymbolTableError {
+                    error: format!("{} 中找不到{}函数", name, method),
+                    location: Loc(0, 0, 0),
+                });
+            }
+
             _ => unreachable!()
         }
         Ok(())
     }
+
 
     pub fn verify_field_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
         match ty {
@@ -951,6 +992,17 @@ impl SymbolTableBuilder {
                                 location: Loc(0, 0, 0),
                             });
                         }
+                    }
+                }
+                return Err(SymbolTableError {
+                    error: format!("{} 中找不到{}属性", name, method),
+                    location: Loc(0, 0, 0),
+                });
+            }
+            CType::Enum(ty) => {
+                for (method_name, _) in ty.variants.iter() {
+                    if method_name.eq(&method) {
+                        return Ok(());
                     }
                 }
                 return Err(SymbolTableError {
@@ -979,6 +1031,17 @@ impl SymbolTableBuilder {
             _ => unreachable!()
         }
         Ok(())
+    }
+
+    pub fn is_enum_variant(&self, ty: &CType, name: String, variant: String) -> bool {
+        if let CType::Enum(cty) = ty {
+            for (field_name, _, ) in cty.variants.iter() {
+                if variant.eq(field_name) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
     // fn scan_string_group(&mut self, group: &ast::StringGroup) -> SymbolTableResult {
     //     match group {

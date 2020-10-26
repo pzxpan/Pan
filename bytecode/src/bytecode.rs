@@ -219,6 +219,7 @@ pub enum Instruction {
     },
     PrintExpr,
     LoadBuildClass,
+    LoadBuildEnum,
     BuildTypeValue { size: usize },
     UnpackSequence {
         size: usize,
@@ -274,7 +275,7 @@ pub enum Constant {
     Bytes { value: Vec<u8> },
     Code { code: Box<CodeObject> },
     Tuple { elements: Vec<Constant> },
-    Struct(TypeValue),
+    StructEnum(TypeValue),
     None,
     Ellipsis,
 }
@@ -514,6 +515,7 @@ impl Instruction {
             MapAdd { i } => w!(MapAdd, i),
             PrintExpr => w!(PrintExpr),
             LoadBuildClass => w!(LoadBuildClass),
+            LoadBuildEnum => w!(LoadBuildEnum),
             UnpackSequence { size } => w!(UnpackSequence, size),
             UnpackEx { before, after } => w!(UnpackEx, before, after),
             Reverse { amount } => w!(Reverse, amount),
@@ -559,7 +561,7 @@ impl fmt::Display for Constant {
             ),
             Constant::None => write!(f, "None"),
             Constant::Ellipsis => write!(f, "Ellipsis"),
-            Constant::Struct(ty) => write!(f, "Struct{:?}", ty)
+            Constant::StructEnum(ty) => write!(f, "Struct{:?}", ty)
         }
     }
 }

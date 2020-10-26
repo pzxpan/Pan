@@ -566,7 +566,7 @@ impl VirtualMachine {
             }
             None => Value::Nil,
             Ellipsis => Value::Nil,
-            Struct(ref ty) => Value::Type(ty.clone())
+            StructEnum(ref ty) => Value::Type(ty.clone())
         }
     }
 }

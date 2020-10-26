@@ -1177,17 +1177,6 @@ impl Frame {
     fn load_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let parent = self.last_value();
         let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
-        // if let Value::Obj(mut e) = obj {
-        //     match &*e.borrow_mut() {
-        //         Obj::InstanceObj(InstanceObj { typ, field_map }) => {
-        //             let map = field_map.hash_map_value();
-        //             for (k, v) in map.iter() {
-        //                 self.scope.store_name(k.to_string(), v.clone());
-        //             }
-        //         }
-        //         _ => unreachable!()
-        //     }
-        // }
         //true 是struct方法， false 为属性
         if !obj.0 {
             self.pop_value();
