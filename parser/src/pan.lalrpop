@@ -109,18 +109,18 @@ Generics: Vec<Generic> = {
 }
 
 Generic: Generic = {
-    <l:@L> <name:Identifier> <args: (":" <Identifier>)?> <r:@R> => {
-        if args.is_some() {
+    <l:@L> <name:Identifier> <bounds: (":" <Identifier>)?> <r:@R> => {
+        if bounds.is_some() {
             Generic {
                 loc: Loc(file_no, l, r),
                 name,
-                args:Some(Expression::Variable(args.unwrap()))
+                bounds:Some(bounds.unwrap())
             }
         } else {
              Generic {
                 loc: Loc(file_no, l, r),
                 name,
-                args:None
+                bounds:None
              }
        }
     }
@@ -136,7 +136,7 @@ StructDefinition: Box<StructDefinition> = {
 
 EnumDefinition: Box<EnumDefinition> = {
     <doc:DocComments> <l:@L> <is_pub:"pub"?> "enum" <name:Identifier> <generics:Generics> "{" <parts:(<EnumPart>)*> "}" <r:@R> => {
-         let is_pub = is_pub.is_some();
+        let is_pub = is_pub.is_some();
         Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, generics,parts,is_pub})
     }
 }
@@ -151,9 +151,9 @@ StructVariableDefinition: Box<StructVariableDefinition> = {
 }
 
 EnumVariableDefinition: Box<EnumVariableDefinition> = {
-    <doc:DocComments> <l:@L>  <name:Identifier> "(" <ty:Precedence0> ")" <r:@R> "," => {
-        Box::new(EnumVariableDefinition {
-            doc, loc: Loc(file_no, l, r), ty, name
+    <doc:DocComments> <l:@L>  <name:Identifier> <tys : ("(" <Comma<Expression>>  ")" )?> <r:@R> ","? => {
+     Box::new(EnumVariableDefinition {
+         doc, loc: Loc(file_no, l, r), tys, name
         })
     },
 }

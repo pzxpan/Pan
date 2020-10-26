@@ -178,7 +178,7 @@ impl fmt::Display for StructTy {
 pub struct Generic {
     pub loc: Loc,
     pub name: Identifier,
-    pub args: Option<Expression>,
+    pub bounds: Option<Identifier>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -198,7 +198,7 @@ pub struct EnumDefinition {
     pub loc: Loc,
     pub name: Identifier,
     pub generics: Vec<Generic>,
-    pub parts:Vec<EnumPart>,
+    pub parts: Vec<EnumPart>,
     pub is_pub: bool,
 }
 
@@ -222,7 +222,7 @@ pub struct StructVariableDefinition {
 pub struct EnumVariableDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
-    pub ty: Expression,
+    pub tys: Option<Vec<Expression>>,
     pub name: Identifier,
 }
 
