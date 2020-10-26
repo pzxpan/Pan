@@ -147,7 +147,6 @@ pub struct DataDefinition {
 #[derive(Debug, PartialEq)]
 pub enum StructPart {
     ConstDefinition(Box<ConstVariableDefinition>),
-    EnumDefinition(Box<EnumDefinition>),
     StructVariableDefinition(Box<StructVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
 }
@@ -192,7 +191,8 @@ pub struct EnumDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
     pub name: Identifier,
-    pub values: Expression,
+    pub values: Vec<Expression>,
+    pub is_pub: bool,
 }
 
 #[derive(Debug, PartialEq)]

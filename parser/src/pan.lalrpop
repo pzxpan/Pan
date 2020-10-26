@@ -95,7 +95,6 @@ StructTy: StructTy = {
 }
 
 StructPart: StructPart = {
-    EnumDefinition => StructPart::EnumDefinition(<>),
     StructVariableDefinition => StructPart::StructVariableDefinition(<>),
     FunctionDefinition => StructPart::FunctionDefinition(<>),
 }
@@ -122,8 +121,9 @@ StructDefinition: Box<StructDefinition> = {
 }
 
 EnumDefinition: Box<EnumDefinition> = {
-    <doc:DocComments> <l:@L> "enum" <name:Identifier> "{" <values:Expression> "}" <r:@R> => {
-        Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, values})
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "enum" <name:Identifier> "{" <values:Comma<Expression>> "}" <r:@R> => {
+         let is_pub = is_pub.is_some();
+        Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, values,is_pub})
     }
 }
 
@@ -502,6 +502,18 @@ CommaOne<T>: Vec<T> = {
         v.insert(0, e);
         v
     }
+};
+CommaOmit<T>: Vec<T> = {
+    => Vec::new(),
+    CommaOmitInner<T> => <>,
+};
+
+CommaOmitInner<T>: Vec<T> = {
+   <e:T> <v:(","* <T>)*>  => {
+    let mut v = v;
+    v.insert(0, e);
+    v
+  }
 };
 
 CommaTwo<T>: Vec<T> = {

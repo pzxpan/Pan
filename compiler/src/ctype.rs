@@ -62,6 +62,7 @@ pub struct StructType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EnumType {
     pub name: String,
+    pub type_args: Vec<(String, CType)>,
     pub variants: Vec<(/* name: */ String, /* type: */ CType)>,
     pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
     pub methods: Vec<(String, CType)>,

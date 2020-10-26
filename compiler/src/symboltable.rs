@@ -24,7 +24,7 @@ use crate::variable_type::*;
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
-    builder.scan_symbol_types(program)?;
+    builder.scan_top_symbol_types(program)?;
     builder.scan_program(program)?;
     builder.finish()
 }
@@ -75,6 +75,7 @@ pub enum SymbolTableType {
     Module,
     Class,
     Function,
+    Enum,
 }
 
 impl fmt::Display for SymbolTableType {
@@ -83,6 +84,7 @@ impl fmt::Display for SymbolTableType {
             SymbolTableType::Module => write!(f, "module"),
             SymbolTableType::Class => write!(f, "class"),
             SymbolTableType::Function => write!(f, "function"),
+            SymbolTableType::Enum => write!(f, "function"),
         }
     }
 }
@@ -296,7 +298,10 @@ impl SymbolTableBuilder {
                     //resolve_contract(&def, file_no, &mut delay, ns);
                 }
                 ast::SourceUnitPart::EnumDefinition(def) => {
-                    // let _ = enum_decl(&def, file_no, None, ns);
+                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Enum, def.loc.1);
+                    self.scan_expressions(&def.values, &ExpressionContext::Load);
+                    self.leave_scope();
+                    //self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
@@ -362,7 +367,8 @@ impl SymbolTableBuilder {
         self.leave_scope();
         Ok(())
     }
-    fn scan_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
+    //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
+    fn scan_top_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
         self.register_name(&"int".to_string(), CType::Int, SymbolUsage::Used)?;
         self.register_name(&"float".to_string(), CType::Float, SymbolUsage::Used)?;
         self.register_name(&"string".to_string(), CType::Str, SymbolUsage::Used)?;
@@ -384,38 +390,13 @@ impl SymbolTableBuilder {
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
-                    //resolve_contract(&def, file_no, &mut delay, ns);
+                  //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::EnumDefinition(def) => {
-                    // let _ = enum_decl(&def, file_no, None, ns);
+                   // self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
-                    // self.enter_scope(name, SymbolTableType::Class, statement.location.row());
-                    // self.register_name("__module__", SymbolUsage::Assigned)?;
-                    // self.register_name("__qualname__", SymbolUsage::Assigned)?;
-                    // self.scan_statements(body)?;
-                    // self.leave_scope();
-                    // self.scan_expressions(bases, &ExpressionContext::Load)?;
-                    // for keyword in keywords {
-                    //     self.scan_expression(&keyword.value, &ExpressionContext::Load)?;
-                    // }
-                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    // self.register_name(name, SymbolUsage::Assigned)?;
-                    let tt = def.get_type(&self.tables);
-                    self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
-                    // for part in &def.parts {
-                    //     match part {
-                    //         ast::StructPart::FunctionDefinition(def) => {
-                    //             let tt = def.get_type();
-                    //             self.register_name(&def.name.as_ref().unwrap().name, tt, SymbolUsage::Assigned)?;
-                    //         }
-                    //         ast::StructPart::StructVariableDefinition(def) => {
-                    //             let tt = def.ty.get_type();
-                    //             self.register_name(&def.name.name, tt, SymbolUsage::Assigned)?;
-                    //         }
-                    //         _ => {}
-                    //     }
-                    // }
+                    self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {}
                 ast::SourceUnitPart::ConstDefinition(def) => {}

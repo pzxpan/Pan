@@ -70,6 +70,32 @@ impl HasType for StructDefinition {
     }
 }
 
+impl HasType for EnumDefinition {
+    fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
+        let mut type_args = Vec::new();
+        // for ty in &self.generics {
+        //     //TODO
+        //     type_args.push((ty.name.name.clone(), CType::Any))
+        // }
+        let mut fields: Vec<(String, CType, bool)> = Vec::new();
+        let mut methods: Vec<(String, CType)> = Vec::new();
+        // for field in &self.parts {
+        //     match field {
+        //         StructPart::FunctionDefinition(f) => {
+        //             methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(tables)));
+        //         }
+        //         StructPart::StructVariableDefinition(v) => {
+        //             fields.push((v.name.name.clone(), v.ty.get_type(tables), v.is_pub))
+        //         }
+        //         _ => {}
+        //     }
+        // }
+
+        let name = self.name.name.clone();
+        CType::Struct(StructType { name, type_args, fields, static_fields: vec![], is_pub: self.is_pub, methods })
+    }
+}
+
 impl HasType for Expression {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match self {
