@@ -299,7 +299,7 @@ impl SymbolTableBuilder {
                 }
                 ast::SourceUnitPart::EnumDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Enum, def.loc.1);
-                    self.scan_expressions(&def.values, &ExpressionContext::Load);
+                 //   self.scan_expressions(&def.values, &ExpressionContext::Load);
                     self.leave_scope();
                     //self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }

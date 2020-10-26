@@ -151,6 +151,12 @@ pub enum StructPart {
     FunctionDefinition(Box<FunctionDefinition>),
 }
 
+#[derive(Debug, PartialEq)]
+pub enum EnumPart {
+    EnumVariableDefinition(Box<EnumVariableDefinition>),
+    FunctionDefinition(Box<FunctionDefinition>),
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructTy {
     Struct(Loc),
@@ -191,7 +197,8 @@ pub struct EnumDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
     pub name: Identifier,
-    pub values: Vec<Expression>,
+    pub generics: Vec<Generic>,
+    pub parts:Vec<EnumPart>,
     pub is_pub: bool,
 }
 
@@ -209,6 +216,14 @@ pub struct StructVariableDefinition {
     pub is_pub: bool,
     pub name: Identifier,
     pub initializer: Option<Expression>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct EnumVariableDefinition {
+    pub doc: Vec<DocComment>,
+    pub loc: Loc,
+    pub ty: Expression,
+    pub name: Identifier,
 }
 
 #[derive(Debug, PartialEq)]

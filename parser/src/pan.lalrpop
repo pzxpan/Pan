@@ -98,6 +98,10 @@ StructPart: StructPart = {
     StructVariableDefinition => StructPart::StructVariableDefinition(<>),
     FunctionDefinition => StructPart::FunctionDefinition(<>),
 }
+EnumPart: EnumPart = {
+    EnumVariableDefinition => EnumPart::EnumVariableDefinition(<>),
+    FunctionDefinition => EnumPart::FunctionDefinition(<>),
+}
 
 Generics: Vec<Generic> = {
     => Vec::new(),
@@ -121,9 +125,9 @@ StructDefinition: Box<StructDefinition> = {
 }
 
 EnumDefinition: Box<EnumDefinition> = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?> "enum" <name:Identifier> "{" <values:Comma<Expression>> "}" <r:@R> => {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "enum" <name:Identifier> <generics:Generics> "{" <parts:(<EnumPart>)*> "}" <r:@R> => {
          let is_pub = is_pub.is_some();
-        Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, values,is_pub})
+        Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, generics,parts,is_pub})
     }
 }
 
@@ -132,6 +136,14 @@ StructVariableDefinition: Box<StructVariableDefinition> = {
         let is_pub = is_pub.is_some();
         Box::new(StructVariableDefinition {
             doc, loc: Loc(file_no, l, r), ty, is_pub, name, initializer: e,
+        })
+    },
+}
+
+EnumVariableDefinition: Box<EnumVariableDefinition> = {
+    <doc:DocComments> <l:@L>  <name:Identifier> "(" <ty:Precedence0> ")" <r:@R> "," => {
+        Box::new(EnumVariableDefinition {
+            doc, loc: Loc(file_no, l, r), ty, name
         })
     },
 }
