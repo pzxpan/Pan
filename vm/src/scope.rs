@@ -3,7 +3,7 @@ use pan_bytecode::bytecode::CodeObject;
 
 use crate::vm::VirtualMachine;
 use std::collections::{hash_map::DefaultHasher, HashMap};
-use crate::value::Value;
+use pan_bytecode::value::Value;
 use crate::frame::FrameResult;
 use std::cell::{RefCell, Ref};
 use std::borrow::BorrowMut;

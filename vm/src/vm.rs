@@ -22,8 +22,8 @@ use rustpython_compiler::{compile, error::CompileError};
 use pan_bytecode::bytecode;
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::{Scope, NameProtocol};
-use pan_bytecode::bytecode::{CodeObject, TypeValue};
-use crate::value::{Value, Obj, InstanceObj};
+use pan_bytecode::bytecode::*;
+use pan_bytecode::value::*;
 use std::ops::Add;
 
 // use objects::objects;

@@ -6,6 +6,7 @@ use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use crate::value::*;
 
 /// 源代码代码位置
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -280,12 +281,6 @@ pub enum Constant {
     Ellipsis,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TypeValue {
-    pub name: String,
-    pub methods: Vec<(String, CodeObject)>,
-    pub static_fields: Vec<(String, CodeObject)>,
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ComparisonOperator {

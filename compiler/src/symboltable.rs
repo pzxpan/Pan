@@ -15,7 +15,6 @@ use std::fmt;
 use std::borrow::Borrow;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
-use pan_bytecode::bytecode::TypeValue;
 use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;

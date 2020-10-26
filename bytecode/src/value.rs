@@ -1,4 +1,3 @@
-use crate::vm;
 // use crate::vm::compiler::Upvalue;
 use std::fmt::{Display, Formatter, Error};
 use std::cmp::Ordering;
@@ -6,9 +5,9 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::cell::RefCell;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 // use crate::native_fns::NativeFn;
-use pan_bytecode::bytecode::CodeObject;
-use pan_bytecode::bytecode::TypeValue;
+use crate::bytecode::CodeObject;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FnValue {
@@ -64,6 +63,13 @@ pub enum Value {
     Type(TypeValue),
     Code(CodeObject),
     Nil,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TypeValue {
+    pub name: String,
+    pub methods: Vec<(String, CodeObject)>,
+    pub static_fields: Vec<(String, CodeObject)>,
 }
 
 impl Value {
@@ -135,6 +141,7 @@ impl Value {
         }
     }
 }
+
 
 impl Value {
     pub fn to_string(&self) -> String {
