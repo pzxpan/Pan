@@ -19,7 +19,7 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 fn main() {
-    //test_one_file(&env::current_dir().unwrap().join("demo").join("struct.pan"));
+    //test_one_file(&env::current_dir().unwrap().join("demo").join("hashmap.pan"));
     test_all_demo_file();
 }
 

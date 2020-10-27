@@ -1,6 +1,7 @@
 use pan_parser::ast::*;
 use crate::symboltable::*;
 use crate::ctype::*;
+use std::borrow::Borrow;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -126,7 +127,9 @@ impl HasType for Expression {
             Expression::Subtract(_, left, right) => {
                 //TODO 需要处理两个变量的四则运算的返回类型，需要在利用注册了的symbol进行处理;
                 let l = left.get_type(tables);
+                println!("left{:?}", l);
                 let r = right.get_type(tables);
+                println!("right{:?}", r);
                 if l == r {
                     l
                 } else {
@@ -142,13 +145,7 @@ impl HasType for Expression {
                 }
             }
             Expression::Variable(s) => {
-                match s.name.as_str() {
-                    "int" => CType::Int,
-                    "float" => CType::Float,
-                    "string" => CType::Str,
-                    "bool" => CType::Bool,
-                    _ => CType::Unknown
-                }
+                return get_register_type(tables, s.name.clone());
             }
             // Expression::FunctionCall(_, s, _) => {
             //     s.get_type()
@@ -235,7 +232,10 @@ impl HasType for LambdaDefinition {
                 let s = statements.last();
                 match s {
                     Some(Statement::Return(_, e)) => {
-                        e.as_ref().unwrap().get_type(tables)
+                        println!("ddd{:?}", e);
+                        let ty = e.as_ref().unwrap().get_type(tables);
+                        println!("ttty:{:?}", ty);
+                        ty
                     }
                     _ => { CType::Any }
                 }
@@ -255,3 +255,4 @@ impl HasType for SourceUnitPart {
         }
     }
 }
+

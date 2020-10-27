@@ -556,20 +556,22 @@ impl SymbolTableBuilder {
             // name: Identifier { loc: Loc(1, 2, 11), name: "dd" } }, Some(Number(Loc(1, 61, 68), U32(888)))
             VariableDefinition(location, decl, expression) => {
                 println!("dddddregister symbol: {:?}", decl.name.borrow().name.clone());
-                if expression.is_some() {
-                    //注意：lambda表达式的类型，包含有args_type,ret_type,但名称为统一的"lambda",可能需要更改，
-                    let mut ty = expression.as_ref().unwrap().get_type(&self.tables);
-                    match ty {
-                        CType::Lambda(_) => {
-                            self.lambda_name = decl.name.borrow().name.clone();
-                            self.register_name(decl.name.borrow().name.borrow(), ty, SymbolUsage::Assigned)?;
-                            if let Some(e) = expression {
-                                self.scan_expression(e, &ExpressionContext::Load);
-                            }
-                            return Ok(());
-                        }
-                        _ => {}
+
+                if let Some(ast::Expression::Lambda(_, lambda)) = expression {
+                    if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
+                        let name = &decl.name.name.clone();
+                        self.enter_function(name, params, loc.1)?;
+                        self.scan_statement(body.as_ref())?;
+                        //需要在子域获取到相应变量的类型，才能计算出返回值的，因此需要在pop之前推断返回值类型;
+                        let mut ty = lambda.get_type(&self.tables);
+                        self.leave_scope();
+
+                        //需要修改名称
+                        //ty.name = decl.name.borrow().name.clone();
+                        self.lambda_name = name.clone();
+                        self.register_name(name, ty, SymbolUsage::Assigned)?;
                     }
+                    return Ok(());
                 }
                 if decl.ty.is_some() {
                     self.register_name(decl.name.borrow().name.borrow(),
@@ -596,11 +598,9 @@ impl SymbolTableBuilder {
                             if let Some(ast::Expression::Attribute(_, _, name, idx)) = expression {
                                 if name.is_some() {
                                     ty = ty.attri_type(0, name.as_ref().unwrap().borrow().name.clone()).clone();
-                                    println!("attri _tttty{:?}", ty);
                                     self.register_name(decl.name.borrow().name.borrow(), ty, SymbolUsage::Assigned)?;
                                 } else if idx.is_some() {
                                     ty = ty.attri_type(idx.as_ref().unwrap().to_usize().unwrap(), "".to_string()).clone();
-                                    println!("attri _tttty{:?}", ty);
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned)?;
                                 }
                             } else {
@@ -619,7 +619,6 @@ impl SymbolTableBuilder {
                         }
                     }
                 }
-                // println!("otheris :{:?}",);
             }
             Return(loc, expression) => {
                 if let Some(e) = expression {
@@ -637,8 +636,10 @@ impl SymbolTableBuilder {
             }
             MultiVariableDefinition(loc, decls, e) => {
                 let mut ty = self.get_register_type(e.expr_name());
+                println!("getMultiType:{:?}", ty);
                 if ty == CType::Unknown {
                     ty = e.get_type(&self.tables);
+                    println!("Unkwown getMultiType:{:?}", ty);
                 }
                 if ty == CType::Unknown {
                     return Err(SymbolTableError {
@@ -661,6 +662,12 @@ impl SymbolTableBuilder {
             }
             CType::Tuple(item_ty) => {
                 for (part, cty) in decls.variables.iter().zip(item_ty.iter()) {
+                    self.scan_multi_value_part(part, cty);
+                }
+            }
+            CType::Dict(key, value) => {
+                let v = vec![key, value];
+                for (part, cty) in decls.variables.iter().zip(v.iter()) {
                     self.scan_multi_value_part(part, cty);
                 }
             }

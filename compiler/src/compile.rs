@@ -20,6 +20,7 @@ use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_parser::lexer::Token::Identifier;
 use crate::ctype::CType;
 use crate::ctype::*;
+use crate::variable_type::HasType;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -116,12 +117,6 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        println!("symbol_table is {:?}", symbol_table.name);
-        println!("symbol_table IndexMap {:?}", symbol_table.symbols);
-        for a in symbol_table.sub_tables.clone() {
-            println!("{:?} sub_symbol is {:?}", symbol_table.name, a.name);
-            println!("{:?} sub_symbol IndexMap {:?}", symbol_table.name, a.symbols);
-        }
         compiler.compile_program(&ast, symbol_table)
     })
 }
@@ -355,9 +350,7 @@ impl<O: OutputStream> Compiler<O> {
             VariableDefinition(_, decl, expression) => {
                 if let Some(e) = &expression {
                     //绝大部分的类型都会在symbol分析阶段完成;
-                    //let mut ty = expression.as_ref().unwrap().get_type();
-                    let mut ty = CType::Unknown;
-                    if let CType::Lambda(_) = ty {
+                    if self.is_lambda(&decl.name.borrow().name) {
                         //如果是lambda，就直接返回，不需要存储，因为lambda作为函数类型存储，只要将名称传递过去
                         self.lambda_name = decl.name.borrow().name.clone();
                         self.compile_expression(e)?;
@@ -2262,13 +2255,13 @@ impl<O: OutputStream> Compiler<O> {
 
     fn lookup_name(&self, name: &str) -> &Symbol {
         println!("Looking up {:?}", name);
-        let len: usize = self.symbol_table_stack.len();
-        for i in 0..len {
-            println!("aaaaa {:?},{:?}", i, self.symbol_table_stack[i]);
-            for a in self.symbol_table_stack[i].symbols.iter() {
-                println!("dddddd  sub Symbol is ,{:?}", a);
-            }
-        }
+        // let len: usize = self.symbol_table_stack.len();
+        // for i in 0..len {
+        //     println!("aaaaa {:?},{:?}", i, self.symbol_table_stack[i]);
+        //     for a in self.symbol_table_stack[i].symbols.iter() {
+        //         println!("dddddd  sub Symbol is ,{:?}", a);
+        //     }
+        // }
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
@@ -2311,6 +2304,19 @@ impl<O: OutputStream> Compiler<O> {
             let symbol = self.symbol_table_stack[i].lookup(name);
             if let Some(s) = symbol {
                 if let CType::Struct(_) = &s.ty {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    fn is_lambda(&self, name: &str) -> bool {
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if let Some(s) = symbol {
+                if let CType::Lambda(_) = &s.ty {
                     return true;
                 }
             }
@@ -2416,138 +2422,3 @@ fn compile_location(location: &ast::Loc) -> bytecode::Location {
 //     }
 // }
 
-#[cfg(test)]
-mod tests {
-    use super::Compiler;
-    use crate::symboltable::make_symbol_table;
-    use rustpython_bytecode::bytecode::Constant::*;
-    use rustpython_bytecode::bytecode::Instruction::*;
-    use rustpython_bytecode::bytecode::{CodeObject, Label};
-    use rustpython_parser::parser;
-
-    fn compile_exec(source: &str) -> CodeObject {
-        let mut compiler: Compiler = Default::default();
-        compiler.source_path = Some("source_path".to_owned());
-        compiler.push_new_code_object("<module>".to_owned());
-        let ast = parser::parse_program(source).unwrap();
-        let symbol_scope = make_symbol_table(&ast).unwrap();
-        compiler.compile_program(&ast, symbol_scope).unwrap();
-        compiler.pop_code_object()
-    }
-
-    #[test]
-    fn test_if_ors() {
-        let code = compile_exec("if True or False or False:\n pass\n");
-        assert_eq!(
-            vec![
-                LoadConst {
-                    value: Boolean { value: true }
-                },
-                JumpIfTrue {
-                    target: Label::new(1)
-                },
-                LoadConst {
-                    value: Boolean { value: false }
-                },
-                JumpIfTrue {
-                    target: Label::new(1)
-                },
-                LoadConst {
-                    value: Boolean { value: false }
-                },
-                JumpIfFalse {
-                    target: Label::new(0)
-                },
-                LoadConst { value: None },
-                ReturnValue
-            ],
-            code.instructions
-        );
-    }
-
-    #[test]
-    fn test_if_ands() {
-        let code = compile_exec("if True and False and False:\n pass\n");
-        assert_eq!(
-            vec![
-                LoadConst {
-                    value: Boolean { value: true }
-                },
-                JumpIfFalse {
-                    target: Label::new(0)
-                },
-                LoadConst {
-                    value: Boolean { value: false }
-                },
-                JumpIfFalse {
-                    target: Label::new(0)
-                },
-                LoadConst {
-                    value: Boolean { value: false }
-                },
-                JumpIfFalse {
-                    target: Label::new(0)
-                },
-                LoadConst { value: None },
-                ReturnValue
-            ],
-            code.instructions
-        );
-    }
-
-    #[test]
-    fn test_if_mixed() {
-        let code = compile_exec("if (True and False) or (False and True):\n pass\n");
-        assert_eq!(
-            vec![
-                LoadConst {
-                    value: Boolean { value: true }
-                },
-                JumpIfFalse {
-                    target: Label::new(2)
-                },
-                LoadConst {
-                    value: Boolean { value: false }
-                },
-                JumpIfTrue {
-                    target: Label::new(1)
-                },
-                LoadConst {
-                    value: Boolean { value: false }
-                },
-                JumpIfFalse {
-                    target: Label::new(0)
-                },
-                LoadConst {
-                    value: Boolean { value: true }
-                },
-                JumpIfFalse {
-                    target: Label::new(0)
-                },
-                LoadConst { value: None },
-                ReturnValue
-            ],
-            code.instructions
-        );
-    }
-
-    #[test]
-    fn test_constant_optimization() {
-        let code = compile_exec("1 + 2 + 3 + 4\n1.5 * 2.5");
-        assert_eq!(
-            code.instructions,
-            vec![
-                LoadConst {
-                    value: Integer { value: 10.into() }
-                },
-                Pop,
-                LoadConst {
-                    value: Float { value: 3.75 }
-                },
-                Pop,
-                LoadConst { value: None },
-                ReturnValue,
-            ]
-        );
-    }
-}

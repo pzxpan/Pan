@@ -81,6 +81,7 @@ impl CType {
     pub fn ret_type(&self) -> &CType {
         match self {
             CType::Fn(s) => s.ret_type.as_ref(),
+            CType::Lambda(s) => s.ret_type.as_ref(),
             _ => self
         }
     }

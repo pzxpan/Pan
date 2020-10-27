@@ -1,12 +1,11 @@
-fun add(a:int,b:int): int {
-    return a + b;
-}
+
 fun main() {
-   let ladd = (a:int,b:int) => {
-       return a + b;
+   let bb = 30;
+   let ladd = (b:int) => {
+       return bb + b;
    };
-  // print(add(10,20));
- //  print(ladd(20,30));
+   let cc = ladd(1000) + 10000;
+   print(cc);
    return;
 }
 fun print(a:int) {
