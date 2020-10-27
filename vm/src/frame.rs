@@ -424,6 +424,12 @@ impl Frame {
                 // self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
                 None
             }
+
+            bytecode::Instruction::LoadBuildEnum(count) => {
+                self.excute_make_enum_instance(vm, *count);
+                // self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
+                None
+            }
             // bytecode::Instruction::UnpackSequence { size } => {
             //     let value = self.pop_value();
             //     let elements = vm.extract_elements(&value)?;
@@ -1021,6 +1027,23 @@ impl Frame {
         let code_obj = self.pop_value();
 
         let v = Value::new_instance_obj(qualified_name, code_obj);
+        //  let func = Obj { name: qualified_name.name(), code: code_obj.code(), has_return: true };
+        self.push_value(v);
+        None
+    }
+
+    fn excute_make_enum_instance(&self, vm: &VirtualMachine, count: usize) -> FrameResult {
+        let mut args = self.pop_multiple(count - 2);
+        let item_name = self.pop_value();
+        let typ = self.pop_value();
+        let mut fields: Option<Vec<Value>> = None;
+        if !args.is_empty() {
+            //需要调个头，不然是反序;
+            args.reverse();
+            fields = Some(args);
+        }
+
+        let v = Value::new_enum_obj(typ, fields, item_name);
         //  let func = Obj { name: qualified_name.name(), code: code_obj.code(), has_return: true };
         self.push_value(v);
         None

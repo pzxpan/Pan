@@ -19,6 +19,7 @@ use num_traits::FromPrimitive;
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_parser::lexer::Token::Identifier;
 use crate::ctype::CType;
+use crate::ctype::*;
 
 type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -982,7 +983,6 @@ impl<O: OutputStream> Compiler<O> {
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(qualified_name.clone());
 
-        self.emit(Instruction::LoadBuildEnum);
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             Default::default(),
@@ -1473,9 +1473,19 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(value)?;
                 //按名字取，还是下标取
                 if name.is_some() {
-                    self.emit(Instruction::LoadAttr {
-                        name: name.as_ref().unwrap().name.clone(),
-                    });
+                    let is_enum_item = self.is_enum_variant_def(value, name);
+                    if is_enum_item {
+                        self.emit(Instruction::LoadConst {
+                            value: bytecode::Constant::String {
+                                value: name.as_ref().unwrap().name.clone(),
+                            },
+                        });
+                        self.emit(Instruction::LoadBuildEnum(2));
+                    } else {
+                        self.emit(Instruction::LoadAttr {
+                            name: name.as_ref().unwrap().name.clone(),
+                        });
+                    }
                 } else {
                     self.emit(Instruction::LoadConst {
                         value: bytecode::Constant::Integer {
@@ -1929,6 +1939,12 @@ impl<O: OutputStream> Compiler<O> {
         function: &ast::Expression,
         args: &[ast::Expression],
     ) -> Result<(), CompileError> {
+        let mut is_enum_item = false;
+        if let ast::Expression::Attribute(_, variable, attribute, _) = function {
+            is_enum_item = self.is_enum_variant_def(variable, attribute);
+        }
+
+        let mut is_constructor = false;
         // [Return(Loc(1, 9, 22), Some(FunctionCall(Loc(1, 9, 22), Variable(Identifier { loc: Loc(1, 9, 20), name: "close" })
         if self.ctx.func == FunctionContext::StructFunction {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
@@ -1946,9 +1962,25 @@ impl<O: OutputStream> Compiler<O> {
             } else {
                 self.compile_expression(function)?;
             }
+            //Attribute(Loc(1, 14, 24),
+            //Variable(Identifier { loc: Loc(1, 14, 20), name: "Color" }),
+            //Some(Identifier { loc: Loc(1, 14, 24), name: "Red" }), None),
+        } else if is_enum_item {
+            if let ast::Expression::Attribute(_, variable, attribute, _) = function {
+                self.emit(Instruction::LoadName {
+                    name: variable.expr_name().to_string(),
+                    scope: bytecode::NameScope::Global,
+                });
+                self.emit(Instruction::LoadConst {
+                    value: bytecode::Constant::String {
+                        value: attribute.as_ref().unwrap().name.clone(),
+                    },
+                });
+            }
         } else {
             self.compile_expression(function)?;
         }
+
 
         let count = args.len();
 
@@ -1963,10 +1995,13 @@ impl<O: OutputStream> Compiler<O> {
             });
         } else {
             // Keyword arguments:
-
-            self.emit(Instruction::CallFunction {
-                typ: CallType::Positional(count),
-            });
+            if is_enum_item {
+                self.emit(Instruction::LoadBuildEnum(count + 2));
+            } else {
+                self.emit(Instruction::CallFunction {
+                    typ: CallType::Positional(count),
+                });
+            }
         }
         Ok(())
     }
@@ -2236,6 +2271,32 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         unreachable!()
+    }
+
+    fn is_enum_variant_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
+        let mut name_str = "";
+        let mut attri = "";
+        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
+            name_str = name;
+        }
+        if let Some(ident) = attribute {
+            attri = &ident.name;
+        }
+
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name_str);
+            if let Some(s) = symbol {
+                if let CType::Enum(EnumType { variants, .. }) = &s.ty {
+                    for (a_name, _) in variants {
+                        if a_name.eq(attri) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     fn is_out_symbol(&self, name: &str) -> bool {

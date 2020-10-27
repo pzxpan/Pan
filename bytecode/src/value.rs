@@ -81,16 +81,6 @@ pub struct EnumValue {
     pub static_fields: Vec<(String, CodeObject)>,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct EnumVariantValue {
-    pub enum_name: String,
-    pub name: String,
-    pub idx: usize,
-    pub methods: Vec<CodeObject>,
-    pub arity: usize,
-    // pub values: Option<Vec<Value>>,
-}
-
 impl Value {
     pub fn name(&self) -> String {
         match self {
@@ -218,6 +208,11 @@ impl Value {
         let inst = Obj::InstanceObj(InstanceObj { typ: Box::new(typ), field_map: fields });
         Value::Obj(Arc::new(RefCell::new(inst)))
     }
+
+    pub fn new_enum_obj(typ: Value, fields: Option<Vec<Value>>, item_name: Value) -> Value {
+        let inst = Obj::EnumObj(EnumObj { typ: Box::new(typ), field_map: fields, item_name });
+        Value::Obj(Arc::new(RefCell::new(inst)))
+    }
 }
 
 impl Display for Value {
@@ -263,6 +258,13 @@ pub struct InstanceObj {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct EnumObj {
+    pub typ: Box<Value>,
+    pub field_map: Option<Vec<Value>>,
+    pub item_name: Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Obj {
     StringObj(String),
     ArrayObj(Vec<Value>),
@@ -270,6 +272,7 @@ pub enum Obj {
     MapObj(HashMap<String, Value>),
     // SetObj(HashSet<Value>),
     InstanceObj(InstanceObj),
+    EnumObj(EnumObj),
 }
 
 impl Obj {
@@ -288,6 +291,12 @@ impl Obj {
                 match &*inst.typ {
                     Value::Type(TypeValue { name, .. }) => format!("<instance {}>", name),
                     _ => unreachable!("Shouldn't have instances of non-struct types")
+                }
+            }
+            Obj::EnumObj(inst) => {
+                match &*inst.typ {
+                    Value::Type(TypeValue { name, .. }) => format!("<enum instance {}>", name),
+                    _ => unreachable!("Shouldn't have instances of enum types")
                 }
             }
         }
