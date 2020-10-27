@@ -19,17 +19,17 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 fn main() {
-    test_all_one_file(&env::current_dir().unwrap().join("demo").join("enum.pan"));
-   // test_all_demo_file();
+    //test_one_file(&env::current_dir().unwrap().join("demo").join("struct.pan"));
+    test_all_demo_file();
 }
 
 fn test_all_demo_file() {
     for f in WalkDir::new(env::current_dir().unwrap().join("demo")).min_depth(1) {
-        test_all_one_file(f.unwrap().path());
+        test_one_file(f.unwrap().path());
     }
 }
 
-fn test_all_one_file(home_path: &Path) {
+fn test_one_file(home_path: &Path) {
     let mut file = File::open(home_path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();

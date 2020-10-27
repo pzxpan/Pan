@@ -419,9 +419,8 @@ impl Frame {
             //     }
             //     None
             // }
-            bytecode::Instruction::LoadBuildClass => {
-                //  self.excute_make_struct_instance(vm);
-                // self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
+            bytecode::Instruction::LoadBuildStruct => {
+                  self.excute_make_struct_instance(vm);
                 None
             }
 
@@ -780,10 +779,6 @@ impl Frame {
         let func_ref = self.pop_value();
 
         println!("ddd func_def:{:?}", func_ref);
-        if let Value::Type(ty) = func_ref {
-            self.push_value(Value::new_instance_obj(Value::Type(ty), args[0].clone()));
-            return None;
-        }
         let code = func_ref.code();
         println!("cao  function name:{:?},equal = print: {:?}", code.obj_name, code.obj_name.eq("print"));
         if code.obj_name.eq("print") {
@@ -1023,12 +1018,9 @@ impl Frame {
         None
     }
     fn excute_make_struct_instance(&self, vm: &VirtualMachine) -> FrameResult {
-        let qualified_name = self.pop_value();
-        let code_obj = self.pop_value();
-
-        let v = Value::new_instance_obj(qualified_name, code_obj);
-        //  let func = Obj { name: qualified_name.name(), code: code_obj.code(), has_return: true };
-        self.push_value(v);
+        let args = self.pop_value();
+        let ty = self.pop_value();
+        self.push_value(Value::new_instance_obj(ty, args));
         None
     }
 

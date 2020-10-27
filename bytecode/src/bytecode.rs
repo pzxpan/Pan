@@ -219,7 +219,7 @@ pub enum Instruction {
         i: usize,
     },
     PrintExpr,
-    LoadBuildClass,
+    LoadBuildStruct,
     LoadBuildEnum(usize),
     BuildTypeValue { size: usize },
     UnpackSequence {
@@ -522,7 +522,7 @@ impl Instruction {
             SetAdd { i } => w!(SetAdd, i),
             MapAdd { i } => w!(MapAdd, i),
             PrintExpr => w!(PrintExpr),
-            LoadBuildClass => w!(LoadBuildClass),
+            LoadBuildStruct => w!(LoadBuildClass),
             LoadBuildEnum(size) => w!(LoadBuildEnum,size),
             UnpackSequence { size } => w!(UnpackSequence, size),
             UnpackEx { before, after } => w!(UnpackEx, before, after),

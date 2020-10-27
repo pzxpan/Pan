@@ -877,7 +877,6 @@ impl<O: OutputStream> Compiler<O> {
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(qualified_name.clone());
 
-        self.emit(Instruction::LoadBuildClass);
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             Default::default(),
@@ -2019,8 +2018,12 @@ impl<O: OutputStream> Compiler<O> {
         // BigInt { sign: Plus, data: BigUint { data: [30] } }) }, NamedArgument { loc: Loc(1, 10, 37),
         // name: Identifier { loc: Loc(1, 10, 35), name: "name" }, expr: StringLiteral([StringLiteral { loc: Loc(1, 10, 37),
         // string: "pan" }]) }])))
-
+        let mut is_constructor = false;
+        if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
+            is_constructor = self.is_constructor(name);
+        }
         self.compile_expression(function)?;
+
         let count = args.len();
 
         // Named arguments:
@@ -2034,16 +2037,19 @@ impl<O: OutputStream> Compiler<O> {
             });
             self.compile_expression(&keyword.expr)?;
         }
-
         self.emit(Instruction::BuildMap {
             size: args.len(),
             unpack: false,
             for_call: false,
         });
 
-        self.emit(Instruction::CallFunction {
-            typ: CallType::Keyword(1),
-        });
+        if is_constructor {
+            self.emit(Instruction::LoadBuildStruct);
+        } else {
+            self.emit(Instruction::CallFunction {
+                typ: CallType::Keyword(1),
+            });
+        }
         Ok(())
     }
 
@@ -2293,6 +2299,19 @@ impl<O: OutputStream> Compiler<O> {
                             return true;
                         }
                     }
+                }
+            }
+        }
+        return false;
+    }
+
+    fn is_constructor(&self, name: &str) -> bool {
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if let Some(s) = symbol {
+                if let CType::Struct(_) = &s.ty {
+                    return true;
                 }
             }
         }
