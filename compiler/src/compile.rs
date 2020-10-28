@@ -370,6 +370,9 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_store_multi_value_def(decl)?;
                 // self.emit(Instruction::Pop);
             }
+            While(loc,expression,body) => {
+                self.compile_while(expression,body)?;
+            }
             _ => {}
         }
         Ok(())
@@ -1073,8 +1076,7 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_while(
         &mut self,
         test: &ast::Expression,
-        body: &[ast::Statement],
-        orelse: &Option<Vec<ast::Statement>>,
+        body: &ast::Statement,
     ) -> Result<(), CompileError> {
         let start_label = self.new_label();
         let else_label = self.new_label();
@@ -1083,14 +1085,11 @@ impl<O: OutputStream> Compiler<O> {
             start: start_label,
             end: end_label,
         });
-
         self.set_label(start_label);
-
         self.compile_jump_if(test, false, else_label)?;
-
         let was_in_loop = self.ctx.in_loop;
         self.ctx.in_loop = true;
-        // self.compile_statements(body)?;
+        self.compile_statements(body)?;
         self.ctx.in_loop = was_in_loop;
         self.emit(Instruction::Jump {
             target: start_label,
