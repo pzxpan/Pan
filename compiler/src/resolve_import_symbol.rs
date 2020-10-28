@@ -59,7 +59,7 @@ fn resovle_file(path: &PathBuf, as_name: &Option<String>, is_all: &bool, symbol_
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     let ast = parse(&contents, 2).unwrap();
-    let symbols = file_top_symbol(&ast).unwrap();
+    let symbols = make_symbol_table(&ast).unwrap();
     if *is_all {
         let table = symbol_table.last_mut().unwrap();
         for (name, symbol) in symbols.symbols {

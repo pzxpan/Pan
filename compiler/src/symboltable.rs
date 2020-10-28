@@ -19,7 +19,7 @@ use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::resolve_import_symbol;
+use crate::resolve_import_symbol::resolve_import_symbol;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -429,7 +429,7 @@ impl SymbolTableBuilder {
                     match def {
                         //CType 如何确定，这是个问题，先往前走
                         Import::Plain(mod_path, all) => {
-                            self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                           // self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
                             resolve_import_symbol(mod_path, &None, all,&mut self.tables)?;
                         }
                         Import::GlobalSymbol(mod_path, as_name, all) => {

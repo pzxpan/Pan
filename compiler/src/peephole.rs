@@ -23,6 +23,7 @@ impl From<Vec<InstructionMetadata>> for InstructionMetadata {
         }
     }
 }
+
 impl From<Location> for InstructionMetadata {
     fn from(loc: Location) -> Self {
         InstructionMetadata {
@@ -32,7 +33,7 @@ impl From<Location> for InstructionMetadata {
     }
 }
 
-pub(crate) struct PeepholeOptimizer<O: OutputStream> {
+pub struct PeepholeOptimizer<O: OutputStream> {
     inner: O,
     buffer: ArrayVec<[(Instruction, InstructionMetadata); PEEPHOLE_BUFFER_SIZE]>,
 }
@@ -42,6 +43,7 @@ impl<O: OutputStream> From<CodeObject> for PeepholeOptimizer<O> {
         Self::new(code.into())
     }
 }
+
 impl<O: OutputStream> From<PeepholeOptimizer<O>> for CodeObject {
     fn from(mut peep: PeepholeOptimizer<O>) -> Self {
         peep.flush();
@@ -97,8 +99,8 @@ impl<O: OutputStream> PeepholeOptimizer<O> {
 }
 
 impl<O> OutputStream for PeepholeOptimizer<O>
-where
-    O: OutputStream,
+    where
+        O: OutputStream,
 {
     fn emit(&mut self, instruction: Instruction, loc: Location) {
         self.push(instruction, loc.into());

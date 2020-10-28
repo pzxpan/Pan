@@ -9,7 +9,7 @@ use num_complex::Complex64;
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
 use pan_bytecode::value::*;
 use pan_parser::{ast, parse};
-use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType};
+use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType, Import};
 use std::borrow::Borrow;
 use pan_bytecode::bytecode::CallType::Positional;
 use pan_bytecode::bytecode::NameScope::Global;
@@ -21,11 +21,12 @@ use pan_parser::lexer::Token::Identifier;
 use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
+use crate::resolve_import_compile::resolve_import_compile;
 
-type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
+pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
 /// Main structure holding the state of compilation.
-struct Compiler<O: OutputStream = BasicOutputStream> {
+pub struct Compiler<O: OutputStream = BasicOutputStream> {
     output_stack: Vec<O>,
     symbol_table_stack: Vec<SymbolTable>,
     nxt_label: usize,
@@ -89,27 +90,7 @@ fn with_compiler(
     trace!("Compilation completed: {:?}", code);
     Ok(code)
 }
-// symbol_table IndexMap {"other": Symbol { name: "other", scope: Local, is_param: false,
-// is_referenced: false, is_assigned: true, is_parameter: false, is_free: false,
-// ty: Fn(FnType { name: "other", arg_types: [("a", Int, true), ("b", Int, true)], type_args: [],
-// ret_type: Int, is_pub: false }) },
-// "int": Symbol { name: "int", scope: Unknown, is_param: false, is_referenced: true, is_assigned: false,
-// is_parameter: false, is_free: false, ty: Int },
-// "main": Symbol { name: "main", scope: Local, is_param: false, is_referenced: false, is_assigned: true,
-// is_parameter: false, is_free: false, ty: Fn(FnType { name: "main", arg_types: [], type_args: [],
-// ret_type: Unknown, is_pub: false }) }}
 
-// {"other":
-// Symbol { name: "other", scope: Local, is_param: false, is_referenced: false, is_assigned: true,
-// is_parameter: false, is_free: false, ty: Fn(FnType { name: "other", arg_types: [("a", Int, true),
-// ("b", Int, true)], type_args: [], ret_type: Float, is_pub: false }) },
-// "float": Symbol { name: "float", scope: Unknown, is_param: false, is_referenced: true, is_assigned: false,
-// is_parameter: false, is_free: false, ty: Float }, "main":
-// Symbol { name: "main", scope: Local, is_param: false, is_referenced: false, is_assigned: true,
-// is_parameter: false, is_free: false, ty: Fn(FnType { name: "main", arg_types: [], type_args: [],
-// ret_type: Unknown, is_pub: false }) }}
-
-/// Compile a standard Python program to bytecode
 pub fn compile_program(
     ast: ast::SourceUnit,
     source_path: String,
@@ -117,7 +98,7 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        compiler.compile_program(&ast, symbol_table)
+        compiler.compile_program(&ast, symbol_table, false, false, "".to_string())
     })
 }
 
@@ -170,14 +151,29 @@ impl<O: OutputStream> Compiler<O> {
         self.output_stack.pop().unwrap().into()
     }
 
-    fn compile_program(
+    pub fn compile_program(
         &mut self,
         program: &ast::SourceUnit,
         symbol_table: SymbolTable,
+        is_import: bool,
+        is_all: bool,
+        import_name: String,
     ) -> Result<(), CompileError> {
+        if is_import {} else {
+            for ss in symbol_table.symbols.clone() {
+                println!("main table sybmols is {:?} ", ss);
+            }
+            for s in symbol_table.sub_tables.clone() {
+                println!("subtable sybmols len is is {:?} ", symbol_table.sub_tables.len());
+                for ss in s.symbols {
+                    println!("subtable sybmols is {:?} ", ss);
+                }
+            }
+            self.symbol_table_stack.push(symbol_table);
+        }
         let size_before = self.output_stack.len();
         println!("size before is{:?}", size_before);
-        self.symbol_table_stack.push(symbol_table);
+
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
@@ -187,15 +183,35 @@ impl<O: OutputStream> Compiler<O> {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_enum_def(name.as_str(), &body, &generics);
+                    if is_import {
+                        if is_all || name.eq(import_name.as_str()) {
+                            self.compile_enum_def(name.as_str(), &body, &generics);
+                        }
+                    } else {
+                        self.compile_enum_def(name.as_str(), &body, &generics);
+                    }
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_class_def(name.as_str(), &body, &generics);
+                    if is_import {
+                        if is_all || name.eq(import_name.as_str()) {
+                            self.compile_class_def(name.as_str(), &body, &generics);
+                        }
+                    } else {
+                        self.compile_class_def(name.as_str(), &body, &generics);
+                    }
                 }
-                ast::SourceUnitPart::ImportDirective(def) => {}
+                ast::SourceUnitPart::ImportDirective(def) => {
+                    match def {
+                        Import::Plain(mod_path, all) => {
+                            resolve_import_compile(self, mod_path, &None, all)?;
+                        }
+                        _ => {}
+                    }
+                }
+
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
@@ -209,7 +225,13 @@ impl<O: OutputStream> Compiler<O> {
                     // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
+                    if is_import {
+                        if is_all || name.eq(import_name.as_str()) {
+                            self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
+                        }
+                    } else {
+                        self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
+                    }
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                 }
                 _ => (),
@@ -219,18 +241,20 @@ impl<O: OutputStream> Compiler<O> {
 
         assert_eq!(self.output_stack.len(), size_before);
         println!("cccc after size before is {:?} ", size_before);
-        self.emit(Instruction::LoadName {
-            name: "main".to_string(),
-            scope: NameScope::Free,
-        });
-        self.emit(Instruction::CallFunction { typ: Positional(0) });
-        self.emit(Instruction::Pop);
+        if !is_import {
+            self.emit(Instruction::LoadName {
+                name: "main".to_string(),
+                scope: NameScope::Free,
+            });
+            self.emit(Instruction::CallFunction { typ: Positional(0) });
+            self.emit(Instruction::Pop);
 
-        // Emit None at end:
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::None,
-        });
-        self.emit(Instruction::ReturnValue);
+            // Emit None at end:
+            self.emit(Instruction::LoadConst {
+                value: bytecode::Constant::None,
+            });
+            self.emit(Instruction::ReturnValue);
+        }
         Ok(())
     }
 
@@ -370,13 +394,14 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_store_multi_value_def(decl)?;
                 // self.emit(Instruction::Pop);
             }
-            While(loc,expression,body) => {
-                self.compile_while(expression,body)?;
+            While(loc, expression, body) => {
+                self.compile_while(expression, body)?;
             }
             _ => {}
         }
         Ok(())
     }
+
     fn compile_store_multi_value_def(&mut self, decl: &MultiVariableDeclaration) -> Result<(), CompileError> {
         for (i, parts) in decl.variables.iter().enumerate() {
             self.emit(Instruction::Duplicate);
@@ -384,6 +409,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         Ok(())
     }
+
     fn compile_store_multi_value_part(&mut self, index: usize, part: &MultiDeclarationPart, ty: &DestructType) -> Result<(), CompileError> {
         match part {
             MultiDeclarationPart::Single(ident) => {
@@ -634,6 +660,7 @@ impl<O: OutputStream> Compiler<O> {
         self.ctx = prev_ctx;
         Ok(())
     }
+
     fn compile_function_def(
         &mut self,
         name: &str,
@@ -2333,6 +2360,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         return false;
     }
+
     // Low level helper functions:
     fn emit(&mut self, instruction: Instruction) {
         let location = compile_location(&self.current_source_location);

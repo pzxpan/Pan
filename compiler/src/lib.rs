@@ -8,4 +8,5 @@ pub mod compile;
 pub mod error;
 pub mod variable_type;
 pub mod ctype;
-pub mod resolve_symbol;
+pub mod resolve_import_symbol;
+pub mod resolve_import_compile;
