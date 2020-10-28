@@ -39,9 +39,17 @@ pub enum SourceUnitPart {
 
 #[derive(Debug, PartialEq)]
 pub enum Import {
-    Plain(StringLiteral),
-    GlobalSymbol(StringLiteral, Identifier),
-    Rename(StringLiteral, Vec<(Identifier, Option<Identifier>)>),
+    //import std.math.sqrt;
+    //import std.math.*;
+    Plain(Vec<Identifier>, bool),
+
+    //import std.math.* as Math;
+    //import std.math.sqrt as Sqrt
+    GlobalSymbol(Vec<Identifier>, Identifier, bool),
+
+    //import std.math {sqrt,floor};
+    //import std.math {sqrt as Sqrt, floor as Floor};
+    Rename(Vec<Identifier>, Vec<(Identifier, Option<Identifier>)>),
 }
 
 #[derive(Debug, PartialEq, Clone)]

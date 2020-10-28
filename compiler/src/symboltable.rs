@@ -414,7 +414,20 @@ impl SymbolTableBuilder {
                 ast::SourceUnitPart::StructDefinition(def) => {
                     self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
-                ast::SourceUnitPart::ImportDirective(def) => {}
+                ast::SourceUnitPart::ImportDirective(def) => {
+                    // for name in names {
+                    //     if let Some(alias) = &name.alias {
+                    //         // `import mymodule as myalias`
+                    //         self.register_name(alias, SymbolUsage::Imported)?;
+                    //     } else {
+                    //         // `import module`
+                    //         self.register_name(
+                    //             name.symbol.split('.').next().unwrap(),
+                    //             SymbolUsage::Imported,
+                    //         )?;
+                    //     }
+                    // }
+                }
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;

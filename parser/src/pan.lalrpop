@@ -20,10 +20,9 @@ SourceUnitPart: SourceUnitPart = {
 }
 
 ImportDirective: Import = {
-    "import" <s:StringLiteral> ";" => Import::Plain(s),
-    "import" <s:StringLiteral> "as" <id:Identifier> ";" => Import::GlobalSymbol(s, id),
-    "import" "*" "as" <id:Identifier> "from" <s:StringLiteral> ";" => Import::GlobalSymbol(s, id),
-    "import" "{" <rename:CommaOne<ImportRename>> "}" "from" <s:StringLiteral> ";" => {
+    "import" <s:Dot<Identifier>> <all:(".*")?> ";" => Import::Plain(s,all.is_some()),
+    "import" <s:Dot<Identifier>> <all:(".*")?> "as" <id:Identifier> ";" => Import::GlobalSymbol(s, id,all.is_some()),
+    "import" <s:Dot<Identifier>> "{" <rename:CommaOne<ImportRename>> "}" ";" => {
         Import::Rename(s, rename)
     }
 }
@@ -513,6 +512,19 @@ NonIfStatement: Statement = {
     },
 }
 
+Dot<T>: Vec<T> = {
+    => Vec::new(),
+    DotOne<T> => <>,
+};
+
+DotOne<T>: Vec<T> = {
+    <e:T> <v:("." <T>)*>  => {
+        let mut v = v;
+        v.insert(0, e);
+        v
+    }
+};
+
 Comma<T>: Vec<T> = {
     => Vec::new(),
     CommaOne<T> => <>,
@@ -524,18 +536,6 @@ CommaOne<T>: Vec<T> = {
         v.insert(0, e);
         v
     }
-};
-CommaOmit<T>: Vec<T> = {
-    => Vec::new(),
-    CommaOmitInner<T> => <>,
-};
-
-CommaOmitInner<T>: Vec<T> = {
-   <e:T> <v:(","* <T>)*>  => {
-    let mut v = v;
-    v.insert(0, e);
-    v
-  }
 };
 
 CommaTwo<T>: Vec<T> = {

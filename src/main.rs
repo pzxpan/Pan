@@ -19,13 +19,15 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 fn main() {
-    test_one_file(&env::current_dir().unwrap().join("demo").join("while.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
     //test_all_demo_file();
 }
 
 fn test_all_demo_file() {
     for f in WalkDir::new(env::current_dir().unwrap().join("demo")).min_depth(1) {
         test_one_file(f.unwrap().path());
+        let mut s = "".to_string();
+        s.push_str(".");
     }
 }
 
