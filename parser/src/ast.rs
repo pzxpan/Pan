@@ -49,7 +49,8 @@ pub enum Import {
 
     //import std.math {sqrt,floor};
     //import std.math {sqrt as Sqrt, floor as Floor};
-    Rename(Vec<Identifier>, Vec<(Identifier, Option<Identifier>)>),
+    //import std { math as Math, math.foolor as Floor};
+    Rename(Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
 }
 
 #[derive(Debug, PartialEq, Clone)]

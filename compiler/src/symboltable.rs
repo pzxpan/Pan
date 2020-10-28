@@ -10,7 +10,7 @@ Inspirational file: https://github.com/python/cpython/blob/master/Python/symtabl
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Parameter, Expression, LambdaDefinition, MultiVariableDeclaration, MultiDeclarationPart};
+use pan_parser::ast::{Loc, Identifier, Import, Parameter, Expression, LambdaDefinition, MultiVariableDeclaration, MultiDeclarationPart};
 use std::fmt;
 use std::borrow::Borrow;
 use num_bigint::BigInt;
@@ -236,6 +236,7 @@ enum SymbolUsage {
     Used,
     Assigned,
     Parameter,
+    Imported,
     Unknown,
 }
 
@@ -415,18 +416,24 @@ impl SymbolTableBuilder {
                     self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {
-                    // for name in names {
-                    //     if let Some(alias) = &name.alias {
-                    //         // `import mymodule as myalias`
-                    //         self.register_name(alias, SymbolUsage::Imported)?;
-                    //     } else {
-                    //         // `import module`
-                    //         self.register_name(
-                    //             name.symbol.split('.').next().unwrap(),
-                    //             SymbolUsage::Imported,
-                    //         )?;
-                    //     }
-                    // }
+                    match def {
+                        //CType 如何确定，这是个问题，先往前走
+                        Import::Plain(mod_path, all) => {
+                            self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                        }
+                        Import::GlobalSymbol(mod_path, as_name, all) => {
+                            self.register_name(&as_name.name, CType::Any, SymbolUsage::Imported)?;
+                        }
+                        Import::Rename(mod_path, as_part) => {
+                            for (name, as_name) in as_part {
+                                if as_name.is_some() {
+                                    self.register_name(&as_name.as_ref().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                                } else {
+                                    self.register_name(&name.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                                }
+                            }
+                        }
+                    }
                 }
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
@@ -1177,6 +1184,9 @@ impl SymbolTableBuilder {
             }
             SymbolUsage::Unknown => {
                 symbol.ty = CType::Unknown;
+            }
+            SymbolUsage::Imported => {
+
             }
         }
         println!("after register name={:?}, ty: {:?}", symbol.name, symbol.ty);

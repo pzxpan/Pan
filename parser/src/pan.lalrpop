@@ -27,9 +27,9 @@ ImportDirective: Import = {
     }
 }
 
-ImportRename: (Identifier, Option<Identifier>) = {
-    <Identifier> => (<>, None),
-    <from:Identifier> "as" <to:Identifier> => (from, Some(to)),
+ImportRename: (Vec<Identifier>, Option<Identifier>) = {
+    <n:Dot<Identifier>> => (n, None),
+    <from:Dot<Identifier>> "as" <to:Identifier> => (from, Some(to)),
 }
 
 
