@@ -19,10 +19,12 @@ use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
+use crate::resolve_symbol::resolve_import_symbol;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
+    builder.insert_builtin_symbol();
     builder.scan_top_symbol_types(program)?;
     builder.scan_program(program)?;
     builder.finish()
@@ -34,6 +36,13 @@ pub fn statements_to_symbol_table(
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
     builder.scan_statement(statements)?;
+    builder.finish()
+}
+
+pub fn file_top_symbol(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
+    let mut builder: SymbolTableBuilder = Default::default();
+    builder.prepare();
+    builder.scan_top_symbol_types(program)?;
     builder.finish()
 }
 
@@ -146,8 +155,8 @@ impl Symbol {
 
 #[derive(Debug)]
 pub struct SymbolTableError {
-    error: String,
-    location: Loc,
+    pub error: String,
+    pub location: Loc,
 }
 
 impl From<SymbolTableError> for CompileError {
@@ -161,7 +170,7 @@ impl From<SymbolTableError> for CompileError {
     }
 }
 
-type SymbolTableResult = Result<(), SymbolTableError>;
+pub type SymbolTableResult = Result<(), SymbolTableError>;
 
 impl SymbolTable {
     pub fn lookup(&self, name: &str) -> Option<&Symbol> {
@@ -384,13 +393,12 @@ impl SymbolTableBuilder {
         self.leave_scope();
         Ok(())
     }
-    //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
-    fn scan_top_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
-        self.register_name(&"int".to_string(), CType::Int, SymbolUsage::Used)?;
-        self.register_name(&"float".to_string(), CType::Float, SymbolUsage::Used)?;
-        self.register_name(&"string".to_string(), CType::Str, SymbolUsage::Used)?;
-        self.register_name(&"bool".to_string(), CType::Bool, SymbolUsage::Used)?;
-        self.register_name(&"Any".to_string(), CType::Any, SymbolUsage::Used)?;
+    fn insert_builtin_symbol(&mut self) {
+        self.register_name(&"int".to_string(), CType::Int, SymbolUsage::Used);
+        self.register_name(&"float".to_string(), CType::Float, SymbolUsage::Used);
+        self.register_name(&"string".to_string(), CType::Str, SymbolUsage::Used);
+        self.register_name(&"bool".to_string(), CType::Bool, SymbolUsage::Used);
+        self.register_name(&"Any".to_string(), CType::Any, SymbolUsage::Used);
         let mut arg_types = Vec::new();
         arg_types.push((String::from("value"), CType::Any, false));
         let tt = CType::Fn(FnType {
@@ -401,9 +409,11 @@ impl SymbolTableBuilder {
             is_pub: true,
             is_static: false,
         });
+        self.register_name(&"print".to_string(), tt, SymbolUsage::Used);
+    }
 
-        self.register_name(&"print".to_string(), tt, SymbolUsage::Used)?;
-
+    //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
+    fn scan_top_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
@@ -420,6 +430,7 @@ impl SymbolTableBuilder {
                         //CType 如何确定，这是个问题，先往前走
                         Import::Plain(mod_path, all) => {
                             self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                            resolve_import_symbol(mod_path, &None, all,&mut self.tables)?;
                         }
                         Import::GlobalSymbol(mod_path, as_name, all) => {
                             self.register_name(&as_name.name, CType::Any, SymbolUsage::Imported)?;
@@ -1185,9 +1196,7 @@ impl SymbolTableBuilder {
             SymbolUsage::Unknown => {
                 symbol.ty = CType::Unknown;
             }
-            SymbolUsage::Imported => {
-
-            }
+            SymbolUsage::Imported => {}
         }
         println!("after register name={:?}, ty: {:?}", symbol.name, symbol.ty);
         Ok(())

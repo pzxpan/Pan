@@ -13,6 +13,7 @@ dependencies = [
  "clap",
  "dirs 2.0.2",
  "env_logger",
+ "lazy_static",
  "log",
  "num-traits",
  "pan-bytecode",
@@ -801,12 +802,14 @@ dependencies = [
  "arrayvec 0.5.1",
  "indexmap",
  "itertools 0.8.2",
+ "lazy_static",
  "log",
  "num-bigint",
  "num-complex",
  "num-traits",
  "pan-bytecode",
  "pan-parser",
+ "walkdir",
 ]
 
 [[package]]

@@ -8,6 +8,8 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
+lazy_static = "1.4"
+walkdir = "2"
 num-traits = "0.2"
 num-bigint = "0.2"
 indexmap = "1.0"
