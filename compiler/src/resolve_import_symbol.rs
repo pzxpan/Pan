@@ -64,9 +64,14 @@ fn resovle_file(path: &PathBuf, as_name: &Option<String>, is_all: &bool, symbol_
     let symbols = make_symbol_table(&ast).unwrap();
     if *is_all {
         let table = symbol_table.last_mut().unwrap();
+        println!("before insert{:?}", table);
         for (name, symbol) in symbols.symbols {
             table.symbols.insert(name.to_owned(), symbol);
         }
+        println!("after insert{:?}", table);
+        // for t in symbols.sub_tables.iter() {
+        //     table.sub_tables.push(t.clone());
+        // }
     } else {
         let table = symbol_table.last_mut().unwrap();
         for (name, symbol) in symbols.symbols {

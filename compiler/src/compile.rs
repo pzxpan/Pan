@@ -160,15 +160,7 @@ impl<O: OutputStream> Compiler<O> {
         import_name: String,
     ) -> Result<(), CompileError> {
         if is_import {} else {
-            for ss in symbol_table.symbols.clone() {
-                println!("main table sybmols is {:?} ", ss);
-            }
-            for s in symbol_table.sub_tables.clone() {
-                println!("subtable sybmols len is is {:?} ", symbol_table.sub_tables.len());
-                for ss in s.symbols {
-                    println!("subtable sybmols is {:?} ", ss);
-                }
-            }
+            println!("compile symboltable{:?}", symbol_table);
             self.symbol_table_stack.push(symbol_table);
         }
         let size_before = self.output_stack.len();
@@ -1983,7 +1975,11 @@ impl<O: OutputStream> Compiler<O> {
             //Attribute(Loc(1, 14, 24),
             //Variable(Identifier { loc: Loc(1, 14, 20), name: "Color" }),
             //Some(Identifier { loc: Loc(1, 14, 24), name: "Red" }), None),
-        } else if is_enum_item {
+        } else {
+            self.compile_expression(function)?;
+        }
+
+        if is_enum_item {
             if let ast::Expression::Attribute(_, variable, attribute, _) = function {
                 self.emit(Instruction::LoadName {
                     name: variable.expr_name().to_string(),
@@ -1995,11 +1991,7 @@ impl<O: OutputStream> Compiler<O> {
                     },
                 });
             }
-        } else {
-            self.compile_expression(function)?;
         }
-
-
         let count = args.len();
 
         // Normal arguments:

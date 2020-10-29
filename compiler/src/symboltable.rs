@@ -182,10 +182,23 @@ impl std::fmt::Debug for SymbolTable {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "SymbolTable({:?} symbols, {:?} sub scopes)",
+            "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
+            self.name,
             self.symbols.len(),
             self.sub_tables.len()
-        )
+        );
+        write!(f, "symbols:\n");
+        for (key, value) in self.symbols.iter() {
+            write!(f, "key:{:?},value:{:?}\n", key, value);
+        }
+
+        write!(f, "subtable is:\n");
+        write!(f, "symbols222:\n");
+        for (idx, table) in self.sub_tables.iter().enumerate() {
+            write!(f, "table idx {:?} is fuck fuck {:?}\n", idx, table);
+        }
+
+        write!(f, "table name:{:?} end:\n",self.name)
     }
 }
 

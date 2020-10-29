@@ -1,3 +1,4 @@
+import std.color.*;
 pub struct House {
     pub size: float,
     pub price: float,
@@ -19,6 +20,8 @@ pub struct Person {
   //  money: int,
     //pub house: House,
     pub fun is_older(): bool {
+        let a = Color::Red(10);
+        print(a);
         return age > 40;
     }
     pub fun older_than(a: int): bool {
