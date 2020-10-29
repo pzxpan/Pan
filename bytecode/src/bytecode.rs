@@ -19,11 +19,9 @@ impl Location {
     pub fn new(row: usize, column: usize) -> Self {
         Location { row, column }
     }
-
     pub fn row(&self) -> usize {
         self.row
     }
-
     pub fn column(&self) -> usize {
         self.column
     }
@@ -89,145 +87,61 @@ pub enum NameScope {
 //指令集
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Instruction {
-    Import {
-        name: Option<String>,
-        symbols: Vec<String>,
-        level: usize,
-    },
-    ImportStar,
-    ImportFrom {
-        name: String,
-    },
-    LoadName {
-        name: String,
-        scope: NameScope,
-    },
-    StoreName {
-        name: String,
-        scope: NameScope,
-    },
+    LoadName(String, NameScope),
+    StoreName(String, NameScope),
     Subscript,
     StoreSubscript,
     DeleteSubscript,
-    StoreAttr {
-        name: String,
-    },
-    DeleteAttr {
-        name: String,
-    },
-    LoadConst {
-        value: Constant,
-    },
-    UnaryOperation {
-        op: UnaryOperator,
-    },
-    BinaryOperation {
-        op: BinaryOperator,
-        inplace: bool,
-    },
-    LoadAttr {
-        name: String,
-    },
-    CompareOperation {
-        op: ComparisonOperator,
-    },
+    StoreAttr(String),
+    DeleteAttr(String),
+    LoadConst(Constant),
+    UnaryOperation(UnaryOperator),
+    BinaryOperation(BinaryOperator, bool),
+    LoadAttr(String),
+    CompareOperation(ComparisonOperator),
     Pop,
-    Rotate {
-        amount: usize,
-    },
+    Rotate(usize),
     Duplicate,
     GetIter,
     Continue,
     Break,
-    Jump {
-        target: Label,
-    },
+    Jump(Label),
     /// 真跳
-    JumpIfTrue {
-        target: Label,
-    },
+    JumpIfTrue(Label),
     ///假跳
-    JumpIfFalse {
-        target: Label,
-    },
+    JumpIfFalse(Label),
     /// 真跳假弹
-    JumpIfTrueOrPop {
-        target: Label,
-    },
+    JumpIfTrueOrPop(Label),
     /// 假跳真弹
-    JumpIfFalseOrPop {
-        target: Label,
-    },
+    JumpIfFalseOrPop(Label),
     MakeFunction,
-    CallFunction {
-        typ: CallType,
-    },
-    ForIter {
-        target: Label,
-    },
+    CallFunction(CallType),
+    ForIter(Label),
     ReturnValue,
     YieldValue,
     YieldFrom,
-    SetupLoop {
-        start: Label,
-        end: Label,
-    },
+    SetupLoop(Label, Label),
     PopBlock,
-    BuildString {
-        size: usize,
-    },
-    BuildTuple {
-        size: usize,
-        unpack: bool,
-    },
-    BuildList {
-        size: usize,
-        unpack: bool,
-    },
-    BuildSet {
-        size: usize,
-        unpack: bool,
-    },
-    BuildMap {
-        size: usize,
-        unpack: bool,
-        for_call: bool,
-    },
-    BuildSlice {
-        size: usize,
-    },
-    ListAppend {
-        i: usize,
-    },
-    SetAdd {
-        i: usize,
-    },
-    MapAdd {
-        i: usize,
-    },
+    BuildString(usize),
+    BuildTuple(usize, bool),
+    BuildList(usize, bool),
+    BuildSet(usize, bool),
+    BuildMap(usize, bool, bool),
+    BuildSlice(usize),
+    ListAppend(usize),
+    SetAdd(usize),
+    MapAdd(usize),
     PrintExpr,
     LoadBuildStruct,
     LoadBuildEnum(usize),
     LoadBuildModule,
-    BuildTypeValue { size: usize },
-    UnpackSequence {
-        size: usize,
-    },
-    UnpackEx {
-        before: usize,
-        after: usize,
-    },
-    // FormatValue {
-    //     conversion: Option<ConversionFlag>,
-    // },
-    Reverse {
-        amount: usize,
-    },
+    BuildTypeValue(usize),
+    UnpackSequence(usize),
+    UnpackEx(usize, usize),
+    Reverse(usize),
     GetAwaitable,
     BeforeAsyncWith,
-    SetupAsyncWith {
-        end: Label,
-    },
+    SetupAsyncWith(Label),
     GetAIter,
     GetANext,
 }
@@ -244,32 +158,26 @@ pub enum CallType {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Constant {
-    I8 { value: i8 },
-    I16 { value: i16 },
-    I32 { value: i32 },
-    I64 { value: i64 },
-    I128 { value: i128 },
-    ISize { value: isize },
-    U8 { value: u8 },
-    U16 { value: u16 },
-    U32 { value: u32 },
-    U64 { value: u64 },
-    U128 { value: u128 },
-    USize { value: usize },
-    // Enum(EnumType { name: "Color", type_args: [],
-    // variants: [("Red", Reference("Red", [Int])),
-    // ("Green", Reference("Green", [Float])),
-    // ("Blue", Reference("Blue", [Int, Int, Int])),
-    // ("Black", Reference("Black", [])),
-    // ("White", Reference("White", []))],
-    Integer { value: BigInt },
-    Float { value: f64 },
-    Complex { value: Complex64 },
-    Boolean { value: bool },
-    String { value: String },
-    Bytes { value: Vec<u8> },
-    Code { code: Box<CodeObject> },
-    Tuple { elements: Vec<Constant> },
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    ISize(isize),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
+    USize(usize),
+    Integer(BigInt),
+    Float(f64),
+    Complex(Complex64),
+    Boolean(bool),
+    String(String),
+    Bytes(Vec<u8>),
+    Code(Box<CodeObject>),
+    Tuple(Vec<Constant>),
     Struct(TypeValue),
     Enum(EnumValue),
     None,
@@ -365,7 +273,7 @@ impl CodeObject {
 
     pub fn get_constants(&self) -> impl Iterator<Item=&Constant> {
         self.instructions.iter().filter_map(|x| {
-            if let Instruction::LoadConst { value } = x {
+            if let Instruction::LoadConst(value) = x {
                 Some(value)
             } else {
                 None
@@ -443,83 +351,71 @@ impl Instruction {
         }
 
         match self {
-            Import {
-                name,
-                symbols,
-                level,
-            } => w!(
-                Import,
-                format!("{:?}", name),
-                format!("{:?}", symbols),
-                level
-            ),
-            ImportStar => w!(ImportStar),
-            ImportFrom { name } => w!(ImportFrom, name),
-            LoadName { name, scope } => w!(LoadName, name, format!("{:?}", scope)),
-            StoreName { name, scope } => w!(StoreName, name, format!("{:?}", scope)),
+            LoadName(name, scope) => w!(LoadName, name, format!("{:?}", scope)),
+            StoreName(name, scope) => w!(StoreName, name, format!("{:?}", scope)),
             Subscript => w!(Subscript),
             StoreSubscript => w!(StoreSubscript),
             DeleteSubscript => w!(DeleteSubscript),
-            StoreAttr { name } => w!(StoreAttr, name),
-            DeleteAttr { name } => w!(DeleteAttr, name),
-            LoadConst { value } => match value {
-                Constant::Code { code } if expand_codeobjects => {
+            StoreAttr(name) => w!(StoreAttr, name),
+            DeleteAttr(name) => w!(DeleteAttr, name),
+            LoadConst(value) => match value {
+                Constant::Code(code) if expand_codeobjects => {
                     writeln!(f, "LoadConst ({:?}):", code)?;
                     code.display_inner(f, true, level + 1)?;
                     Ok(())
                 }
                 _ => w!(LoadConst, value),
             },
-            UnaryOperation { op } => w!(UnaryOperation, format!("{:?}", op)),
-            BinaryOperation { op, inplace } => w!(BinaryOperation, format!("{:?}", op), inplace),
-            LoadAttr { name } => w!(LoadAttr, name),
-            CompareOperation { op } => w!(CompareOperation, format!("{:?}", op)),
+            UnaryOperation(op) => w!(UnaryOperation, format!("{:?}", op)),
+            BinaryOperation(op, inplace) => w!(BinaryOperation, format!("{:?}", op), inplace),
+            LoadAttr(name) => w!(LoadAttr, name),
+            CompareOperation(op) => w!(CompareOperation, format!("{:?}", op)),
             Pop => w!(Pop),
-            Rotate { amount } => w!(Rotate, amount),
+            Rotate(amount) => w!(Rotate, amount),
             Duplicate => w!(Duplicate),
             GetIter => w!(GetIter),
             Continue => w!(Continue),
             Break => w!(Break),
-            Jump { target } => w!(Jump, label_map[target]),
-            JumpIfTrue { target } => w!(JumpIfTrue, label_map[target]),
-            JumpIfFalse { target } => w!(JumpIfFalse, label_map[target]),
-            JumpIfTrueOrPop { target } => w!(JumpIfTrueOrPop, label_map[target]),
-            JumpIfFalseOrPop { target } => w!(JumpIfFalseOrPop, label_map[target]),
+            Jump(target) => w!(Jump, label_map[target]),
+            JumpIfTrue(target) => w!(JumpIfTrue, label_map[target]),
+            JumpIfFalse(target) => w!(JumpIfFalse, label_map[target]),
+            JumpIfTrueOrPop(target) => w!(JumpIfTrueOrPop, label_map[target]),
+            JumpIfFalseOrPop(target) => w!(JumpIfFalseOrPop, label_map[target]),
             MakeFunction => w!(MakeFunction),
-            CallFunction { typ } => w!(CallFunction, format!("{:?}", typ)),
-            ForIter { target } => w!(ForIter, label_map[target]),
+            CallFunction(typ) => w!(CallFunction, format!("{:?}", typ)),
+            ForIter(target) => w!(ForIter, label_map[target]),
             ReturnValue => w!(ReturnValue),
             YieldValue => w!(YieldValue),
             YieldFrom => w!(YieldFrom),
-            SetupLoop { start, end } => w!(SetupLoop, label_map[start], label_map[end]),
+            SetupLoop(start, end) => w!(SetupLoop, label_map[start], label_map[end]),
 
             BeforeAsyncWith => w!(BeforeAsyncWith),
-            SetupAsyncWith { end } => w!(SetupAsyncWith, label_map[end]),
+            SetupAsyncWith(end) => w!(SetupAsyncWith, label_map[end]),
             PopBlock => w!(PopBlock),
-            BuildString { size } => w!(BuildString, size),
-            BuildTuple { size, unpack } => w!(BuildTuple, size, unpack),
-            BuildList { size, unpack } => w!(BuildList, size, unpack),
-            BuildSet { size, unpack } => w!(BuildSet, size, unpack),
-            BuildMap {
+            BuildString(size) => w!(BuildString, size),
+            BuildTuple(size, unpack) => w!(BuildTuple, size, unpack),
+            BuildList(size, unpack) => w!(BuildList, size, unpack),
+            BuildSet(size, unpack) => w!(BuildSet, size, unpack),
+            BuildMap(
                 size,
                 unpack,
                 for_call,
-            } => w!(BuildMap, size, unpack, for_call),
-            BuildSlice { size } => w!(BuildSlice, size),
-            ListAppend { i } => w!(ListAppend, i),
-            SetAdd { i } => w!(SetAdd, i),
-            MapAdd { i } => w!(MapAdd, i),
+            ) => w!(BuildMap, size, unpack, for_call),
+            BuildSlice(size) => w!(BuildSlice, size),
+            ListAppend(i) => w!(ListAppend, i),
+            SetAdd(i) => w!(SetAdd, i),
+            MapAdd(i) => w!(MapAdd, i),
             PrintExpr => w!(PrintExpr),
             LoadBuildStruct => w!(LoadBuildClass),
             LoadBuildEnum(size) => w!(LoadBuildEnum,size),
             LoadBuildModule => w!(LoadBuildModule),
-            UnpackSequence { size } => w!(UnpackSequence, size),
-            UnpackEx { before, after } => w!(UnpackEx, before, after),
-            Reverse { amount } => w!(Reverse, amount),
+            UnpackSequence(size) => w!(UnpackSequence, size),
+            UnpackEx(before, after) => w!(UnpackEx, before, after),
+            Reverse(amount) => w!(Reverse, amount),
             GetAwaitable => w!(GetAwaitable),
             GetAIter => w!(GetAIter),
             GetANext => w!(GetANext),
-            BuildTypeValue { size } => w!(BuildTypeValue,size)
+            BuildTypeValue(size) => w!(BuildTypeValue,size)
         }
     }
 }
@@ -527,27 +423,27 @@ impl Instruction {
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Constant::I8 { value } => write!(f, "{}", value),
-            Constant::I16 { value } => write!(f, "{}", value),
-            Constant::I32 { value } => write!(f, "{}", value),
-            Constant::I64 { value } => write!(f, "{}", value),
-            Constant::I128 { value } => write!(f, "{}", value),
-            Constant::ISize { value } => write!(f, "{}", value),
-            Constant::U8 { value } => write!(f, "{}", value),
-            Constant::U16 { value } => write!(f, "{}", value),
-            Constant::U32 { value } => write!(f, "{}", value),
-            Constant::U64 { value } => write!(f, "{}", value),
-            Constant::U128 { value } => write!(f, "{}", value),
-            Constant::USize { value } => write!(f, "{}", value),
+            Constant::I8(value) => write!(f, "{}", value),
+            Constant::I16(value) => write!(f, "{}", value),
+            Constant::I32(value) => write!(f, "{}", value),
+            Constant::I64(value) => write!(f, "{}", value),
+            Constant::I128(value) => write!(f, "{}", value),
+            Constant::ISize(value) => write!(f, "{}", value),
+            Constant::U8(value) => write!(f, "{}", value),
+            Constant::U16(value) => write!(f, "{}", value),
+            Constant::U32(value) => write!(f, "{}", value),
+            Constant::U64(value) => write!(f, "{}", value),
+            Constant::U128(value) => write!(f, "{}", value),
+            Constant::USize(value) => write!(f, "{}", value),
 
-            Constant::Integer { value } => write!(f, "{}", value),
-            Constant::Float { value } => write!(f, "{}", value),
-            Constant::Complex { value } => write!(f, "{}", value),
-            Constant::Boolean { value } => write!(f, "{}", value),
-            Constant::String { value } => write!(f, "{:?}", value),
-            Constant::Bytes { value } => write!(f, "{:?}", value),
-            Constant::Code { code } => write!(f, "{:?}", code),
-            Constant::Tuple { elements } => write!(
+            Constant::Integer(value) => write!(f, "{}", value),
+            Constant::Float(value) => write!(f, "{}", value),
+            Constant::Complex(value) => write!(f, "{}", value),
+            Constant::Boolean(value) => write!(f, "{}", value),
+            Constant::String(value) => write!(f, "{:?}", value),
+            Constant::Bytes(value) => write!(f, "{:?}", value),
+            Constant::Code(code) => write!(f, "{:?}", code),
+            Constant::Tuple(elements) => write!(
                 f,
                 "({})",
                 elements

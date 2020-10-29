@@ -539,29 +539,28 @@ impl VirtualMachine {
     pub fn unwrap_constant(&mut self, value: &bytecode::Constant) -> Value {
         use bytecode::Constant::*;
         match *value {
-            I8 { ref value } => Value::I8(*value),
-            I16 { ref value } => Value::I16(*value),
-            I32 { ref value } => Value::I32(*value),
-            I64 { ref value } => Value::I64(*value),
-            I128 { ref value } => Value::I128(*value),
-            ISize { ref value } => Value::ISize(*value),
-            U8 { ref value } => Value::U8(*value),
-            U16 { ref value } => Value::U16(*value),
-            U32 { ref value } => Value::U32(*value),
-            U64 { ref value } => Value::U64(*value),
-            U128 { ref value } => Value::U128(*value),
-            USize { ref value } => Value::USize(*value),
-
-            Integer { ref value } => Value::Int(value.to_i64().unwrap()),
-            Float { ref value } => Value::Float(*value),
-            Complex { ref value } => Value::Nil,
-            String { ref value } => Value::Str(value.clone()),
-            Bytes { ref value } => Value::Nil,
-            Boolean { ref value } => Value::Bool(value.clone()),
-            Code { ref code } => {
+            I8(ref value) => Value::I8(*value),
+            I16(ref value) => Value::I16(*value),
+            I32(ref value) => Value::I32(*value),
+            I64(ref value) => Value::I64(*value),
+            I128(ref value) => Value::I128(*value),
+            ISize(ref value) => Value::ISize(*value),
+            U8(ref value) => Value::U8(*value),
+            U16(ref value) => Value::U16(*value),
+            U32(ref value) => Value::U32(*value),
+            U64(ref value) => Value::U64(*value),
+            U128(ref value) => Value::U128(*value),
+            USize(ref value) => Value::USize(*value),
+            Integer(ref value) => Value::Int(value.to_i64().unwrap()),
+            Float(ref value) => Value::Float(*value),
+            Complex(ref value) => Value::Nil,
+            String(ref value) => Value::Str(value.clone()),
+            Bytes(ref value) => Value::Nil,
+            Boolean(ref value) => Value::Bool(value.clone()),
+            Code(ref code) => {
                 Value::Code(*code.to_owned())
             }
-            Tuple { ref elements } => {
+            Tuple(ref elements) => {
                 Value::Nil
             }
             None => Value::Nil,

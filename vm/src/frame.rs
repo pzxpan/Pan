@@ -172,27 +172,21 @@ impl Frame {
             }
         println!("instruction {:?}", instruction);
         match instruction {
-            bytecode::Instruction::LoadConst { ref value } => {
+            bytecode::Instruction::LoadConst ( ref value ) => {
                 let obj = vm.unwrap_constant(value);
                 println!("{:?}", obj);
                 self.push_value(obj);
                 None
             }
-            bytecode::Instruction::Import {
-                ref name,
-                ref symbols,
-                ref level,
-            } => self.import(vm, name, symbols, *level),
-            // bytecode::Instruction::ImportStar => self.import_star(vm),
-            // bytecode::Instruction::ImportFrom { ref name } => self.import_from(vm, name),
-            bytecode::Instruction::LoadName {
+
+            bytecode::Instruction::LoadName (
                 ref name,
                 ref scope,
-            } => self.load_name(vm, name, scope),
-            bytecode::Instruction::StoreName {
+            ) => self.load_name(vm, name, scope),
+            bytecode::Instruction::StoreName (
                 ref name,
                 ref scope,
-            } => self.store_name(vm, name, scope),
+                ) => self.store_name(vm, name, scope),
             //  bytecode::Instruction::DeleteName { ref name } => self.delete_name(vm, name),
             bytecode::Instruction::Subscript => self.execute_subscript(vm),
             bytecode::Instruction::StoreSubscript => self.execute_store_subscript(vm),
@@ -210,7 +204,7 @@ impl Frame {
                 None
             }
             // bytecode::Instruction::Rotate { amount } => self.execute_rotate(*amount),
-            bytecode::Instruction::BuildString { size } => {
+            bytecode::Instruction::BuildString ( size )=> {
                 // let s = self
                 //     .pop_multiple(*size)
                 //     .into_iter()
@@ -220,12 +214,12 @@ impl Frame {
                 // self.push_value(str_obj);
                 None
             }
-            bytecode::Instruction::BuildList { size, unpack } => {
+            bytecode::Instruction::BuildList ( size, unpack ) => {
                 let list_value = self.get_elements(vm, *size, *unpack);
                 self.push_value(list_value);
                 None
             }
-            bytecode::Instruction::BuildSet { size, unpack } => {
+            bytecode::Instruction::BuildSet ( size, unpack ) => {
                 let mut hash_map: HashMap<String, Value> = HashMap::new();
                 let mut map_obj = Value::new_map_obj(hash_map);
                 for key in self.pop_multiple(*size).into_iter() {
@@ -234,19 +228,19 @@ impl Frame {
                 self.push_value(map_obj);
                 None
             }
-            bytecode::Instruction::BuildTuple { size, unpack } => {
+            bytecode::Instruction::BuildTuple ( size, unpack ) => {
                 let array_value = self.get_elements(vm, *size, *unpack);
                 self.push_value(array_value);
                 None
             }
-            bytecode::Instruction::BuildMap {
+            bytecode::Instruction::BuildMap (
                 size,
                 unpack,
                 for_call,
-            } => self.execute_build_map(vm, *size, *unpack, *for_call),
-            bytecode::Instruction::BuildTypeValue {
+                ) => self.execute_build_map(vm, *size, *unpack, *for_call),
+            bytecode::Instruction::BuildTypeValue (
                 size
-            } => {
+                ) => {
                 self.build_struct(vm, *size);
                 None
             }
@@ -270,14 +264,14 @@ impl Frame {
             //     vm.call_method(&dict_obj, "__setitem__", vec![key, value])?;
             //     None
             // }
-            bytecode::Instruction::BinaryOperation { ref op, inplace } => {
+            bytecode::Instruction::BinaryOperation ( ref op, inplace ) => {
                 self.execute_binop(vm, op, *inplace)
             }
-            bytecode::Instruction::LoadAttr { ref name } => self.load_attr(vm, name),
-            bytecode::Instruction::StoreAttr { ref name } => self.store_attr(vm, name),
-            bytecode::Instruction::DeleteAttr { ref name } => self.delete_attr(vm, name),
-            bytecode::Instruction::UnaryOperation { ref op } => self.execute_unop(vm, op),
-            bytecode::Instruction::CompareOperation { ref op } => self.execute_compare(vm, op),
+            bytecode::Instruction::LoadAttr ( ref name ) => self.load_attr(vm, name),
+            bytecode::Instruction::StoreAttr ( ref name ) => self.store_attr(vm, name),
+            bytecode::Instruction::DeleteAttr ( ref name ) => self.delete_attr(vm, name),
+            bytecode::Instruction::UnaryOperation ( ref op ) => self.execute_unop(vm, op),
+            bytecode::Instruction::CompareOperation ( ref op ) => self.execute_compare(vm, op),
             bytecode::Instruction::ReturnValue => {
                 let value = self.pop_value();
                 Some(ExecutionResult::Return(value))
@@ -288,7 +282,7 @@ impl Frame {
             //     Ok(Some(ExecutionResult::Yield(value)))
             // }
             // bytecode::Instruction::YieldFrom => self.execute_yield_from(vm),
-            bytecode::Instruction::SetupLoop { start, end } => {
+            bytecode::Instruction::SetupLoop ( start, end ) => {
                 self.push_block(BlockType::Loop {
                     start: *start,
                     end: *end,
@@ -359,14 +353,14 @@ impl Frame {
                 // self.push_value(awaitable);
                 None
             }
-            bytecode::Instruction::ForIter { target } => self.execute_for_iter(vm, *target),
+            bytecode::Instruction::ForIter ( target ) => self.execute_for_iter(vm, *target),
             bytecode::Instruction::MakeFunction => self.execute_make_function(vm),
-            bytecode::Instruction::CallFunction { typ } => self.execute_call_function(vm, typ),
-            bytecode::Instruction::Jump { target } => {
+            bytecode::Instruction::CallFunction ( typ ) => self.execute_call_function(vm, typ),
+            bytecode::Instruction::Jump ( target ) => {
                 self.jump(*target);
                 None
             }
-            bytecode::Instruction::JumpIfTrue { target } => {
+            bytecode::Instruction::JumpIfTrue (target ) => {
                 let obj = self.pop_value();
                 let value = obj.bool_value();
                 if value {
@@ -375,7 +369,7 @@ impl Frame {
                 None
             }
 
-            bytecode::Instruction::JumpIfFalse { target } => {
+            bytecode::Instruction::JumpIfFalse ( target ) => {
                 let obj = self.pop_value();
                 let value = obj.bool_value();
                 if !value {
@@ -384,7 +378,7 @@ impl Frame {
                 None
             }
 
-            bytecode::Instruction::JumpIfTrueOrPop { target } => {
+            bytecode::Instruction::JumpIfTrueOrPop ( target ) => {
                 let obj = self.last_value();
                 let value = obj.bool_value();
                 if value {
@@ -395,7 +389,7 @@ impl Frame {
                 None
             }
 
-            bytecode::Instruction::JumpIfFalseOrPop { target } => {
+            bytecode::Instruction::JumpIfFalseOrPop ( target ) => {
                 let obj = self.last_value();
                 let value = obj.bool_value();
                 if !value {

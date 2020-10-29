@@ -8,13 +8,13 @@ macro_rules! metas {
     };
 }
 macro_rules! lc {
-    ($name:ident {$($field:tt)*}) => {
-        Instruction::LoadConst {
-            value: bytecode::Constant::$name {$($field)*},
-        }
+    ($name:ident ($($field:tt)*)) => {
+        Instruction::LoadConst(
+            bytecode::Constant::$name ($($field)*),
+        )
     };
     ($name:ident, $($value:tt)*) => {
-        lc!($name { value: $($value)* })
+        lc!($name ( $($value)* ))
     };
 }
 macro_rules! emitconst {
@@ -28,7 +28,7 @@ macro_rules! emitconst {
 
 pub fn operator(buf: &mut impl OptimizationBuffer) {
     let (instruction, meta) = buf.pop();
-    if let Instruction::BinaryOperation { op, inplace } = instruction {
+    if let Instruction::BinaryOperation(op, inplace) = instruction {
         let (rhs, rhs_meta) = buf.pop();
         let (lhs, lhs_meta) = buf.pop();
         macro_rules! op {
@@ -65,7 +65,7 @@ pub fn operator(buf: &mut impl OptimizationBuffer) {
             (op, lhs, rhs) => {
                 buf.emit(lhs, lhs_meta);
                 buf.emit(rhs, rhs_meta);
-                buf.emit(Instruction::BinaryOperation { op, inplace }, meta);
+                buf.emit(Instruction::BinaryOperation(op, inplace), meta);
             }
         }
     } else {
@@ -75,15 +75,16 @@ pub fn operator(buf: &mut impl OptimizationBuffer) {
 
 pub fn unpack(buf: &mut impl OptimizationBuffer) {
     let (instruction, meta) = buf.pop();
-    if let Instruction::UnpackSequence { size } = instruction {
+    if let Instruction::UnpackSequence(size) = instruction {
         let (arg, arg_meta) = buf.pop();
         match arg {
-            Instruction::BuildTuple {
-                size: tup_size,
+            Instruction::BuildTuple(
+                tup_size,
                 unpack,
-            } if !unpack && tup_size == size => {
+            ) if !
+                unpack && tup_size == size => {
                 buf.emit(
-                    Instruction::Reverse { amount: size },
+                    Instruction::Reverse(size),
                     vec![arg_meta, meta].into(),
                 );
             }

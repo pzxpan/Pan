@@ -206,16 +206,11 @@ impl<O: OutputStream> Compiler<O> {
         for i in self.import_instructions.clone().iter() {
             self.emit(i.clone());
         }
-        self.emit(Instruction::LoadName {
-            name: "main".to_string(),
-            scope: NameScope::Free,
-        });
-        self.emit(Instruction::CallFunction { typ: Positional(0) });
+        self.emit(Instruction::LoadName("main".to_string(), NameScope::Free));
+        self.emit(Instruction::CallFunction(Positional(0)));
         self.emit(Instruction::Pop);
 
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::None,
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
         Ok(())
     }
@@ -237,18 +232,12 @@ impl<O: OutputStream> Compiler<O> {
 
     fn load_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);
-        self.emit(Instruction::LoadName {
-            name: name.to_owned(),
-            scope,
-        });
+        self.emit(Instruction::LoadName(name.to_owned(), scope));
     }
 
     fn store_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);
-        self.emit(Instruction::StoreName {
-            name: name.to_owned(),
-            scope,
-        });
+        self.emit(Instruction::StoreName(name.to_owned(), scope));
     }
 
     fn compile_statement(&mut self, statement: &ast::Statement) -> Result<(), CompileError> {
@@ -275,9 +264,7 @@ impl<O: OutputStream> Compiler<O> {
                         self.compile_expression(v)?;
                     }
                     None => {
-                        self.emit(Instruction::LoadConst {
-                            value: bytecode::Constant::None,
-                        });
+                        self.emit(Instruction::LoadConst(bytecode::Constant::None));
                     }
                 }
                 self.emit(Instruction::ReturnValue);
@@ -319,7 +306,7 @@ impl<O: OutputStream> Compiler<O> {
                         let else_label = self.new_label();
                         self.compile_jump_if(test, false, else_label)?;
                         self.compile_statements(body)?;
-                        self.emit(Instruction::Jump { target: end_label });
+                        self.emit(Instruction::Jump(end_label));
 
                         // else
                         self.set_label(else_label);
@@ -373,20 +360,14 @@ impl<O: OutputStream> Compiler<O> {
             MultiDeclarationPart::Single(ident) => {
                 match ty {
                     DestructType::Array => {
-                        self.emit(Instruction::LoadConst {
-                            value: bytecode::Constant::Integer {
-                                value: BigInt::from_usize(index).unwrap(),
-                            },
-                        });
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::Integer(BigInt::from_usize(index).unwrap())));
                         self.emit(Instruction::Subscript);
                         self.store_name(ident.name.clone().as_ref());
                     }
                     DestructType::Tuple => {
-                        self.emit(Instruction::LoadConst {
-                            value: bytecode::Constant::Integer {
-                                value: BigInt::from_usize(index).unwrap(),
-                            },
-                        });
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::Integer(BigInt::from_usize(index).unwrap())));
                         self.emit(Instruction::Subscript);
                         self.store_name(ident.name.clone().as_ref());
                     }
@@ -394,11 +375,8 @@ impl<O: OutputStream> Compiler<O> {
                 }
             }
             MultiDeclarationPart::TupleOrArray(decl) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::Integer {
-                        value: BigInt::from_usize(index).unwrap(),
-                    },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Integer(BigInt::from_usize(index).unwrap())));
                 self.emit(Instruction::Subscript);
                 self.compile_store_multi_value_def(decl)?;
             }
@@ -442,22 +420,12 @@ impl<O: OutputStream> Compiler<O> {
 
         let a: Vec<Parameter> = Vec::new();
         self.enter_function(name, &a)?;
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::None,
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
         let mut code = self.pop_code_object();
         self.leave_scope();
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Code {
-                code: Box::new(code),
-            },
-        });
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String {
-                value: qualified_name,
-            },
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code))));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name)));
 
         // Turn code object into function object:
         self.emit(Instruction::MakeFunction);
@@ -503,9 +471,7 @@ impl<O: OutputStream> Compiler<O> {
                         // the last instruction is a ReturnValue already, we don't need to emit it
                     }
                     _ => {
-                        self.emit(Instruction::LoadConst {
-                            value: bytecode::Constant::None,
-                        });
+                        self.emit(Instruction::LoadConst(bytecode::Constant::None));
                         self.emit(Instruction::ReturnValue);
                     }
                 }
@@ -518,27 +484,18 @@ impl<O: OutputStream> Compiler<O> {
 
 
         for arg in args.iter() {
-            self.emit(Instruction::LoadConst {
-                value: bytecode::Constant::String {
-                    value: arg.name.as_ref().unwrap().name.clone()
-                },
-            });
+            self.emit(Instruction::LoadConst(
+                bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
             self.compile_expression(&arg.ty)?;
         }
         if is_async {
             code.flags |= bytecode::CodeFlags::IS_COROUTINE;
         }
 
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Code {
-                code: Box::new(code),
-            },
-        });
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String {
-                value: qualified_name,
-            },
-        });
+        self.emit(Instruction::LoadConst(
+            bytecode::Constant::Code(Box::new(code))));
+        self.emit(Instruction::LoadConst(
+            bytecode::Constant::String(qualified_name)));
 
         self.emit(Instruction::MakeFunction);
         self.store_name(name);
@@ -582,9 +539,7 @@ impl<O: OutputStream> Compiler<O> {
                         // the last instruction is a ReturnValue already, we don't need to emit it
                     }
                     _ => {
-                        self.emit(Instruction::LoadConst {
-                            value: bytecode::Constant::None,
-                        });
+                        self.emit(Instruction::LoadConst(bytecode::Constant::None));
                         self.emit(Instruction::ReturnValue);
                     }
                 }
@@ -602,50 +557,32 @@ impl<O: OutputStream> Compiler<O> {
         // Return annotation:
         if let Some(annotation) = returns {
             // key:
-            self.emit(Instruction::LoadConst {
-                value: bytecode::Constant::String {
-                    value: "return".to_string(),
-                },
-            });
+            self.emit(Instruction::LoadConst(
+                bytecode::Constant::String("return".to_string())));
             // value:
             self.compile_expression(annotation)?;
             num_annotations += 1;
         }
 
         for arg in args.iter() {
-            self.emit(Instruction::LoadConst {
-                value: bytecode::Constant::String {
-                    value: arg.name.as_ref().unwrap().name.clone()
-                },
-            });
+            self.emit(Instruction::LoadConst(
+                bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
             self.compile_expression(&arg.ty)?;
             num_annotations += 1;
         }
 
         if num_annotations > 0 {
             code.flags |= bytecode::CodeFlags::HAS_ANNOTATIONS;
-            self.emit(Instruction::BuildMap {
-                size: num_annotations,
-                unpack: false,
-                for_call: false,
-            });
+            self.emit(Instruction::BuildMap(num_annotations, false, false));
         }
 
         if is_async {
             code.flags |= bytecode::CodeFlags::IS_COROUTINE;
         }
 
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Code {
-                code: Box::new(code.clone()),
-            },
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code.clone()))));
         methods.push((name.to_string(), code.clone()));
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String {
-                value: qualified_name,
-            },
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name)));
 
         // Turn code object into function object:
         self.emit(Instruction::MakeFunction);
@@ -686,27 +623,11 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_scope();
 
 
-        self.emit(Instruction::LoadName {
-            name: "__name__".to_owned(),
-            scope: bytecode::NameScope::Global,
-        });
-        self.emit(Instruction::StoreName {
-            name: "__module__".to_owned(),
-            scope: bytecode::NameScope::Free,
-        });
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String {
-                value: qualified_name.clone(),
-            },
-        });
-        self.emit(Instruction::StoreName {
-            name: "__qualname__".to_owned(),
-            scope: bytecode::NameScope::Free,
-        });
-        self.emit(Instruction::StoreName {
-            name: "self".to_owned(),
-            scope: bytecode::NameScope::Local,
-        });
+        self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
+        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
+        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
@@ -734,18 +655,14 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
 
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::None,
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
 
         let mut code = self.pop_code_object();
         code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Struct(ty)
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
         self.store_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
@@ -781,27 +698,11 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_scope();
 
 
-        self.emit(Instruction::LoadName {
-            name: "__name__".to_owned(),
-            scope: bytecode::NameScope::Global,
-        });
-        self.emit(Instruction::StoreName {
-            name: "__module__".to_owned(),
-            scope: bytecode::NameScope::Free,
-        });
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String {
-                value: qualified_name.clone(),
-            },
-        });
-        self.emit(Instruction::StoreName {
-            name: "__qualname__".to_owned(),
-            scope: bytecode::NameScope::Free,
-        });
-        self.emit(Instruction::StoreName {
-            name: "self".to_owned(),
-            scope: bytecode::NameScope::Local,
-        });
+        self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
+        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
+        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
@@ -828,17 +729,13 @@ impl<O: OutputStream> Compiler<O> {
                 _ => {}
             }
         }
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::None,
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
         let mut code = self.pop_code_object();
         code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Struct(ty)
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
 
         self.store_name(name);
         self.current_qualified_path = old_qualified_path;
@@ -851,17 +748,16 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::Duplicate);
 
         // Doc string value:
-        self.emit(Instruction::LoadConst {
-            value: match doc_str {
-                Some(doc) => bytecode::Constant::String { value: doc },
+        self.emit(Instruction::LoadConst(
+            match doc_str {
+                Some(doc) => bytecode::Constant::String(doc),
                 None => bytecode::Constant::None, // set docstring None if not declared
             },
-        });
+        ));
 
-        self.emit(Instruction::Rotate { amount: 2 });
-        self.emit(Instruction::StoreAttr {
-            name: "__doc__".to_owned(),
-        });
+        self.emit(Instruction::Rotate(2));
+        self.emit(Instruction::StoreAttr(
+            "__doc__".to_owned()));
     }
 
     fn compile_while(
@@ -872,19 +768,17 @@ impl<O: OutputStream> Compiler<O> {
         let start_label = self.new_label();
         let else_label = self.new_label();
         let end_label = self.new_label();
-        self.emit(Instruction::SetupLoop {
-            start: start_label,
-            end: end_label,
-        });
+        self.emit(Instruction::SetupLoop(
+            start_label,
+            end_label,
+        ));
         self.set_label(start_label);
         self.compile_jump_if(test, false, else_label)?;
         let was_in_loop = self.ctx.in_loop;
         self.ctx.in_loop = true;
         self.compile_statements(body)?;
         self.ctx.in_loop = was_in_loop;
-        self.emit(Instruction::Jump {
-            target: start_label,
-        });
+        self.emit(Instruction::Jump(start_label));
         self.set_label(else_label);
         self.emit(Instruction::PopBlock);
         self.set_label(end_label);
@@ -903,10 +797,7 @@ impl<O: OutputStream> Compiler<O> {
         let else_label = self.new_label();
         let end_label = self.new_label();
 
-        self.emit(Instruction::SetupLoop {
-            start: start_label,
-            end: end_label,
-        });
+        self.emit(Instruction::SetupLoop(start_label, end_label));
 
         // The thing iterated:
         self.compile_expression(start)?;
@@ -917,7 +808,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::GetIter);
 
         self.set_label(start_label);
-        self.emit(Instruction::ForIter { target: else_label });
+        self.emit(Instruction::ForIter(else_label));
 
         // Start of loop iteration, set targets:
         self.compile_store(target)?;
@@ -927,9 +818,7 @@ impl<O: OutputStream> Compiler<O> {
         self.compile_statement(body)?;
         self.ctx.in_loop = was_in_loop;
 
-        self.emit(Instruction::Jump {
-            target: start_label,
-        });
+        self.emit(Instruction::Jump(start_label));
         self.set_label(else_label);
         self.emit(Instruction::PopBlock);
         self.set_label(end_label);
@@ -949,15 +838,10 @@ impl<O: OutputStream> Compiler<O> {
             ast::Expression::Attribute(_, obj, attr, idx) => {
                 self.compile_expression(obj)?;
                 if attr.is_some() {
-                    self.emit(Instruction::StoreAttr {
-                        name: attr.as_ref().unwrap().name.clone(),
-                    });
+                    self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
                 } else {
-                    self.emit(Instruction::LoadConst {
-                        value: bytecode::Constant::Integer {
-                            value: idx.as_ref().unwrap().clone(),
-                        },
-                    });
+                    self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
+                        idx.as_ref().unwrap().clone())));
                     self.emit(Instruction::StoreSubscript);
                 }
             }
@@ -965,9 +849,7 @@ impl<O: OutputStream> Compiler<O> {
             ast::Expression::Tuple(_, elements) => {
                 let mut seen_star = false;
                 if !seen_star {
-                    self.emit(Instruction::UnpackSequence {
-                        size: elements.len(),
-                    });
+                    self.emit(Instruction::UnpackSequence(elements.len()));
                 }
             }
             _ => {
@@ -998,7 +880,7 @@ impl<O: OutputStream> Compiler<O> {
             ast::Expression::BitwiseAnd(_, _, _) => bytecode::BinaryOperator::And,
             _ => unreachable!()
         };
-        self.emit(Instruction::BinaryOperation { op: i, inplace });
+        self.emit(Instruction::BinaryOperation(i, inplace));
     }
 
     fn compile_compare(&mut self, vals: &[ast::Expression], ops: &[ast::Expression]) -> Result<(), CompileError> {
@@ -1026,28 +908,22 @@ impl<O: OutputStream> Compiler<O> {
             self.compile_expression(val)?;
             // store rhs for the next comparison in chain
             self.emit(Instruction::Duplicate);
-            self.emit(Instruction::Rotate { amount: 3 });
+            self.emit(Instruction::Rotate(3));
 
-            self.emit(Instruction::CompareOperation {
-                op: to_operator(op),
-            });
+            self.emit(Instruction::CompareOperation(to_operator(op)));
 
             // if comparison result is false, we break with this value; if true, try the next one.
-            self.emit(Instruction::JumpIfFalseOrPop {
-                target: break_label,
-            });
+            self.emit(Instruction::JumpIfFalseOrPop(break_label));
         }
 
         // handle the last comparison
         self.compile_expression(vals.last().unwrap())?;
-        self.emit(Instruction::CompareOperation {
-            op: to_operator(ops.last().unwrap()),
-        });
-        self.emit(Instruction::Jump { target: last_label });
+        self.emit(Instruction::CompareOperation(to_operator(ops.last().unwrap())));
+        self.emit(Instruction::Jump(last_label));
 
         // early exit left us with stack: `rhs, comparison_result`. We need to clean up rhs.
         self.set_label(break_label);
-        self.emit(Instruction::Rotate { amount: 2 });
+        self.emit(Instruction::Rotate(2));
         self.emit(Instruction::Pop);
 
         self.set_label(last_label);
@@ -1097,13 +973,9 @@ impl<O: OutputStream> Compiler<O> {
                 // Fall back case which always will work!
                 self.compile_expression(expression)?;
                 if condition {
-                    self.emit(Instruction::JumpIfTrue {
-                        target: target_label,
-                    });
+                    self.emit(Instruction::JumpIfTrue(target_label));
                 } else {
-                    self.emit(Instruction::JumpIfFalse {
-                        target: target_label,
-                    });
+                    self.emit(Instruction::JumpIfFalse(target_label));
                 }
             }
         }
@@ -1147,11 +1019,7 @@ impl<O: OutputStream> Compiler<O> {
             self.compile_expression(&entry.value)?;
             subsize += 1;
         }
-        self.emit(Instruction::BuildMap {
-            size: subsize,
-            unpack: false,
-            for_call: false,
-        });
+        self.emit(Instruction::BuildMap(subsize, false, false));
         Ok(())
     }
 
@@ -1172,23 +1040,15 @@ impl<O: OutputStream> Compiler<O> {
                 if name.is_some() {
                     let is_enum_item = self.is_enum_variant_def(value, name);
                     if is_enum_item {
-                        self.emit(Instruction::LoadConst {
-                            value: bytecode::Constant::String {
-                                value: name.as_ref().unwrap().name.clone(),
-                            },
-                        });
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
                         self.emit(Instruction::LoadBuildEnum(2));
                     } else {
-                        self.emit(Instruction::LoadAttr {
-                            name: name.as_ref().unwrap().name.clone(),
-                        });
+                        self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
                     }
                 } else {
-                    self.emit(Instruction::LoadConst {
-                        value: bytecode::Constant::Integer {
-                            value: idx.as_ref().unwrap().clone(),
-                        },
-                    });
+                    self.emit(Instruction::LoadConst(
+                        bytecode::Constant::Integer(idx.as_ref().unwrap().clone())));
                     self.emit(Instruction::Subscript);
                 }
             }
@@ -1200,15 +1060,15 @@ impl<O: OutputStream> Compiler<O> {
             }
             Not(loc, name) => {
                 self.compile_expression(name)?;
-                self.emit(Instruction::UnaryOperation { op: bytecode::UnaryOperator::Not });
+                self.emit(Instruction::UnaryOperation(bytecode::UnaryOperator::Not));
             }
             UnaryPlus(loc, name) => {
                 self.compile_expression(name)?;
-                self.emit(Instruction::UnaryOperation { op: bytecode::UnaryOperator::Plus });
+                self.emit(Instruction::UnaryOperation(bytecode::UnaryOperator::Plus));
             }
             UnaryMinus(loc, name) => {
                 self.compile_expression(name)?;
-                self.emit(Instruction::UnaryOperation { op: bytecode::UnaryOperator::Minus });
+                self.emit(Instruction::UnaryOperation(bytecode::UnaryOperator::Minus));
             }
             Power(loc, a, b) |
             Multiply(loc, a, b) |
@@ -1265,30 +1125,20 @@ impl<O: OutputStream> Compiler<O> {
             }
             BoolLiteral(loc, _) => {}
             NumberLiteral(loc, value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::Integer {
-                        value: value.clone(),
-                    },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Integer(value.clone())));
             }
             StringLiteral(values) => {
                 let mut value = values.iter().fold(String::new(), |mut s, x| {
                     s.push_str(&x.string);
                     s
                 });
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::String {
-                        value
-                    },
-                })
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(value)))
             }
             ArrayLiteral(loc, elements) => {
                 let size = elements.len();
                 let must_unpack = self.gather_elements(elements)?;
-                self.emit(Instruction::BuildList {
-                    size,
-                    unpack: must_unpack,
-                });
+                self.emit(Instruction::BuildList(size, must_unpack));
             }
             List(loc, _) => {}
             Type(loc, ty) => {
@@ -1306,10 +1156,7 @@ impl<O: OutputStream> Compiler<O> {
             Tuple(loc, elements) => {
                 let size = elements.len();
                 let must_unpack = self.gather_elements(elements)?;
-                self.emit(Instruction::BuildTuple {
-                    size,
-                    unpack: must_unpack,
-                });
+                self.emit(Instruction::BuildTuple(size, must_unpack));
             }
             Dict(loc, entries) => {
                 self.compile_dict(entries);
@@ -1317,10 +1164,7 @@ impl<O: OutputStream> Compiler<O> {
             Set(loc, elements) => {
                 let size = elements.len();
                 let must_unpack = self.gather_elements(elements)?;
-                self.emit(Instruction::BuildSet {
-                    size,
-                    unpack: must_unpack,
-                });
+                self.emit(Instruction::BuildSet(size, must_unpack));
             }
             Comprehension(loc, _, _) => {}
             StringLiteral(v) => {}
@@ -1347,77 +1191,62 @@ impl<O: OutputStream> Compiler<O> {
         use ast::Number::*;
         match number {
             I8(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::I8 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::I8(value)));
             }
             I16(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::I16 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::I16(value)));
             }
             I32(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::I32 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::I32(value)));
             }
             I64(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::I64 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::I64(value)));
             }
             I128(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::I128 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::I128(value)));
             }
             ISize(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::ISize { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::ISize(value)));
             }
 
             U8(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::U8 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::U8(value)));
             }
             U16(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::U16 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::U16(value)));
             }
             U32(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::U32 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::U32(value)));
             }
             U64(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::U64 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::U64(value)));
             }
             U128(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::U128 { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::U128(value)));
             }
             USize(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::USize { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::USize(value)));
             }
             Int(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::Integer {
-                        value: value.clone(),
-                    },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Integer(value.clone())));
             }
             Float(value) => {
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::Float { value },
-                });
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Float(value),
+                ));
             }
         }
         Ok(())
@@ -1438,13 +1267,11 @@ impl<O: OutputStream> Compiler<O> {
                 if self.is_out_symbol(name.as_str()) {
                     self.compile_expression(function)?;
                 } else {
-                    self.emit(Instruction::LoadName {
-                        name: "self".to_string(),
-                        scope: bytecode::NameScope::Local,
-                    });
-                    self.emit(Instruction::LoadAttr {
-                        name: name.clone(),
-                    });
+                    self.emit(Instruction::LoadName(
+                        "self".to_string(),
+                        bytecode::NameScope::Local,
+                    ));
+                    self.emit(Instruction::LoadAttr(name.clone()));
                 }
             } else {
                 self.compile_expression(function)?;
@@ -1455,15 +1282,12 @@ impl<O: OutputStream> Compiler<O> {
 
         if is_enum_item {
             if let ast::Expression::Attribute(_, variable, attribute, _) = function {
-                self.emit(Instruction::LoadName {
-                    name: variable.expr_name().to_string(),
-                    scope: bytecode::NameScope::Global,
-                });
-                self.emit(Instruction::LoadConst {
-                    value: bytecode::Constant::String {
-                        value: attribute.as_ref().unwrap().name.clone(),
-                    },
-                });
+                self.emit(Instruction::LoadName(
+                    variable.expr_name().to_string(),
+                    bytecode::NameScope::Global,
+                ));
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(
+                    attribute.as_ref().unwrap().name.clone())));
             }
         }
         let count = args.len();
@@ -1473,18 +1297,13 @@ impl<O: OutputStream> Compiler<O> {
 
         if must_unpack {
             // Create a tuple with positional args:
-            self.emit(Instruction::BuildTuple {
-                size: args.len(),
-                unpack: must_unpack,
-            });
+            self.emit(Instruction::BuildTuple(args.len(), must_unpack));
         } else {
             // Keyword arguments:
             if is_enum_item {
                 self.emit(Instruction::LoadBuildEnum(count + 2));
             } else {
-                self.emit(Instruction::CallFunction {
-                    typ: CallType::Positional(count),
-                });
+                self.emit(Instruction::CallFunction(CallType::Positional(count)));
             }
         }
         Ok(())
@@ -1502,25 +1321,15 @@ impl<O: OutputStream> Compiler<O> {
         self.compile_expression(function)?;
 
         for keyword in args {
-            self.emit(Instruction::LoadConst {
-                value: bytecode::Constant::String {
-                    value: keyword.name.name.clone()
-                },
-            });
+            self.emit(Instruction::LoadConst(bytecode::Constant::String(keyword.name.name.clone())));
             self.compile_expression(&keyword.expr)?;
         }
-        self.emit(Instruction::BuildMap {
-            size: args.len(),
-            unpack: false,
-            for_call: false,
-        });
+        self.emit(Instruction::BuildMap(args.len(), false, false));
 
         if is_constructor {
             self.emit(Instruction::LoadBuildStruct);
         } else {
-            self.emit(Instruction::CallFunction {
-                typ: CallType::Keyword(1),
-            });
+            self.emit(Instruction::CallFunction(CallType::Keyword(1)));
         }
         Ok(())
     }
@@ -1564,23 +1373,13 @@ impl<O: OutputStream> Compiler<O> {
         match kind {
             ast::ComprehensionKind::GeneratorExpression { .. } => {}
             ast::ComprehensionKind::List { .. } => {
-                self.emit(Instruction::BuildList {
-                    size: 0,
-                    unpack: false,
-                });
+                self.emit(Instruction::BuildList(0, false));
             }
             ast::ComprehensionKind::Set { .. } => {
-                self.emit(Instruction::BuildSet {
-                    size: 0,
-                    unpack: false,
-                });
+                self.emit(Instruction::BuildSet(0, false));
             }
             ast::ComprehensionKind::Dict { .. } => {
-                self.emit(Instruction::BuildMap {
-                    size: 0,
-                    unpack: false,
-                    for_call: false,
-                });
+                self.emit(Instruction::BuildMap(0, false, false));
             }
         }
 
@@ -1592,10 +1391,7 @@ impl<O: OutputStream> Compiler<O> {
 
             if loop_labels.is_empty() {
                 // Load iterator onto stack (passed as first argument):
-                self.emit(Instruction::LoadName {
-                    name: String::from(".0"),
-                    scope: bytecode::NameScope::Local,
-                });
+                self.emit(Instruction::LoadName(String::from(".0"), bytecode::NameScope::Local));
             } else {
                 // Evaluate iterated item:
                 self.compile_expression(&generator.iter)?;
@@ -1608,12 +1404,9 @@ impl<O: OutputStream> Compiler<O> {
             let start_label = self.new_label();
             let end_label = self.new_label();
             loop_labels.push((start_label, end_label));
-            self.emit(Instruction::SetupLoop {
-                start: start_label,
-                end: end_label,
-            });
+            self.emit(Instruction::SetupLoop(start_label, end_label));
             self.set_label(start_label);
-            self.emit(Instruction::ForIter { target: end_label });
+            self.emit(Instruction::ForIter(end_label));
 
             self.compile_store(&generator.target)?;
 
@@ -1632,31 +1425,23 @@ impl<O: OutputStream> Compiler<O> {
             }
             ast::ComprehensionKind::List { element } => {
                 self.compile_expression(element)?;
-                self.emit(Instruction::ListAppend {
-                    i: 1 + generators.len(),
-                });
+                self.emit(Instruction::ListAppend(1 + generators.len()));
             }
             ast::ComprehensionKind::Set { element } => {
                 self.compile_expression(element)?;
-                self.emit(Instruction::SetAdd {
-                    i: 1 + generators.len(),
-                });
+                self.emit(Instruction::SetAdd(1 + generators.len()));
             }
             ast::ComprehensionKind::Dict { key, value } => {
                 self.compile_expression(value)?;
                 self.compile_expression(key)?;
 
-                self.emit(Instruction::MapAdd {
-                    i: 1 + generators.len(),
-                });
+                self.emit(Instruction::MapAdd(1 + generators.len()));
             }
         }
 
         for (start_label, end_label) in loop_labels.iter().rev() {
             // Repeat:
-            self.emit(Instruction::Jump {
-                target: *start_label,
-            });
+            self.emit(Instruction::Jump(*start_label));
 
             // End of for loop:
             self.set_label(*end_label);
@@ -1669,16 +1454,10 @@ impl<O: OutputStream> Compiler<O> {
         self.leave_scope();
 
         // List comprehension code:
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::Code {
-                code: Box::new(code),
-            },
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code))));
 
         // List comprehension function name:
-        self.emit(Instruction::LoadConst {
-            value: bytecode::Constant::String { value: name },
-        });
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(name)));
 
         // Turn code object into function object:
         self.emit(Instruction::MakeFunction);
@@ -1690,9 +1469,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::GetIter);
 
         // Call just created <listcomp> function:
-        self.emit(Instruction::CallFunction {
-            typ: CallType::Positional(1),
-        });
+        self.emit(Instruction::CallFunction(CallType::Positional(1)));
         Ok(())
     }
 
@@ -1785,6 +1562,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         return false;
     }
+
     //弹出指令
     pub fn emit(&mut self, instruction: Instruction) {
         let location = compile_location(&self.current_source_location);
