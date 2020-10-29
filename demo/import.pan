@@ -6,7 +6,6 @@ fun main() {
   print(bb);
   let color2 = Color::Red(10);
   print(color2);
-
 }
 fun print(a:int) {
 }

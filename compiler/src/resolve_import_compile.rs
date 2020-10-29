@@ -31,8 +31,10 @@ pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, ident
         //可能是文件中的定义项，删除名称、.pan后缀和/
         let len = path_str.len() - (idents.last().unwrap().name.len() + 4 + 1);
         let tmp = path_str.clone();
+        let mut slice = String::from(&tmp[0..len]);
+        slice.push_str(".pan");
         let mut path = env::current_dir().unwrap();
-        path.push(String::from(&tmp[0..len]));
+        path.push(slice);
         if path.is_file() {
             resovle_file_compile(compiler, &path, as_name, is_all)?;
         } else {}

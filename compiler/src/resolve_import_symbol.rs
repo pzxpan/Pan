@@ -40,8 +40,10 @@ pub fn resolve_import_symbol(idents: &Vec<Identifier>, as_name: &Option<String>,
         //可能是文件中的定义项，删除名称、.pan后缀和/
         let len = path_str.len() - (idents.last().unwrap().name.len() + 4 + 1);
         let tmp = path_str.clone();
+        let mut slice = String::from(&tmp[0..len]);
+        slice.push_str(".pan");
         let mut path = env::current_dir().unwrap();
-        path.push(String::from(&tmp[0..len]));
+        path.push(slice);
         if path.is_file() {
             resovle_file(&path, as_name, is_all, symbol_tables)?;
         } else {
@@ -61,6 +63,11 @@ fn resovle_file(path: &PathBuf, as_name: &Option<String>, is_all: &bool, symbol_
     let ast = parse(&contents, 2).unwrap();
     let symbols = make_symbol_table(&ast).unwrap();
     if *is_all {
+        let table = symbol_table.last_mut().unwrap();
+        for (name, symbol) in symbols.symbols {
+            table.symbols.insert(name.to_owned(), symbol);
+        }
+    } else {
         let table = symbol_table.last_mut().unwrap();
         for (name, symbol) in symbols.symbols {
             table.symbols.insert(name.to_owned(), symbol);
@@ -85,8 +92,10 @@ pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifie
         //可能是文件中的定义项，删除名称、.pan后缀和/
         let len = path_str.len() - (idents.last().unwrap().name.len() + 4 + 1);
         let tmp = path_str.clone();
+        let mut slice = String::from(&tmp[0..len]);
+        slice.push_str(".pan");
         let mut path = env::current_dir().unwrap();
-        path.push(String::from(&tmp[0..len]));
+        path.push(slice);
         if path.is_file() {
             scan_import_file(build, &path, as_name, is_all)?;
         } else {
