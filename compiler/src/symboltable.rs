@@ -19,7 +19,7 @@ use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_import_symbol::resolve_import_symbol;
+use crate::resolve_import_symbol::{resolve_import_symbol, scan_import_symbol};
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -250,7 +250,7 @@ enum SymbolUsage {
 }
 
 #[derive(Default)]
-struct SymbolTableBuilder {
+pub struct SymbolTableBuilder {
     // Scope stack.
     tables: Vec<SymbolTable>,
     lambda_name: String,
@@ -291,11 +291,7 @@ impl SymbolTableBuilder {
         self.tables.last_mut().unwrap().sub_tables.push(table);
     }
 
-    fn scan_program(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
-        self.register_name(&"int".to_string(), CType::Int, SymbolUsage::Used)?;
-        self.register_name(&"float".to_string(), CType::Float, SymbolUsage::Used)?;
-        self.register_name(&"string".to_string(), CType::Str, SymbolUsage::Used)?;
-        self.register_name(&"bool".to_string(), CType::Bool, SymbolUsage::Used)?;
+    pub fn scan_program(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
@@ -362,7 +358,15 @@ impl SymbolTableBuilder {
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
                     self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
-                ast::SourceUnitPart::ImportDirective(def) => {}
+                ast::SourceUnitPart::ImportDirective(def) => {
+                    match def {
+                        Import::Plain(mod_path, all) => {
+                            // self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                            scan_import_symbol(self, mod_path, &None, all)?;
+                        }
+                        _ => {}
+                    }
+                }
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
@@ -429,8 +433,8 @@ impl SymbolTableBuilder {
                     match def {
                         //CType 如何确定，这是个问题，先往前走
                         Import::Plain(mod_path, all) => {
-                           // self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
-                            resolve_import_symbol(mod_path, &None, all,&mut self.tables)?;
+                            // self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                            resolve_import_symbol(mod_path, &None, all, &mut self.tables)?;
                         }
                         Import::GlobalSymbol(mod_path, as_name, all) => {
                             self.register_name(&as_name.name, CType::Any, SymbolUsage::Imported)?;
