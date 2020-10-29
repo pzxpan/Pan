@@ -88,9 +88,7 @@ impl fmt::Display for SymbolTableType {
 #[derive(Debug, Clone)]
 pub enum SymbolScope {
     Global,
-    Nonlocal,
     Local,
-    Unknown,
 }
 
 /// A single symbol in a table. Has various properties such as the scope
@@ -112,7 +110,7 @@ impl Symbol {
         Symbol {
             name: name.to_owned(),
             // table,
-            scope: SymbolScope::Unknown,
+            scope: SymbolScope::Local,
             is_param: false,
             is_referenced: false,
             is_assigned: false,
@@ -239,12 +237,9 @@ impl<'a> SymbolTableAnalyzer<'a> {
 #[derive(Debug, Clone)]
 enum SymbolUsage {
     Global,
-    Nonlocal,
     Used,
     Assigned,
     Parameter,
-    Imported,
-    Unknown,
 }
 
 #[derive(Default)]
@@ -420,36 +415,16 @@ impl SymbolTableBuilder {
                             Import::Plain(mod_path, all) => {
                                 scan_import_symbol(self, mod_path, &None, all)?;
                             }
-                            Import::GlobalSymbol(mod_path, as_name, all) => {
-                                self.register_name(&as_name.name, CType::Any, SymbolUsage::Imported)?;
-                            }
-                            Import::Rename(mod_path, as_part) => {
-                                for (name, as_name) in as_part {
-                                    if as_name.is_some() {
-                                        self.register_name(&as_name.as_ref().unwrap().name, CType::Any, SymbolUsage::Imported)?;
-                                    } else {
-                                        self.register_name(&name.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
-                                    }
-                                }
-                            }
+                            Import::GlobalSymbol(mod_path, as_name, all) => {}
+                            Import::Rename(mod_path, as_part) => {}
                         }
                     }
                 }
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
-                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    let tt = def.get_type(&self.tables);
-                    println!("type is :{:?}", tt);
-                    println!("function is :{:?}", def.clone());
+                    let ty = def.get_type(&self.tables);
                     if let Some(name) = &def.name {
-                        self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
-                        // if let Some(expression) = &def.as_ref().returns {
-                        //     self.scan_expression(expression, &ExpressionContext::Load)?;
-                        // }
-                        // // // let params = def.as_ref().params.iter().map(|s| s.1).collect();
-                        // self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
-                        // self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
-                        // self.leave_scope();
+                        self.register_name(&name.name, ty, SymbolUsage::Assigned)?;
                     }
                 }
                 _ => (),
@@ -466,23 +441,8 @@ impl SymbolTableBuilder {
     }
 
     fn scan_parameter(&mut self, parameter: &ast::Parameter) -> SymbolTableResult {
-        //self.register_name(&parameter.name, SymbolUsage::Parameter)
         Ok(())
     }
-
-    // fn scan_parameters_annotations(&mut self, parameters: &[ast::Parameter]) -> SymbolTableResult {
-    //     for parameter in parameters {
-    //         self.scan_parameter_annotation(parameter)?;
-    //     }
-    //     Ok(())
-    // }
-    //
-    // fn scan_parameter_annotation(&mut self, parameter: &ast::Parameter) -> SymbolTableResult {
-    //     if let Some(annotation) = &parameter.annotation {
-    //         self.scan_expression(&annotation, &ExpressionContext::Load)?;
-    //     }
-    //     Ok(())
-    // }
     fn get_register_type(&mut self, name: String) -> CType {
         let len = self.tables.len();
         for i in (0..len).rev() {
@@ -503,7 +463,7 @@ impl SymbolTableBuilder {
         return false;
     }
     fn scan_statement(&mut self, statement: &ast::Statement) -> SymbolTableResult {
-        println!("statement is {:?}", statement);
+        trace!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(loc, stmts) => {
@@ -511,13 +471,6 @@ impl SymbolTableBuilder {
                     self.scan_statement(stmt)?;
                 }
             }
-            // For(Loc(1, 4, 3), Variable(Identifier { loc: Loc(1, 4, 7), name: "i" }),
-            //     NumberLiteral(Loc(1, 4, 12), BigInt { sign: NoSign, data: BigUint { data: [] } }),
-            //     Some(NumberLiteral(Loc(1, 4, 14), BigInt { sign: Plus, data: BigUint { data: [100] } })),
-            //For(Loc(1, 3, 3), Variable(Identifier { loc: Loc(1, 3, 7), name: "a" }),
-            // Variable(Identifier { loc: Loc(1, 3, 14), name: "arr" }), None, Some(Block(Loc(1, 3, 3),
-            // [Expression(Loc(1, 4, 12), FunctionCall(Loc(1, 4, 12), Variable(Identifier { loc: Loc(1, 4, 9), name: "print" }),
-            // [Variable(Identifier { loc: Loc(1, 4, 11), name: "a" })]))])))
             For(loc, target, iter, end, body) => {
                 let ty = iter.get_type(&self.tables);
                 let mut symbol_name = String::new();
@@ -552,42 +505,30 @@ impl SymbolTableBuilder {
                 self.scan_statement(body)?;
             }
             Break(_) | Continue(_) => {
-                // No symbols here.
             }
             Expression(loc, expression) => {
                 self.scan_expression(expression, &ExpressionContext::Load)?;
             }
             If(loc, test, body, orelse) => {
-                println!("if enter");
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 self.scan_statement(body)?;
                 if let Some(code) = orelse {
                     self.scan_statement(code)?;
                 }
             }
-
-            // VariableDefinition(Loc(1, 6, 25), VariableDeclaration {
-            //     loc: Loc(1, 6, 11), ty: None, name: Identifier {
-            //         loc: Loc(1, 6, 11), name: "aaa" } },
-            //                    Some(FunctionCall(Loc(1, 6, 25), Variable(Identifier { loc: Loc(1, 6, 20), name: "other" }), [NumberLiteral(Loc(1, 6, 22), BigInt { sign: Plus, data: BigUint { data: [20] } }), NumberLiteral(Loc(1, 6, 24), BigInt { sign: Plus, data: BigUint { data: [30] } })])))
-
             Args(loc, _) => {}
-            // VariableDeclaration { loc: Loc(1, 2, 11), ty: None,
-            // name: Identifier { loc: Loc(1, 2, 11), name: "dd" } }, Some(Number(Loc(1, 61, 68), U32(888)))
             VariableDefinition(location, decl, expression) => {
-                println!("dddddregister symbol: {:?}", decl.name.borrow().name.clone());
-
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
                         self.enter_function(name, params, loc.1)?;
                         self.scan_statement(body.as_ref())?;
+
                         //需要在子域获取到相应变量的类型，才能计算出返回值的，因此需要在pop之前推断返回值类型;
+                        //还没处理环境变量在其后定义的情况;
                         let mut ty = lambda.get_type(&self.tables);
                         self.leave_scope();
 
-                        //需要修改名称
-                        //ty.name = decl.name.borrow().name.clone();
                         self.lambda_name = name.clone();
                         self.register_name(name, ty, SymbolUsage::Assigned)?;
                     }
@@ -598,12 +539,9 @@ impl SymbolTableBuilder {
                                        decl.ty.as_ref().unwrap().get_type(&self.tables),
                                        SymbolUsage::Assigned)?;
                 }
-                //这里的内容太多，需要好好整理归纳;确定变量的类型是重中之重;现在只能慢慢往里加，
+
                 if let Some(e) = expression {
-                    println!("bbbbbb symbol: {:?}", decl.name.borrow().name.clone());
                     self.scan_expression(e, &ExpressionContext::Load)?;
-                    //获取右侧表达式的返回类型,
-                    println!("right expression is {:?}", e);
                     let mut ty = e.get_type(&self.tables);
                     let lookup_symbol = ty == CType::Unknown;
                     if ty == CType::Unknown {
@@ -645,21 +583,11 @@ impl SymbolTableBuilder {
                     self.scan_expression(e, &ExpressionContext::Load)?;
                 }
             }
-
-            ConstDefinition(loc, decl, expression) => {
-
-                // self.register_name(decl.name.borrow().name.borrow(), decl.ty.get_type(), SymbolUsage::Global)?;
-                // self.scan_expression(decl.ty.borrow(), &ExpressionContext::Load)?;
-                // if let Some(e) = expression {
-                //     self.scan_expression(e, &ExpressionContext::Load)?;
-                // }
-            }
+            ConstDefinition(loc, decl, expression) => {}
             MultiVariableDefinition(loc, decls, e) => {
                 let mut ty = self.get_register_type(e.expr_name());
-                println!("getMultiType:{:?}", ty);
                 if ty == CType::Unknown {
                     ty = e.get_type(&self.tables);
-                    println!("Unkwown getMultiType:{:?}", ty);
                 }
                 if ty == CType::Unknown {
                     return Err(SymbolTableError {
@@ -731,14 +659,7 @@ impl SymbolTableBuilder {
         match &expression {
             Subscript(loc, a, b) => {
                 self.scan_expression(a, context)?;
-                // self.scan_expression(b, context)?;
             }
-
-            // Expression(Loc(1, 30, 681),
-            // Assign(Loc(1, 30, 29),
-            // Attribute(Loc(1, 30, 27),
-            //           Variable(Identifier { loc: Loc(1, 30, 21), name: "house" }),
-            //           Some(Identifier { loc: Loc(1, 30, 27), name: "inner" }), None)
             Attribute(loc, obj, name, idx) => {
                 if self.fun_call {
                     self.fun_call = false;
@@ -750,12 +671,6 @@ impl SymbolTableBuilder {
                 }
                 self.scan_expression(obj, context)?;
             }
-            //
-            // Expression(Loc(1, 16, 18),
-            //            FunctionCall(Loc(1, 16, 18),
-            //                         Attribute(Loc(1, 16, 16),
-            //                                   Variable(Identifier { loc: Loc(1, 16, 9), name: "aaaaaa" }),
-            //                                   Some(Identifier { loc: Loc(1, 16, 16), name: "normal" }), None), []))
             FunctionCall(loc, name, args) => {
                 let ty = self.get_register_type(name.expr_name());
                 if ty == CType::Unknown {
@@ -770,7 +685,7 @@ impl SymbolTableBuilder {
                             self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
                         }
                     }
-                    //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分
+                    //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分,不雅观;
                     self.fun_call = true;
                 }
 
@@ -842,10 +757,6 @@ impl SymbolTableBuilder {
             }
             BoolLiteral(loc, _) => {}
             NumberLiteral(loc, _) => {}
-
-            //statement is Block(Loc(1, 1, 1), [VariableDefinition(Loc(1, 2, 19), VariableDeclaration { loc: Loc(1, 2, 9), ty: None, name: Identifier { loc: Loc(1, 2, 9), name: "sum" } }, Some(ArrayLiteral(Loc(1, 2, 19), [NumberLiteral(Loc(1, 2, 14), BigInt { sign: Plus, data: BigUint { data: [1] } }), NumberLiteral(Loc(1, 2, 16), BigInt { sign: Plus, data: BigUint { data: [2] } }), NumberLiteral(Loc(1, 2, 18), BigInt { sign: Plus, data: BigUint { data: [3] } })]))), Expression(Loc(1, 4, 12), FunctionCall(Loc(1, 4, 12), Variable(Identifier { loc: Loc(1, 4, 7), name: "print" }), [Variable(Identifier { loc: Loc(1, 4, 11), name: "sum" })])), Return(Loc(1, 5, 8), None)])
-            //statement is VariableDefinition(Loc(1, 2, 19), VariableDeclaration { loc: Loc(1, 2, 9), ty: None, name: Identifier { loc: Loc(1, 2, 9), name: "sum" } }, Some(ArrayLiteral(Loc(1, 2, 19), [NumberLiteral(Loc(1, 2, 14), BigInt { sign: Plus, data: BigUint { data: [1] } }), NumberLiteral(Loc(1, 2, 16), BigInt { sign: Plus, data: BigUint { data: [2] } }), NumberLiteral(Loc(1, 2, 18), BigInt { sign: Plus, data: BigUint { data: [3] } })])))
-
             ArrayLiteral(loc, elements) => {
                 self.scan_expressions(elements, context)?;
             }
@@ -893,7 +804,6 @@ impl SymbolTableBuilder {
                 self.scan_lambda(self.lambda_name.to_string(), *lambda.clone());
             }
             Number(loc, number) => {}
-            // [Set(Loc(1, 12, 36), [Variable(Identifier { loc: Loc(1, 12, 27), name: "age" }), Variable(Identifier { loc: Loc(1, 12, 35), name: "namemmm" })]
             NamedFunctionCall(loc, exp, args) => {
                 let ty = self.get_register_type(exp.as_ref().expr_name());
                 if let CType::Struct(_) = ty {
@@ -913,8 +823,6 @@ impl SymbolTableBuilder {
                         self.verify_param_enough(ty.borrow(), exp.as_ref().expr_name(), hash_set)?;
                     }
                 }
-
-                println!("namedfun type  {:?}", ty);
             }
         }
         Ok(())
@@ -926,40 +834,12 @@ impl SymbolTableBuilder {
         args: &Vec<(Loc, Option<ast::Parameter>)>,
         line_number: usize,
     ) -> SymbolTableResult {
-        // Evaluate eventual default parameters:
-        // self.scan_expressions(&args.defaults, &ExpressionContext::Load)?;
-        // for kw_default in &args.kw_defaults {
-        //     if let Some(expression) = kw_default {
-        //         self.scan_expression(&expression, &ExpressionContext::Load)?;
-        //     }
-        // }
-
-        // Annotations are scanned in outer scope:
-        // self.scan_parameters_annotations(&args.args)?;
-        // self.scan_parameters_annotations(&args.kwonlyargs)?;
-        // if let ast::Varargs::Named(name) = &args.vararg {
-        //     self.scan_parameter_annotation(name)?;
-        // }
-        // if let ast::Varargs::Named(name) = &args.kwarg {
-        //     self.scan_parameter_annotation(name)?;
-        // }
-
         self.enter_scope(name, SymbolTableType::Function, line_number);
         let arg_types: Vec<(String, CType, bool)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
-            println!("paramis{:?},", s);
             self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter);
         }
-        // Fill scope with parameter names:
-        // self.scan_parameters(&args.args)?;
-        // self.scan_parameters(&args.kwonlyargs)?;
-        // if let ast::Varargs::Named(name) = &args.vararg {
-        //     self.scan_parameter(name)?;
-        // }
-        // if let ast::Varargs::Named(name) = &args.kwarg {
-        //     self.scan_parameter(name)?;
-        // }
         Ok(())
     }
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
@@ -1075,41 +955,18 @@ impl SymbolTableBuilder {
         }
         return false;
     }
-    // fn scan_string_group(&mut self, group: &ast::StringGroup) -> SymbolTableResult {
-    //     match group {
-    //         ast::StringGroup::Constant { .. } => {}
-    //         ast::StringGroup::FormattedValue { value, spec, .. } => {
-    //             self.scan_expression(value, &ExpressionContext::Load)?;
-    //             if let Some(spec) = spec {
-    //                 self.scan_string_group(spec)?;
-    //             }
-    //         }
-    //         ast::StringGroup::Joined { values } => {
-    //             for subgroup in values {
-    //                 self.scan_string_group(subgroup)?;
-    //             }
-    //         }
-    //     }
-    //     Ok(())
-    // }
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage) -> SymbolTableResult {
-        let scope_depth = self.tables.len();
-
+        trace!("register name={:?}, ty: {:?}", name, ty);
         let table = self.tables.last_mut().unwrap();
         let location = Loc(0, 0, 0);
-
-        println!("register name={:?}, ty: {:?}", name, ty);
         // Some checks:
         let containing = table.symbols.contains_key(name);
         if containing {
-            println!("found!");
-            // Role already set..
             match role {
                 SymbolUsage::Global => {
                     let symbol = table.symbols.get(name).unwrap();
-                    println!("Symbol is {:?}", symbol);
                     if let SymbolScope::Global = symbol.scope {
                         // Ok
                     } else {
@@ -1119,54 +976,18 @@ impl SymbolTableBuilder {
                         });
                     }
                 }
-                SymbolUsage::Nonlocal => {
-                    return Err(SymbolTableError {
-                        error: format!("name '{}' is used prior to nonlocal declaration", name),
-                        location,
-                    });
-                }
                 _ => {
                     // Ok?
                 }
             }
         }
 
-        // Some more checks:
-        match role {
-            SymbolUsage::Nonlocal => {
-                if scope_depth < 2 {
-                    return Err(SymbolTableError {
-                        error: format!("cannot define nonlocal '{}' at top level.", name),
-                        location,
-                    });
-                }
-            }
-            _ => {
-                // Ok!
-            }
-        }
-
-        // Insert symbol when required:
         if !containing {
-            println!("notFound");
             let symbol = Symbol::new(name, ty.clone());
             table.symbols.insert(name.to_owned(), symbol);
         }
-
-        // Set proper flags on symbol:
         let symbol = table.symbols.get_mut(name).unwrap();
-        println!("Symbol is {:?}", symbol);
         match role {
-            SymbolUsage::Nonlocal => {
-                if let SymbolScope::Unknown = symbol.scope {
-                    symbol.scope = SymbolScope::Global;
-                } else {
-                    return Err(SymbolTableError {
-                        error: format!("Symbol {} scope cannot be set to nonlocal, since its scope was already determined otherwise.", name),
-                        location,
-                    });
-                }
-            }
             SymbolUsage::Parameter => {
                 symbol.is_parameter = true;
             }
@@ -1174,9 +995,8 @@ impl SymbolTableBuilder {
                 symbol.is_assigned = true;
             }
             SymbolUsage::Global => {
-                if let SymbolScope::Unknown = symbol.scope {
-                    symbol.scope = SymbolScope::Global;
-                } else if let SymbolScope::Global = symbol.scope {
+                if let SymbolScope::Global = symbol.scope
+                {
                     // Global scope can be set to global
                 } else {
                     return Err(SymbolTableError {
@@ -1188,12 +1008,7 @@ impl SymbolTableBuilder {
             SymbolUsage::Used => {
                 symbol.is_referenced = true;
             }
-            SymbolUsage::Unknown => {
-                symbol.ty = CType::Unknown;
-            }
-            SymbolUsage::Imported => {}
         }
-        println!("after register name={:?}, ty: {:?}", symbol.name, symbol.ty);
         Ok(())
     }
 }

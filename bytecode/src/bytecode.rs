@@ -29,7 +29,7 @@ impl Location {
     }
 }
 
-/// Data Struct 和 Function 对应一个CodeObject；
+/// Data、Struct、 Function，Module 对应一个CodeObject；
 ///
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodeObject {
@@ -86,18 +86,7 @@ pub enum NameScope {
     Free,
 }
 
-///
-// #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
-// pub enum ConversionFlag {
-//     /// Converts by calling `str(<value>)`.
-//     Str,
-//     /// Converts by calling `ascii(<value>)`.
-//     Ascii,
-//     /// Converts by calling `repr(<value>)`.
-//     Repr,
-// }
-
-/// A Single bytecode instruction.
+//指令集
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Instruction {
     Import {
@@ -153,21 +142,19 @@ pub enum Instruction {
     Jump {
         target: Label,
     },
-    /// Pop the top of the stack, and jump if this value is true.
+    /// 真跳
     JumpIfTrue {
         target: Label,
     },
-    /// Pop the top of the stack, and jump if this value is false.
+    ///假跳
     JumpIfFalse {
         target: Label,
     },
-    /// Peek at the top of the stack, and jump if this value is true.
-    /// Otherwise, pop top of stack.
+    /// 真跳假弹
     JumpIfTrueOrPop {
         target: Label,
     },
-    /// Peek at the top of the stack, and jump if this value is false.
-    /// Otherwise, pop top of stack.
+    /// 假跳真弹
     JumpIfFalseOrPop {
         target: Label,
     },
