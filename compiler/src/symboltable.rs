@@ -1,12 +1,5 @@
-/* Python code is pre-scanned for symbols in the ast.
-
-This ensures that global and nonlocal keywords are picked up.
-Then the compiler can use the symbol table to generate proper
-load and store instructions for names.
-
-Inspirational file: https://github.com/python/cpython/blob/master/Python/symtable.c
+/* 文件扫描，symbol生成
 */
-
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
@@ -19,13 +12,13 @@ use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_import_symbol::{resolve_import_symbol, scan_import_symbol};
+use crate::resolve_import_symbol::scan_import_symbol;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
     builder.insert_builtin_symbol();
-    builder.scan_top_symbol_types(program)?;
+    builder.scan_top_symbol_types(program, false)?;
     builder.scan_program(program)?;
     builder.finish()
 }
@@ -42,27 +35,22 @@ pub fn statements_to_symbol_table(
 pub fn file_top_symbol(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
-    builder.scan_top_symbol_types(program)?;
+    builder.scan_top_symbol_types(program, false)?;
     builder.finish()
 }
 
-/// Captures all symbols in the current scope, and has a list of subscopes in this scope.
+
 #[derive(Clone)]
 pub struct SymbolTable {
-    /// The name of this symbol table. Often the name of the class or function.
+    /// 符号表名称
     pub name: String,
-
-    /// The type of symbol table
+    /// 类型
     pub typ: SymbolTableType,
-
-    /// The line number in the sourcecode where this symboltable begins.
+    /// 开始的文件行数
     pub line_number: usize,
-
-    /// A set of symbols present on this scope level.
+    /// 符号集合
     pub symbols: IndexMap<String, Symbol>,
-
-    /// A list of subscopes in the order as found in the
-    /// AST nodes.
+    ///子域的table
     pub sub_tables: Vec<SymbolTable>,
 }
 
@@ -92,13 +80,11 @@ impl fmt::Display for SymbolTableType {
             SymbolTableType::Module => write!(f, "module"),
             SymbolTableType::Class => write!(f, "class"),
             SymbolTableType::Function => write!(f, "function"),
-            SymbolTableType::Enum => write!(f, "function"),
+            SymbolTableType::Enum => write!(f, "enum"),
         }
     }
 }
 
-/// Indicator for a single symbol what the scope of this symbol is.
-/// The scope can be unknown, which is unfortunate, but not impossible.
 #[derive(Debug, Clone)]
 pub enum SymbolScope {
     Global,
@@ -186,19 +172,18 @@ impl std::fmt::Debug for SymbolTable {
             self.name,
             self.symbols.len(),
             self.sub_tables.len()
-        );
-        write!(f, "symbols:\n");
-        for (key, value) in self.symbols.iter() {
-            write!(f, "key:{:?},value:{:?}\n", key, value);
-        }
+        )
+        // write!(f, "symbols:\n");
+        // for (key, value) in self.symbols.iter() {
+        //     write!(f, "key:{:?},value:{:?}\n", key, value);
+        // }
+        // write!(f, "subtable is:\n");
+        // write!(f, "symbols222:\n");
+        // for (idx, table) in self.sub_tables.iter().enumerate() {
+        //     write!(f, "table idx {:?} is {:?}\n", idx, table);
+        // }
 
-        write!(f, "subtable is:\n");
-        write!(f, "symbols222:\n");
-        for (idx, table) in self.sub_tables.iter().enumerate() {
-            write!(f, "table idx {:?} is fuck fuck {:?}\n", idx, table);
-        }
-
-        write!(f, "table name:{:?} end:\n",self.name)
+        // write!(f, "table name:{:?} end:\n", self.name)
     }
 }
 
@@ -372,27 +357,14 @@ impl SymbolTableBuilder {
                     self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {
-                    match def {
-                        Import::Plain(mod_path, all) => {
-                            // self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
-                            scan_import_symbol(self, mod_path, &None, all)?;
-                        }
-                        _ => {}
-                    }
+                    //处理文件各项内容时，不需要处理import， import在扫描文件顶层symbol的时候处理;
                 }
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
-                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    // let tt = def.get_type();
-                    // println!("type is :{:?}", tt);
-                    //
-                    // println!("function is :{:?}", def.clone());
                     if let Some(name) = &def.name {
-                        // self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
                         if let Some(expression) = &def.as_ref().returns {
                             self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
-                        // // let params = def.as_ref().params.iter().map(|s| s.1).collect();
                         self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                         self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                         self.leave_scope();
@@ -430,7 +402,7 @@ impl SymbolTableBuilder {
     }
 
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
-    fn scan_top_symbol_types(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
+    pub fn scan_top_symbol_types(&mut self, program: &ast::SourceUnit, in_import: bool) -> SymbolTableResult {
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
@@ -443,21 +415,21 @@ impl SymbolTableBuilder {
                     self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {
-                    match def {
-                        //CType 如何确定，这是个问题，先往前走
-                        Import::Plain(mod_path, all) => {
-                            // self.register_name(&mod_path.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
-                            resolve_import_symbol(mod_path, &None, all, &mut self.tables)?;
-                        }
-                        Import::GlobalSymbol(mod_path, as_name, all) => {
-                            self.register_name(&as_name.name, CType::Any, SymbolUsage::Imported)?;
-                        }
-                        Import::Rename(mod_path, as_part) => {
-                            for (name, as_name) in as_part {
-                                if as_name.is_some() {
-                                    self.register_name(&as_name.as_ref().unwrap().name, CType::Any, SymbolUsage::Imported)?;
-                                } else {
-                                    self.register_name(&name.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                    if !in_import {
+                        match def {
+                            Import::Plain(mod_path, all) => {
+                                scan_import_symbol(self, mod_path, &None, all)?;
+                            }
+                            Import::GlobalSymbol(mod_path, as_name, all) => {
+                                self.register_name(&as_name.name, CType::Any, SymbolUsage::Imported)?;
+                            }
+                            Import::Rename(mod_path, as_part) => {
+                                for (name, as_name) in as_part {
+                                    if as_name.is_some() {
+                                        self.register_name(&as_name.as_ref().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                                    } else {
+                                        self.register_name(&name.last().unwrap().name, CType::Any, SymbolUsage::Imported)?;
+                                    }
                                 }
                             }
                         }
@@ -786,6 +758,12 @@ impl SymbolTableBuilder {
             //                                   Some(Identifier { loc: Loc(1, 16, 16), name: "normal" }), None), []))
             FunctionCall(loc, name, args) => {
                 let ty = self.get_register_type(name.expr_name());
+                if ty == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("未定义{:?}的类型，", name.expr_name()),
+                        location: loc.clone(),
+                    });
+                }
                 if let Attribute(_, name, Some(ident), _) = name.as_ref() {
                     if name.expr_name().ne("self".clone()) {
                         if !self.is_enum_variant(&ty, name.expr_name(), ident.name.clone()) {

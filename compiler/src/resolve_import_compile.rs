@@ -1,7 +1,7 @@
 //根据import，生成各种Value,最好是有个中间的代码形式，直接读取就好，不要重新编译;跟java的class中间字节码一样;
 use crate::compile::*;
 use pan_parser::ast::*;
-use pan_bytecode::bytecode::CodeObject;
+use pan_bytecode::bytecode::{CodeObject, Instruction, Constant};
 use std::collections::HashMap;
 use std::env;
 use pan_parser::parse;
@@ -46,9 +46,17 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
     let mut file = File::open(path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let ast = parse(&contents, 2).unwrap();
-    let symboltable = make_symbol_table(&ast).unwrap();
-    compiler.compile_program(&ast, symboltable, true, *is_all, "".to_string());
+    let code_object = compile(&contents, String::from(path.clone().to_str().unwrap()), 0).unwrap();
+    compiler.import_instructions.extend(code_object.instructions);
+    // compiler.emit(Instruction::LoadConst {
+    //     value: Constant::Code {
+    //         code: Box::new(code_object)
+    //     },
+    // });
+    // compiler.emit(Instruction::LoadBuildModule);
+    // let ast = parse(&contents, 2).unwrap();
+    // let symboltable = make_symbol_table(&ast).unwrap();
+    // compiler.compile_program(&ast, symboltable, true, *is_all, "".to_string());
     Ok(())
 }
 

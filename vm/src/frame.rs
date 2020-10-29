@@ -420,13 +420,19 @@ impl Frame {
             //     None
             // }
             bytecode::Instruction::LoadBuildStruct => {
-                  self.excute_make_struct_instance(vm);
+                self.excute_make_struct_instance(vm);
                 None
             }
 
             bytecode::Instruction::LoadBuildEnum(count) => {
                 self.excute_make_enum_instance(vm, *count);
                 // self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
+                None
+            }
+
+            bytecode::Instruction::LoadBuildModule => {
+                let value = self.pop_value();
+                vm.run_code_obj(value.code(), self.scope.clone());
                 None
             }
             // bytecode::Instruction::UnpackSequence { size } => {

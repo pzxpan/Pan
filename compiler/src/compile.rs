@@ -27,6 +27,7 @@ pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
 /// Main structure holding the state of compilation.
 pub struct Compiler<O: OutputStream = BasicOutputStream> {
+    pub import_instructions: Vec<Instruction>,
     output_stack: Vec<O>,
     symbol_table_stack: Vec<SymbolTable>,
     nxt_label: usize,
@@ -98,7 +99,7 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        compiler.compile_program(&ast, symbol_table, false, false, "".to_string())
+        compiler.compile_program(&ast, symbol_table)
     })
 }
 
@@ -114,6 +115,7 @@ impl<O> Default for Compiler<O>
 impl<O: OutputStream> Compiler<O> {
     fn new(optimize: u8) -> Self {
         Compiler {
+            import_instructions: Vec::new(),
             output_stack: Vec::new(),
             symbol_table_stack: Vec::new(),
             nxt_label: 0,
@@ -155,14 +157,9 @@ impl<O: OutputStream> Compiler<O> {
         &mut self,
         program: &ast::SourceUnit,
         symbol_table: SymbolTable,
-        is_import: bool,
-        is_all: bool,
-        import_name: String,
     ) -> Result<(), CompileError> {
-        if is_import {} else {
-            println!("compile symboltable{:?}", symbol_table);
-            self.symbol_table_stack.push(symbol_table);
-        }
+        println!("compile symboltable{:?}", symbol_table);
+        self.symbol_table_stack.push(symbol_table);
         let size_before = self.output_stack.len();
         println!("size before is{:?}", size_before);
 
@@ -175,25 +172,13 @@ impl<O: OutputStream> Compiler<O> {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    if is_import {
-                        if is_all || name.eq(import_name.as_str()) {
-                            self.compile_enum_def(name.as_str(), &body, &generics);
-                        }
-                    } else {
-                        self.compile_enum_def(name.as_str(), &body, &generics);
-                    }
+                    self.compile_enum_def(name.as_str(), &body, &generics);
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    if is_import {
-                        if is_all || name.eq(import_name.as_str()) {
-                            self.compile_class_def(name.as_str(), &body, &generics);
-                        }
-                    } else {
-                        self.compile_class_def(name.as_str(), &body, &generics);
-                    }
+                    self.compile_class_def(name.as_str(), &body, &generics);
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {
                     match def {
@@ -217,14 +202,7 @@ impl<O: OutputStream> Compiler<O> {
                     // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
-                    if is_import {
-                        if is_all || name.eq(import_name.as_str()) {
-                            self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
-                        }
-                    } else {
-                        self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
-                    }
-                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
+                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
                 }
                 _ => (),
             }
@@ -233,20 +211,21 @@ impl<O: OutputStream> Compiler<O> {
 
         assert_eq!(self.output_stack.len(), size_before);
         println!("cccc after size before is {:?} ", size_before);
-        if !is_import {
-            self.emit(Instruction::LoadName {
-                name: "main".to_string(),
-                scope: NameScope::Free,
-            });
-            self.emit(Instruction::CallFunction { typ: Positional(0) });
-            self.emit(Instruction::Pop);
-
-            // Emit None at end:
-            self.emit(Instruction::LoadConst {
-                value: bytecode::Constant::None,
-            });
-            self.emit(Instruction::ReturnValue);
+        for i in self.import_instructions.clone().iter() {
+            self.emit(i.clone());
         }
+        self.emit(Instruction::LoadName {
+            name: "main".to_string(),
+            scope: NameScope::Free,
+        });
+        self.emit(Instruction::CallFunction { typ: Positional(0) });
+        self.emit(Instruction::Pop);
+
+        // Emit None at end:
+        self.emit(Instruction::LoadConst {
+            value: bytecode::Constant::None,
+        });
+        self.emit(Instruction::ReturnValue);
         Ok(())
     }
 
@@ -2354,7 +2333,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     // Low level helper functions:
-    fn emit(&mut self, instruction: Instruction) {
+    pub fn emit(&mut self, instruction: Instruction) {
         let location = compile_location(&self.current_source_location);
         // TODO: insert source filename
         self.current_output().emit(instruction, location);
