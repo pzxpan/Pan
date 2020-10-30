@@ -272,6 +272,7 @@ pub struct DictEntry {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Number {
+    Char(char),
     I8(i8),
     I16(i16),
     I32(i32),
@@ -288,6 +289,7 @@ pub enum Number {
 
     Int(BigInt),
     Float(f64),
+
 }
 
 #[derive(Debug, PartialEq, Clone)]

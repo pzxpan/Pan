@@ -1419,6 +1419,8 @@ impl<O: OutputStream> Compiler<O> {
                     value: bytecode::Constant::Float { value },
                 });
             }
+            _ => {}
+
         }
         Ok(())
     }

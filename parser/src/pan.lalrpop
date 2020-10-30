@@ -368,6 +368,7 @@ Number: Number = {
     <value:u128> => { Number::U128(value)  },
     <value:usize> => { Number::USize(value)  },
     <value:float> => { Number::Float( value ) },
+    <value:char> => { Number::Char( value ) },
    // <s:complex> => { Number::Complex { real: s.0, imag: s.1 } },
 };
 
@@ -382,11 +383,6 @@ StringLiteral: StringLiteral = {
 // and as an added bonus we can generate error messages about missing parameters/returns
 // to functions
 Parameter: Parameter = {
-    <l:@L><name:Identifier?> ":"  "ref'"  <ty:Expression>   <r:@R> => {
-        let loc = Loc(file_no, l, r);
-        Parameter{loc, ty, is_ref:true, is_mut:true, name}
-    },
-
     <l:@L><name:Identifier?> ":"  "ref"  <ty:Expression>   <r:@R> => {
             let loc = Loc(file_no, l, r);
             Parameter{loc, ty, is_ref:true, is_mut: false, name}
@@ -570,7 +566,6 @@ extern {
         ";" => Token::Semicolon,
         ".." => Token::TwoDot,
         "::" => Token::TwoColon,
-        "ref'" => Token::MutRef,
         "ref" => Token::ReadOnlyRef,
         "{" => Token::OpenCurlyBrace,
         "}" => Token::CloseCurlyBrace,
@@ -632,6 +627,7 @@ extern {
         u32 => Token::U32(<u32>),
         u64 => Token::U64(<u64>),
         u128 => Token::U128(<u128>),
+        char => Token::Char(<char>),
         usize => Token::USize(<usize>),
         "data" => Token::Data,
         "import" => Token::Import,
