@@ -212,6 +212,7 @@ impl HasType for Expression {
                     USize(_) => CType::USize,
                     Int(e) => CType::Int,
                     Float(f64) => CType::Float,
+                    Char(char) => CType::Char,
                 }
             }
 

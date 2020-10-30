@@ -504,8 +504,7 @@ impl SymbolTableBuilder {
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 self.scan_statement(body)?;
             }
-            Break(_) | Continue(_) => {
-            }
+            Break(_) | Continue(_) => {}
             Expression(loc, expression) => {
                 self.scan_expression(expression, &ExpressionContext::Load)?;
             }
@@ -597,6 +596,7 @@ impl SymbolTableBuilder {
                 }
                 self.scan_multi_value_def(decls, &ty);
             }
+            Match(loc, _, _) => {}
         }
         Ok(())
     }
@@ -823,6 +823,12 @@ impl SymbolTableBuilder {
                         self.verify_param_enough(ty.borrow(), exp.as_ref().expr_name(), hash_set)?;
                     }
                 }
+            }
+            IfExpression(loc, _, _, _) => {
+
+            }
+            MatchExpression(loc, _, _) => {
+
             }
         }
         Ok(())

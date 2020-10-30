@@ -15,9 +15,11 @@ pub enum CType {
     U64,
     U128,
     USize,
+    Char,
 
     Int,
     Float,
+
     Str,
     Bool,
     Tuple(Box<Vec<CType>>),

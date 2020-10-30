@@ -68,14 +68,12 @@ pub enum Token<'input> {
     U64(u64),
     U128(u128),
     USize(usize),
+    Char(char),
 
     Bool,
-
     String,
-
     Semicolon,
     TwoDot,
-    MutRef,
     ReadOnlyRef,
     Comma,
     OpenParenthesis,
@@ -102,6 +100,7 @@ pub enum Token<'input> {
     SubtractAssign,
     Decrement,
     Subtract,
+    Hole,
 
     MulAssign,
     Mul,
@@ -119,9 +118,11 @@ pub enum Token<'input> {
     True,
     False,
     Else,
+    Elif,
     For,
     While,
     If,
+    Match,
 
     ShiftRight,
     ShiftRightAssign,
@@ -145,6 +146,7 @@ pub enum Token<'input> {
 
     Mapping,
     Arrow,
+    ThinArrow,
 
     As,
     From,
@@ -183,7 +185,8 @@ impl<'input> fmt::Display for Token<'input> {
             Token::U64(n) => write!(f, "{:?}", n),
             Token::U128(n) => write!(f, "{:?}", n),
             Token::USize(n) => write!(f, "{:?}", n),
-            Token::MutRef => write!(f, "ref'"),
+            Token::Char(c) => write!(f, "{:?}", c),
+
             Token::TwoDot => write!(f, ".."),
             Token::ReadOnlyRef => write!(f, "ref"),
             Token::Semicolon => write!(f, ";"),
@@ -207,6 +210,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::SubtractAssign => write!(f, ".-"),
             Token::Decrement => write!(f, "--"),
             Token::Subtract => write!(f, "-"),
+            Token::Hole => write!(f, "_"),
             Token::MulAssign => write!(f, ".*"),
             Token::Mul => write!(f, "*"),
             Token::Power => write!(f, "**"),
@@ -258,12 +262,15 @@ impl<'input> fmt::Display for Token<'input> {
             Token::True => write!(f, "true"),
             Token::False => write!(f, "false"),
             Token::Else => write!(f, "else"),
+            Token::Elif => write!(f, "elif"),
             Token::For => write!(f, "for"),
             Token::While => write!(f, "while"),
             Token::If => write!(f, "if"),
+            Token::Match => write!(f, "match"),
             Token::Constructor => write!(f, "constructor"),
             Token::Mapping => write!(f, "mapping"),
             Token::Arrow => write!(f, "=>"),
+            Token::ThinArrow => write!(f, "->"),
 
             Token::As => write!(f, "as"),
             Token::From => write!(f, "from"),
@@ -325,27 +332,23 @@ impl LexicalError {
 }
 
 static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
-   // "bool" => Token::Bool,
     "break" => Token::Break,
-
-  //  "float" => Token::Float,
-
     "constant" => Token::Constant,
     "constructor" => Token::Constructor,
     "continue" => Token::Continue,
     "struct" => Token::Struct,
     "do" => Token::Do,
     "else" => Token::Else,
+    "elif" => Token::Elif,
+    "match" => Token::Match,
 
     "enum" => Token::Enum,
-
     "false" => Token::False,
     "for" => Token::For,
     "fun" => Token::Function,
     "if" => Token::If,
     "import" => Token::Import,
 
-  //  "int" => Token::Int,
     "mapping" => Token::Mapping,
     "private" => Token::Private,
     "public" => Token::Public,
@@ -353,7 +356,6 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "payable" => Token::Payable,
     "return" => Token::Return,
     "returns" => Token::Returns,
- //   "string" => Token::String,
     "data" => Token::Data,
     "true" => Token::True,
 
@@ -368,10 +370,8 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "lambda" => Token::Lambda,
     "in" => Token::In,
     "pub" => Token::Pub,
-    "ref'" => Token::MutRef,
     ".." => Token::TwoDot,
     "ref" => Token::ReadOnlyRef,
-
 };
 
 impl<'input> Lexer<'input> {
@@ -510,14 +510,6 @@ impl<'input> Lexer<'input> {
                 self.chars.next();
                 end_pos = end_pos + 1;
                 return Some(Ok((start_pos, Token::Float(value), end_pos)));
-                // Ok((
-                //     start_pos,
-                //     Token::Complex {
-                //         real: 0.0,
-                //         imag: value,
-                //     },
-                //     end_pos,
-                // ))
             } else {
                 return Some(Ok((start_pos, Token::Float(value), end_pos)));
             }
@@ -710,12 +702,29 @@ impl<'input> Lexer<'input> {
                 Some((start, '\n')) => {
                     self.newline();
                 }
-                Some((start, ch)) if ch == '_' || ch == '\'' || UnicodeXID::is_xid_start(ch) => {
+                Some((start, '\'')) => {
+                    //let mut end = start;
+                    if let Some((i, ch)) = self.chars.next() {
+                        if let Some((j, cc)) = self.chars.peek() {
+                            if *cc == '\'' {
+                                self.chars.next();
+                                return Some(Ok((self.row, Token::Char(ch), self.column)));
+                            } else {
+                                return Some(Err(LexicalError::UnrecognisedToken(
+                                    self.row,
+                                    self.column,
+                                    self.input[start..start + 2].to_owned(),
+                                )));
+                            }
+                        }
+                    }
+                }
+                Some((start, ch)) if ch == '_' || UnicodeXID::is_xid_start(ch) => {
                     let end;
 
                     loop {
                         if let Some((i, ch)) = self.chars.peek() {
-                            if !UnicodeXID::is_xid_continue(*ch) && *ch != '\'' {
+                            if !UnicodeXID::is_xid_continue(*ch) {
                                 end = *i;
                                 break;
                             }
@@ -916,7 +925,14 @@ impl<'input> Lexer<'input> {
                     return Some(Ok((self.row, Token::Add, self.column)));
                 }
                 Some((i, '-')) => {
+                    if let Some((_, '>')) = self.chars.peek() {
+                        self.chars.next();
+                        return Some(Ok((self.row, Token::ThinArrow, self.column)));
+                    }
                     return Some(Ok((self.row, Token::Subtract, self.column)));
+                }
+                Some((i, '_')) => {
+                    return Some(Ok((self.row, Token::Hole, self.column)));
                 }
                 Some((i, '*')) => {
                     return match self.chars.peek() {
@@ -1097,17 +1113,7 @@ impl<'input> Iterator for Lexer<'input> {
 
     /// Return the next token
     fn next(&mut self) -> Option<Self::Item> {
-        // Lexer should be aware of whether the last two tokens were
-        // pragma followed by identifier. If this is true, then special parsing should be
-        // done for the pragma value
-        // let token = if let [Some(Token::Pragma), Some(Token::Identifier(_))] = self.last_tokens {
-        //     self.pragma_value()
-        // } else {
-        //     self.next()
-        // };
-
         let token = self.next();
-
         self.last_tokens = [
             self.last_tokens[1],
             match token {
@@ -1115,222 +1121,6 @@ impl<'input> Iterator for Lexer<'input> {
                 _ => None,
             },
         ];
-
         token
     }
-}
-
-#[test]
-fn lexertest() {
-    let tokens = Lexer::new("bool").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(tokens, vec!(Ok((0, Token::Bool, 4))));
-
-    let tokens = Lexer::new("uint8").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(tokens, vec!(Ok((0, Token::Uint(8), 5))));
-
-    let tokens = Lexer::new("hex").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(tokens, vec!(Ok((0, Token::Identifier("hex"), 3))));
-
-    let tokens = Lexer::new("hex\"cafe_dead\" /* adad*** */")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Ok((0, Token::HexLiteral("hex\"cafe_dead\""), 14)))
-    );
-
-    let tokens = Lexer::new("// foo bar\n0x00fead0_12 00090 0_0")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((11, Token::HexNumber("0x00fead0_12"), 23)),
-            Ok((24, Token::Number("00090"), 29)),
-            Ok((30, Token::Number("0_0"), 33))
-        )
-    );
-
-    let tokens =
-        Lexer::new("\"foo\"").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(tokens, vec!(Ok((0, Token::StringLiteral("foo"), 5)), ));
-
-    let tokens = Lexer::new("pragma solidity >=0.5.0 <0.7.0;")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::Pragma, 6)),
-            Ok((7, Token::Identifier("solidity"), 15)),
-            Ok((16, Token::StringLiteral(">=0.5.0 <0.7.0"), 30)),
-            Ok((30, Token::Semicolon, 31)),
-        )
-    );
-
-    let tokens = Lexer::new("pragma solidity \t>=0.5.0 <0.7.0 \n ;")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::Pragma, 6)),
-            Ok((7, Token::Identifier("solidity"), 15)),
-            Ok((17, Token::StringLiteral(">=0.5.0 <0.7.0"), 31)),
-            Ok((34, Token::Semicolon, 35)),
-        )
-    );
-
-    let tokens = Lexer::new("pragma solidity 赤;")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::Pragma, 6)),
-            Ok((7, Token::Identifier("solidity"), 15)),
-            Ok((16, Token::StringLiteral("赤"), 19)),
-            Ok((19, Token::Semicolon, 20))
-        )
-    );
-
-    let tokens =
-        Lexer::new(">>= >> >= >").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::ShiftRightAssign, 3)),
-            Ok((4, Token::ShiftRight, 6)),
-            Ok((7, Token::MoreEqual, 9)),
-            Ok((10, Token::More, 11)),
-        )
-    );
-
-    let tokens =
-        Lexer::new("<<= << <= <").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::ShiftLeftAssign, 3)),
-            Ok((4, Token::ShiftLeft, 6)),
-            Ok((7, Token::LessEqual, 9)),
-            Ok((10, Token::Less, 11)),
-        )
-    );
-
-    let tokens =
-        Lexer::new("-16 -- - -=").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::Subtract, 1)),
-            Ok((1, Token::Number("16"), 3)),
-            Ok((4, Token::Decrement, 6)),
-            Ok((7, Token::Subtract, 8)),
-            Ok((9, Token::SubtractAssign, 11)),
-        )
-    );
-
-    let tokens = Lexer::new("-4 ").collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Ok((0, Token::Subtract, 1)), Ok((1, Token::Number("4"), 2)), )
-    );
-
-    let tokens =
-        Lexer::new(r#"hex"abcdefg""#).collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Err(LexicalError::InvalidCharacterInHexLiteral(10, 'g')))
-    );
-
-    let tokens = Lexer::new(r#" € "#).collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Err(LexicalError::UnrecognisedToken(1, 4, "€".to_owned())))
-    );
-
-    let tokens = Lexer::new(r#"€"#).collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Err(LexicalError::UnrecognisedToken(0, 3, "€".to_owned())))
-    );
-
-    let tokens = Lexer::new(r#"pragma foo bar"#)
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::Pragma, 6)),
-            Ok((7, Token::Identifier("foo"), 10)),
-            Ok((11, Token::StringLiteral("bar"), 14)),
-        )
-    );
-
-    let tokens =
-        Lexer::new(r#"/// foo"#).collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Ok((3, Token::DocComment(CommentType::Line, " foo"), 7)))
-    );
-
-    let tokens = Lexer::new("/// jadajadadjada\n// bar")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Ok((
-            3,
-            Token::DocComment(CommentType::Line, " jadajadadjada"),
-            17
-        )))
-    );
-
-    let tokens =
-        Lexer::new(r#"/** foo */"#).collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Ok((3, Token::DocComment(CommentType::Block, " foo "), 8)))
-    );
-
-    let tokens = Lexer::new("/** jadajadadjada */\n/* bar */")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(Ok((
-            3,
-            Token::DocComment(CommentType::Block, " jadajadadjada "),
-            18
-        )))
-    );
-
-    // some unicode tests
-    let tokens = Lexer::new(">=\u{a0} . très\u{2028}αβγδεζηθικλμνξοπρστυφχψω\u{85}カラス")
-        .collect::<Vec<Result<(usize, Token, usize), LexicalError>>>();
-
-    assert_eq!(
-        tokens,
-        vec!(
-            Ok((0, Token::MoreEqual, 2)),
-            Ok((5, Token::Member, 6)),
-            Ok((7, Token::Identifier("très"), 12)),
-            Ok((15, Token::Identifier("αβγδεζηθικλμνξοπρστυφχψω"), 63)),
-            Ok((65, Token::Identifier("カラス"), 74))
-        )
-    );
 }
