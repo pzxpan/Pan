@@ -119,6 +119,7 @@ pub enum Token<'input> {
     True,
     False,
     Else,
+    Elif,
     For,
     While,
     If,
@@ -258,6 +259,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::True => write!(f, "true"),
             Token::False => write!(f, "false"),
             Token::Else => write!(f, "else"),
+            Token::Elif => write!(f, "elif"),
             Token::For => write!(f, "for"),
             Token::While => write!(f, "while"),
             Token::If => write!(f, "if"),
@@ -336,9 +338,9 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "struct" => Token::Struct,
     "do" => Token::Do,
     "else" => Token::Else,
+    "elif" => Token::Elif,
 
     "enum" => Token::Enum,
-
     "false" => Token::False,
     "for" => Token::For,
     "fun" => Token::Function,

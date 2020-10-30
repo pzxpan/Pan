@@ -464,13 +464,26 @@ BlockStatement: Statement = {
 
 Statement: Statement = {
    NonIfStatement,
-   <l:@L> "if"  <cond:Expression>  <body:BlockStatement> <r:@R> => {
-       Statement::If(Loc(file_no, l, r), cond, Box::new(body), None)
-    },
-   <l:@L> "if"  <cond:Expression>  <body:BlockStatement> "else" <o:BlockStatement> <r:@R> => {
-      Statement::If(Loc(file_no, l, r), cond, Box::new(body), Some(Box::new(o)))
-   },
-
+   <l:@L> "if" <cond:Expression> <body:BlockStatement> <s2:("elif" <Expression> <BlockStatement>)*> <el:("else" BlockStatement)?> <r:@R> => {
+         if el.is_some() {
+            let mut s3 = el.map(|s|s.1).unwrap();
+            for i in s2.into_iter().rev() {
+                s3 = Statement::If(Loc(file_no, l, r), i.0, Box::new(i.1), Some(Box::new(s3)));
+            }
+            Statement::If(Loc(file_no, l, r), cond, Box::new(body), Some(Box::new(s3)))
+         } else {
+            if s2.len() > 0 {
+                let a = s2.last().unwrap();
+                let mut s3 = Statement::If(Loc(file_no, l, r), a.0.clone(), Box::new(a.1.clone()), None);
+                for i in s2.into_iter().rev().skip(1) {
+                   s3 = Statement::If(Loc(file_no, l, r), i.0, Box::new(i.1), Some(Box::new(s3)));
+                }
+                Statement::If(Loc(file_no, l, r), cond, Box::new(body), Some(Box::new(s3)))
+            } else {
+               Statement::If(Loc(file_no, l, r), cond, Box::new(body), None)
+            }
+         }
+      },
    <l:@L> "while"  <e:Expression>  <b:BlockStatement> <r:@R> => {
       Statement::While(Loc(file_no, l, r), e, Box::new(b))
     },
@@ -649,6 +662,7 @@ extern {
         "for" => Token::For,
         "while" => Token::While,
         "else" => Token::Else,
+        "elif" => Token::Elif,
         "do" => Token::Do,
         "continue" => Token::Continue,
         "break" => Token::Break,
