@@ -100,6 +100,7 @@ pub enum Token<'input> {
     SubtractAssign,
     Decrement,
     Subtract,
+    Hole,
 
     MulAssign,
     Mul,
@@ -121,6 +122,7 @@ pub enum Token<'input> {
     For,
     While,
     If,
+    Match,
 
     ShiftRight,
     ShiftRightAssign,
@@ -144,6 +146,7 @@ pub enum Token<'input> {
 
     Mapping,
     Arrow,
+    ThinArrow,
 
     As,
     From,
@@ -207,6 +210,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::SubtractAssign => write!(f, ".-"),
             Token::Decrement => write!(f, "--"),
             Token::Subtract => write!(f, "-"),
+            Token::Hole => write!(f, "_"),
             Token::MulAssign => write!(f, ".*"),
             Token::Mul => write!(f, "*"),
             Token::Power => write!(f, "**"),
@@ -262,9 +266,11 @@ impl<'input> fmt::Display for Token<'input> {
             Token::For => write!(f, "for"),
             Token::While => write!(f, "while"),
             Token::If => write!(f, "if"),
+            Token::Match => write!(f, "match"),
             Token::Constructor => write!(f, "constructor"),
             Token::Mapping => write!(f, "mapping"),
             Token::Arrow => write!(f, "=>"),
+            Token::ThinArrow => write!(f, "->"),
 
             Token::As => write!(f, "as"),
             Token::From => write!(f, "from"),
@@ -326,11 +332,7 @@ impl LexicalError {
 }
 
 static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
-   // "bool" => Token::Bool,
     "break" => Token::Break,
-
-  //  "float" => Token::Float,
-
     "constant" => Token::Constant,
     "constructor" => Token::Constructor,
     "continue" => Token::Continue,
@@ -338,6 +340,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "do" => Token::Do,
     "else" => Token::Else,
     "elif" => Token::Elif,
+    "match" => Token::Match,
 
     "enum" => Token::Enum,
     "false" => Token::False,
@@ -346,7 +349,6 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "if" => Token::If,
     "import" => Token::Import,
 
-  //  "int" => Token::Int,
     "mapping" => Token::Mapping,
     "private" => Token::Private,
     "public" => Token::Public,
@@ -354,7 +356,6 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "payable" => Token::Payable,
     "return" => Token::Return,
     "returns" => Token::Returns,
- //   "string" => Token::String,
     "data" => Token::Data,
     "true" => Token::True,
 
@@ -371,7 +372,6 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "pub" => Token::Pub,
     ".." => Token::TwoDot,
     "ref" => Token::ReadOnlyRef,
-
 };
 
 impl<'input> Lexer<'input> {
@@ -713,7 +713,7 @@ impl<'input> Lexer<'input> {
                                 return Some(Err(LexicalError::UnrecognisedToken(
                                     self.row,
                                     self.column,
-                                    self.input[start..start + 3].to_owned(),
+                                    self.input[start..start + 2].to_owned(),
                                 )));
                             }
                         }
@@ -925,7 +925,14 @@ impl<'input> Lexer<'input> {
                     return Some(Ok((self.row, Token::Add, self.column)));
                 }
                 Some((i, '-')) => {
+                    if let Some((_, '>')) = self.chars.peek() {
+                        self.chars.next();
+                        return Some(Ok((self.row, Token::ThinArrow, self.column)));
+                    }
                     return Some(Ok((self.row, Token::Subtract, self.column)));
+                }
+                Some((i, '_')) => {
+                    return Some(Ok((self.row, Token::Hole, self.column)));
                 }
                 Some((i, '*')) => {
                     return match self.chars.peek() {

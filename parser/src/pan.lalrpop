@@ -486,6 +486,10 @@ Statement: Statement = {
    <l:@L> "for"  <b:Expression>  "in"  <c:Expression> <d: (".." <Expression>)?> <block:BlockStatement> <r:@R> => {
       Statement::For(Loc(file_no, l, r), b, c, d,Some(Box::new(block)))
    },
+   <l:@L> "match"  <e:Expression>  "{" <b1:( <Expression> "->"  <Statement>)*> "}" <r:@R> => {
+        let a = b1.iter().map(|s| (Box::new(s.0.clone()),Box::new(s.1.clone()))).collect();
+        Statement::Match(Loc(file_no, l, r),e,a)
+   }
 }
 
 SimpleStatement: Statement = {
@@ -574,6 +578,7 @@ extern {
         "=" => Token::Assign,
         "==" => Token::Equal,
         "=>" => Token::Arrow,
+        "->" => Token::ThinArrow,
         ".|" => Token::BitwiseOrAssign,
         ".=" => Token::ReAssign,
         ".^" => Token::BitwiseXorAssign,
@@ -581,7 +586,6 @@ extern {
         ".<<" => Token::ShiftLeftAssign,
         ".>>" => Token::ShiftRightAssign,
         ".+" => Token::AddAssign,
-        ".=" => Token::ReAssign,
         ".-" => Token::SubtractAssign,
         ".*" => Token::MulAssign,
         "./" => Token::DivideAssign,
@@ -655,6 +659,7 @@ extern {
         "return" => Token::Return,
         "returns" => Token::Return,
         "if" => Token::If,
+        "match" => Token::Match,
         "for" => Token::For,
         "while" => Token::While,
         "else" => Token::Else,

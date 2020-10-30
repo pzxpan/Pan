@@ -372,6 +372,8 @@ pub enum Expression {
     Set(Loc, Vec<Expression>),
     Lambda(Loc, Box<LambdaDefinition>),
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
+    IfExpression(Loc, Box<Expression>, Box<Expression>, Box<Expression>),
+    MatchExpression(Loc, Box<Expression>, Vec<(Box<Expression>, Box<Expression>)>),
 }
 
 impl Expression {
@@ -463,6 +465,8 @@ impl Expression {
             | Comprehension(loc, _, _)
             | Number(loc, _)
             | NamedFunctionCall(loc, _, _)
+            | IfExpression(loc, _, _, _)
+            | MatchExpression(loc, _, _)
             => *loc,
             StringLiteral(v) => v[0].loc,
         }
@@ -572,6 +576,7 @@ pub enum Statement {
     MultiVariableDefinition(Loc, MultiVariableDeclaration, Expression),
     ConstDefinition(Loc, VariableDeclaration, Option<Expression>),
     While(Loc, Expression, Box<Statement>),
+    Match(Loc, Expression, Vec<(Box<Expression>, Box<Statement>)>),
     For(
         Loc,
         Expression,
@@ -603,6 +608,7 @@ impl Statement {
             | Statement::Continue(loc)
             | Statement::Break(loc)
             | Statement::ConstDefinition(loc, _, _)
+            | Statement::Match(loc, _, _)
             | Statement::Return(loc, _) => *loc,
         }
     }
