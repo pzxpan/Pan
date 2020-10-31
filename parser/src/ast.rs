@@ -92,7 +92,7 @@ pub struct Note {
 pub struct Diagnostic {
     pub level: Level,
     pub ty: ErrorType,
-    pub pos: Option<Loc>,
+    pub pos: String,
     pub message: String,
     pub notes: Vec<Note>,
 }
