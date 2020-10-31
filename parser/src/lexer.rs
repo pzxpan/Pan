@@ -412,18 +412,6 @@ impl<'input> Lexer<'input> {
         end: usize,
         ch: char,
     ) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
-        // if ch == '0' {}
-        //
-        // let mut end = end;
-        // while let Some((i, ch)) = self.chars.peek() {
-        //     //添加浮点
-        //     println!("num char is {:?}", ch);
-        //     if !ch.is_ascii_digit() && (*ch != '_' || *ch != '.') {
-        //         break;
-        //     }
-        //     end = *i;
-        //     self.chars.next();
-        // }
         if ch == '0' {
             match self.chars.peek() {
                 Some((_, 'x')) | Some((_, 'X')) => {
@@ -460,7 +448,7 @@ impl<'input> Lexer<'input> {
         if value.is_ok() {
             Some(Ok((start_pos, Token::I32(value.unwrap().to_i32().unwrap()), end_pos)))
         } else {
-            return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned())));
+            return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned())));
         }
     }
     fn parse_normal_number(&mut self,
@@ -487,7 +475,7 @@ impl<'input> Lexer<'input> {
             if ch1 == '.' {
                 self.chars.next();
                 if let Some((_, '_')) = self.chars.peek() {
-                    return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos + 2].to_owned())));
+                    return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos + 2].to_owned())));
                 }
                 value_text.push(ch1);
                 value_text.push_str(&self.radix_run(10));
@@ -518,7 +506,7 @@ impl<'input> Lexer<'input> {
             end_pos = start_pos + value_text.len();
             let value = value_text.parse::<BigInt>().unwrap();
             if start_is_zero && !value.is_zero() {
-                return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
                 )));
             }
             self.chars.next();
@@ -557,7 +545,7 @@ impl<'input> Lexer<'input> {
                             return Some(Ok((start_pos, Token::I128(value.to_i128().unwrap()), end_pos)));
                         }
                         _ => {
-                            return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                            return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
                             )));
                         }
                     }
@@ -584,48 +572,24 @@ impl<'input> Lexer<'input> {
                             return Some(Ok((start_pos, Token::U128(value.to_u128().unwrap()), end_pos)));
                         }
                         _ => {
-                            return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                            return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
                             )));
                         }
                     }
                 }
             }
-            // Parse trailing 'j':
-            // if self.chr0 == Some('j') || self.chr0 == Some('J') {
-            //     self.next_char();
-            //     let end_pos = self.get_pos();
-            //     let imag = f64::from_str(&value_text).unwrap();
-            //     Ok((start_pos, Tok::Complex { real: 0.0, imag }, end_pos))
-            // } else {
-            //     let end_pos = self.get_pos();
-
-            // let value = value_text.parse::<BigInt>().unwrap();
-            // if start_is_zero && !value.is_zero() {
-            //     return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
-            //     )));
-            // }
-            // // }
-            // return Some(Ok((start_pos, Token::Int(value.to_i64().unwrap()), end_pos)));
         } else {
             let value = value_text.parse::<BigInt>().unwrap();
             if start_is_zero && !value.is_zero() {
-                return Some(Err(LexicalError::UnrecognisedToken(start_pos, end_pos, self.input[start_pos..end_pos].to_owned(),
+                return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
                 )));
             }
             // }
-            return Some(Ok((start_pos, Token::Number(&self.input[start_pos..end_pos]), end_pos)));
+            return Some(Ok((self.row, Token::Number(&self.input[start_pos..end_pos]), self.column)));
         }
 
-        // return Some(Ok((
-        //     self.row,
-        //     Token::Int,
-        //     self.column,
-        // )));
     }
-
-    /// Consume a sequence of numbers with the given radix,
-   /// the digits can be decorated with underscores
-   /// like this: '1_2_3_4' == '1234'
+   /// 可以用 _ 分割数字 '1_2_3_4_' == '1234'
     fn radix_run(&mut self, radix: u32) -> String {
         let mut value_text = String::new();
         loop {
@@ -783,7 +747,6 @@ impl<'input> Lexer<'input> {
                         Some((_, '/')) => {
                             // line comment
                             self.chars.next();
-
                             let doc_comment_start = match self.chars.peek() {
                                 Some((i, '/')) => Some(i + 1),
                                 _ => None,
@@ -793,6 +756,7 @@ impl<'input> Lexer<'input> {
 
                             while let Some((i, ch)) = self.chars.next() {
                                 if ch == '\n' || ch == '\r' {
+                                    self.newline();
                                     break;
                                 }
                                 last = i;
@@ -810,6 +774,7 @@ impl<'input> Lexer<'input> {
                                     )));
                                 }
                             }
+
                         }
                         Some((_, '*')) => {
                             // multiline comment
@@ -825,6 +790,9 @@ impl<'input> Lexer<'input> {
 
                             loop {
                                 if let Some((i, ch)) = self.chars.next() {
+                                    if ch == '\n' || ch == '\r' {
+                                        self.newline();
+                                    }
                                     if seen_star && ch == '/' {
                                         break;
                                     }

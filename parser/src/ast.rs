@@ -346,6 +346,7 @@ pub enum Expression {
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
     IfExpression(Loc, Box<Expression>, Box<Expression>, Box<Expression>),
     MatchExpression(Loc, Box<Expression>, Vec<(Box<Expression>, Box<Expression>)>),
+    Error
 }
 
 impl Expression {
@@ -441,6 +442,7 @@ impl Expression {
             | MatchExpression(loc, _, _)
             => *loc,
             StringLiteral(v) => v[0].loc,
+            _ => {Loc(0,0,0)}
         }
     }
 }
@@ -555,7 +557,7 @@ pub enum Statement {
         Expression,
         Option<Expression>,
         Option<Box<Statement>>,
-    ),
+    )
 }
 
 

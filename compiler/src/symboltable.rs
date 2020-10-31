@@ -830,6 +830,7 @@ impl SymbolTableBuilder {
             MatchExpression(loc, _, _) => {
 
             }
+            _ => {}
         }
         Ok(())
     }

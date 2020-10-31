@@ -18,7 +18,7 @@ SourceUnitPart: SourceUnitPart = {
     EnumDefinition => SourceUnitPart::EnumDefinition(<>),
     DataDefinition => SourceUnitPart::DataDefinition(<>),
     FunctionDefinition => SourceUnitPart::FunctionDefinition(<>),
-     "{" <err: !> "}" => { errors.push(err); SourceUnitPart::Error},
+    <err: !>  => { errors.push(err); SourceUnitPart::Error},
 }
 
 ImportDirective: Import = {
@@ -361,7 +361,7 @@ Precedence0: Expression = {
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
  //  <l:@L> "{" <v:CommaOne<Expression>> "}" <r:@R> => Expression::Set(Loc(file_no, l, r), v),
     <LambdaDefinition> => <>,
-
+    <!> => {errors.push(<>); Expression::Error}
 }
 
 Number: Number = {
