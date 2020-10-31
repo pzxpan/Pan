@@ -23,6 +23,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_import_compile::resolve_import_compile;
+use pan_parser::diagnostics::ErrorType;
 
 pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -78,13 +79,13 @@ pub fn compile(
             })
     } else {
         for a in ast.err().unwrap().iter() {
-            println!("{:?}", a);
+            println!("{}", a);
         }
         Err(CompileError {
             statement: None,
-            error: CompileErrorType::SyntaxError("".to_string()),
+            error: CompileErrorType::Parse(ErrorType::None),
             location: Loc(0, 0, 0),
-            source_path: None,
+            source_path: Some(source_path.to_string()),
         })
     }
 }

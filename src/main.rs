@@ -19,7 +19,7 @@ use walkdir::WalkDir;
 
 fn main() {
     test_one_file(&env::current_dir().unwrap().join("demo").join("error_recovery.pan"));
-   // test_all_demo_file();
+    // test_all_demo_file();
 }
 
 fn test_all_demo_file() {
@@ -29,7 +29,6 @@ fn test_all_demo_file() {
         if path.is_file() {
             println!("正在测试：{:?}", path);
             test_one_file(path);
-
         }
     }
 }
@@ -38,15 +37,16 @@ fn test_one_file(home_path: &Path) {
     let mut file = File::open(home_path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0).unwrap();
-    for i in code_object.instructions.clone() {
-        println!("instruction {:?}", i);
+    let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0);
+    if code_object.is_ok() {
+        let mut vm = VirtualMachine::new();
+        let mut global_value = HashMap::new();
+        let mut local_value: HashMap<String, Value> = HashMap::new();
+        let mut v = Vec::new();
+        v.push(local_value);
+        let scope = Scope::with_builtins(v, global_value, &vm);
+        vm.run_code_obj(code_object.unwrap(), scope);
+    } else {
+        println!("{:?}", code_object.err());
     }
-    let mut vm = VirtualMachine::new();
-    let mut global_value = HashMap::new();
-    let mut local_value: HashMap<String, Value> = HashMap::new();
-    let mut v = Vec::new();
-    v.push(local_value);
-    let scope = Scope::with_builtins(v, global_value, &vm);
-    vm.run_code_obj(code_object, scope);
 }

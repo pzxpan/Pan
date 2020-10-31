@@ -1,10 +1,13 @@
 use crate::file_cache::FileCache;
 use serde::Serialize;
+use std::fmt::{Display, Debug, Formatter, Error};
+use core::fmt;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Location(pub String, pub usize, pub usize);
 
 fn pos_str(pos: Location) -> String {
-    format!("{:?}文件,第{:?}行，第{:?}列", pos.0, pos.1, pos.2)
+    format!("文件{:?},第{:?}行，第{:?}列", pos.0, pos.1, pos.2)
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -166,5 +169,25 @@ impl Diagnostic {
             message,
             notes,
         }
+    }
+}
+
+impl Display for Diagnostic {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let title = match self.level {
+            Level::Error => {
+                "错误".to_string()
+            }
+            Level::Debug => {
+                "调试".to_string()
+            }
+            Level::Warning => {
+                "警告".to_string()
+            }
+            Level::Info => {
+                "信息".to_string()
+            }
+        };
+        write!(f, "{:?}: {:?}\n{:?}", title, self.pos, self.message)
     }
 }

@@ -37,20 +37,14 @@ impl CompileError {
 
 #[derive(Debug)]
 pub enum CompileErrorType {
-    /// Invalid assignment, cannot store value in target.
     Assign(&'static str),
-    /// Invalid delete
     Delete(&'static str),
-    /// Expected an expression got a statement
     ExpectExpr,
-    /// Parser error
     Parse(ErrorType),
     SyntaxError(String),
-    /// Multiple `*` detected
     StarArgs,
-    /// Break statement outside of loop.
     InvalidBreak,
-    /// Continue statement outside of loop.
+
     InvalidContinue,
     InvalidReturn,
     InvalidYield,
