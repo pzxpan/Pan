@@ -18,7 +18,7 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 fn main() {
-    test_one_file(&env::current_dir().unwrap().join("demo").join("demo.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("error_recovery.pan"));
    // test_all_demo_file();
 }
 

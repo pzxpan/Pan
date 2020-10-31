@@ -24,48 +24,49 @@ pub fn parse(src: &str, file_no: usize) -> Result<ast::SourceUnit, Vec<Diagnosti
     // parse phase
     let mut lex = lexer::Lexer::new(src);
     let mut token_erros: Vec<ErrorRecovery<usize, Token, LexicalError>> = Vec::new();
-    let s = pan::SourceUnitParser::new().parse(src, file_no, &mut token_erros, &mut lex);
-
-    println!("LexError len is {:?}", token_erros.len());
-
+    let r = pan::SourceUnitParser::new().parse(src, file_no, &mut token_erros, &mut lex);
     let mut errors = Vec::new();
+    if token_erros.is_empty() {
+        return Ok(r.unwrap());
+    }
     for e in token_erros {
-        println!("error recovery {:?}",e);
+        errors.push(Diagnostic::parser_error(
+            ast::Loc(file_no, 0, 0),
+            format!(
+                "unrecognised token `{}', expected {}",
+                e.error,
+                "".to_string()
+            ),
+        ));
     }
-    if let Err(e) = s {
-        errors.push(match e {
-            ParseError::InvalidToken { location } => Diagnostic::parser_error(
-                ast::Loc(file_no, location, location),
-                "invalid token".to_string(),
-            ),
-            ParseError::UnrecognizedToken {
-                token: (l, token, r),
-                expected,
-            } => Diagnostic::parser_error(
-                ast::Loc(file_no, l, r),
-                format!(
-                    "unrecognised token `{}', expected {}",
-                    token,
-                    expected.join(", ")
-                ),
-            ),
-            ParseError::User { error } => {
-                Diagnostic::parser_error(error.loc(file_no), error.to_string())
-            }
-            ParseError::ExtraToken { token } => Diagnostic::parser_error(
-                ast::Loc(file_no, token.0, token.2),
-                format!("extra token `{}' encountered", token.0),
-            ),
-            ParseError::UnrecognizedEOF { location, expected } => Diagnostic::parser_error(
-                ast::Loc(file_no, location, location),
-                format!("unexpected end of file, expecting {}", expected.join(", ")),
-            ),
-        });
+    return Err(errors);
+    // if let Err(e) = r {
+    //     errors.push(match e {
+    //         ParseError::InvalidToken { location } => Diagnostic::parser_error(
+    //             ast::Loc(file_no, location, location),
+    //             "invalid token".to_string(),
+    //         ),
+    //         ParseError::UnrecognizedToken {
+    //             token: (l, token, r),
+    //             expected,
+    //         } =>
+    //         ParseError::User { error } => {
+    //             Diagnostic::parser_error(error.loc(file_no), error.to_string())
+    //         }
+    //         ParseError::ExtraToken { token } => Diagnostic::parser_error(
+    //             ast::Loc(file_no, token.0, token.2),
+    //             format!("extra token `{}' encountered", token.0),
+    //         ),
+    //         ParseError::UnrecognizedEOF { location, expected } => Diagnostic::parser_error(
+    //             ast::Loc(file_no, location, location),
+    //             format!("unexpected end of file, expecting {}", expected.join(", ")),
+    //         ),
+    //     });
 
-        Err(errors)
-    } else {
-        Ok(s.unwrap())
-    }
+    //     Err(errors)
+    // } else {
+    //     Ok(r.unwrap())
+    // }
 }
 
 pub fn box_option<T>(o: Option<T>) -> Option<Box<T>> {

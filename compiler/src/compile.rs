@@ -18,6 +18,7 @@ use num_bigint::BigInt;
 use num_traits::FromPrimitive;
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_parser::lexer::Token::Identifier;
+use pan_parser::ast::Loc;
 use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
@@ -68,12 +69,24 @@ pub fn compile(
     source_path: String,
     optimize: u8,
 ) -> Result<CodeObject, CompileError> {
-    let ast = parse(source, 1).unwrap();
-    compile_program(ast, source_path.clone(), optimize)
-        .map_err(|mut err| {
-            err.update_source_path(&source_path);
-            err
+    let ast = parse(source, 1);
+    if ast.is_ok() {
+        compile_program(ast.unwrap(), source_path.clone(), optimize)
+            .map_err(|mut err| {
+                err.update_source_path(&source_path);
+                err
+            })
+    } else {
+        for a in ast.err().unwrap().iter() {
+            println!("{:#?}", a);
+        }
+        Err(CompileError {
+            statement: None,
+            error: CompileErrorType::SyntaxError("".to_string()),
+            location: Loc(0, 0, 0),
+            source_path: None,
         })
+    }
 }
 
 fn with_compiler(
@@ -1249,7 +1262,6 @@ impl<O: OutputStream> Compiler<O> {
                 ));
             }
             _ => {}
-
         }
         Ok(())
     }
