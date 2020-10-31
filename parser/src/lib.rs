@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate log;
+
 use lalrpop_util::lalrpop_mod;
 
 pub mod doc;
@@ -14,16 +15,23 @@ lalrpop_mod!(
 );
 
 use lalrpop_util::ParseError;
+use lalrpop_util::ErrorRecovery;
 use crate::ast::Diagnostic;
+use crate::lexer::Token;
+use crate::lexer::LexicalError;
 
 pub fn parse(src: &str, file_no: usize) -> Result<ast::SourceUnit, Vec<Diagnostic>> {
     // parse phase
-    let lex = lexer::Lexer::new(src);
+    let mut lex = lexer::Lexer::new(src);
+    let mut token_erros: Vec<ErrorRecovery<usize, Token, LexicalError>> = Vec::new();
+    let s = pan::SourceUnitParser::new().parse(src, file_no, &mut token_erros, &mut lex);
 
-    let s = pan::SourceUnitParser::new().parse(src, file_no, lex);
+    println!("LexError len is {:?}", token_erros.len());
 
     let mut errors = Vec::new();
-
+    for e in token_erros {
+        println!("error recovery {:?}",e);
+    }
     if let Err(e) = s {
         errors.push(match e {
             ParseError::InvalidToken { location } => Diagnostic::parser_error(

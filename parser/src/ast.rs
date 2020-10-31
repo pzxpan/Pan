@@ -35,7 +35,10 @@ pub enum SourceUnitPart {
     DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
+    Error
 }
+
+
 
 #[derive(Debug, PartialEq)]
 pub enum Import {

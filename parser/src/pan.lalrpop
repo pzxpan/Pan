@@ -4,8 +4,9 @@ use crate::ast::*;
 use crate::box_option;
 use crate::lexer::{Token, LexicalError, CommentType};
 use crate::doc::tags;
+use lalrpop_util::ErrorRecovery;
 
-grammar<'input>(input: &'input str, file_no: usize);
+grammar<'input,'err>(input: &'input str, file_no: usize,errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, LexicalError>>);
 
 pub SourceUnit: SourceUnit = {
     SourceUnitPart+ => SourceUnit(<>)
@@ -17,6 +18,7 @@ SourceUnitPart: SourceUnitPart = {
     EnumDefinition => SourceUnitPart::EnumDefinition(<>),
     DataDefinition => SourceUnitPart::DataDefinition(<>),
     FunctionDefinition => SourceUnitPart::FunctionDefinition(<>),
+     "{" <err: !> "}" => { errors.push(err); SourceUnitPart::Error},
 }
 
 ImportDirective: Import = {

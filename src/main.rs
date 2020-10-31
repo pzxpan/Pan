@@ -2,7 +2,6 @@ use pan_parser::lexer;
 use std::fs::File;
 use std::io::Read;
 use pan_parser::ast::*;
-use pan_parser::parse;
 use pan_bytecode::bytecode::Instruction;
 use pan_compiler::symboltable;
 use pan_compiler::symboltable::SymbolTable;
