@@ -6,6 +6,7 @@ use pan_bytecode::bytecode::Instruction;
 use pan_compiler::symboltable;
 use pan_compiler::symboltable::SymbolTable;
 use pan_compiler::compile::{compile_program, compile};
+use pan_compiler::error::CompileErrorType;
 use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
 use std::collections::HashMap;
@@ -47,6 +48,12 @@ fn test_one_file(home_path: &Path) {
         let scope = Scope::with_builtins(v, global_value, &vm);
         vm.run_code_obj(code_object.unwrap(), scope);
     } else {
-        println!("{:?}", code_object.err());
+        let error = code_object.err().unwrap();
+        match error.error {
+            CompileErrorType::Parse(_) => {
+                println!("语法分析出错");
+            }
+            _ => { println!("{:?}", error); }
+        }
     }
 }
