@@ -4,6 +4,18 @@ fun main() {
    let a = 0;
    let b = 20;
 
+    a +=b;
+    a -=b;
+    a *=b;
+    a /=b;
+    a %=b;
+
+    a <<=b;
+    a >>=b;
+    a ^=b;
+    a |=b;
+    a &=b;
+
     let cccc = (aaa:int,bbb:int) => {
         return a + b + aaa;
     };
