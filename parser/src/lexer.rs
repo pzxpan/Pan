@@ -74,6 +74,7 @@ pub enum Token<'input> {
     String,
     Semicolon,
     TwoDot,
+    All,
     ReadOnlyRef,
     Comma,
     OpenParenthesis,
@@ -93,7 +94,6 @@ pub enum Token<'input> {
     And,
 
     AddAssign,
-    ReAssign,
     Increment,
     Add,
 
@@ -188,6 +188,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Char(c) => write!(f, "{:?}", c),
 
             Token::TwoDot => write!(f, ".."),
+            Token::All => write!(f, ".*"),
             Token::ReadOnlyRef => write!(f, "ref"),
             Token::Semicolon => write!(f, ";"),
             Token::Comma => write!(f, ","),
@@ -196,34 +197,33 @@ impl<'input> fmt::Display for Token<'input> {
             Token::OpenCurlyBrace => write!(f, "{{"),
             Token::CloseCurlyBrace => write!(f, "}}"),
             Token::BitwiseOr => write!(f, "|"),
-            Token::BitwiseOrAssign => write!(f, ".|"),
+            Token::BitwiseOrAssign => write!(f, "|="),
             Token::Or => write!(f, "||"),
             Token::BitwiseXor => write!(f, "^"),
-            Token::BitwiseXorAssign => write!(f, ".^"),
+            Token::BitwiseXorAssign => write!(f, "^="),
             Token::BitwiseAnd => write!(f, "&"),
-            Token::BitwiseAndAssign => write!(f, ".&"),
+            Token::BitwiseAndAssign => write!(f, "&="),
             Token::And => write!(f, "&&"),
-            Token::AddAssign => write!(f, ".+"),
-            Token::ReAssign => write!(f, ".+"),
+            Token::AddAssign => write!(f, "+="),
             Token::Increment => write!(f, "++"),
             Token::Add => write!(f, "+"),
-            Token::SubtractAssign => write!(f, ".-"),
+            Token::SubtractAssign => write!(f, "-="),
             Token::Decrement => write!(f, "--"),
             Token::Subtract => write!(f, "-"),
             Token::Hole => write!(f, "_"),
-            Token::MulAssign => write!(f, ".*"),
+            Token::MulAssign => write!(f, "*="),
             Token::Mul => write!(f, "*"),
             Token::Power => write!(f, "**"),
             Token::Divide => write!(f, "/"),
-            Token::DivideAssign => write!(f, "./"),
-            Token::ModuloAssign => write!(f, ".%"),
+            Token::DivideAssign => write!(f, "/="),
+            Token::ModuloAssign => write!(f, "%="),
             Token::Modulo => write!(f, "%"),
             Token::Equal => write!(f, "=="),
             Token::Assign => write!(f, "="),
             Token::NotEqual => write!(f, "!="),
             Token::Not => write!(f, "!"),
             Token::ShiftLeft => write!(f, "<<"),
-            Token::ShiftLeftAssign => write!(f, ".<<"),
+            Token::ShiftLeftAssign => write!(f, "<<="),
             Token::More => write!(f, ">"),
             Token::MoreEqual => write!(f, ">="),
             Token::Member => write!(f, "."),
@@ -233,8 +233,8 @@ impl<'input> fmt::Display for Token<'input> {
             Token::CloseBracket => write!(f, "]"),
             Token::Complement => write!(f, "~"),
             Token::Question => write!(f, "?"),
-            Token::ShiftRightAssign => write!(f, ".<<"),
-            Token::ShiftRight => write!(f, "<<"),
+            Token::ShiftRightAssign => write!(f, ">>="),
+            Token::ShiftRight => write!(f, ">>"),
             Token::Less => write!(f, "<"),
             Token::LessEqual => write!(f, "<="),
             Token::Bool => write!(f, "bool"),
@@ -890,11 +890,11 @@ impl<'input> Lexer<'input> {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
-                            Some(Ok((self.row, Token::BitwiseOrAssign, self.column)))
+                            Some(Ok((self.row, Token::BitwiseOrAssign, self.column + 1)))
                         }
                         Some((_, '|')) => {
                             self.chars.next();
-                            Some(Ok((self.row, Token::Or, self.column)))
+                            Some(Ok((self.row, Token::Or, self.column + 1)))
                         }
                         _ => Some(Ok((self.row, Token::BitwiseOr, self.column))),
                     };
@@ -922,14 +922,26 @@ impl<'input> Lexer<'input> {
                     };
                 }
                 Some((i, '+')) => {
-                    return Some(Ok((self.row, Token::Add, self.column)));
+                    return match self.chars.peek() {
+                        Some((_, '=')) => {
+                            self.chars.next();
+                            Some(Ok((self.row, Token::AddAssign, self.column + 2)))
+                        }
+                        _ => Some(Ok((self.row, Token::Add, self.column + 1)))
+                    };
                 }
                 Some((i, '-')) => {
                     if let Some((_, '>')) = self.chars.peek() {
                         self.chars.next();
-                        return Some(Ok((self.row, Token::ThinArrow, self.column)));
+                        return Some(Ok((self.row, Token::ThinArrow, self.column + 2)));
                     }
-                    return Some(Ok((self.row, Token::Subtract, self.column)));
+                    return match self.chars.peek() {
+                        Some((_, '=')) => {
+                            self.chars.next();
+                            Some(Ok((self.row, Token::SubtractAssign, self.column + 2)))
+                        }
+                        _ => Some(Ok((self.row, Token::Subtract, self.column + 1)))
+                    };
                 }
                 Some((i, '_')) => {
                     return Some(Ok((self.row, Token::Hole, self.column)));
@@ -940,17 +952,37 @@ impl<'input> Lexer<'input> {
                             self.chars.next();
                             Some(Ok((self.row, Token::Power, self.column)))
                         }
+                        Some((_, '=')) => {
+                            self.chars.next();
+                            Some(Ok((self.row, Token::MulAssign, self.column)))
+                        }
                         _ => Some(Ok((self.row, Token::Mul, self.column))),
                     };
                 }
                 Some((i, '%')) => {
-                    return Some(Ok((self.row, Token::Modulo, self.column)));
+                    return match self.chars.peek() {
+                        Some((_, '=')) => {
+                            self.chars.next();
+                            Some(Ok((self.row, Token::ModuloAssign, self.column)))
+                        }
+                        _ => Some(Ok((self.row, Token::Modulo, self.column)))
+                    };
                 }
                 Some((i, '<')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
                             Some(Ok((self.row, Token::LessEqual, self.column)))
+                        }
+                        Some((_, '<')) => {
+                            self.chars.next();
+                            return match self.chars.peek() {
+                                Some((_, '=')) => {
+                                    self.chars.next();
+                                    Some(Ok((self.row, Token::ShiftLeftAssign, self.column)))
+                                }
+                                _ => Some(Ok((self.row, Token::ShiftLeft, self.column)))
+                            };
                         }
                         _ => Some(Ok((self.row, Token::Less, self.column))),
                     };
@@ -961,69 +993,28 @@ impl<'input> Lexer<'input> {
                             self.chars.next();
                             Some(Ok((self.row, Token::MoreEqual, self.column)))
                         }
+                        Some((_, '>')) => {
+                            self.chars.next();
+                            return match self.chars.peek() {
+                                Some((_, '=')) => {
+                                    self.chars.next();
+                                    Some(Ok((self.row, Token::ShiftRightAssign, self.column)))
+                                }
+                                _ => Some(Ok((self.row, Token::ShiftRight, self.column)))
+                            };
+                        }
                         _ => Some(Ok((self.row, Token::More, self.column))),
                     };
                 }
                 Some((i, '.')) => if let Some((pos, ch)) = self.chars.peek() {
                     match *ch {
-                        '=' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::ReAssign, self.column)));
-                        }
-                        '+' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::AddAssign, self.column)));
-                        }
-                        '*' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::MulAssign, self.column)));
-                        }
-                        '/' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::DivideAssign, self.column)));
-                        }
-
-                        '-' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::SubtractAssign, self.column)));
-                        }
-                        '%' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::ModuloAssign, self.column)));
-                        }
-                        '|' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::BitwiseOrAssign, self.column)));
-                        }
-                        '&' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::BitwiseAndAssign, self.column)));
-                        }
-                        '^' => {
-                            self.chars.next();
-                            return Some(Ok((self.row, Token::BitwiseXorAssign, self.column)));
-                        }
                         '.' => {
                             self.chars.next();
                             return Some(Ok((self.row, Token::TwoDot, self.column)));
                         }
-                        '>' => {
+                        '*' => {
                             self.chars.next();
-                            if let Some((pp, ch)) = self.chars.peek() {
-                                if *ch == '>' {
-                                    self.chars.next();
-                                    return Some(Ok((self.row, Token::ShiftRightAssign, self.column)));
-                                }
-                            }
-                        }
-                        '<' => {
-                            self.chars.next();
-                            if let Some((pp, ch)) = self.chars.peek() {
-                                if *ch == '<' {
-                                    self.chars.next();
-                                    return Some(Ok((self.row, Token::ShiftLeftAssign, self.column)));
-                                }
-                            }
+                            return Some(Ok((self.row, Token::All, self.column)));
                         }
                         _ => return Some(Ok((self.row, Token::Member, self.column)))
                     }

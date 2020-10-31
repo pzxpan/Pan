@@ -183,17 +183,23 @@ Expression: Expression = {
 
 Precedence15: Expression = {
     <l:Precedence13> <a:@L> "=" <b:@R> <r:Precedence15> => Expression::Assign(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".=" <b:@R> <r:Precedence15> => Expression::ReAssign(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".|" <b:@R> <r:Precedence15> => Expression::AssignOr(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".^" <b:@R> <r:Precedence15> => Expression::AssignXor(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".&" <b:@R> <r:Precedence15> => Expression::AssignAnd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".<<" <b:@R> <r:Precedence15> => Expression::AssignShiftLeft(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".>>" <b:@R> <r:Precedence15> => Expression::AssignShiftRight(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".+" <b:@R> <r:Precedence15> => Expression::AssignAdd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".-" <b:@R> <r:Precedence15> => Expression::AssignSubtract(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".*" <b:@R> <r:Precedence15> => Expression::AssignMultiply(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "./" <b:@R> <r:Precedence15> => Expression::AssignDivide(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ".%" <b:@R> <r:Precedence15> => Expression::AssignModulo(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "|=" <b:@R> <r:Precedence15> => Expression::AssignOr(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "^=" <b:@R> <r:Precedence15> => Expression::AssignXor(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "&=" <b:@R> <r:Precedence15> => Expression::AssignAnd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "<<=" <b:@R> <r:Precedence15> => Expression::AssignShiftLeft(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> ">>=" <b:@R> <r:Precedence15> => Expression::AssignShiftRight(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "+=" <b:@R> <r:Precedence15> => Expression::AssignAdd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "-=" <b:@R> <r:Precedence15> => Expression::AssignSubtract(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "*=" <b:@R> <r:Precedence15> => Expression::AssignMultiply(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "/=" <b:@R> <r:Precedence15> => Expression::AssignDivide(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "%=" <b:@R> <r:Precedence15> => Expression::AssignModulo(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:@L> "if" <cond:Precedence13> ":" <body:Precedence15> <s2:("elif" <Precedence13> ":" <Precedence15>)*> <el:("else" ":"  <Precedence15>)> <r:@R> => {
+            let mut s3 = el;
+            for i in s2.into_iter().rev() {
+               s3 = Expression::IfExpression(Loc(file_no, l, r), Box::new(i.0), Box::new(i.1), Box::new(s3));
+            }
+            Expression::IfExpression(Loc(file_no, l, r), Box::new(cond), Box::new(body), Box::new(s3))
+        },
     Precedence13,
 }
 
@@ -314,6 +320,7 @@ ObjAttribute: Expression = {
 }
 
 Precedence0: Expression = {
+
     <FunctionCall> => <>,
     <ObjAttribute> => <>,
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),
@@ -353,7 +360,8 @@ Precedence0: Expression = {
 
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
  //  <l:@L> "{" <v:CommaOne<Expression>> "}" <r:@R> => Expression::Set(Loc(file_no, l, r), v),
-    <LambdaDefinition> => <>
+    <LambdaDefinition> => <>,
+
 }
 
 Number: Number = {
@@ -571,6 +579,7 @@ extern {
         LexNumber => Token::Number(<&'input str>),
         ";" => Token::Semicolon,
         ".." => Token::TwoDot,
+        ".*" => Token::All,
         "::" => Token::TwoColon,
         "ref" => Token::ReadOnlyRef,
         "{" => Token::OpenCurlyBrace,
@@ -581,17 +590,19 @@ extern {
         "==" => Token::Equal,
         "=>" => Token::Arrow,
         "->" => Token::ThinArrow,
-        ".|" => Token::BitwiseOrAssign,
-        ".=" => Token::ReAssign,
-        ".^" => Token::BitwiseXorAssign,
-        ".&" => Token::BitwiseAndAssign,
-        ".<<" => Token::ShiftLeftAssign,
-        ".>>" => Token::ShiftRightAssign,
-        ".+" => Token::AddAssign,
-        ".-" => Token::SubtractAssign,
-        ".*" => Token::MulAssign,
-        "./" => Token::DivideAssign,
-        ".%" => Token::ModuloAssign,
+        "|=" => Token::BitwiseOrAssign,
+        "^=" => Token::BitwiseXorAssign,
+        "&=" => Token::BitwiseAndAssign,
+
+        "<<=" => Token::ShiftLeftAssign,
+        ">>=" => Token::ShiftRightAssign,
+
+        "+=" => Token::AddAssign,
+        "-=" => Token::SubtractAssign,
+        "*=" => Token::MulAssign,
+        "/=" => Token::DivideAssign,
+        "%=" => Token::ModuloAssign,
+
         "?" => Token::Question,
         ":" => Token::Colon,
         "||" => Token::Or,
