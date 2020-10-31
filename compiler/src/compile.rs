@@ -69,7 +69,7 @@ pub fn compile(
     source_path: String,
     optimize: u8,
 ) -> Result<CodeObject, CompileError> {
-    let ast = parse(source, 1);
+    let ast = parse(source, source_path.to_string());
     if ast.is_ok() {
         compile_program(ast.unwrap(), source_path.clone(), optimize)
             .map_err(|mut err| {
@@ -78,7 +78,7 @@ pub fn compile(
             })
     } else {
         for a in ast.err().unwrap().iter() {
-            println!("{:#?}", a);
+            println!("{:?}", a);
         }
         Err(CompileError {
             statement: None,

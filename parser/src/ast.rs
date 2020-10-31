@@ -64,38 +64,7 @@ pub enum BuiltinType {
     Float,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
-pub enum Level {
-    Debug,
-    Info,
-    Warning,
-    Error,
-}
 
-#[derive(Debug, Eq, Hash, PartialEq)]
-pub enum ErrorType {
-    None,
-    ParserError,
-    SyntaxError,
-    DeclarationError,
-    TypeError,
-    Warning,
-}
-
-#[derive(Debug, Eq, Hash, PartialEq)]
-pub struct Note {
-    pub pos: Loc,
-    pub message: String,
-}
-
-#[derive(Debug, Eq, Hash, PartialEq)]
-pub struct Diagnostic {
-    pub level: Level,
-    pub ty: ErrorType,
-    pub pos: String,
-    pub message: String,
-    pub notes: Vec<Note>,
-}
 
 impl BuiltinType {
     pub fn name(&self) -> &str {

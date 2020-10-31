@@ -49,7 +49,7 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, as_name: &Op
     let mut file = File::open(path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let ast = parse(&contents, 2).unwrap();
+    let ast = parse(&contents, path.clone().into_os_string().into_string().unwrap()).unwrap();
     if *is_all {
         build.scan_top_symbol_types(&ast, true)?
     }

@@ -15,6 +15,7 @@ use num_bigint::BigInt;
 use num_traits::identities::Zero;
 use num_traits::{Num, ToPrimitive};
 use std::str::FromStr;
+use crate::diagnostics::Location;
 
 pub type Spanned<Token, Loc, Error> = Result<(Loc, Token, Loc), Error>;
 
@@ -320,13 +321,13 @@ impl fmt::Display for LexicalError {
 }
 
 impl LexicalError {
-    pub fn loc(&self, file_no: usize) -> Loc {
+    pub fn loc(&self, file_no: String) -> Location {
         match self {
-            LexicalError::EndOfFileInComment(start, end) => Loc(file_no, *start, *end),
-            LexicalError::EndOfFileInString(start, end) => Loc(file_no, *start, *end),
-            LexicalError::EndofFileInHex(start, end) => Loc(file_no, *start, *end),
-            LexicalError::MissingNumber(start, end) => Loc(file_no, *start, *end),
-            LexicalError::UnrecognisedToken(start, end, _) => Loc(file_no, *start, *end),
+            LexicalError::EndOfFileInComment(start, end) => Location(file_no, *start, *end),
+            LexicalError::EndOfFileInString(start, end) => Location(file_no, *start, *end),
+            LexicalError::EndofFileInHex(start, end) => Location(file_no, *start, *end),
+            LexicalError::MissingNumber(start, end) => Location(file_no, *start, *end),
+            LexicalError::UnrecognisedToken(start, end, _) => Location(file_no, *start, *end),
         }
     }
 }
