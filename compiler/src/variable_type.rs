@@ -13,17 +13,6 @@ impl HasType for Parameter {
     }
 }
 
-impl HasType for BuiltinType {
-    fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
-        match self {
-            BuiltinType::Bool => CType::Bool,
-            BuiltinType::String => CType::Str,
-            BuiltinType::Int => CType::Int,
-            BuiltinType::Float => CType::Float,
-        }
-    }
-}
-
 pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
     let ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
@@ -136,14 +125,14 @@ impl HasType for Expression {
                     r
                 }
             }
-            Expression::Type(_, ty) => {
-                match ty {
-                    BuiltinType::Int => CType::Int,
-                    BuiltinType::Bool => CType::Bool,
-                    BuiltinType::String => CType::Str,
-                    BuiltinType::Float => CType::Float,
-                }
-            }
+            // Expression::Type(_, ty) => {
+            //     match ty {
+            //         BuiltinType::Int => CType::Int,
+            //         BuiltinType::Bool => CType::Bool,
+            //         BuiltinType::String => CType::Str,
+            //         BuiltinType::Float => CType::Float,
+            //     }
+            // }
             Expression::Variable(s) => {
                 return get_register_type(tables, s.name.clone());
             }
@@ -151,7 +140,7 @@ impl HasType for Expression {
             //     s.get_type()
             // }
             Expression::NumberLiteral(_, _) => {
-                CType::Int
+                CType::I32
             }
             Expression::StringLiteral(s) => {
                 CType::Str
@@ -210,7 +199,6 @@ impl HasType for Expression {
                     U64(_) => CType::U64,
                     U128(_) => CType::U128,
                     USize(_) => CType::USize,
-                    Int(e) => CType::Int,
                     Float(f64) => CType::Float,
                     Char(char) => CType::Char,
                 }
@@ -233,9 +221,7 @@ impl HasType for LambdaDefinition {
                 let s = statements.last();
                 match s {
                     Some(Statement::Return(_, e)) => {
-                        println!("ddd{:?}", e);
                         let ty = e.as_ref().unwrap().get_type(tables);
-                        println!("ttty:{:?}", ty);
                         ty
                     }
                     _ => { CType::Any }

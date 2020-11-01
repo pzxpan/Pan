@@ -7,8 +7,6 @@ fun main() {
   print(cc);
   return;
 }
-fun print(a:int) {
-}
 
 
 

@@ -376,13 +376,13 @@ impl<O: OutputStream> Compiler<O> {
                 match ty {
                     DestructType::Array => {
                         self.emit(Instruction::LoadConst(
-                            bytecode::Constant::Integer(BigInt::from_usize(index).unwrap())));
+                            bytecode::Constant::Integer(index as i32)));
                         self.emit(Instruction::Subscript);
                         self.store_name(ident.name.clone().as_ref());
                     }
                     DestructType::Tuple => {
                         self.emit(Instruction::LoadConst(
-                            bytecode::Constant::Integer(BigInt::from_usize(index).unwrap())));
+                            bytecode::Constant::Integer(index as i32)));
                         self.emit(Instruction::Subscript);
                         self.store_name(ident.name.clone().as_ref());
                     }
@@ -391,7 +391,7 @@ impl<O: OutputStream> Compiler<O> {
             }
             MultiDeclarationPart::TupleOrArray(decl) => {
                 self.emit(Instruction::LoadConst(
-                    bytecode::Constant::Integer(BigInt::from_usize(index).unwrap())));
+                    bytecode::Constant::Integer(index as i32)));
                 self.emit(Instruction::Subscript);
                 self.compile_store_multi_value_def(decl)?;
             }
@@ -856,7 +856,7 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
                 } else {
                     self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
-                        idx.as_ref().unwrap().clone())));
+                        idx.unwrap())));
                     self.emit(Instruction::StoreSubscript);
                 }
             }
@@ -1039,7 +1039,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        println!("Compiling {:?}", expression);
+        trace!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;
@@ -1063,7 +1063,7 @@ impl<O: OutputStream> Compiler<O> {
                     }
                 } else {
                     self.emit(Instruction::LoadConst(
-                        bytecode::Constant::Integer(idx.as_ref().unwrap().clone())));
+                        bytecode::Constant::Integer(idx.unwrap() as i32)));
                     self.emit(Instruction::Subscript);
                 }
             }
@@ -1156,9 +1156,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::BuildList(size, must_unpack));
             }
             List(loc, _) => {}
-            Type(loc, ty) => {
-                // self.load_name(&ty.name())
-            }
+
             Variable(ast::Identifier { loc, name }) => {
                 // Determine the contextual usage of this symbol:
                 self.load_name(name);
@@ -1254,7 +1252,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::LoadConst(
                     bytecode::Constant::USize(value)));
             }
-            Int(value) => {
+            I32(value) => {
                 self.emit(Instruction::LoadConst(
                     bytecode::Constant::Integer(value.clone())));
             }

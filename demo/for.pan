@@ -6,8 +6,6 @@ fun main() {
   print(sum);
   return;
 }
-fun print(a:int) {
-}
 
 
 

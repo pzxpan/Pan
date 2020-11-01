@@ -35,9 +35,8 @@ pub enum SourceUnitPart {
     DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
-    Error
+    Error,
 }
-
 
 
 #[derive(Debug, PartialEq)]
@@ -54,38 +53,6 @@ pub enum Import {
     //import std.math {sqrt as Sqrt, floor as Floor};
     //import std { math as Math, math.foolor as Floor};
     Rename(Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum BuiltinType {
-    Bool,
-    String,
-    Int,
-    Float,
-}
-
-
-
-impl BuiltinType {
-    pub fn name(&self) -> &str {
-        match self {
-            BuiltinType::Bool => "bool",
-            BuiltinType::String => "string",
-            BuiltinType::Int => "int",
-            BuiltinType::Float => "float",
-        }
-    }
-}
-
-impl fmt::Display for BuiltinType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BuiltinType::Bool => write!(f, "bool"),
-            BuiltinType::String => write!(f, "string"),
-            BuiltinType::Int => write!(f, "int"),
-            BuiltinType::Float => write!(f, "float"),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -258,8 +225,6 @@ pub enum Number {
     U64(u64),
     U128(u128),
     USize(usize),
-
-    Int(BigInt),
     Float(f64),
 
 }
@@ -318,7 +283,7 @@ pub enum Expression {
 
     Subscript(Loc, Box<Expression>, Box<Expression>),
     Slice(Loc, Vec<Expression>),
-    Attribute(Loc, Box<Expression>, Option<Identifier>, Option<BigInt>),
+    Attribute(Loc, Box<Expression>, Option<Identifier>, Option<i32>),
 
     FunctionCall(Loc, Box<Expression>, Vec<Expression>),
     NamedFunctionCall(Loc, Box<Expression>, Vec<NamedArgument>),
@@ -329,12 +294,12 @@ pub enum Expression {
     Yield(Loc, Option<Box<Expression>>),
 
     BoolLiteral(Loc, bool),
-    NumberLiteral(Loc, BigInt),
+    NumberLiteral(Loc, i32),
     StringLiteral(Vec<StringLiteral>),
     ArrayLiteral(Loc, Vec<Expression>),
     Number(Loc, Number),
 
-    Type(Loc, BuiltinType),
+    // Type(Loc, BuiltinType),
     Variable(Identifier),
 
     //新增
@@ -346,7 +311,7 @@ pub enum Expression {
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
     IfExpression(Loc, Box<Expression>, Box<Expression>, Box<Expression>),
     MatchExpression(Loc, Box<Expression>, Vec<(Box<Expression>, Box<Expression>)>),
-    Error
+    Error,
 }
 
 impl Expression {
@@ -424,7 +389,6 @@ impl Expression {
             | NumberLiteral(loc, _)
             | ArrayLiteral(loc, _)
             | List(loc, _)
-            | Type(loc, _)
             | Lambda(loc, _)
             | Variable(Identifier { loc, .. })
             | Yield(loc, _)
@@ -442,7 +406,7 @@ impl Expression {
             | MatchExpression(loc, _, _)
             => *loc,
             StringLiteral(v) => v[0].loc,
-            _ => {Loc(0,0,0)}
+            _ => { Loc(0, 0, 0) }
         }
     }
 }
@@ -557,7 +521,7 @@ pub enum Statement {
         Expression,
         Option<Expression>,
         Option<Box<Statement>>,
-    )
+    ),
 }
 
 

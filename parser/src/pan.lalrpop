@@ -1,5 +1,7 @@
 use std::str::FromStr;
 use num_bigint::BigInt;
+use num_traits::identities::Zero;
+use num_traits::{Num, ToPrimitive};
 use crate::ast::*;
 use crate::box_option;
 use crate::lexer::{Token, LexicalError, CommentType};
@@ -291,7 +293,8 @@ DictEntry: DictEntry = {
     },
     <l:@L> <n:LexNumber> ":" <value:Expression> <r:@R> => {
         let s: String = n.chars().filter(|v| *v != '_').collect();
-        let key = Expression::NumberLiteral(Loc(file_no, l, r), BigInt::from_str(&s).unwrap());
+        let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
+        let key = Expression::NumberLiteral(Loc(file_no, l, r), num);
         DictEntry{ loc: Loc(file_no, l, r),key, value }
      }
 }
@@ -311,7 +314,7 @@ ObjAttribute: Expression = {
      },
      <a:@L> <e:Precedence0> "."  <n:LexNumber> <b:@R> => {
         let s: String = n.chars().filter(|v| *v != '_').collect();
-        let num = BigInt::from_str(&s).unwrap();
+        let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
         Expression::Attribute(Loc(file_no, a, b), Box::new(e), None, Some(num))
      },
      <a:@L> <e:Precedence0> "::"  <i:Identifier> <b:@R> => {
@@ -344,8 +347,8 @@ Precedence0: Expression = {
     <a:@L> <n:Number>  <b:@R> => Expression::Number(Loc(file_no, a, b),n),
     <l:@L> <n:LexNumber> <r:@R> => {
         let s: String = n.chars().filter(|v| *v != '_').collect();
-
-        Expression::NumberLiteral(Loc(file_no, l, r), BigInt::from_str(&s).unwrap())
+        let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
+        Expression::NumberLiteral(Loc(file_no, l, r), num)
     },
     <l:@L> <a:ParameterList> <r:@R> => {
         if a.len() == 1 {

@@ -54,7 +54,7 @@ impl Scope {
         //         .set_item("__builtins__", vm.builtins.clone(), vm)
         //         .unwrap();
         // }
-        // globals.insert("int".to_string(), Value::Int(0));
+        // globals.insert("int".to_string(), Value::I32(0));
         Scope::new(locals, globals, vm)
     }
 
@@ -121,12 +121,9 @@ impl NameProtocol for Scope {
 
     fn store_name(&self, key: String, value: Value) {
         let mut a = self.locals.borrow_mut();
-        println!("dddd name:{:?}", key);
         a.first().unwrap().borrow_mut().insert(key.to_string(), value);
         // a.insert(key.to_string(), value);
-        println!("222dictddd2:{:?}", a);
     }
-
 
     #[cfg_attr(feature = "flame-it", flame("Scope"))]
     /// Load a local name. Only check the local dictionary for the given name.

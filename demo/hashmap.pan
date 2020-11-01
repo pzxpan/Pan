@@ -21,8 +21,6 @@ fun main() {
     }
   return;
 }
-fun print(a:int) {
-}
 
 
 

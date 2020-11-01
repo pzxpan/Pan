@@ -1,6 +1,6 @@
 pub struct House {
-    pub size: float,
-    pub price: float,
+    pub size: f64,
+    pub price: f64,
     fun idea(): bool {
         return price / size > 10000;
     }
@@ -9,19 +9,19 @@ pub struct House {
     }
 }
 
-pub fun name_call(age:int, name:string) : bool {
+pub fun name_call(age:i32, name:string) : bool {
    return age > 30;
 }
 pub struct Person {
-    pub age: int,
+    pub age: i32,
     pub name: string,
    // pub address: string,
-  //  money: int,
+  //  money: i32,
     //pub house: House,
     pub fun is_older(): bool {
         return age > 40;
     }
-    pub fun older_than(a: int): bool {
+    pub fun older_than(a: i32): bool {
         //money = 100;
         return age > a;
     }
@@ -42,8 +42,6 @@ fun main() {
    print(person.name);
 
    return;
-}
-fun print(a:int) {
 }
 
 

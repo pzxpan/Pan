@@ -111,15 +111,15 @@
 // }
 //
 // fn range(_receiver: &Option<Arc<RefCell<Obj>>>, args: Vec<Value>, _vm: &mut VirtualMachine) -> Option<Value> {
-//     let mut start = if let Some(Value::Int(i)) = args.get(0) { *i } else {
+//     let mut start = if let Some(Value::I32(i)) = args.get(0) { *i } else {
 //         panic!("range requires an Int as first argument")
 //     };
-//     let end = if let Some(Value::Int(i)) = args.get(1) { *i } else {
+//     let end = if let Some(Value::I32(i)) = args.get(1) { *i } else {
 //         panic!("range requires an Int as second argument")
 //     };
 //     let incr = match args.get(2) {
 //         None | Some(Value::Nil) => 1,
-//         Some(Value::Int(i)) => *i,
+//         Some(Value::I32(i)) => *i,
 //         Some(_) => panic!("range requires an Int as third argument")
 //     };
 //
@@ -127,7 +127,7 @@
 //     let mut values = Vec::with_capacity(size as usize);
 //
 //     while start < end {
-//         values.push(Value::Int(start));
+//         values.push(Value::I32(start));
 //         start += incr;
 //     }
 //
@@ -150,22 +150,22 @@
 //         let mut vm = make_vm();
 //
 //         // Test w/ increment of 1
-//         let arr = range(&None, vec![Value::Int(0), Value::Int(5), Value::Int(1)], &mut vm);
+//         let arr = range(&None, vec![Value::I32(0), Value::I32(5), Value::I32(1)], &mut vm);
 //         let expected = Some(Value::new_array_obj(vec![
-//             Value::Int(0),
-//             Value::Int(1),
-//             Value::Int(2),
-//             Value::Int(3),
-//             Value::Int(4),
+//             Value::I32(0),
+//             Value::I32(1),
+//             Value::I32(2),
+//             Value::I32(3),
+//             Value::I32(4),
 //         ]));
 //         assert_eq!(expected, arr);
 //
 //         // Test w/ increment of 2
-//         let arr = range(&None, vec![Value::Int(0), Value::Int(5), Value::Int(2)], &mut vm);
+//         let arr = range(&None, vec![Value::I32(0), Value::I32(5), Value::I32(2)], &mut vm);
 //         let expected = Some(Value::new_array_obj(vec![
-//             Value::Int(0),
-//             Value::Int(2),
-//             Value::Int(4),
+//             Value::I32(0),
+//             Value::I32(2),
+//             Value::I32(4),
 //         ]));
 //         assert_eq!(expected, arr);
 //     }
@@ -175,17 +175,17 @@
 //         let mut vm = make_vm();
 //
 //         // Test w/ increment larger than range
-//         let arr = range(&&None, vec![Value::Int(0), Value::Int(5), Value::Int(5)], &mut vm);
-//         let expected = Some(Value::new_array_obj(vec![Value::Int(0)]));
+//         let arr = range(&&None, vec![Value::I32(0), Value::I32(5), Value::I32(5)], &mut vm);
+//         let expected = Some(Value::new_array_obj(vec![Value::I32(0)]));
 //         assert_eq!(expected, arr);
 //
 //         // Test w/ [0, 1)
-//         let arr = range(&None, vec![Value::Int(0), Value::Int(1), Value::Int(1)], &mut vm);
-//         let expected = Some(Value::new_array_obj(vec![Value::Int(0)]));
+//         let arr = range(&None, vec![Value::I32(0), Value::I32(1), Value::I32(1)], &mut vm);
+//         let expected = Some(Value::new_array_obj(vec![Value::I32(0)]));
 //         assert_eq!(expected, arr);
 //
 //         // Test w/ [0, 0) -> Empty array
-//         let arr = range(&None, vec![Value::Int(0), Value::Int(0), Value::Int(1)], &mut vm);
+//         let arr = range(&None, vec![Value::I32(0), Value::I32(0), Value::I32(1)], &mut vm);
 //         let expected = Some(Value::new_array_obj(vec![]));
 //         assert_eq!(expected, arr);
 //     }

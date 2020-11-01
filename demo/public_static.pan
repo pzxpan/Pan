@@ -1,6 +1,6 @@
 pub struct Person {
     pub name: string,
-    pub age: int,
+    pub age: i32,
 
     pub fun ddd() : bool {
         return age > 0;
@@ -16,8 +16,6 @@ fun main() {
    print(person.age);
    print(person.name);
    return;
-}
-fun print(a:int) {
 }
 
 

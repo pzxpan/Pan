@@ -170,7 +170,7 @@ pub enum Constant {
     U64(u64),
     U128(u128),
     USize(usize),
-    Integer(BigInt),
+    Integer(i32),
     Float(f64),
     Complex(Complex64),
     Boolean(bool),
@@ -262,7 +262,7 @@ impl CodeObject {
 
     pub fn new_builtin(
         obj_name: String,
-        arg_names: Vec<String>
+        arg_names: Vec<String>,
     ) -> CodeObject {
         CodeObject {
             instructions: Vec::new(),

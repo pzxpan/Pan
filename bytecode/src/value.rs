@@ -43,7 +43,6 @@ pub enum Value {
     U128(u128),
     USize(usize),
 
-    Int(i64),
     Float(f64),
     Bool(bool),
     /// Represents a compile-time string constant (ie. the name of a function, or the key of a map).
@@ -88,10 +87,10 @@ impl Value {
         }
     }
 
-    pub fn int_value(&self) -> i64 {
+    pub fn int_value(&self) -> i32 {
         match *self {
-            Value::Int(v) => { v }
-            Value::Float(v) => { v as i64 }
+            Value::I32(v) => { v }
+            Value::Float(v) => { v as i32 }
             _ => unreachable!()
         }
     }
@@ -128,7 +127,6 @@ impl Value {
     }
 
     pub fn code(&self) -> CodeObject {
-        println!("code is:{:?}", self);
         match self {
             Value::Fn(v) => {
                 v.code.clone()
@@ -161,8 +159,6 @@ impl Value {
             Value::U64(val) => format!("{}", val),
             Value::U128(val) => format!("{}", val),
             Value::USize(val) => format!("{}", val),
-
-            Value::Int(val) => format!("{}", val),
             Value::Float(val) => format!("{}", val),
             Value::Bool(val) => format!("{}", val),
             Value::Str(val) => val.clone(),
@@ -225,7 +221,6 @@ impl Display for Value {
             Value::U128(val) => write!(f, "{}", val),
             Value::USize(val) => write!(f, "{}", val),
 
-            Value::Int(v) => write!(f, "{}", v),
             Value::Float(v) => write!(f, "{}", v),
             Value::Bool(v) => write!(f, "{}", v),
             Value::Str(val) => write!(f, "{}", val),

@@ -170,11 +170,9 @@ impl Frame {
                 trace!("  Executing op code: {:?}", instruction);
                 trace!("=======");
             }
-        println!("instruction {:?}", instruction);
         match instruction {
             bytecode::Instruction::LoadConst(ref value) => {
                 let obj = vm.unwrap_constant(value);
-                println!("{:?}", obj);
                 self.push_value(obj);
                 None
             }
@@ -308,7 +306,7 @@ impl Frame {
             }
             bytecode::Instruction::GetIter => {
                 let end = self.pop_value();
-                if let Value::Int(value) = end {
+                if let Value::I32(value) = end {
                     let start = self.pop_value();
                     if vm._gt(end.clone(), start.clone()).bool_value() {
                         self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(true)));
@@ -316,7 +314,7 @@ impl Frame {
                         self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
                     }
                 } else {
-                    self.push_value(Value::new_range_obj(end.clone(), Value::Int(0), Value::Bool(false)));
+                    self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), Value::Bool(false)));
                 }
 
 
@@ -481,9 +479,6 @@ impl Frame {
         unpack: bool,
     ) -> Value {
         let elements = self.pop_multiple(size);
-        for e in elements.clone() {
-            println!("args : {:?}", e);
-        }
         Value::new_array_obj(elements)
     }
 
@@ -579,7 +574,6 @@ impl Frame {
                 self.scope.store_global(name.to_string(), obj);
             }
             bytecode::NameScope::Local => {
-                println!("store name {:?},value:{:?},{:p}", name, obj, self);
                 self.scope.store_name(name.to_string(), obj);
             }
             bytecode::NameScope::Free => {
@@ -610,7 +604,7 @@ impl Frame {
                 Value::Nil
             }
         };
-        println!("load_name value: {:?},栈名:{:p}", value, self);
+        // println!("load_name value: {:?},栈名:{:p}", value, self);
         self.push_value(value.clone());
         None
     }
@@ -726,7 +720,6 @@ impl Frame {
     // }
 
     fn execute_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
-        println!("call_function");
         let mut named_call = false;
         let args = match typ {
             bytecode::CallType::Positional(count) => {
@@ -736,10 +729,8 @@ impl Frame {
                 } else { vec![Value::Nil] }
             }
             bytecode::CallType::Keyword(count) => {
-                // let kwarg_names = self.pop_value();
                 named_call = true;
                 let args = self.pop_multiple(*count);
-                // println!("kwarg_names{:?},args:{:?}", kwarg_names, args);
                 args
             }
             _ => { vec![Value::Nil] }
@@ -779,18 +770,9 @@ impl Frame {
 
         // Call function:
         // let args = self.pop_value();
-        println!("ddd args:{:?}", args);
         let func_ref = self.pop_value();
-
-        println!("ddd func_def:{:?}", func_ref);
         let code = func_ref.code();
-        println!("cao  function name:{:?},equal = print: {:?}", code.obj_name, code.obj_name.eq("print"));
-        if code.obj_name.eq("print") {
-            for i in code.instructions {
-                println!("innnn{:?}", i);
-            }
-        }
-        // else {
+
         self.scope.new_child_scope_with_locals();
         if self.stack.borrow_mut().len() > 0 {
             let last_value = self.last_value();
@@ -803,19 +785,6 @@ impl Frame {
                 self.pop_value();
             }
         }
-        // match last_value {
-        //     Value::Obj(e) => {
-        //         match &*e.borrow_mut() {
-        //             Obj::InstanceObj(InstanceObj { typ, field_map }) => {
-        //                 let map = last_value.hash_map_value();
-        //                 self.scope.update_local(&mut RefCell::new(map));
-        //                 self.pop_value();
-        //             }
-        //             _ => {}
-        //         }
-        //     }
-        //     _ => {}
-        // }
 
         let mut s = self.scope.new_child_scope_with_locals();
         if named_call {
@@ -834,14 +803,6 @@ impl Frame {
                 self.push_value(v);
             }
             _ => self.push_value(Value::Nil)
-        }
-
-
-        for a in self.scope.globals.borrow_mut().iter() {
-            println!("aaaaglobals: {:?}", a);
-        }
-        for a in self.scope.locals.borrow_mut().iter() {
-            println!("bbbbblocals: {:?}", a);
         }
         None
     }
@@ -1054,7 +1015,6 @@ impl Frame {
         op: &bytecode::BinaryOperator,
         inplace: bool,
     ) -> FrameResult {
-        println!("iii in ");
         let b_ref = self.pop_value();
         let a_ref = self.pop_value();
         let value = if inplace {
@@ -1072,7 +1032,7 @@ impl Frame {
                 // bytecode::BinaryOperator::Xor => vm._ixor(a_ref, b_ref),
                 // bytecode::BinaryOperator::Or => vm._ior(a_ref, b_ref),
                 // bytecode::BinaryOperator::And => vm._iand(a_ref, b_ref),
-                _ => Value::Int(0)
+                _ => Value::I32(0)
             }
         } else {
             match *op {
@@ -1089,7 +1049,7 @@ impl Frame {
                 // bytecode::BinaryOperator::Xor => vm._xor(a_ref, b_ref),
                 // bytecode::BinaryOperator::Or => vm._or(a_ref, b_ref),
                 // bytecode::BinaryOperator::And => vm._and(a_ref, b_ref),
-                _ => Value::Int(0)
+                _ => Value::I32(0)
             }
         };
 

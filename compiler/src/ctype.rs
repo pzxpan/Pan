@@ -18,7 +18,7 @@ pub enum CType {
     USize,
     Char,
 
-    Int,
+    // Int,
     Float,
     Type,
     Str,
@@ -77,7 +77,6 @@ impl CType {
         match self {
             CType::Unit => "unit".to_string(),
             CType::Float => "f64".to_string(),
-            CType::Int => "int".to_string(),
             CType::I32 => "i32".to_string(),
             _ => "unknown".to_string()
         }

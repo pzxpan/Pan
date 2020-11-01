@@ -1,7 +1,7 @@
 pub enum Color {
-   Red(int),
+   Red(i32),
    Green(float),
-   Blue(int,int,int),
+   Blue(i32,i32,i32),
    Black(),
    White,
 
@@ -15,8 +15,6 @@ fun main() {
    print(color2);
    //color.is_warm();
    return;
-}
-fun print(a:int) {
 }
 
 

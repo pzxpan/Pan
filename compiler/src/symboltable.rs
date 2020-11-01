@@ -752,9 +752,9 @@ impl SymbolTableBuilder {
                 self.scan_expressions(elements, context)?;
             }
             List(loc, _) => {}
-            Type(loc, ty) => {
-                self.register_name(&ty.name().to_string(), ty.get_type(&self.tables), SymbolUsage::Used)?;
-            }
+            // Type(loc, ty) => {
+            //     self.register_name(&ty.name().to_string(), ty.get_type(&self.tables), SymbolUsage::Used)?;
+            // }
             Variable(Identifier { loc, name }) => {
                 let ty = self.get_register_type(name.to_string()).clone();
                 match context {
