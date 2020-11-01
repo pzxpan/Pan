@@ -131,7 +131,7 @@ pub enum Instruction {
     ListAppend(usize),
     SetAdd(usize),
     MapAdd(usize),
-    PrintExpr,
+    Print,
     LoadBuildStruct,
     LoadBuildEnum(usize),
     LoadBuildModule,
@@ -256,6 +256,23 @@ impl CodeObject {
             varargs,
             source_path,
             first_line_number,
+            obj_name,
+        }
+    }
+
+    pub fn new_builtin(
+        obj_name: String,
+        arg_names: Vec<String>
+    ) -> CodeObject {
+        CodeObject {
+            instructions: Vec::new(),
+            label_map: HashMap::new(),
+            locations: Vec::new(),
+            flags: Default::default(),
+            arg_names,
+            varargs: Varargs::None,
+            source_path: "".to_string(),
+            first_line_number: 0,
             obj_name,
         }
     }
@@ -405,7 +422,7 @@ impl Instruction {
             ListAppend(i) => w!(ListAppend, i),
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),
-            PrintExpr => w!(PrintExpr),
+            Print => w!(Print),
             LoadBuildStruct => w!(LoadBuildClass),
             LoadBuildEnum(size) => w!(LoadBuildEnum,size),
             LoadBuildModule => w!(LoadBuildModule),

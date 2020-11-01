@@ -22,7 +22,7 @@ use pan_parser::ast::Loc;
 use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
-use crate::resolve_import_compile::resolve_import_compile;
+use crate::resolve_import_compile::{resolve_import_compile, resolve_builtin_fun};
 use pan_parser::diagnostics::ErrorType;
 
 pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
@@ -172,6 +172,7 @@ impl<O: OutputStream> Compiler<O> {
         trace!("compile symboltable{:?}", symbol_table);
         self.symbol_table_stack.push(symbol_table);
         let size_before = self.output_stack.len();
+        resolve_builtin_fun(self);
 
         for part in &program.0 {
             match part {
@@ -249,7 +250,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadName(name.to_owned(), scope));
     }
 
-    fn store_name(&mut self, name: &str) {
+    pub fn store_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);
         self.emit(Instruction::StoreName(name.to_owned(), scope));
     }
@@ -1038,7 +1039,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        trace!("Compiling {:?}", expression);
+        println!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;

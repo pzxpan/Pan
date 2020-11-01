@@ -14,6 +14,7 @@ use walkdir::WalkDir;
 use std::io::Read;
 use crate::symboltable::make_symbol_table;
 use crate::output_stream::OutputStream;
+use crate::builtin::builtin_fun::get_builtin_fun;
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> Result<(), CompileError> {
     let mut whole_name = "demo".to_string();
@@ -51,7 +52,17 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
         compiler.import_instructions.extend(code_object.unwrap().instructions);
         Ok(())
     } else {
-       Err((code_object.err().unwrap()))
+        Err((code_object.err().unwrap()))
+    }
+}
+
+pub fn resolve_builtin_fun<O: OutputStream>(compiler: &mut Compiler<O>) {
+    let fns = get_builtin_fun();
+    for f in fns.iter() {
+        compiler.emit(Instruction::LoadConst(Constant::Code(Box::new(f.1.clone()))));
+        compiler.emit(Instruction::LoadConst(Constant::String(f.0.clone())));
+        compiler.emit(Instruction::MakeFunction);
+        compiler.store_name(f.0.as_ref());
     }
 }
 

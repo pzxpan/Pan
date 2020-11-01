@@ -2,6 +2,7 @@
 pub enum CType {
     Unit,
     Any,
+    None,
     Union(Vec<CType>),
     I8,
     I16,
@@ -19,7 +20,7 @@ pub enum CType {
 
     Int,
     Float,
-
+    Type,
     Str,
     Bool,
     Tuple(Box<Vec<CType>>),
@@ -75,8 +76,9 @@ impl CType {
     pub fn name(&self) -> String {
         match self {
             CType::Unit => "unit".to_string(),
-            CType::Float => "float".to_string(),
+            CType::Float => "f64".to_string(),
             CType::Int => "int".to_string(),
+            CType::I32 => "i32".to_string(),
             _ => "unknown".to_string()
         }
     }

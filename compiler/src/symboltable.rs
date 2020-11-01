@@ -13,6 +13,8 @@ use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
 use crate::resolve_import_symbol::scan_import_symbol;
+use crate::builtin::builtin_type::get_builtin_type;
+use crate::builtin::builtin_fun::get_builtin_fun;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -146,10 +148,10 @@ pub struct SymbolTableError {
 impl From<SymbolTableError> for CompileError {
     fn from(error: SymbolTableError) -> Self {
         CompileError {
-            statement: None,
+            statement: Option::None,
             error: CompileErrorType::SyntaxError(error.error),
             location: error.location,
-            source_path: None,
+            source_path: Option::None,
         }
     }
 }
@@ -235,7 +237,8 @@ impl<'a> SymbolTableAnalyzer<'a> {
 }
 
 #[derive(Debug, Clone)]
-enum SymbolUsage {
+pub enum SymbolUsage {
+    Builtin,
     Global,
     Used,
     Assigned,
@@ -377,23 +380,11 @@ impl SymbolTableBuilder {
         self.leave_scope();
         Ok(())
     }
-    fn insert_builtin_symbol(&mut self) {
-        self.register_name(&"int".to_string(), CType::Int, SymbolUsage::Used);
-        self.register_name(&"float".to_string(), CType::Float, SymbolUsage::Used);
-        self.register_name(&"string".to_string(), CType::Str, SymbolUsage::Used);
-        self.register_name(&"bool".to_string(), CType::Bool, SymbolUsage::Used);
-        self.register_name(&"Any".to_string(), CType::Any, SymbolUsage::Used);
-        let mut arg_types = Vec::new();
-        arg_types.push((String::from("value"), CType::Any, false));
-        let tt = CType::Fn(FnType {
-            name: "print".to_string(),
-            arg_types,
-            type_args: Vec::new(),
-            ret_type: Box::from(CType::Any),
-            is_pub: true,
-            is_static: false,
-        });
-        self.register_name(&"print".to_string(), tt, SymbolUsage::Used);
+    pub fn insert_builtin_symbol(&mut self) {
+        let types = get_builtin_type();
+        for t in types.iter() {
+            self.register_name(&t.0, t.1.clone(), t.2.clone());
+        }
     }
 
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
@@ -413,7 +404,7 @@ impl SymbolTableBuilder {
                     if !in_import {
                         match def {
                             Import::Plain(mod_path, all) => {
-                                scan_import_symbol(self, mod_path, &None, all)?;
+                                scan_import_symbol(self, mod_path, &Option::None, all)?;
                             }
                             Import::GlobalSymbol(mod_path, as_name, all) => {}
                             Import::Rename(mod_path, as_part) => {}
@@ -824,12 +815,8 @@ impl SymbolTableBuilder {
                     }
                 }
             }
-            IfExpression(loc, _, _, _) => {
-
-            }
-            MatchExpression(loc, _, _) => {
-
-            }
+            IfExpression(loc, _, _, _) => {}
+            MatchExpression(loc, _, _) => {}
             _ => {}
         }
         Ok(())
@@ -1015,6 +1002,7 @@ impl SymbolTableBuilder {
             SymbolUsage::Used => {
                 symbol.is_referenced = true;
             }
+            _ => {}
         }
         Ok(())
     }
