@@ -831,7 +831,6 @@ impl SymbolTableBuilder {
         self.enter_scope(name, SymbolTableType::Function, line_number);
         let arg_types: Vec<(String, CType, bool)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
-            self.register_name(&s.1.name(), s.1.clone(), SymbolUsage::Global);
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter);
         }
         Ok(())

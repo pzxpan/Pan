@@ -1,28 +1,30 @@
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+use std::cmp::Ordering;
+#[derive(Debug, Clone, Eq, PartialEq, Hash,PartialOrd)]
 pub enum CType {
     Unit,
     Any,
     None,
     Union(Vec<CType>),
+    Char,
+    Bool,
     I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    ISize,
     U8,
+    I16,
     U16,
+    I32,
     U32,
+    ISize,
+    USize,
+    I64,
     U64,
     U128,
-    USize,
-    Char,
+    I128,
+    Float,
 
     // Int,
-    Float,
-    Type,
     Str,
-    Bool,
+    Type,
+
     Tuple(Box<Vec<CType>>),
     Array(Box<CType>),
     Dict(Box<CType>, Box<CType>),
@@ -101,6 +103,38 @@ impl CType {
         match self {
             CType::Fn(s) => s.arg_types.iter().map(|s| s.1.clone()).collect(),
             _ => Vec::new()
+        }
+    }
+}
+
+impl PartialOrd for FnType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (_, _) => None
+        }
+    }
+}
+
+impl PartialOrd for StructType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (_, _) => None
+        }
+    }
+}
+
+impl PartialOrd for EnumType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (_, _) => None
+        }
+    }
+}
+
+impl PartialOrd for LambdaType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (_, _) => None
         }
     }
 }

@@ -26,6 +26,7 @@ pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, ident
     path_str.push_str(".pan");
     let mut path = env::current_dir().unwrap();
     path.push(path_str.clone());
+    //TODO 需要处理文件夹和 部分导入的情况
     if path.is_file() {
         resovle_file_compile(compiler, &path, as_name, is_all)?;
     } else {

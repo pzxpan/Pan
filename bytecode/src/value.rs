@@ -1,4 +1,3 @@
-// use crate::vm::compiler::Upvalue;
 use std::fmt::{Display, Formatter, Error};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -7,7 +6,6 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde::ser::Serializer;
-// use crate::native_fns::NativeFn;
 use crate::bytecode::CodeObject;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -30,21 +28,23 @@ pub struct ClosureValue {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
-    I8(i8),
-    I16(i16),
-    I32(i32),
-    I64(i64),
-    I128(i128),
-    ISize(isize),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    U128(u128),
-    USize(usize),
-
-    Float(f64),
     Bool(bool),
+    Char(char),
+    I8(i8),
+    U8(u8),
+
+    I16(i16),
+    U16(u16),
+    I32(i32),
+    U32(u32),
+    ISize(isize),
+    USize(usize),
+    I64(i64),
+    U64(u64),
+    I128(i128),
+    U128(u128),
+    Float(f64),
+
     /// Represents a compile-time string constant (ie. the name of a function, or the key of a map).
     /// These are only transient values and should not remain on the stack. Compare to an actual,
     /// heap-allocated, run-time Value::Obj(Obj::StringObj) value.
@@ -146,6 +146,7 @@ impl Value {
 impl Value {
     pub fn to_string(&self) -> String {
         match self {
+            Value::Char(val) => format!("{}", val),
             Value::I8(val) => format!("{}", val),
             Value::I16(val) => format!("{}", val),
             Value::I32(val) => format!("{}", val),
@@ -207,6 +208,7 @@ impl Value {
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
+            Value::Char(val) => write!(f, "{}", val),
             Value::I8(val) => write!(f, "{}", val),
             Value::I16(val) => write!(f, "{}", val),
             Value::I32(val) => write!(f, "{}", val),

@@ -2,6 +2,7 @@ use pan_parser::ast::*;
 use crate::symboltable::*;
 use crate::ctype::*;
 use std::borrow::Borrow;
+use crate::ctype::CType::Unknown;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -109,30 +110,45 @@ impl HasType for EnumDefinition {
     }
 }
 
+fn get_register_expr_type(tables: &Vec<SymbolTable>, name: String, depth: i32) -> CType {
+    let len = tables.len();
+    for i in (0..len).rev() {
+        let table = tables.get(i);
+        let symbol = table.unwrap().lookup(&name);
+        if let Some(s) = symbol {
+            return match &s.ty {
+                CType::Fn(f) => f.ret_type.as_ref().clone(),
+                CType::Lambda(f) => f.ret_type.as_ref().clone(),
+                _ => s.ty.clone()
+            };
+        }
+    }
+    return CType::Unknown;
+}
+
 impl HasType for Expression {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match self {
             Expression::Add(_, left, right) |
             Expression::Subtract(_, left, right) => {
                 //TODO 需要处理两个变量的四则运算的返回类型，需要在利用注册了的symbol进行处理;
-                let l = left.get_type(tables);
-                println!("left{:?}", l);
-                let r = right.get_type(tables);
-                println!("right{:?}", r);
-                if l == r {
-                    l
-                } else {
-                    r
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                if l == CType::Unknown {
+                    l = get_register_expr_type(tables, left.expr_name(), 0);
                 }
+                if r == CType::Unknown {
+                    r = get_register_expr_type(tables, right.expr_name(), 0);
+                }
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                return if min < CType::I8 {
+                    CType::Unknown
+                } else if max <= CType::Float {
+                    max
+                } else {
+                    CType::Unknown
+                };
             }
-            // Expression::Type(_, ty) => {
-            //     match ty {
-            //         BuiltinType::Int => CType::Int,
-            //         BuiltinType::Bool => CType::Bool,
-            //         BuiltinType::String => CType::Str,
-            //         BuiltinType::Float => CType::Float,
-            //     }
-            // }
             Expression::Variable(s) => {
                 return get_register_type(tables, s.name.clone());
             }
