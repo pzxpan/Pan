@@ -333,6 +333,7 @@ impl<O: OutputStream> Compiler<O> {
                 }
                 self.set_label(end_label);
             }
+
             Expression(_, expression) => {
                 self.compile_expression(expression)?;
             }
@@ -359,6 +360,30 @@ impl<O: OutputStream> Compiler<O> {
             }
             While(loc, expression, body) => {
                 self.compile_while(expression, body)?;
+            }
+            Match(loc, test, bodies) => {
+                self.compile_expression(test)?;
+                let end_label = self.new_label();
+                let mut labels = Vec::new();
+                let len = bodies.len();
+                for i in 0..bodies.len() {
+                    labels.push(self.new_label());
+                }
+                for (index, expr) in bodies.iter().enumerate() {
+                    self.set_label(labels[index]);
+                    self.compile_expression(expr.0.as_ref())?;
+                    self.emit(Instruction::Match);
+                    if index + 1 < len {
+                        self.emit(Instruction::JumpIfFalse(labels[index + 1]));
+                    } else {
+                        self.emit(Instruction::JumpIfFalse(end_label));
+                    }
+                    self.compile_statements(expr.1.as_ref())?;
+                    self.emit(Instruction::Jump(end_label));
+                }
+                self.set_label(end_label);
+                //弹出被比较的数据
+                self.emit(Instruction::Pop);
             }
             _ => {}
         }

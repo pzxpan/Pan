@@ -587,7 +587,13 @@ impl SymbolTableBuilder {
                 }
                 self.scan_multi_value_def(decls, &ty);
             }
-            Match(loc, _, _) => {}
+            Match(loc, test, items) => {
+                self.scan_expression(test, &ExpressionContext::Load)?;
+                for (expr, item) in items.iter() {
+                    self.scan_expression(expr, &ExpressionContext::Load)?;
+                    self.scan_statement(item)?;
+                }
+            }
         }
         Ok(())
     }

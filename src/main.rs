@@ -21,7 +21,7 @@ use log::*;
 
 fn main() {
     env_logger::init();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("calculate.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("match.pan"));
     //test_all_demo_file();
 }
 
