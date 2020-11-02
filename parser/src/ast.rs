@@ -226,7 +226,6 @@ pub enum Number {
     U128(u128),
     USize(usize),
     Float(f64),
-
 }
 
 #[derive(Debug, PartialEq, Clone)]

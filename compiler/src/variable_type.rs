@@ -143,7 +143,7 @@ impl HasType for Expression {
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
                 return if min < CType::I8 {
                     CType::Unknown
-                } else if max <= CType::Float {
+                } else if max <= CType::Str {
                     max
                 } else {
                     CType::Unknown

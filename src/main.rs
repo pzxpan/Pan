@@ -17,8 +17,10 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
+use log::*;
 
 fn main() {
+    env_logger::init();
     test_one_file(&env::current_dir().unwrap().join("demo").join("calculate.pan"));
     //test_all_demo_file();
 }

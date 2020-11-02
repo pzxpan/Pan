@@ -14,6 +14,8 @@ use pan_bytecode::value::{Value, FnValue, Obj, InstanceObj, TypeValue};
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
 use std::sync::Arc;
+use log::*;
+use crate::util::change_to_primitive_type;
 
 
 #[derive(Clone, Debug)]
@@ -135,7 +137,7 @@ impl Frame {
     pub fn run(&self, vm: &mut VirtualMachine) -> FrameResult {
         // Execute until return or exception:
         loop {
-           // let lineno = self.get_lineno();
+            // let lineno = self.get_lineno();
             let result = self.execute_instruction(vm);
             match result {
                 None => {}
@@ -158,6 +160,7 @@ impl Frame {
         //  vm.check_signals()?;
 
         let instruction = self.fetch_instruction();
+        trace!("instruction is:{:?}", instruction);
         #[cfg(feature = "vm-tracing-logging")]
             {
                 trace!("=======");
@@ -467,6 +470,11 @@ impl Frame {
                 vm.print(self.pop_value());
                 None
             }
+            bytecode::Instruction::PrimitiveTypeChange(idx) => {
+                let value = self.pop_value();
+                self.push_value(change_to_primitive_type(&value, *idx));
+                None
+            }
             _ => { None }
         }
     }
@@ -604,7 +612,7 @@ impl Frame {
                 Value::Nil
             }
         };
-        // println!("load_name value: {:?},栈名:{:p}", value, self);
+       // println!("load_name value: {:?},栈名:{:p}", value, self);
         self.push_value(value.clone());
         None
     }
@@ -1182,7 +1190,6 @@ impl Frame {
     }
 
     pub fn get_lineno(&self) -> bytecode::Location {
-        println!("lasti:{:?}", self.lasti.get());
         self.code.locations[self.lasti.get()].clone()
     }
 

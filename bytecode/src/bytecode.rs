@@ -96,6 +96,7 @@ pub enum Instruction {
     DeleteAttr(String),
     LoadConst(Constant),
     UnaryOperation(UnaryOperator),
+    PrimitiveTypeChange(i32),
     BinaryOperation(BinaryOperator, bool),
     LoadAttr(String),
     CompareOperation(ComparisonOperator),
@@ -408,6 +409,7 @@ impl Instruction {
 
             BeforeAsyncWith => w!(BeforeAsyncWith),
             SetupAsyncWith(end) => w!(SetupAsyncWith, label_map[end]),
+            PrimitiveTypeChange(n) => w!(PrimitiveTypeChange, n),
             PopBlock => w!(PopBlock),
             BuildString(size) => w!(BuildString, size),
             BuildTuple(size, unpack) => w!(BuildTuple, size, unpack),

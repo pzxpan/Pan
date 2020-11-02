@@ -2,6 +2,7 @@ pub mod frame;
 pub mod vm;
 pub mod scope;
 pub mod native_fns;
+pub mod util;
 
 #[cfg(test)]
 mod tests {

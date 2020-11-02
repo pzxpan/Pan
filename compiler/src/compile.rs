@@ -24,6 +24,9 @@ use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_builtinfun_import::{resolve_import_compile, resolve_builtin_fun};
 use pan_parser::diagnostics::ErrorType;
+use pan_parser::ast::VariableAttribute::Constant;
+use crate::util::get_number_type;
+use log::*;
 
 pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -100,7 +103,7 @@ fn with_compiler(
     compiler.push_new_code_object("<module>".to_owned());
     f(&mut compiler)?;
     let code = compiler.pop_code_object();
-    trace!("Compilation completed: {:?}", code);
+    debug!("Compilation completed: {:?}", code);
     Ok(code)
 }
 
@@ -1098,8 +1101,23 @@ impl<O: OutputStream> Compiler<O> {
             BitwiseOr(loc, a, b) |
             And(loc, a, b) |
             Or(loc, a, b) => {
-                self.compile_expression(a)?;
-                self.compile_expression(b)?;
+                //let rt = expression.get_type(&self.symbol_table_stack);
+                let at = a.get_type(&self.symbol_table_stack);
+                let bt = b.get_type(&self.symbol_table_stack);
+                if at == bt {
+                    self.compile_expression(a)?;
+                    self.compile_expression(b)?;
+                } else if at < bt {
+                    self.compile_expression(a)?;
+                    let idx = get_number_type(bt);
+                    self.emit(Instruction::PrimitiveTypeChange(idx));
+                    self.compile_expression(b)?;
+                } else {
+                    self.compile_expression(a)?;
+                    self.compile_expression(b)?;
+                    let idx = get_number_type(at);
+                    self.emit(Instruction::PrimitiveTypeChange(idx));
+                }
                 self.compile_op(expression, false);
             }
 

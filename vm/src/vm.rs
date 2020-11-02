@@ -330,11 +330,49 @@ impl VirtualMachine {
             (Value::I32(a), Value::I32(b)) => {
                 Value::I32(a - b)
             }
+            (Value::I8(a), Value::I8(b)) => {
+                Value::I8(a - b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::U8(a - b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::I16(a - b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::U16(a - b)
+            }
+            (Value::I32(a), Value::I32(b)) => {
+                Value::I32(a - b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::U32(a - b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::I64(a - b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::U64(a - b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::I128(a - b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::U128(a - b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::ISize(a - b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::USize(a - b)
+            }
+            (Value::Float(a), Value::Float(b)) => {
+                Value::Float(a - b)
+            }
             _ => unreachable!()
         }
     }
     pub fn add(&self, a: Value, b: Value) -> Value {
-        println!("{:?} {:?}",a,b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)

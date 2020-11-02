@@ -59,7 +59,6 @@ impl Scope {
     }
 
     pub fn get_locals(&self) -> PanDictRef {
-        println!("self.locals:{:?}", self.locals);
         match self.locals.borrow_mut().first() {
             Some(dict) => dict.borrow().clone(),
             None => unreachable!(),
@@ -155,8 +154,6 @@ impl NameProtocol for Scope {
 
     fn update_local(&self, hash_map: &mut RefCell<HashMap<String, Value>>) {
         let mut a = self.locals.borrow_mut();
-        println!("eeeeeee:{:?}", a.clone());
         a.first_mut().replace(hash_map);
-        println!("ddddd:{:?}", a.clone());
     }
 }

@@ -60,7 +60,6 @@ pub fn parse(src: &str, file_name: String) -> Result<ast::SourceUnit, Vec<Diagno
                     format!("文件结束错误{}", expected.join(", ")),
                 ),
                 ParseError::User { error } => {
-                    println!("use define{:?}", error);
                     Diagnostic::parser_error(error.loc(file_name.clone()), error.to_string())
                 }
             });
