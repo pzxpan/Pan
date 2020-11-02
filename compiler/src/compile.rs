@@ -896,6 +896,17 @@ impl<O: OutputStream> Compiler<O> {
             ast::Expression::BitwiseOr(_, _, _) => bytecode::BinaryOperator::Or,
             ast::Expression::BitwiseXor(_, _, _) => bytecode::BinaryOperator::Xor,
             ast::Expression::BitwiseAnd(_, _, _) => bytecode::BinaryOperator::And,
+
+            ast::Expression::AssignAdd(_, _, _) => bytecode::BinaryOperator::Add,
+            ast::Expression::AssignSubtract(_, _, _) => bytecode::BinaryOperator::Subtract,
+            ast::Expression::AssignMultiply(_, _, _) => bytecode::BinaryOperator::Multiply,
+            ast::Expression::AssignDivide(_, _, _) => bytecode::BinaryOperator::Divide,
+            ast::Expression::AssignModulo(_, _, _) => bytecode::BinaryOperator::Modulo,
+            ast::Expression::AssignShiftLeft(_, _, _) => bytecode::BinaryOperator::Lshift,
+            ast::Expression::AssignShiftRight(_, _, _) => bytecode::BinaryOperator::Rshift,
+            ast::Expression::AssignOr(_, _, _) => bytecode::BinaryOperator::Or,
+            ast::Expression::AssignXor(_, _, _) => bytecode::BinaryOperator::Xor,
+            ast::Expression::AssignAnd(_, _, _) => bytecode::BinaryOperator::And,
             _ => unreachable!()
         };
         self.emit(Instruction::BinaryOperation(i, inplace));
@@ -1145,16 +1156,16 @@ impl<O: OutputStream> Compiler<O> {
             AssignXor(loc, a, b) |
             AssignShiftLeft(loc, a, b) |
             AssignShiftRight(loc, a, b) |
-            ReAssign(loc, a, b) |
             AssignAdd(loc, a, b) |
             AssignSubtract(loc, a, b) |
             AssignMultiply(loc, a, b) |
             AssignDivide(loc, a, b) |
             AssignModulo(loc, a, b)
             => {
-                self.compile_expression(b)?;
                 self.compile_expression(a)?;
-                //TODO
+                self.compile_expression(b)?;
+                self.compile_op(expression, true);
+                self.compile_store(a)?;
             }
             BoolLiteral(loc, _) => {}
             NumberLiteral(loc, value) => {

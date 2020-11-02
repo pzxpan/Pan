@@ -730,21 +730,24 @@ impl SymbolTableBuilder {
                 self.scan_expression(a, context)?;
                 self.scan_expression(b, context)?;
             }
-            Assign(loc, a, b) |
+            Assign(loc, a, b) => {
+                self.scan_expression(a, &ExpressionContext::Store)?;
+                self.scan_expression(b, &ExpressionContext::Load)?;
+            }
             AssignOr(loc, a, b) |
             AssignAnd(loc, a, b) |
             AssignXor(loc, a, b) |
             AssignShiftLeft(loc, a, b) |
             AssignShiftRight(loc, a, b) |
-            ReAssign(loc, a, b) |
             AssignAdd(loc, a, b) |
             AssignSubtract(loc, a, b) |
             AssignMultiply(loc, a, b) |
             AssignDivide(loc, a, b) |
             AssignModulo(loc, a, b)
             => {
-                self.scan_expression(a, &ExpressionContext::Store)?;
                 self.scan_expression(b, &ExpressionContext::Load)?;
+                self.scan_expression(a, &ExpressionContext::Load)?;
+                self.scan_expression(a, &ExpressionContext::Store)?;
             }
             BoolLiteral(loc, _) => {}
             NumberLiteral(loc, _) => {}

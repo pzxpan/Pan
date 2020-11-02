@@ -18,6 +18,33 @@ fun main() {
    print(ee);
    print(ff);
 
+   ff += 10;
+   print(ff);
+
+   ff -= 10;
+   print(ff);
+   ff *= 10;
+   print(ff);
+
+
+    ff = 20;
+    ff |= 10;
+    print(ff);
+
+    ff ^= 10;
+    print(ff);
+
+    ff &= 10;
+    print(ff);
+
+    print(20000);
+    print(ff);
+    ff = 0;
+    ff %= 10;
+    print(ff);
+
+
+
    let sss = "我们有";
    let s1 = sss + b + "块";
    print(s1);
