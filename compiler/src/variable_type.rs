@@ -130,7 +130,9 @@ impl HasType for Expression {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match self {
             Expression::Add(_, left, right) |
-            Expression::Subtract(_, left, right) => {
+            Expression::Subtract(_, left, right) |
+            Expression::Multiply(_, left, right) |
+            Expression::Divide(_, left, right) => {
                 //TODO 需要处理两个变量的四则运算的返回类型，需要在利用注册了的symbol进行处理;
                 let mut l = left.get_type(tables);
                 let mut r = right.get_type(tables);
@@ -149,6 +151,48 @@ impl HasType for Expression {
                     CType::Unknown
                 };
             }
+            Expression::Power(_, left, right) |
+            Expression::Modulo(_, left, right) |
+            Expression::ShiftLeft(_, left, right) |
+            Expression::ShiftRight(_, left, right) => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                if l == CType::Unknown {
+                    l = get_register_expr_type(tables, left.expr_name(), 0);
+                }
+                if r == CType::Unknown {
+                    r = get_register_expr_type(tables, right.expr_name(), 0);
+                }
+
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                return if min < CType::I8 {
+                    CType::Unknown
+                } else if max <= CType::U128 {
+                    max
+                } else {
+                    CType::Unknown
+                };
+            }
+
+            Expression::BitwiseAnd(_, left, right) |
+            Expression::BitwiseXor(_, left, right) |
+            Expression::BitwiseOr(_, left, right) => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                if l == CType::Unknown {
+                    l = get_register_expr_type(tables, left.expr_name(), 0);
+                }
+                if r == CType::Unknown {
+                    r = get_register_expr_type(tables, right.expr_name(), 0);
+                }
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                return if min == max {
+                    return max;
+                } else {
+                    CType::Unknown
+                };
+            }
+
             Expression::Variable(s) => {
                 return get_register_type(tables, s.name.clone());
             }

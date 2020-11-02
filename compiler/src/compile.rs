@@ -891,7 +891,7 @@ impl<O: OutputStream> Compiler<O> {
             ast::Expression::Divide(_, _, _) => bytecode::BinaryOperator::Divide,
             ast::Expression::Modulo(_, _, _) => bytecode::BinaryOperator::Modulo,
             ast::Expression::Power(_, _, _) => bytecode::BinaryOperator::Power,
-            ast::Expression::ShiftRight(_, _, _) => bytecode::BinaryOperator::Lshift,
+            ast::Expression::ShiftLeft(_, _, _) => bytecode::BinaryOperator::Lshift,
             ast::Expression::ShiftRight(_, _, _) => bytecode::BinaryOperator::Rshift,
             ast::Expression::BitwiseOr(_, _, _) => bytecode::BinaryOperator::Or,
             ast::Expression::BitwiseXor(_, _, _) => bytecode::BinaryOperator::Xor,

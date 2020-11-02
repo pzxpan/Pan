@@ -612,7 +612,7 @@ impl Frame {
                 Value::Nil
             }
         };
-       // println!("load_name value: {:?},栈名:{:p}", value, self);
+        // println!("load_name value: {:?},栈名:{:p}", value, self);
         self.push_value(value.clone());
         None
     }
@@ -1030,16 +1030,13 @@ impl Frame {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
                 bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
                 bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
-                // //     bytecode::BinaryOperator::MatrixMultiply => vm._imatmul(a_ref, b_ref),
-                // bytecode::BinaryOperator::Power => vm._ipow(a_ref, b_ref),
-                // bytecode::BinaryOperator::Divide => vm._itruediv(a_ref, b_ref),
-                // bytecode::BinaryOperator::FloorDivide => vm._ifloordiv(a_ref, b_ref),
-                // bytecode::BinaryOperator::Modulo => vm._imod(a_ref, b_ref),
-                // bytecode::BinaryOperator::Lshift => vm._ilshift(a_ref, b_ref),
-                // bytecode::BinaryOperator::Rshift => vm._irshift(a_ref, b_ref),
-                // bytecode::BinaryOperator::Xor => vm._ixor(a_ref, b_ref),
-                // bytecode::BinaryOperator::Or => vm._ior(a_ref, b_ref),
-                // bytecode::BinaryOperator::And => vm._iand(a_ref, b_ref),
+                bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
+                bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
+                bytecode::BinaryOperator::Lshift => vm.shiftleft(a_ref, b_ref),
+                bytecode::BinaryOperator::Rshift => vm.shiftright(a_ref, b_ref),
+                bytecode::BinaryOperator::Xor => vm.bitxor(a_ref, b_ref),
+                bytecode::BinaryOperator::Or => vm.bitor(a_ref, b_ref),
+                bytecode::BinaryOperator::And => vm.bitand(a_ref, b_ref),
                 _ => Value::I32(0)
             }
         } else {
@@ -1047,16 +1044,13 @@ impl Frame {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
                 bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
                 bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
-                // bytecode::BinaryOperator::MatrixMultiply => vm._matmul(a_ref, b_ref),
-                // bytecode::BinaryOperator::Power => vm._pow(a_ref, b_ref),
-                // bytecode::BinaryOperator::Divide => vm._truediv(a_ref, b_ref),
-                // bytecode::BinaryOperator::FloorDivide => vm._floordiv(a_ref, b_ref),
-                // bytecode::BinaryOperator::Modulo => vm._mod(a_ref, b_ref),
-                // bytecode::BinaryOperator::Lshift => vm._lshift(a_ref, b_ref),
-                // bytecode::BinaryOperator::Rshift => vm._rshift(a_ref, b_ref),
-                // bytecode::BinaryOperator::Xor => vm._xor(a_ref, b_ref),
-                // bytecode::BinaryOperator::Or => vm._or(a_ref, b_ref),
-                // bytecode::BinaryOperator::And => vm._and(a_ref, b_ref),
+                bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
+                bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
+                bytecode::BinaryOperator::Lshift => vm.shiftleft(a_ref, b_ref),
+                bytecode::BinaryOperator::Rshift => vm.shiftright(a_ref, b_ref),
+                bytecode::BinaryOperator::Xor => vm.bitxor(a_ref, b_ref),
+                bytecode::BinaryOperator::Or => vm.bitor(a_ref, b_ref),
+                bytecode::BinaryOperator::And => vm.bitand(a_ref, b_ref),
                 _ => Value::I32(0)
             }
         };
