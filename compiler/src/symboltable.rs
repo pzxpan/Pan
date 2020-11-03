@@ -907,6 +907,7 @@ impl SymbolTableBuilder {
         Ok(())
     }
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+        println!("ty:{:?},name:{:?}",ty,name);
         match ty {
             CType::Struct(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {

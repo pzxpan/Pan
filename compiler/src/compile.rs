@@ -1225,7 +1225,10 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_op(expression, true);
                 self.compile_store(a)?;
             }
-            BoolLiteral(loc, _) => {}
+            BoolLiteral(loc, value) => {
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Boolean(value.clone())));
+            }
             NumberLiteral(loc, value) => {
                 self.emit(Instruction::LoadConst(
                     bytecode::Constant::Integer(value.clone())));
