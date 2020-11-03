@@ -3,6 +3,7 @@ use crate::symboltable::*;
 use crate::ctype::*;
 use std::borrow::Borrow;
 use crate::ctype::CType::Unknown;
+use pan_bytecode::bytecode::Instruction::CallFunction;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -171,6 +172,16 @@ impl HasType for Expression {
                     max
                 } else {
                     CType::Unknown
+                };
+            }
+
+            Expression::As(_, left, right) => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                return if r > CType::Str || l > CType::Str {
+                    CType::Unknown
+                } else {
+                    r
                 };
             }
 

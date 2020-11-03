@@ -262,6 +262,7 @@ Precedence4: Expression = {
     <l:Precedence4> <a:@L> "*" <b:@R> <r:Precedence3> => Expression::Multiply(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence4> <a:@L> "/" <b:@R> <r:Precedence3> => Expression::Divide(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence4> <a:@L> "%" <b:@R> <r:Precedence3> => Expression::Modulo(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <e:Precedence4> <a:@L>  "as" <b:@R> <target:Precedence3> => Expression::As(Loc(file_no, a, b),Box::new(e),Box::new(target)),
     Precedence3,
 }
 
@@ -274,6 +275,7 @@ Precedence2: Expression = {
     <a:@L> "!" <b:@R> <e:Precedence2> => Expression::Not(Loc(file_no, a, b), Box::new(e)),
     <a:@L> "+" <b:@R> <e:Precedence2> => Expression::UnaryPlus(Loc(file_no, a, b), Box::new(e)),
     <a:@L> "-" <b:@R> <e:Precedence2> => Expression::UnaryMinus(Loc(file_no, a, b), Box::new(e)),
+
     Precedence0,
 }
 

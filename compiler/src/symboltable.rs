@@ -538,7 +538,6 @@ impl SymbolTableBuilder {
                         //如果是函数或获取属性，就获取注册了的函数和返回类型，
                         ty = self.get_register_type(e.expr_name());
                     }
-
                     if decl.ty.is_none() {
                         if lookup_symbol {
                             //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
@@ -558,10 +557,11 @@ impl SymbolTableBuilder {
                             self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned)?;
                         }
                     } else {
-                        println!("实际类型 {:?}, 期望类型 {:?}", decl.ty.as_ref().unwrap().get_type(&self.tables), ty.ret_type().clone());
-                        if decl.ty.as_ref().unwrap().get_type(&self.tables) != ty.ret_type().clone() {
+                        let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables);
+                        let right_ty = ty.ret_type().clone();
+                        if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
                             return Err(SymbolTableError {
-                                error: format!("类型不匹配"),
+                                error: format!("类型不匹配,右侧类型 {:?}, 右侧类型 {:?}", right_ty, left_ty),
                                 location: location.clone(),
                             });
                         }
@@ -826,6 +826,10 @@ impl SymbolTableBuilder {
             }
             IfExpression(loc, _, _, _) => {}
             MatchExpression(loc, _, _) => {}
+            As(loc, a, b) => {
+                self.scan_expression(a, context)?;
+                self.scan_expression(b, context)?;
+            }
             _ => {}
         }
         Ok(())

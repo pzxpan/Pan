@@ -2,11 +2,10 @@ pub enum Color {
    Red(i32),
    Green(float),
    Blue(i32,i32,i32),
-   Black(),
+   Black,
    White,
-
    pub fun is_warm() {
-        return self == Black();
+        return self == Black;
    }
 }
 

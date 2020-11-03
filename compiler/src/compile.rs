@@ -1137,9 +1137,10 @@ impl<O: OutputStream> Compiler<O> {
             BitwiseOr(loc, a, b) |
             And(loc, a, b) |
             Or(loc, a, b) => {
-                //let rt = expression.get_type(&self.symbol_table_stack);
+                let rt = expression.get_type(&self.symbol_table_stack);
                 let at = a.get_type(&self.symbol_table_stack);
                 let bt = b.get_type(&self.symbol_table_stack);
+                let max = if at < bt { bt.clone() } else { at.clone() };
                 if at == bt {
                     self.compile_expression(a)?;
                     self.compile_expression(b)?;
@@ -1155,8 +1156,17 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::PrimitiveTypeChange(idx));
                 }
                 self.compile_op(expression, false);
+                if rt != max {
+                    let idx = get_number_type(rt);
+                    self.emit(Instruction::PrimitiveTypeChange(idx));
+                }
             }
-
+            As(loc, a, b) => {
+                let bt = b.get_type(&self.symbol_table_stack);
+                self.compile_expression(a)?;
+                let idx = get_number_type(bt);
+                self.emit(Instruction::PrimitiveTypeChange(idx));
+            }
             Less(loc, a, b) |
             More(loc, a, b) |
             LessEqual(loc, a, b) |

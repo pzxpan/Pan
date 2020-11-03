@@ -245,6 +245,7 @@ pub enum Expression {
     //新加
     In(Loc, Box<Expression>, Box<Expression>),
     Is(Loc, Box<Expression>, Box<Expression>),
+    As(Loc, Box<Expression>, Box<Expression>),
 
     //赋值
     Assign(Loc, Box<Expression>, Box<Expression>),
@@ -400,6 +401,7 @@ impl Expression {
             | Number(loc, _)
             | NamedFunctionCall(loc, _, _)
             | IfExpression(loc, _, _, _)
+            | As(loc, _, _)
             | MatchExpression(loc, _, _)
             => *loc,
             StringLiteral(v) => v[0].loc,
