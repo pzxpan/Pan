@@ -11,7 +11,7 @@ pub enum Color {
         match self {
             Red(a) -> { print(a); return true;}
             Single(a) -> { print(a); return true;}
-            Threed(a,b,c) -> {print(a); print(b);print(c);return false;}
+            Three(a,b,c) -> {print(a); print(b);print(c);return false;}
         }
    }
 }
