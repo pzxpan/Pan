@@ -1,19 +1,18 @@
 pub enum Color {
    Red(i32),
    Single(i128),
-   Two(i32,string),
-   Three(i32,i32,i32),
-   Green(i32),
-   Blue(i32,i32,i32),
-   Black,
-   White,
-   pub fun is_warm() {
-        match self {
-            Red(a) -> { print(a); return true;}
-            Single(a) -> { print(a); return true;}
-            Three(a,b,c) -> {print(a); print(b);print(c);return false;}
-        }
-   }
+   White(i32,string),
+
+}
+
+fun main() {
+    let color = Color::White(20,"pan");
+     match color {
+           Color::Red(a) -> { print(a); return true;}
+           Color::Single(a) -> { print(a); return true;}
+           Color::White(a,b) -> { print(a);print(b); return true;}
+       }
+    print(a);
 }
 
 

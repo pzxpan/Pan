@@ -159,7 +159,7 @@ impl Frame {
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         //  vm.check_signals()?;
         let instruction = self.fetch_instruction();
-        // println!("instruction is:{:?}", instruction);
+        println!("instruction is:{:?}", instruction);
         #[cfg(feature = "vm-tracing-logging")]
             {
                 trace!("=======");
@@ -404,7 +404,16 @@ impl Frame {
                 //TOTO match 不是简单的值比较，应该类型匹配即可
                 let a = self.pop_value();
                 let b = self.last_value();
-                self.push_value(vm._eq(a, b));
+                if let Value::Obj(_) = b {
+                    let (matched, values) = vm._match(b, a);
+                    for i in values {
+                        self.push_value(i);
+                    }
+                    self.push_value(matched)
+                } else {
+                    self.push_value(vm._eq(a, b));
+                }
+
                 None
             }
 

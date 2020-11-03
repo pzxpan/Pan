@@ -166,6 +166,25 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
+
+    pub fn _match(&self, obj: Value, b: Value) -> (Value, Vec<Value>) {
+        match obj {
+            Value::Obj(e) => {
+                match &*e.borrow_mut() {
+                    Obj::EnumObj(EnumObj { item_name, field_map, .. }) => {
+                        if item_name == &b {
+                            return (Value::Bool(true), field_map.as_ref().cloned().unwrap());
+                        } else {
+                            return (Value::Bool(false), vec![]);
+                        }
+                    }
+                    _ => unreachable!()
+                }
+            }
+            _ => unreachable!()
+        }
+    }
+
     pub fn _eq(&self, a: Value, b: Value) -> Value {
         match (a, b) {
             (Value::I32(a), Value::I32(b)) => {

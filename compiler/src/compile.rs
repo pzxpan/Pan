@@ -371,13 +371,14 @@ impl<O: OutputStream> Compiler<O> {
                 }
                 for (index, expr) in bodies.iter().enumerate() {
                     self.set_label(labels[index]);
-                    self.compile_expression(expr.0.as_ref())?;
+                    self.compile_match_item(expr.0.as_ref())?;
                     self.emit(Instruction::Match);
                     if index + 1 < len {
                         self.emit(Instruction::JumpIfFalse(labels[index + 1]));
                     } else {
                         self.emit(Instruction::JumpIfFalse(end_label));
                     }
+                    self.store_match_content(expr.0.as_ref())?;
                     self.compile_statements(expr.1.as_ref())?;
                     self.emit(Instruction::Jump(end_label));
                 }
@@ -386,6 +387,26 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::Pop);
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    fn compile_match_item(&mut self, expression: &Expression) -> Result<(), CompileError> {
+        if let Expression::FunctionCall(loc, name, args) = expression {
+            if let Expression::Attribute(_, _, Some(ident), _) = name.as_ref() {
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
+            }
+        } else {
+            self.compile_expression(expression)?;
+        }
+        Ok(())
+    }
+
+    fn store_match_content(&mut self, expression: &Expression) -> Result<(), CompileError> {
+        if let Expression::FunctionCall(loc, name, args) = expression {
+            for arg in args.iter() {
+                self.emit(Instruction::StoreName(arg.expr_name(), NameScope::Local));
+            }
         }
         Ok(())
     }

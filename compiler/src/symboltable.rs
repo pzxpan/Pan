@@ -313,7 +313,9 @@ impl SymbolTableBuilder {
                             ast::EnumPart::EnumVariableDefinition(def) => {
                                 let mut ref_type: Vec<CType> = Vec::new();
                                 if let Some(tys) = &def.tys {
-                                    tys.iter().map(|s| ref_type.push(s.get_type(&self.tables)));
+                                    for ty in tys {
+                                        ref_type.push(ty.get_type(&self.tables));
+                                    }
                                 }
                                 self.register_name(&def.name.name, CType::Reference(def.name.name.clone(), ref_type), SymbolUsage::Assigned);
                             }
@@ -590,10 +592,55 @@ impl SymbolTableBuilder {
             Match(loc, test, items) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 for (expr, item) in items.iter() {
-                    self.scan_expression(expr, &ExpressionContext::Load)?;
+                    self.scan_match_item(expr, &ExpressionContext::Load)?;
                     self.scan_statement(item)?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn scan_match_item(&mut self, expression: &Expression, context: &ExpressionContext) -> SymbolTableResult {
+        if let Expression::FunctionCall(loc, name, args) = expression {
+            // println!("tables is {:?},",self.tables);
+            // for (name, value) in self.tables.get(0).unwrap().sub_tables.get(0).unwrap().symbols.clone() {
+            //     println!("name:{:?},value:{:?}", name,value);
+            // }
+            let item_ty = self.get_register_type(name.expr_name());
+            if let Expression::Attribute(_, name, Some(ident), _) = name.as_ref() {
+                if let Enum(enum_type) = item_ty {
+                    for (c,item_ty) in enum_type.variants.iter() {
+                        if ident.name.eq(c) {
+                            if let CType::Reference(_, tys) = item_ty {
+                                if args.len() == tys.len() {
+                                    for i in 0..args.len() {
+                                        self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Assigned)?;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // let item_ty = self.get_register_type(name.expr_name());
+            // println!("222 type is{:?}", item_ty);
+            // if item_ty == CType::Unknown {
+            //     return Err(SymbolTableError {
+            //         error: format!("未定义{:?}的类型，", name.expr_name()),
+            //         location: loc.clone(),
+            //     });
+            // }
+            // if let CType::Reference(name, tys) = item_ty {
+            //     if args.len() == tys.len() {
+            //         for i in 0..args.len() {
+            //             self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Assigned)?;
+            //         }
+            //     }
+            // } else {
+            //     //TODO Color::Red(30,30,30);
+            // }
+        } else {
+            self.scan_expression(expression, context);
         }
         Ok(())
     }
