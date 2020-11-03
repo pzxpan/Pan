@@ -15,6 +15,7 @@ use crate::variable_type::*;
 use crate::resolve_import_symbol::scan_import_symbol;
 use crate::builtin::builtin_type::get_builtin_type;
 use crate::builtin::builtin_fun::get_builtin_fun;
+use pan_parser::ast::Expression::Variable;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -607,9 +608,10 @@ impl SymbolTableBuilder {
             //     println!("name:{:?},value:{:?}", name,value);
             // }
             let item_ty = self.get_register_type(name.expr_name());
+            //Color::Red(10)
             if let Expression::Attribute(_, name, Some(ident), _) = name.as_ref() {
                 if let Enum(enum_type) = item_ty {
-                    for (c,item_ty) in enum_type.variants.iter() {
+                    for (c, item_ty) in enum_type.variants.iter() {
                         if ident.name.eq(c) {
                             if let CType::Reference(_, tys) = item_ty {
                                 if args.len() == tys.len() {
@@ -618,6 +620,15 @@ impl SymbolTableBuilder {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            } else if let Variable(ident) = name.as_ref() {
+                //Red(10)
+                if let CType::Reference(_, tys) = item_ty {
+                    if args.len() == tys.len() {
+                        for i in 0..args.len() {
+                            self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Assigned)?;
                         }
                     }
                 }

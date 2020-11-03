@@ -404,6 +404,7 @@ impl Frame {
                 //TOTO match 不是简单的值比较，应该类型匹配即可
                 let a = self.pop_value();
                 let b = self.last_value();
+                println!("a:{:?},b:{:?}", a, b);
                 if let Value::Obj(_) = b {
                     let (matched, values) = vm._match(b, a);
                     for i in values {
@@ -800,13 +801,20 @@ impl Frame {
         self.scope.new_child_scope_with_locals();
         if self.stack.borrow_mut().len() > 0 {
             let last_value = self.last_value();
-            if last_value.is_obj_instant() {
-                let map = last_value.hash_map_value();
-                for (k, v) in map {
-                    self.scope.store_name(k, v);
+            match last_value.is_obj_instant() {
+                1 => {
+                    let map = last_value.hash_map_value();
+                    for (k, v) in map {
+                        self.scope.store_name(k, v);
+                    }
+                    self.scope.store_name("self".to_string(), last_value);
+                    self.pop_value();
                 }
-                self.scope.store_name("self".to_string(), last_value);
-                self.pop_value();
+                2 => {
+                    self.scope.store_name("self".to_string(), last_value);
+                    self.pop_value();
+                }
+                _ => {}
             }
         }
 

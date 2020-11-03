@@ -132,6 +132,20 @@ impl VirtualMachine {
                             }
                         }
                     }
+                    Obj::EnumObj(EnumObj { typ, .. }) => {
+                        if let Value::Type(TypeValue { methods, static_fields, .. }) = typ.as_ref() {
+                            for method in methods {
+                                if method.0.eq(&attr.to_string()) {
+                                    return (true, Value::Code(method.1.clone()));
+                                }
+                            }
+                            for (k, v) in static_fields.iter() {
+                                if k.eq(&attr.to_string()) {
+                                    return (true, Value::Code(v.clone()));
+                                }
+                            }
+                        }
+                    }
                     _ => unreachable!()
                 }
             }

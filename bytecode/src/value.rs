@@ -95,17 +95,22 @@ impl Value {
         }
     }
 
-    pub fn is_obj_instant(&self) -> bool {
+    pub fn is_obj_instant(&self) -> i32 {
         return match &*self {
             Value::Obj(v) => {
                 match &*v.borrow() {
                     Obj::InstanceObj(map) => {
-                        true
+                        //1为struct
+                        1
                     }
-                    _ => { false }
+                    Obj::EnumObj(map) => {
+                        //2为enum
+                        2
+                    }
+                    _ => { 0 }
                 }
             }
-            _ => { false }
+            _ => { 0 }
         };
     }
     pub fn hash_map_value(&self) -> HashMap<String, Value> {

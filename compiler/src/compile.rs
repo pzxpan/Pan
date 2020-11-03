@@ -395,6 +395,8 @@ impl<O: OutputStream> Compiler<O> {
         if let Expression::FunctionCall(loc, name, args) = expression {
             if let Expression::Attribute(_, _, Some(ident), _) = name.as_ref() {
                 self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
+            } else if let Expression::Variable(ident) = name.as_ref() {
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
             }
         } else {
             self.compile_expression(expression)?;
