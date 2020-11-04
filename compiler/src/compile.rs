@@ -42,6 +42,7 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
     ctx: CompileContext,
     optimize: u8,
     lambda_name: String,
+    is_import: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -72,10 +73,11 @@ pub fn compile(
     source: &str,
     source_path: String,
     optimize: u8,
+    is_import: bool,
 ) -> Result<CodeObject, CompileError> {
     let ast = parse(source, source_path.to_string());
     if ast.is_ok() {
-        compile_program(ast.unwrap(), source_path.clone(), optimize)
+        compile_program(ast.unwrap(), source_path.clone(), optimize,is_import)
             .map_err(|mut err| {
                 err.update_source_path(&source_path);
                 err
@@ -111,10 +113,11 @@ pub fn compile_program(
     ast: ast::SourceUnit,
     source_path: String,
     optimize: u8,
+    is_import: bool
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        compiler.compile_program(&ast, symbol_table)
+        compiler.compile_program(&ast, symbol_table,is_import)
     })
 }
 
@@ -144,6 +147,7 @@ impl<O: OutputStream> Compiler<O> {
             },
             optimize,
             lambda_name: "".to_string(),
+            is_import: false,
         }
     }
 
@@ -171,8 +175,10 @@ impl<O: OutputStream> Compiler<O> {
         &mut self,
         program: &ast::SourceUnit,
         symbol_table: SymbolTable,
+        is_import: bool
     ) -> Result<(), CompileError> {
         trace!("compile symboltable{:?}", symbol_table);
+        let mut found_main = false;
         self.symbol_table_stack.push(symbol_table);
         let size_before = self.output_stack.len();
         resolve_builtin_fun(self);
@@ -202,10 +208,14 @@ impl<O: OutputStream> Compiler<O> {
                         _ => {}
                     }
                 }
-
                 ast::SourceUnitPart::ConstDefinition(def) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
+                    if name.eq("main") {
+                        if !is_import {
+                            found_main = true;
+                        }
+                    }
                     let mut args = vec![];
                     for para in def.params.iter() {
                         let p = para.1.as_ref().unwrap().to_owned();
@@ -224,12 +234,14 @@ impl<O: OutputStream> Compiler<O> {
         for i in self.import_instructions.clone().iter() {
             self.emit(i.clone());
         }
-        self.emit(Instruction::LoadName("main".to_string(), NameScope::Local));
-        self.emit(Instruction::CallFunction(Positional(0)));
-        self.emit(Instruction::Pop);
-
+        if found_main {
+            self.emit(Instruction::LoadName("main".to_string(), NameScope::Local));
+            self.emit(Instruction::CallFunction(Positional(0)));
+            self.emit(Instruction::Pop);
+        }
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
+
         Ok(())
     }
 

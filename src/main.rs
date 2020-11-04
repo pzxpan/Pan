@@ -21,8 +21,8 @@ use log::*;
 
 fn main() {
     env_logger::init();
-    //test_one_file(&env::current_dir().unwrap().join("demo").join("color.pan"));
-    test_all_demo_file();
+    test_one_file(&env::current_dir().unwrap().join("demo").join("for.pan"));
+    //test_all_demo_file();
 }
 
 fn test_all_demo_file() {
@@ -40,7 +40,7 @@ fn test_one_file(home_path: &Path) {
     let mut file = File::open(home_path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0);
+    let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0,false);
     if code_object.is_ok() {
         let mut vm = VirtualMachine::new();
         let mut global_value = HashMap::new();

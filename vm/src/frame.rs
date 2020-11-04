@@ -70,6 +70,7 @@ pub struct Frame {
 pub enum ExecutionResult {
     Return(Value),
     Yield(Value),
+    Ignore,
 }
 
 pub type FrameResult = Option<ExecutionResult>;
@@ -277,6 +278,10 @@ impl Frame {
                 Some(ExecutionResult::Return(value))
                 // self.unwind_blocks(vm, UnwindReason::Returning { value })
             }
+            bytecode::Instruction::Ignore => {
+                Some(ExecutionResult::Ignore)
+                // self.unwind_blocks(vm, UnwindReason::Returning { value })
+            }
             // bytecode::Instruction::YieldValue => {
             //     let value = self.pop_value();
             //     Ok(Some(ExecutionResult::Yield(value)))
@@ -287,6 +292,14 @@ impl Frame {
                     start: *start,
                     end: *end,
                 });
+                None
+            }
+            bytecode::Instruction::Continue => {
+                self.continue_break(UnwindReason::Continue);
+                None
+            }
+            bytecode::Instruction::Break => {
+                self.continue_break(UnwindReason::Break);
                 None
             }
             // bytecode::Instruction::BeforeAsyncWith => {
@@ -318,10 +331,6 @@ impl Frame {
                 } else {
                     self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), Value::Bool(false)));
                 }
-
-
-                // let iter_obj = objiter::get_iter(vm, &iterated_obj)?;
-                // self.push_value(iter_obj);
                 None
             }
             bytecode::Instruction::GetAwaitable => {
@@ -404,7 +413,7 @@ impl Frame {
                 //TOTO match 不是简单的值比较，应该类型匹配即可
                 let a = self.pop_value();
                 let b = self.last_value();
-                println!("a:{:?},b:{:?}", a, b);
+                // println!("a:{:?},b:{:?}", a, b);
                 if let Value::Obj(_) = b {
                     let (matched, values) = vm._match(b, a);
                     for i in values {
@@ -495,6 +504,28 @@ impl Frame {
             _ => { None }
         }
     }
+    fn continue_break(&self, reason: UnwindReason) -> FrameResult {
+        while let Some(block) = self.current_block() {
+            match block.typ {
+                BlockType::Loop { start, end } => match &reason {
+                    UnwindReason::Break => {
+                        self.pop_block();
+                        self.jump(end);
+                        return None;
+                    }
+                    UnwindReason::Continue => {
+                        self.jump(start);
+                        return None;
+                    }
+                    _ => {
+                        self.pop_block();
+                    }
+                },
+            }
+        }
+        None
+    }
+
 
     // #[cfg_attr(feature = "flame-it", flame("Frame"))]
     fn get_elements(
@@ -522,69 +553,69 @@ impl Frame {
         None
     }
 
-    // #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    // fn import_from(&self, vm: &VirtualMachine, name: &str) -> FrameResult {
-    //     let module = self.last_value();
-    //     // Load attribute, and transform any error into import error.
-    //     let obj = vm
-    //         .get_attribute(module, name)
-    //         .map_err(|_| vm.new_import_error(format!("cannot import name '{}'", name)))?;
-    //     self.push_value(obj);
-    //     None
-    // }
+// #[cfg_attr(feature = "flame-it", flame("Frame"))]
+// fn import_from(&self, vm: &VirtualMachine, name: &str) -> FrameResult {
+//     let module = self.last_value();
+//     // Load attribute, and transform any error into import error.
+//     let obj = vm
+//         .get_attribute(module, name)
+//         .map_err(|_| vm.new_import_error(format!("cannot import name '{}'", name)))?;
+//     self.push_value(obj);
+//     None
+// }
 
-    // #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    // fn import_star(&self, vm: &VirtualMachine) -> FrameResult {
-    //     let module = self.pop_value();
-    //
-    //     // Grab all the names from the module and put them in the context
-    //     if let Some(dict) = &module.dict {
-    //         for (k, v) in &*dict.borrow() {
-    //             let k = vm.to_str(&k)?;
-    //             let k = k.as_str();
-    //             if !k.starts_with('_') {
-    //                 self.scope.store_name(&vm, k, v);
-    //             }
-    //         }
-    //     }
-    //     None
-    // }
+// #[cfg_attr(feature = "flame-it", flame("Frame"))]
+// fn import_star(&self, vm: &VirtualMachine) -> FrameResult {
+//     let module = self.pop_value();
+//
+//     // Grab all the names from the module and put them in the context
+//     if let Some(dict) = &module.dict {
+//         for (k, v) in &*dict.borrow() {
+//             let k = vm.to_str(&k)?;
+//             let k = k.as_str();
+//             if !k.starts_with('_') {
+//                 self.scope.store_name(&vm, k, v);
+//             }
+//         }
+//     }
+//     None
+// }
 
     /// Unwind blocks.
     /// The reason for unwinding gives a hint on what to do when
     /// unwinding a block.
     /// Optionally returns an exception.
-    // #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    // fn unwind_blocks(&self, vm: &VirtualMachine, reason: UnwindReason) -> FrameResult {
-    //     // First unwind all existing blocks on the block stack:
-    //     while let Some(block) = self.current_block() {
-    //         match block.typ {
-    //             BlockType::Loop { start, end } => match &reason {
-    //                 UnwindReason::Break => {
-    //                     self.pop_block();
-    //                     self.jump(end);
-    //                     return None;
-    //                 }
-    //                 UnwindReason::Continue => {
-    //                     self.jump(start);
-    //                     return None;
-    //                 }
-    //                 _ => {
-    //                     self.pop_block();
-    //                 }
-    //             },
-    //
-    //     }
-    //
-    //     // We do not have any more blocks to unwind. Inspect the reason we are here:
-    //     match reason {
-    //         UnwindReason::Raising { exception } => Err(exception),
-    //         UnwindReason::Returning { value } => Ok(Some(ExecutionResult::Return(value))),
-    //         UnwindReason::Break | UnwindReason::Continue => {
-    //             panic!("Internal error: break or continue must occur within a loop block.")
-    //         } // UnwindReason::NoWorries => None,
-    //     }
-    // }
+// #[cfg_attr(feature = "flame-it", flame("Frame"))]
+// fn unwind_blocks(&self, vm: &VirtualMachine, reason: UnwindReason) -> FrameResult {
+//     // First unwind all existing blocks on the block stack:
+//     while let Some(block) = self.current_block() {
+//         match block.typ {
+//             BlockType::Loop { start, end } => match &reason {
+//                 UnwindReason::Break => {
+//                     self.pop_block();
+//                     self.jump(end);
+//                     return None;
+//                 }
+//                 UnwindReason::Continue => {
+//                     self.jump(start);
+//                     return None;
+//                 }
+//                 _ => {
+//                     self.pop_block();
+//                 }
+//             },
+//
+//     }
+//
+//     // We do not have any more blocks to unwind. Inspect the reason we are here:
+//     match reason {
+//         UnwindReason::Raising { exception } => Err(exception),
+//         UnwindReason::Returning { value } => Ok(Some(ExecutionResult::Return(value))),
+//         UnwindReason::Break | UnwindReason::Continue => {
+//             panic!("Internal error: break or continue must occur within a loop block.")
+//         } // UnwindReason::NoWorries => None,
+//     }
+// }
 
     fn store_name(
         &self,
@@ -620,7 +651,7 @@ impl Frame {
         let optional_value = match name_scope {
             bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
             bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
-           // bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
+            // bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
         };
 
         let value = match optional_value {
@@ -634,29 +665,29 @@ impl Frame {
         None
     }
 
-    // fn execute_rotate(&self, amount: usize) -> FrameResult {
-    //     // Shuffles top of stack amount down
-    //     if amount < 2 {
-    //         panic!("Can only rotate two or more values");
-    //     }
-    //
-    //     let mut values = Vec::new();
-    //
-    //     // Pop all values from stack:
-    //     for _ in 0..amount {
-    //         values.push(self.pop_value());
-    //     }
-    //
-    //     // Push top of stack back first:
-    //     self.push_value(values.remove(0));
-    //
-    //     // Push other value back in order:
-    //     values.reverse();
-    //     for value in values {
-    //         self.push_value(value);
-    //     }
-    //     None
-    // }
+// fn execute_rotate(&self, amount: usize) -> FrameResult {
+//     // Shuffles top of stack amount down
+//     if amount < 2 {
+//         panic!("Can only rotate two or more values");
+//     }
+//
+//     let mut values = Vec::new();
+//
+//     // Pop all values from stack:
+//     for _ in 0..amount {
+//         values.push(self.pop_value());
+//     }
+//
+//     // Push top of stack back first:
+//     self.push_value(values.remove(0));
+//
+//     // Push other value back in order:
+//     values.reverse();
+//     for value in values {
+//         self.push_value(value);
+//     }
+//     None
+// }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let subscript = self.pop_value();
@@ -723,26 +754,26 @@ impl Frame {
         None
     }
 
-    // fn execute_build_slice(&self, vm: &VirtualMachine, size: usize) -> FrameResult {
-    //     assert!(size == 2 || size == 3);
-    //
-    //     let step = if size == 3 {
-    //         Some(self.pop_value())
-    //     } else {
-    //         None
-    //     };
-    //     let stop = self.pop_value();
-    //     let start = self.pop_value();
-    //
-    //     let obj = PySlice {
-    //         start: Some(start),
-    //         stop,
-    //         step,
-    //     }
-    //         .into_ref(vm);
-    //     self.push_value(obj.into_object());
-    //     None
-    // }
+// fn execute_build_slice(&self, vm: &VirtualMachine, size: usize) -> FrameResult {
+//     assert!(size == 2 || size == 3);
+//
+//     let step = if size == 3 {
+//         Some(self.pop_value())
+//     } else {
+//         None
+//     };
+//     let stop = self.pop_value();
+//     let start = self.pop_value();
+//
+//     let obj = PySlice {
+//         start: Some(start),
+//         stop,
+//         step,
+//     }
+//         .into_ref(vm);
+//     self.push_value(obj.into_object());
+//     None
+// }
 
     fn execute_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
         let mut named_call = false;
@@ -834,45 +865,46 @@ impl Frame {
             Some(ExecutionResult::Return(v)) => {
                 self.push_value(v);
             }
+            Some(ExecutionResult::Ignore) => {}
             _ => self.push_value(Value::Nil)
         }
         None
     }
 
-    // fn _send(&self, coro: CodeObject, val: CodeObject, vm: &VirtualMachine) -> PanResult {
-    //     // if let Some(gen) = coro.payload::<PyGenerator>() {
-    //     //     gen.send(val, vm)
-    //     // } else if let Some(coro) = coro.payload::<PyCoroutine>() {
-    //     //     coro.send(val, vm)
-    //     // } else if vm.is_none(&val) {
-    //     //     objiter::call_next(vm, &coro)
-    //     // } else {
-    //     //     vm.call_method(&coro, "send", vec![val])
-    //     // }
-    // }
+// fn _send(&self, coro: CodeObject, val: CodeObject, vm: &VirtualMachine) -> PanResult {
+//     // if let Some(gen) = coro.payload::<PyGenerator>() {
+//     //     gen.send(val, vm)
+//     // } else if let Some(coro) = coro.payload::<PyCoroutine>() {
+//     //     coro.send(val, vm)
+//     // } else if vm.is_none(&val) {
+//     //     objiter::call_next(vm, &coro)
+//     // } else {
+//     //     vm.call_method(&coro, "send", vec![val])
+//     // }
+// }
 
-    // fn execute_yield_from(&self, vm: &VirtualMachine) -> FrameResult {
-    // Value send into iterator:
-    // let val = self.pop_value();
-    //
-    // let coro = self.last_value();
-    //
-    // let result = self._send(coro, val, vm);
-    //
-    // let result = ExecutionResult::from_result(vm, result)?;
-    //
-    // match result {
-    //     ExecutionResult::Yield(value) => {
-    //         // Set back program counter:
-    //         self.lasti.set(self.lasti.get() - 1);
-    //         Ok(Some(ExecutionResult::Yield(value)))
-    //     }
-    //     ExecutionResult::Return(value) => {
-    //         self.pop_value();
-    //         self.push_value(value);
-    //         None
-    //     }
-    // }
+// fn execute_yield_from(&self, vm: &VirtualMachine) -> FrameResult {
+// Value send into iterator:
+// let val = self.pop_value();
+//
+// let coro = self.last_value();
+//
+// let result = self._send(coro, val, vm);
+//
+// let result = ExecutionResult::from_result(vm, result)?;
+//
+// match result {
+//     ExecutionResult::Yield(value) => {
+//         // Set back program counter:
+//         self.lasti.set(self.lasti.get() - 1);
+//         Ok(Some(ExecutionResult::Yield(value)))
+//     }
+//     ExecutionResult::Return(value) => {
+//         self.pop_value();
+//         self.push_value(value);
+//         None
+//     }
+// }
 //    }
 
     fn execute_unpack_ex(&self, vm: &VirtualMachine, before: usize, after: usize) -> FrameResult {
@@ -933,36 +965,11 @@ impl Frame {
             None
         } else {
             self.pop_value();
-            // End of for loop
             self.jump(target);
             None
         }
-
-
-        // if let Value::Nil() = next_obj {
-        //     self.push_value(next_obj);
-        //     None
-        // }
-        // match next_obj {
-        //     Ok(Some(value)) => {
-        //         self.push_value(value);
-        //         None
-        //     }
-        //     None => {
-        //         // Pop iterator from stack:
-        //         self.pop_value();
-        //
-        //         // End of for loop
-        //         self.jump(target);
-        //         None
-        //     }
-        //     Err(next_error) => {
-        //         // Pop iterator from stack:
-        //         self.pop_value();
-        //         Err(next_error)
-        //     }
-        // }
     }
+
     fn execute_make_function(&self, vm: &VirtualMachine) -> FrameResult {
         let qualified_name = self.pop_value();
         let code_obj = self.pop_value();
@@ -1017,6 +1024,7 @@ impl Frame {
         self.push_value(Value::Fn(func));
         None
     }
+
     fn excute_make_struct_instance(&self, vm: &VirtualMachine) -> FrameResult {
         let args = self.pop_value();
         let ty = self.pop_value();
@@ -1097,62 +1105,62 @@ impl Frame {
         None
     }
 
-    // fn _id(&self, a: CodeObject) -> usize {
-    //     a.get_id()
-    // }
+// fn _id(&self, a: CodeObject) -> usize {
+//     a.get_id()
+// }
 
-    // fn _in(
-    //     &self,
-    //     vm: &VirtualMachine,
-    //     needle: CodeObject,
-    //     haystack: CodeObject,
-    // ) -> PanResult<bool> {
-    //     // let found = vm._membership(haystack.clone(), needle)?;
-    //     // Ok(objbool::boolval(vm, found)?)
-    // }
+// fn _in(
+//     &self,
+//     vm: &VirtualMachine,
+//     needle: CodeObject,
+//     haystack: CodeObject,
+// ) -> PanResult<bool> {
+//     // let found = vm._membership(haystack.clone(), needle)?;
+//     // Ok(objbool::boolval(vm, found)?)
+// }
 
-    // fn _not_in(
-    //     &self,
-    //     vm: &VirtualMachine,
-    //     needle: CodeObject,
-    //     haystack: CodeObject,
-    // ) -> PanResult<bool> {
-    //     // let found = vm._membership(haystack.clone(), needle)?;
-    //     // Ok(!objbool::boolval(vm, found)?)
-    // }
+// fn _not_in(
+//     &self,
+//     vm: &VirtualMachine,
+//     needle: CodeObject,
+//     haystack: CodeObject,
+// ) -> PanResult<bool> {
+//     // let found = vm._membership(haystack.clone(), needle)?;
+//     // Ok(!objbool::boolval(vm, found)?)
+// }
 
-    // fn _is(&self, a: CodeObject, b: CodeObject) -> bool {
-    //     // Pointer equal:
-    //     true
-    //     // a.is(&b)
-    // }
-    //
-    // fn _is_not(&self, a: CodeObject, b: CodeObject) -> bool {
-    //
-    //     // !a.is(&b)
-    //     false
-    // }
+// fn _is(&self, a: CodeObject, b: CodeObject) -> bool {
+//     // Pointer equal:
+//     true
+//     // a.is(&b)
+// }
+//
+// fn _is_not(&self, a: CodeObject, b: CodeObject) -> bool {
+//
+//     // !a.is(&b)
+//     false
+// }
 
-    // fn exc_match(
-    //     &self,
-    //     vm: &VirtualMachine,
-    //     exc: CodeObject,
-    //     exc_type: CodeObject,
-    // ) -> bool {
-    //     // single_or_tuple_any(
-    //     //     exc_type,
-    //     //     |cls: PanClassRef| vm.isinstance(&exc, &cls),
-    //     //     |o| {
-    //     //         format!(
-    //     //             "isinstance() arg 2 must be a type or tuple of types, not {}",
-    //     //             o.class()
-    //     //         )
-    //     //     },
-    //     //     vm,
-    //     // )
-    //
-    //     false
-    // }
+// fn exc_match(
+//     &self,
+//     vm: &VirtualMachine,
+//     exc: CodeObject,
+//     exc_type: CodeObject,
+// ) -> bool {
+//     // single_or_tuple_any(
+//     //     exc_type,
+//     //     |cls: PanClassRef| vm.isinstance(&exc, &cls),
+//     //     |o| {
+//     //         format!(
+//     //             "isinstance() arg 2 must be a type or tuple of types, not {}",
+//     //             o.class()
+//     //         )
+//     //     },
+//     //     vm,
+//     // )
+//
+//     false
+// }
 
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     fn execute_compare(
@@ -1266,11 +1274,11 @@ impl fmt::Debug for Frame {
             .borrow()
             .iter()
             .map(|elem| {
-                // if elem.payload.as_any().is::<Frame>() {
-                //     "\n  > {frame}".to_owned()
-                // } else {
-                //     format!("\n  > {:?}", elem)
-                // }
+// if elem.payload.as_any().is::<Frame>() {
+//     "\n  > {frame}".to_owned()
+// } else {
+//     format!("\n  > {:?}", elem)
+// }
                 "ssss"
             })
             .collect::<String>();

@@ -86,6 +86,7 @@ impl VirtualMachine {
     pub fn run_frame_full(&mut self, frame: Frame) -> FrameResult {
         match self.run_frame(frame)? {
             ExecutionResult::Return(value) => Some(ExecutionResult::Return(value)),
+            ExecutionResult::Ignore => Some(ExecutionResult::Ignore),
             _ => panic!("Got unexpected result from function"),
         }
     }
@@ -345,7 +346,6 @@ impl VirtualMachine {
                                     *end = Value::I32(idx as i32 + 1);
                                 }
                             }
-
                             _ => {}
                         }
                     }

@@ -12,17 +12,7 @@ pub enum Color {
       }
 }
 
-fun main() {
-     let color = Color::White(20,"pan");
-     match color {
-           Color::Red(a) -> { print(a); }
-           Color::Single(a) -> { print(a); }
-           Color::White(a,b) -> { print(a);print(b);}
-       }
-    let a = Color::Three(12,13,14);
-    let d = a.is_warm();
-    print(d);
-}
+
 
 
 

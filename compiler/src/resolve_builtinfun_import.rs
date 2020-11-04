@@ -48,7 +48,7 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
     let mut file = File::open(path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let code_object = compile(&contents, String::from(path.clone().to_str().unwrap()), 0);
+    let code_object = compile(&contents, String::from(path.clone().to_str().unwrap()), 0,true);
     if code_object.is_ok() {
         compiler.import_instructions.extend(code_object.unwrap().instructions);
         Ok(())
