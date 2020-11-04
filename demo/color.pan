@@ -19,8 +19,8 @@ fun main() {
            Color::Single(a) -> { print(a); }
            Color::White(a,b) -> { print(a);print(b);}
        }
-    let aa = Color::Three(12,13,14);
-    let d = aa.is_warm();
+    let a = Color::Three(12,13,14);
+    let d = a.is_warm();
     print(d);
 }
 

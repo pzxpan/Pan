@@ -81,7 +81,6 @@ impl Label {
 pub enum NameScope {
     Local,
     Global,
-    Free,
 }
 
 //指令集

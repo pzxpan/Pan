@@ -11,12 +11,7 @@ fun main() {
 
    let c = 0b1100110;
    let d = 0b1010101;
-   let dd = c | b;
-   let ee = c & d;
-   let ff = c ^ d;
-   print(dd);
-   print(ee);
-   print(ff);
+
 
    ff += 10;
    print(ff);

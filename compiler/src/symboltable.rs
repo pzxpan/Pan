@@ -907,7 +907,7 @@ impl SymbolTableBuilder {
         Ok(())
     }
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
-        println!("ty:{:?},name:{:?}",ty,name);
+        //println!("ty:{:?},name:{:?}",ty,name);
         match ty {
             CType::Struct(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {
@@ -1033,7 +1033,7 @@ impl SymbolTableBuilder {
                 SymbolUsage::Global => {
                     let symbol = table.symbols.get(name).unwrap();
                     if let SymbolScope::Global = symbol.scope {
-                        // Ok
+                        println!("global name:{:?},symbol:{:?}", name, symbol);
                     } else {
                         return Err(SymbolTableError {
                             error: format!("name '{}' is used prior to global declaration", name),
@@ -1047,10 +1047,8 @@ impl SymbolTableBuilder {
             }
         }
 
-        if !containing {
-            let symbol = Symbol::new(name, ty.clone());
-            table.symbols.insert(name.to_owned(), symbol);
-        }
+        let symbol = Symbol::new(name, ty.clone());
+        table.symbols.insert(name.to_owned(), symbol);
         let symbol = table.symbols.get_mut(name).unwrap();
         match role {
             SymbolUsage::Parameter => {

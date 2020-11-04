@@ -224,7 +224,7 @@ impl<O: OutputStream> Compiler<O> {
         for i in self.import_instructions.clone().iter() {
             self.emit(i.clone());
         }
-        self.emit(Instruction::LoadName("main".to_string(), NameScope::Free));
+        self.emit(Instruction::LoadName("main".to_string(), NameScope::Local));
         self.emit(Instruction::CallFunction(Positional(0)));
         self.emit(Instruction::Pop);
 
@@ -244,7 +244,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         match symbol.scope {
             SymbolScope::Global => bytecode::NameScope::Global,
-            SymbolScope::Local => bytecode::NameScope::Free,
+            SymbolScope::Local => bytecode::NameScope::Local,
         }
     }
 
@@ -690,9 +690,9 @@ impl<O: OutputStream> Compiler<O> {
 
 
         self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
-        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
@@ -765,9 +765,9 @@ impl<O: OutputStream> Compiler<O> {
 
 
         self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
-        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Free));
+        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
@@ -1388,7 +1388,7 @@ impl<O: OutputStream> Compiler<O> {
             if let ast::Expression::Attribute(_, variable, attribute, _) = function {
                 self.emit(Instruction::LoadName(
                     variable.expr_name().to_string(),
-                    bytecode::NameScope::Global,
+                    bytecode::NameScope::Local,
                 ));
                 self.emit(Instruction::LoadConst(bytecode::Constant::String(
                     attribute.as_ref().unwrap().name.clone())));

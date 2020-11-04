@@ -159,7 +159,7 @@ impl Frame {
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         //  vm.check_signals()?;
         let instruction = self.fetch_instruction();
-        println!("instruction is:{:?}", instruction);
+        trace!("instruction is:{:?}", instruction);
         #[cfg(feature = "vm-tracing-logging")]
             {
                 trace!("=======");
@@ -601,9 +601,9 @@ impl Frame {
             bytecode::NameScope::Local => {
                 self.scope.store_name(name.to_string(), obj);
             }
-            bytecode::NameScope::Free => {
-                self.scope.store_global(name.to_string(), obj);
-            }
+            // bytecode::NameScope::Free => {
+            //     self.scope.store_global(name.to_string(), obj);
+            // }
         }
         None
     }
@@ -620,7 +620,7 @@ impl Frame {
         let optional_value = match name_scope {
             bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
             bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
-            bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
+           // bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
         };
 
         let value = match optional_value {
