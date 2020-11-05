@@ -882,7 +882,11 @@ impl SymbolTableBuilder {
                     }
                 }
             }
-            IfExpression(loc, _, _, _) => {}
+            IfExpression(loc, test, body, orelse) => {
+                self.scan_expression(test, &ExpressionContext::Load)?;
+                self.scan_expression(body, &ExpressionContext::Load)?;
+                self.scan_expression(orelse, &ExpressionContext::Load)?;
+            }
             MatchExpression(loc, _, _) => {}
             As(loc, a, b) => {
                 self.scan_expression(a, context)?;

@@ -5,7 +5,14 @@ fun main() {
       print(i);
       sum += i;
   }
+
   print(sum);
+  print(aa);
+
+  sum = 1009;
+  let aa = if sum > 2000 : 20_i64 elif sum > 1000 : 200_i64 else :300_i64;
+
+
   return;
 }
 

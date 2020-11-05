@@ -207,6 +207,15 @@ impl HasType for Expression {
             Expression::Variable(s) => {
                 return get_register_type(tables, s.name.clone());
             }
+            Expression::IfExpression(loc, test, body, orelse) => {
+                let if_type = body.get_type(tables);
+                let else_type = orelse.get_type(tables);
+                if if_type == else_type {
+                    return if_type;
+                } else {
+                    return CType::Unknown;
+                }
+            }
             // Expression::FunctionCall(_, s, _) => {
             //     s.get_type()
             // }

@@ -77,7 +77,7 @@ pub fn compile(
 ) -> Result<CodeObject, CompileError> {
     let ast = parse(source, source_path.to_string());
     if ast.is_ok() {
-        compile_program(ast.unwrap(), source_path.clone(), optimize,is_import)
+        compile_program(ast.unwrap(), source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
                 err.update_source_path(&source_path);
                 err
@@ -113,11 +113,11 @@ pub fn compile_program(
     ast: ast::SourceUnit,
     source_path: String,
     optimize: u8,
-    is_import: bool
+    is_import: bool,
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        compiler.compile_program(&ast, symbol_table,is_import)
+        compiler.compile_program(&ast, symbol_table, is_import)
     })
 }
 
@@ -175,7 +175,7 @@ impl<O: OutputStream> Compiler<O> {
         &mut self,
         program: &ast::SourceUnit,
         symbol_table: SymbolTable,
-        is_import: bool
+        is_import: bool,
     ) -> Result<(), CompileError> {
         trace!("compile symboltable{:?}", symbol_table);
         let mut found_main = false;
@@ -1297,6 +1297,19 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_function_def(&name, args.as_slice(), body, &None, is_async, true);
             }
             Number(loc, number) => { self.compile_load_constant_number(number.clone()); }
+            IfExpression(loc, test, body, orelse) => {
+                let no_label = self.new_label();
+                let end_label = self.new_label();
+                self.compile_jump_if(test, false, no_label)?;
+                // True case
+                self.compile_expression(body)?;
+                self.emit(Instruction::Jump(end_label));
+                // False case
+                self.set_label(no_label);
+                self.compile_expression(orelse)?;
+                // End
+                self.set_label(end_label);
+            }
             _ => {}
         }
         Ok(())
