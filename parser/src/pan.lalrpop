@@ -440,7 +440,7 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 
 FunctionDefinition: Box<FunctionDefinition> = {
-    <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun"  <nl:@L> <is_static: "::"?> <name:Identifier?> <nr:@R> <params:ParameterList>
+    <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun"  <nl:@L> <is_static: "::"?> <name:Identifier?> <nr:@R> <generics:Generics> <params:ParameterList>
     <returns:(":" Expression)?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let is_pub = is_pub.is_some();
         let is_static = is_static.is_some();
@@ -451,6 +451,7 @@ FunctionDefinition: Box<FunctionDefinition> = {
             name_loc: Loc(file_no, nl, nr),
             params,
             is_pub,
+            generics,
             is_static,
             returns:returns.map(|x|x.1),
             body,

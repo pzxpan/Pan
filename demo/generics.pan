@@ -1,7 +1,7 @@
 pub struct Pair<T> {
     pub x: T,
     pub y: T,
-    pub fun get_x(cc: T) : T {
+    pub fun get_x<T>(cc: T) : T {
         return x + cc;
     }
 }

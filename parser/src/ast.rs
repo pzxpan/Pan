@@ -486,6 +486,7 @@ pub struct FunctionDefinition {
     pub name: Option<Identifier>,
     pub name_loc: Loc,
     pub params: Vec<(Loc, Option<Parameter>)>,
+    pub generics: Vec<Generic>,
     pub is_pub: bool,
     pub is_static: bool,
     pub returns: Option<Expression>,
