@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_import_symbol::scan_import_symbol;
+use crate::resolve_import_symbol::{scan_import_symbol, resovle_generic};
 use crate::builtin::builtin_type::get_builtin_type;
 use crate::builtin::builtin_fun::get_builtin_fun;
 use pan_parser::ast::Expression::Variable;
@@ -110,7 +110,7 @@ pub struct Symbol {
 }
 
 impl Symbol {
-    fn new(name: &str, ty: CType) -> Self {
+    pub fn new(name: &str, ty: CType) -> Self {
         Symbol {
             name: name.to_owned(),
             // table,
@@ -901,8 +901,10 @@ impl SymbolTableBuilder {
             }
             Number(loc, number) => {}
             NamedFunctionCall(loc, exp, args) => {
-                let ty = self.get_register_type(exp.as_ref().expr_name());
-                if let CType::Struct(_) = ty {
+                let mut ty = self.get_register_type(exp.as_ref().expr_name());
+                if let CType::Struct(sty) = ty.clone() {
+                    let mut struct_ty = resovle_generic(sty, args.clone(), &self.tables);
+                    ty = CType::Struct(struct_ty);
                     for arg in args {
                         //不在struct当前作用域，则需要检查Named参数的可见性
                         if !self.in_current_scope(arg.name.name.clone()) {

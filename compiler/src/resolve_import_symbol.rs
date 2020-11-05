@@ -12,6 +12,9 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use std::io::Read;
+use pan_parser::ast::Expression;
+use crate::variable_type::HasType;
+use crate::ctype::{CType, StructType, FnType};
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> SymbolTableResult {
     let mut whole_name = "demo".to_string();
@@ -54,4 +57,130 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, as_name: &Op
         build.scan_top_symbol_types(&ast, true)?
     }
     Ok(())
+}
+
+pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
+    let mut result_ty = st.clone();
+    println!("result_ty:{:?}", result_ty);
+    if st.generics.is_some() {
+        let mut generics = st.generics.clone().unwrap();
+        let mut fields = st.fields.clone();
+        let mut methods = st.methods.clone();
+        let mut static_fields = st.static_fields.clone();
+        for arg in args {
+            let mut expected_ty = arg.expr.get_type(tables);
+            let arg_name = &arg.name.name;
+            let mut generic_type_name = "".to_string();
+            for (idx, content) in st.fields.iter().enumerate()
+            {
+                if content.0.eq(arg_name) {
+                    if let CType::Generic(n, cty) = content.1.clone() {
+                        if expected_ty < cty.as_ref().clone() {
+                            fields.swap_remove(idx);
+                            fields.insert(idx, (content.0.clone(), expected_ty.clone(), content.2));
+                            generic_type_name = n.clone();
+                        }
+                    }
+                }
+            }
+            let mut generics_copy = generics.clone();
+            for (idx, generic) in generics.iter().enumerate() {
+                if let CType::Generic(name, cty) = generic {
+                    if name.eq(&generic_type_name) {
+                        generics_copy.remove(idx);
+                    }
+                }
+            }
+            generics = generics_copy;
+            //抹去函数中的泛型
+            for (i, fty) in st.methods.iter().enumerate() {
+                if let CType::Fn(fnty) = fty.1.clone() {
+                    let mut need_replace = false;
+                    let mut fn_arg_tys = fnty.arg_types.clone();
+                    for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
+                        if let CType::Generic(n, cty) = fnarg.1.clone() {
+                            if n.eq(&generic_type_name) {
+                                if expected_ty < fnarg.1 {
+                                    need_replace = true;
+                                    fn_arg_tys.swap_remove(idx);
+                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone()));
+                                }
+                            }
+                        }
+                    }
+
+                    let mut fn_ret_ty = fnty.ret_type.clone();
+                    if let CType::Generic(n, cty) = fnty.ret_type.as_ref() {
+                        if n.eq(&generic_type_name) {
+                            if expected_ty < *fn_ret_ty.as_ref() {
+                                need_replace = true;
+                                fn_ret_ty = Box::new(expected_ty.clone());
+                            }
+                        }
+                    }
+                    methods.remove(i);
+                    methods.insert(i, (fty.0.clone(), CType::Fn(FnType {
+                        name: fnty.name.clone(),
+                        arg_types: fn_arg_tys,
+                        type_args: fnty.type_args.clone(),
+                        ret_type: fn_ret_ty,
+                        is_pub: fnty.is_pub,
+                        is_static: fnty.is_static,
+                    })));
+                }
+            }
+
+            //抹去静态方法中的泛型
+            for (i, fty) in st.static_fields.iter().enumerate() {
+                if let CType::Fn(fnty) = fty.1.clone() {
+                    let mut need_replace = false;
+                    let mut fn_arg_tys = fnty.arg_types.clone();
+                    for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
+                        if let CType::Generic(n, cty) = fnarg.1.clone() {
+                            if n.eq(&generic_type_name) {
+                                if expected_ty < fnarg.1 {
+                                    need_replace = true;
+                                    fn_arg_tys.remove(idx);
+                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2));
+                                }
+                            }
+                        }
+                    }
+
+                    let mut fn_ret_ty = fnty.ret_type.clone();
+                    if let CType::Generic(n, cty) = fnty.ret_type.as_ref() {
+                        if n.eq(&generic_type_name) {
+                            if expected_ty < *fn_ret_ty.as_ref() {
+                                need_replace = true;
+                                fn_ret_ty = Box::new(expected_ty.clone());
+                            }
+                        }
+                    }
+                    static_fields.remove(i);
+                    static_fields.insert(1, (fty.0.clone(), CType::Fn(FnType {
+                        name: fnty.name.clone(),
+                        arg_types: fn_arg_tys,
+                        type_args: fnty.type_args.clone(),
+                        ret_type: fn_ret_ty,
+                        is_pub: fnty.is_pub,
+                        is_static: fnty.is_static,
+                    }), fty.2));
+                }
+            }
+
+            println!("arg:{:?}, arg_ty:{:?},arg.expr:{:?}", arg.name, arg.expr.get_type(tables), arg.expr);
+        }
+
+        result_ty.static_fields = static_fields;
+        result_ty.methods = methods;
+        result_ty.fields = fields;
+        if generics.len() > 0 {
+            result_ty.generics = Some(generics);
+        } else {
+            result_ty.generics = None;
+        }
+    }
+
+    println!("result_ty:{:?}", result_ty);
+    return result_ty;
 }

@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
-#[derive(Debug, Clone, Eq, PartialEq, Hash,PartialOrd)]
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
     Unit,
-    Any,
+
     None,
     Union(Vec<CType>),
     Char,
@@ -32,8 +33,9 @@ pub enum CType {
     Struct(StructType),
     Enum(EnumType),
     Lambda(LambdaType),
-    Generic(/* name: */ String),
+    Generic(/* name: */ String, Box<CType>),
     Reference(/* name: */ String, /* type_args: */ Vec<CType>),
+    Any,
     Unknown,
 }
 
@@ -58,7 +60,7 @@ pub struct LambdaType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct StructType {
     pub name: String,
-    pub type_args: Vec<(String, CType)>,
+    pub generics: Option<Vec<CType>>,
     pub fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
     pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
     pub methods: Vec<(String, CType)>,
@@ -74,12 +76,14 @@ pub struct EnumType {
     pub is_pub: bool,
 }
 
+
 impl CType {
     pub fn name(&self) -> String {
         match self {
             CType::Unit => "unit".to_string(),
             CType::Float => "f64".to_string(),
             CType::I32 => "i32".to_string(),
+            CType::Generic(name, ..) => name.clone(),
             _ => "unknown".to_string()
         }
     }
