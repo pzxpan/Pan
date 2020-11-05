@@ -16,6 +16,7 @@ use crate::resolve_import_symbol::scan_import_symbol;
 use crate::builtin::builtin_type::get_builtin_type;
 use crate::builtin::builtin_fun::get_builtin_fun;
 use pan_parser::ast::Expression::Variable;
+use crate::error::CompileErrorType::SyntaxError;
 
 pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -824,6 +825,13 @@ impl SymbolTableBuilder {
             // }
             Variable(Identifier { loc, name }) => {
                 let ty = self.get_register_type(name.to_string()).clone();
+                if ty == Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("找不到{}的定义", name),
+                        location: loc.clone(),
+                    });
+                }
+
                 match context {
                     ExpressionContext::Delete => {
                         self.register_name(name, ty, SymbolUsage::Used)?;

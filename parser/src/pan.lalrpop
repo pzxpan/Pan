@@ -195,20 +195,22 @@ Precedence15: Expression = {
     <l:Precedence13> <a:@L> "*=" <b:@R> <r:Precedence15> => Expression::AssignMultiply(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence13> <a:@L> "/=" <b:@R> <r:Precedence15> => Expression::AssignDivide(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence13> <a:@L> "%=" <b:@R> <r:Precedence15> => Expression::AssignModulo(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:@L> "if" <cond:Precedence13> ":" <body:Precedence15> <s2:("elif" <Precedence13> ":" <Precedence15>)*> <el:("else" ":"  <Precedence15>)> <r:@R> => {
-            let mut s3 = el;
-            for i in s2.into_iter().rev() {
-               s3 = Expression::IfExpression(Loc(file_no, l, r), Box::new(i.0), Box::new(i.1), Box::new(s3));
-            }
-            Expression::IfExpression(Loc(file_no, l, r), Box::new(cond), Box::new(body), Box::new(s3))
-        },
+
     Precedence13,
 }
 
 
 
 Precedence13: Expression = {
+  <l:@L> "if" <cond:Precedence13> ":" <body:Precedence12> <s2:("elif" <Precedence13> ":" <Precedence12>)*> <el:("else" ":"  <Precedence12>)> <r:@R> => {
+                let mut s3 = el;
+                for i in s2.into_iter().rev() {
+                   s3 = Expression::IfExpression(Loc(file_no, l, r), Box::new(i.0), Box::new(i.1), Box::new(s3));
+                }
+                Expression::IfExpression(Loc(file_no, l, r), Box::new(cond), Box::new(body), Box::new(s3))
+    },
     <l:Precedence13> <a:@L> "||" <b:@R> <r:Precedence12> => Expression::Or(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+
     Precedence12,
 }
 
@@ -475,7 +477,7 @@ BlockStatement: Statement = {
 
 Statement: Statement = {
    NonIfStatement,
-   <l:@L> "if" <cond:Expression> <body:BlockStatement> <s2:("elif" <Expression> <BlockStatement>)*> <el:("else" BlockStatement)?> <r:@R> => {
+   <l:@L> "if" <cond:Precedence13> <body:BlockStatement> <s2:("elif" <Precedence13> <BlockStatement>)*> <el:("else" BlockStatement)?> <r:@R> => {
          if el.is_some() {
             let mut s3 = el.map(|s|s.1).unwrap();
             for i in s2.into_iter().rev() {
