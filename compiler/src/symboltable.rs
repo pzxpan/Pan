@@ -327,9 +327,39 @@ impl SymbolTableBuilder {
                     self.leave_scope();
                     self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
+                // StructDefinition is StructDefinition {
+                // doc: [], loc: Loc(1, 1, 1), ty: Struct(Loc(1, 1, 10)), name:
+                // Identifier { loc: Loc(1, 1, 15), name: "Pair" }, generics:
+                // [Generic { loc: Loc(1, 1, 17), name: Identifier { loc: Loc(1, 1, 17), name: "T" }, bounds: None }],
+                // is_pub: true, parts: [StructVariableDefinition(StructVariableDefinition { doc: [], loc: Loc(1, 2, 8),
+                // ty: Variable(Identifier { loc: Loc(1, 2, 8), name: "T" }), is_pub: false, name: Identifier { loc: Loc(1, 2, 5), name: "x" },
+                // initializer: None }), StructVariableDefinition(StructVariableDefinition { doc: [], loc: Loc(1, 3, 8),
+                // ty: Variable(Identifier { loc: Loc(1, 3, 8), name: "T" }), is_pub: false, name: Identifier { loc: Loc(1, 3, 5), name: "y" },
+                // initializer: None }),
+                // FunctionDefinition(FunctionDefinition { doc: [], loc: Loc(1, 4, 5), name: Some(Identifier { loc: Loc(1, 4, 17), name: "get_x" }),
+                // name_loc: Loc(1, 4, 17), params: [], is_pub: true, is_static: false, returns: Some(Variable(Identifier { loc: Loc(1, 4, 23), name: "T" })),
+                // body: Some(Block(Loc(1, 4, 5), [Return(Loc(1, 5, 16), Some(Variable(Identifier { loc: Loc(1, 5, 16), name: "x" })))])) })]
+                // }
+
                 ast::SourceUnitPart::StructDefinition(def) => {
+                    println!("StructDefinition is {:?}", def);
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Used)?;
+                    for generic in &def.generics {
+                        if let Some(ident) = &generic.bounds {
+                            let bound_type = self.get_register_type(ident.name.clone());
+                            if bound_type == CType::Unknown {
+                                return Err(SymbolTableError {
+                                    error: format!("找不到{}的定义", ident.name.clone()),
+                                    location: generic.loc.clone(),
+                                });
+                            } else {
+                                self.register_name(&generic.name.name.clone(), bound_type, SymbolUsage::Used)?;
+                            }
+                        } else {
+                            self.register_name(&generic.name.name.clone(), CType::Any, SymbolUsage::Used)?;
+                        }
+                    }
                     for part in &def.parts {
                         match part {
                             ast::StructPart::FunctionDefinition(def) => {
@@ -458,7 +488,7 @@ impl SymbolTableBuilder {
         return false;
     }
     fn scan_statement(&mut self, statement: &ast::Statement) -> SymbolTableResult {
-        trace!("statement is {:?}", statement);
+        println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(loc, stmts) => {
