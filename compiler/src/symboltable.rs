@@ -174,18 +174,18 @@ impl std::fmt::Debug for SymbolTable {
             self.name,
             self.symbols.len(),
             self.sub_tables.len()
-        )
-        // write!(f, "symbols:\n");
-        // for (key, value) in self.symbols.iter() {
-        //     write!(f, "key:{:?},value:{:?}\n", key, value);
-        // }
-        // write!(f, "subtable is:\n");
-        // write!(f, "symbols222:\n");
-        // for (idx, table) in self.sub_tables.iter().enumerate() {
-        //     write!(f, "table idx {:?} is {:?}\n", idx, table);
-        // }
+        );
+        write!(f, "symbols:\n");
+        for (key, value) in self.symbols.iter() {
+            write!(f, "key:{:?},value:{:?}\n", key, value);
+        }
+        write!(f, "subtable is:\n");
+        write!(f, "symbols222:\n");
+        for (idx, table) in self.sub_tables.iter().enumerate() {
+            write!(f, "table idx {:?} is {:?}\n", idx, table);
+        }
 
-        // write!(f, "table name:{:?} end:\n", self.name)
+        write!(f, "table name:{:?} end:\n", self.name)
     }
 }
 
@@ -370,7 +370,9 @@ impl SymbolTableBuilder {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
-                                    self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                                    if def.body.is_some() {
+                                        self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                                    }
                                     self.leave_scope();
                                 }
                             }
@@ -398,7 +400,9 @@ impl SymbolTableBuilder {
                             self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
                         self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
-                        self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                        if def.body.is_some() {
+                            self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                        }
                         self.leave_scope();
                     }
                 }

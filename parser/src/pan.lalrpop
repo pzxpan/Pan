@@ -93,8 +93,7 @@ DataDefinition: Box<DataDefinition> = {
 
 StructTy: StructTy = {
     <l:@L> "struct" <r:@R> => StructTy::Struct(Loc(file_no, l, r)),
-    <l:@L> "interface" <r:@R> => StructTy::Interface(Loc(file_no, l, r)),
-    <l:@L> "library" <r:@R> => StructTy::Library(Loc(file_no, l, r)),
+    <l:@L> "bound" <r:@R> => StructTy::Bound(Loc(file_no, l, r)),
 }
 
 StructPart: StructPart = {
@@ -662,8 +661,7 @@ extern {
 
         "string" => Token::String,
 
-        "interface" => Token::Interface,
-        "library" => Token::Library,
+        "bound" => Token::Bound,
 
         "enum" => Token::Enum,
         "public" => Token::Public,

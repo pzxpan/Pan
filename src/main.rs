@@ -18,10 +18,11 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 use log::*;
+use std::ops::Add;
 
 fn main() {
     env_logger::init();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("generics.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("bound.pan"));
     //test_all_demo_file();
 }
 

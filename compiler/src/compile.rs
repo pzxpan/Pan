@@ -117,6 +117,7 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
+        println!("sybmol{:?}",symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
     })
 }
@@ -719,14 +720,16 @@ impl<O: OutputStream> Compiler<O> {
                         args.push(p.clone());
                     }
                     // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
-                    let body = &def.body.as_ref().unwrap();
-                    // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
-                    if *&def.is_static {
-                        self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
-                    } else {
-                        self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                    if def.body.is_some() {
+                        let body = &def.body.as_ref().unwrap();
+                        // let decorator_list = vec![];
+                        if *&def.is_static {
+                            self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                        } else {
+                            self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                        }
                     }
                 }
                 _ => {}

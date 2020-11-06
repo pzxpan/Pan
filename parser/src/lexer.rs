@@ -33,8 +33,7 @@ pub enum Token<'input> {
     DocComment(CommentType, &'input str),
     Divide,
     Struct,
-    Library,
-    Interface,
+    Bound,
     Function,
     Import,
 
@@ -241,8 +240,8 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Bool => write!(f, "bool"),
             Token::String => write!(f, "string"),
             Token::Struct => write!(f, "struct"),
-            Token::Library => write!(f, "library"),
-            Token::Interface => write!(f, "interface"),
+
+            Token::Bound => write!(f, "bound"),
             Token::Function => write!(f, "fun"),
             Token::Import => write!(f, "import"),
             Token::Data => write!(f, "data"),
@@ -338,6 +337,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "constructor" => Token::Constructor,
     "continue" => Token::Continue,
     "struct" => Token::Struct,
+    "bound" => Token::Bound,
     "do" => Token::Do,
     "else" => Token::Else,
     "elif" => Token::Elif,
@@ -587,9 +587,8 @@ impl<'input> Lexer<'input> {
             // }
             return Some(Ok((self.row, Token::Number(&self.input[start_pos..end_pos]), self.column)));
         }
-
     }
-   /// 可以用 _ 分割数字 '1_2_3_4_' == '1234'
+    /// 可以用 _ 分割数字 '1_2_3_4_' == '1234'
     fn radix_run(&mut self, radix: u32) -> String {
         let mut value_text = String::new();
         loop {

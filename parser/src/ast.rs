@@ -30,6 +30,7 @@ pub struct SourceUnit(pub Vec<SourceUnitPart>);
 #[derive(Debug, PartialEq)]
 pub enum SourceUnitPart {
     StructDefinition(Box<StructDefinition>),
+    BoundDefinition(Box<BoundDefinition>),
     ImportDirective(Import),
     EnumDefinition(Box<EnumDefinition>),
     DataDefinition(Box<DataDefinition>),
@@ -108,16 +109,14 @@ pub enum EnumPart {
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructTy {
     Struct(Loc),
-    Interface(Loc),
-    Library(Loc),
+    Bound(Loc),
 }
 
 impl fmt::Display for StructTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StructTy::Struct(_) => write!(f, "struct"),
-            StructTy::Interface(_) => write!(f, "interface"),
-            StructTy::Library(_) => write!(f, "library"),
+            StructTy::Bound(_) => write!(f, "bound"),
         }
     }
 }
@@ -149,6 +148,17 @@ pub struct EnumDefinition {
     pub parts: Vec<EnumPart>,
     pub is_pub: bool,
 }
+
+#[derive(Debug, PartialEq)]
+pub struct BoundDefinition {
+    pub doc: Vec<DocComment>,
+    pub loc: Loc,
+    pub name: Identifier,
+    pub generics: Vec<Generic>,
+    pub parts: Vec<FunctionDefinition>,
+    pub is_pub: bool,
+}
+
 
 #[derive(Debug, PartialEq)]
 pub enum VariableAttribute {
