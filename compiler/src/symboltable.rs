@@ -354,10 +354,10 @@ impl SymbolTableBuilder {
                                     location: generic.loc.clone(),
                                 });
                             } else {
-                                self.register_name(&generic.name.name.clone(), bound_type, SymbolUsage::Used)?;
+                                self.register_name(&generic.name.name.clone(), CType::Generic(generic.name.name.clone(), Box::new(bound_type)), SymbolUsage::Used)?;
                             }
                         } else {
-                            self.register_name(&generic.name.name.clone(), CType::Any, SymbolUsage::Used)?;
+                            self.register_name(&generic.name.name.clone(), CType::Generic(generic.name.name.clone(), Box::new(CType::Any)), SymbolUsage::Used)?;
                         }
                     }
                     for part in &def.parts {

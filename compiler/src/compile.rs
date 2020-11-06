@@ -1176,24 +1176,30 @@ impl<O: OutputStream> Compiler<O> {
                 let at = a.get_type(&self.symbol_table_stack);
                 let bt = b.get_type(&self.symbol_table_stack);
                 let max = if at < bt { bt.clone() } else { at.clone() };
-                if at == bt {
+                if max > CType::Str {
                     self.compile_expression(a)?;
                     self.compile_expression(b)?;
-                } else if at < bt {
-                    self.compile_expression(a)?;
-                    let idx = get_number_type(bt);
-                    self.emit(Instruction::PrimitiveTypeChange(idx));
-                    self.compile_expression(b)?;
+                    self.compile_op(expression, false);
                 } else {
-                    self.compile_expression(a)?;
-                    self.compile_expression(b)?;
-                    let idx = get_number_type(at);
-                    self.emit(Instruction::PrimitiveTypeChange(idx));
-                }
-                self.compile_op(expression, false);
-                if rt != max {
-                    let idx = get_number_type(rt);
-                    self.emit(Instruction::PrimitiveTypeChange(idx));
+                    if at == bt {
+                        self.compile_expression(a)?;
+                        self.compile_expression(b)?;
+                    } else if at < bt {
+                        self.compile_expression(a)?;
+                        let idx = get_number_type(bt);
+                        self.emit(Instruction::PrimitiveTypeChange(idx));
+                        self.compile_expression(b)?;
+                    } else {
+                        self.compile_expression(a)?;
+                        self.compile_expression(b)?;
+                        let idx = get_number_type(at);
+                        self.emit(Instruction::PrimitiveTypeChange(idx));
+                    }
+                    self.compile_op(expression, false);
+                    if rt != max {
+                        let idx = get_number_type(rt);
+                        self.emit(Instruction::PrimitiveTypeChange(idx));
+                    }
                 }
             }
             As(loc, a, b) => {
