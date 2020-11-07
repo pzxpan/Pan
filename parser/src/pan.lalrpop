@@ -110,6 +110,7 @@ Generics: Vec<Generic> = {
     "<" <CommaOne<Generic>> ">" => <>,
 }
 
+
 Generic: Generic = {
     <l:@L> <name:Identifier> <bounds: (":" <Identifier>)?> <r:@R> => {
         if bounds.is_some() {
@@ -129,10 +130,10 @@ Generic: Generic = {
 }
 
 StructDefinition: Box<StructDefinition> = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?> <ty:StructTy> <name:Identifier> <generics:Generics>
-    "{" <parts:(<StructPart>)*> "}" <r:@R> => {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> <ty:StructTy> <name:Identifier> <generics:Generics> <im: ("impl" <CommaOne<Precedence0>>)?>
+    "{" <parts:(<StructPart>)*> "}"  <r:@R> => {
         let is_pub = is_pub.is_some();
-        Box::new(StructDefinition{doc, loc: Loc(file_no, l, r), ty, name, is_pub,generics, parts})
+        Box::new(StructDefinition{doc, loc: Loc(file_no, l, r), ty, name, is_pub,generics, parts,impls:im})
     }
 }
 
@@ -429,7 +430,6 @@ StateMutability: StateMutability = {
 FunctionAttribute: FunctionAttribute = {
     StateMutability => FunctionAttribute::StateMutability(<>),
     Visibility => FunctionAttribute::Visibility(<>),
-    <l:@L> "virtual" <r:@R> => FunctionAttribute::Virtual(Loc(file_no, <>)),
 }
 
 BlockStatementOrSemiColon: Option<Statement> = {
@@ -660,7 +660,6 @@ extern {
         "bool" => Token::Bool,
 
         "string" => Token::String,
-
         "bound" => Token::Bound,
 
         "enum" => Token::Enum,
@@ -676,25 +675,22 @@ extern {
         "constructor" => Token::Constructor,
         "fun" => Token::Function,
         "return" => Token::Return,
-        "returns" => Token::Return,
         "if" => Token::If,
         "match" => Token::Match,
         "for" => Token::For,
         "while" => Token::While,
         "else" => Token::Else,
         "elif" => Token::Elif,
-        "do" => Token::Do,
         "continue" => Token::Continue,
         "break" => Token::Break,
-        "emit" => Token::Emit,
 
         "as" => Token::As,
         "from" => Token::From,
         "is" => Token::Is,
-        "virtual" => Token::Virtual,
-         "let" => Token::Let,
-         "in" => Token::In,
-         "pub" => Token::Pub,
-         "lambda" => Token::Lambda,
+        "impl" => Token::Impl,
+        "let" => Token::Let,
+        "in" => Token::In,
+        "pub" => Token::Pub,
+        "lambda" => Token::Lambda,
     }
 }

@@ -137,6 +137,7 @@ pub struct StructDefinition {
     pub generics: Vec<Generic>,
     pub is_pub: bool,
     pub parts: Vec<StructPart>,
+    pub impls: Option<Vec<Expression>>,
 }
 
 #[derive(Debug, PartialEq)]
