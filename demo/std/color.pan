@@ -7,7 +7,7 @@ pub enum Color {
    Blue(i32,i32,i32),
    Black,
    White,
-   pub fun is_warm() {
+   pub fun is_warm() :bool{
         match self {
             Red(a) -> { print(a); return true;}
             Single(a) -> { print(a); return true;}

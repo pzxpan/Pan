@@ -160,7 +160,7 @@ impl Frame {
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         //  vm.check_signals()?;
         let instruction = self.fetch_instruction();
-        trace!("instruction is:{:?}", instruction);
+        println!("instruction is:{:?}", instruction);
         #[cfg(feature = "vm-tracing-logging")]
             {
                 trace!("=======");

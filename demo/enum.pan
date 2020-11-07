@@ -12,7 +12,7 @@ pub enum Color {
 fun main() {
    let color2 = Color::Red(10);
    print(color2);
-   //color.is_warm();
+   //color2.is_warm();
    return;
 }
 

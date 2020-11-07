@@ -36,6 +36,7 @@ pub enum CType {
     Generic(/* name: */ String, Box<CType>),
     Reference(/* name: */ String, /* type_args: */ Vec<CType>),
     Any,
+    TSelf,
     Unknown,
 }
 

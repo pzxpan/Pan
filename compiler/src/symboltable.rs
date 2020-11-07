@@ -106,6 +106,7 @@ pub struct Symbol {
     pub is_assigned: bool,
     pub is_parameter: bool,
     pub is_free: bool,
+    pub is_attribute: bool,
     pub ty: CType,
 }
 
@@ -120,6 +121,7 @@ impl Symbol {
             is_assigned: false,
             is_parameter: false,
             is_free: false,
+            is_attribute: false,
             ty,
         }
     }
@@ -168,22 +170,22 @@ impl SymbolTable {
 
 impl std::fmt::Debug for SymbolTable {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
-            self.name,
-            self.symbols.len(),
-            self.sub_tables.len()
-        );
-        write!(f, "symbols:\n");
-        for (key, value) in self.symbols.iter() {
-            write!(f, "key:{:?},value:{:?}\n", key, value);
-        }
-        write!(f, "subtable is:\n");
-        write!(f, "symbols222:\n");
-        for (idx, table) in self.sub_tables.iter().enumerate() {
-            write!(f, "table idx {:?} is {:?}\n", idx, table);
-        }
+        // write!(
+        //     f,
+        //     "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
+        //     self.name,
+        //     self.symbols.len(),
+        //     self.sub_tables.len()
+        // );
+        // write!(f, "symbols:\n");
+        // for (key, value) in self.symbols.iter() {
+        //     write!(f, "key:{:?},value:{:?}\n", key, value);
+        // }
+        // write!(f, "subtable is:\n");
+        // write!(f, "symbols222:\n");
+        // for (idx, table) in self.sub_tables.iter().enumerate() {
+        //     write!(f, "table idx {:?} is {:?}\n", idx, table);
+        // }
 
         write!(f, "table name:{:?} end:\n", self.name)
     }
@@ -245,6 +247,7 @@ pub enum SymbolUsage {
     Used,
     Assigned,
     Parameter,
+    Attribute,
 }
 
 #[derive(Default)]
@@ -253,6 +256,7 @@ pub struct SymbolTableBuilder {
     tables: Vec<SymbolTable>,
     lambda_name: String,
     fun_call: bool,
+    in_struct_func: bool,
 }
 
 /// Enum to indicate in what mode an expression
@@ -319,7 +323,7 @@ impl SymbolTableBuilder {
                                         ref_type.push(ty.get_type(&self.tables));
                                     }
                                 }
-                                self.register_name(&def.name.name, CType::Reference(def.name.name.clone(), ref_type), SymbolUsage::Assigned);
+                                self.register_name(&def.name.name, CType::Reference(def.name.name.clone(), ref_type), SymbolUsage::Attribute);
                             }
                             _ => {}
                         }
@@ -344,7 +348,7 @@ impl SymbolTableBuilder {
                 ast::SourceUnitPart::StructDefinition(def) => {
                     println!("StructDefinition is {:?}", def);
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
-                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Used)?;
+                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute)?;
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
                             let bound_type = self.get_register_type(ident.name.clone());
@@ -362,22 +366,29 @@ impl SymbolTableBuilder {
                     }
                     for part in &def.parts {
                         match part {
+                            ast::StructPart::StructVariableDefinition(def) => {
+                                self.register_name(&def.name.name, def.ty.get_type(&self.tables), SymbolUsage::Attribute)?;
+                            }
+                            _ => {}
+                        }
+                    }
+                    for part in &def.parts {
+                        match part {
                             ast::StructPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables);
-                                    self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
+                                    self.register_name(&name.name, tt, SymbolUsage::Attribute)?;
                                     if let Some(expression) = &def.as_ref().returns {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+                                    self.in_struct_func = true;
                                     if def.body.is_some() {
                                         self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                                     }
+                                    self.in_struct_func = false;
                                     self.leave_scope();
                                 }
-                            }
-                            ast::StructPart::StructVariableDefinition(def) => {
-                                self.register_name(&def.name.name, def.ty.get_type(&self.tables), SymbolUsage::Assigned);
                             }
                             _ => {}
                         }
@@ -483,9 +494,18 @@ impl SymbolTableBuilder {
         CType::Unknown
     }
 
-    fn in_current_scope(&mut self, name: String) -> bool {
+    fn in_struct_scope(&self, name: String) -> bool {
         let len = self.tables.len();
         let a = self.tables.get(len - 2).unwrap().lookup(name.as_str());
+        if a.is_some() {
+            return true;
+        }
+        return false;
+    }
+
+    fn in_current_scope(&self, name: String) -> bool {
+        let len = self.tables.len();
+        let a = self.tables.get(len - 1).unwrap().lookup(name.as_str());
         if a.is_some() {
             return true;
         }
@@ -868,13 +888,15 @@ impl SymbolTableBuilder {
 
                 match context {
                     ExpressionContext::Delete => {
-                        self.register_name(name, ty, SymbolUsage::Used)?;
+                        //  self.register_name(name, ty, SymbolUsage::Used)?;
                     }
                     ExpressionContext::Load => {
-                        self.register_name(name, ty, SymbolUsage::Used)?;
+                        // self.register_name(name, ty, SymbolUsage::Used)?;
                     }
                     ExpressionContext::Store => {
-                        self.register_name(name, ty, SymbolUsage::Assigned)?;
+                        if self.in_struct_func && !self.in_struct_scope(name.clone()) {
+                            self.register_name(name, ty, SymbolUsage::Assigned)?;
+                        }
                     }
                     ExpressionContext::Unkown => {}
                 }
@@ -911,7 +933,7 @@ impl SymbolTableBuilder {
                     ty = CType::Struct(struct_ty);
                     for arg in args {
                         //不在struct当前作用域，则需要检查Named参数的可见性
-                        if !self.in_current_scope(arg.name.name.clone()) {
+                        if !self.in_struct_scope(arg.name.name.clone()) {
                             let result = self.verify_field_visible(ty.borrow(), exp.as_ref().expr_name(), arg.name.name.clone());
                             if result.is_err() {
                                 return Err(SymbolTableError {
@@ -1071,13 +1093,30 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage) -> SymbolTableResult {
-        trace!("register name={:?}, ty: {:?}", name, ty);
-        let table = self.tables.last_mut().unwrap();
         let location = Loc(0, 0, 0);
+        println!("register name={:?}, ty: {:?}", name, ty);
+        if self.in_struct_func && self.in_struct_scope(name.clone()) {
+            if name.ne("self") {
+                return Err(SymbolTableError {
+                    error: format!("'{}'是属性,不能重新绑定 ", name),
+                    location,
+                });
+            }
+        }
+        let table = self.tables.last_mut().unwrap();
+        // for (a, b) in table.symbols.iter() {
+        //     println!("aa:{:?},bb{:?}", a, b);
+        // }
         // Some checks:
         let containing = table.symbols.contains_key(name);
         if containing {
             match role {
+                SymbolUsage::Attribute => {
+                    return Err(SymbolTableError {
+                        error: format!("'{}'是属性,不能重新绑定 ", name),
+                        location,
+                    });
+                }
                 SymbolUsage::Global => {
                     let symbol = table.symbols.get(name).unwrap();
                     if let SymbolScope::Global = symbol.scope {
@@ -1094,8 +1133,7 @@ impl SymbolTableBuilder {
                 }
             }
         }
-
-        let symbol = Symbol::new(name, ty.clone());
+        let mut symbol = Symbol::new(name, ty.clone());
         table.symbols.insert(name.to_owned(), symbol);
         let symbol = table.symbols.get_mut(name).unwrap();
         match role {
@@ -1104,6 +1142,9 @@ impl SymbolTableBuilder {
             }
             SymbolUsage::Assigned => {
                 symbol.is_assigned = true;
+            }
+            SymbolUsage::Attribute => {
+                symbol.is_attribute = true;
             }
             SymbolUsage::Global => {
                 if let SymbolScope::Global = symbol.scope

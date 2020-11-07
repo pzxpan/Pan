@@ -3,6 +3,7 @@ pub enum Color {
    Single(i128),
    White(i32,string),
    Three(i32,i32,i32),
+   Black,
    pub fun is_warm() {
            match self {
                Red(a) -> { print(a); return true;}

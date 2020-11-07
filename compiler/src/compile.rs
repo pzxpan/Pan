@@ -117,7 +117,7 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        println!("sybmol{:?}",symbol_table);
+        println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
     })
 }
@@ -909,7 +909,13 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_store(&mut self, target: &ast::Expression) -> Result<(), CompileError> {
         match &target {
             ast::Expression::Variable(ast::Identifier { loc, name }) => {
-                self.store_name(name);
+                let s = self.lookup_name(name);
+                if s.is_attribute {
+                    self.load_name("self");
+                    self.emit(Instruction::StoreAttr(name.clone()));
+                } else {
+                    self.store_name(name);
+                }
             }
             ast::Expression::Subscript(_, a, b) => {
                 self.compile_expression(a)?;
@@ -1227,6 +1233,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_compare(&*v, &*ops);
             }
             Assign(loc, a, b) => {
+                println!("a:{:?},b:{:?}", a, b);
                 self.compile_expression(b)?;
                 self.compile_store(a)?;
             }
@@ -1269,7 +1276,6 @@ impl<O: OutputStream> Compiler<O> {
             List(loc, _) => {}
 
             Variable(ast::Identifier { loc, name }) => {
-                // Determine the contextual usage of this symbol:
                 self.load_name(name);
             }
             Yield(loc, _) => {}
