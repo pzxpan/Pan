@@ -156,6 +156,11 @@ impl VirtualMachine {
                         return (true, Value::Code(v.clone()));
                     }
                 }
+                for (k,v) in ty.methods.iter() {
+                    if k.eq(&attr.to_string()) {
+                        return (true, Value::Code(v.clone()));
+                    }
+                }
             }
             _ => unreachable!()
         }

@@ -160,7 +160,7 @@ impl Frame {
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         //  vm.check_signals()?;
         let instruction = self.fetch_instruction();
-        println!("instruction is:{:?}", instruction);
+        //println!("instruction is:{:?}", instruction);
         #[cfg(feature = "vm-tracing-logging")]
             {
                 trace!("=======");
@@ -827,6 +827,7 @@ impl Frame {
         // Call function:
         // let args = self.pop_value();
         let func_ref = self.pop_value();
+        // println!("func_ref:{:?},",func_ref);
         let code = func_ref.code();
 
         self.scope.new_child_scope_with_locals();
@@ -1193,6 +1194,7 @@ impl Frame {
     fn load_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let parent = self.last_value();
         let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
+
         //true 是struct方法， false 为属性
         if !obj.0 {
             self.pop_value();

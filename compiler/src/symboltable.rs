@@ -170,24 +170,24 @@ impl SymbolTable {
 
 impl std::fmt::Debug for SymbolTable {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
-            self.name,
-            self.symbols.len(),
-            self.sub_tables.len()
-        );
-        write!(f, "symbols:\n");
-        for (key, value) in self.symbols.iter() {
-            write!(f, "key:{:?},value:{:?}\n", key, value);
-        }
-        write!(f, "subtable is:\n");
-        write!(f, "symbols222:\n");
-        for (idx, table) in self.sub_tables.iter().enumerate() {
-            write!(f, "table idx {:?} is {:?}\n", idx, table);
-        }
+        // write!(
+        //     f,
+        //     "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
+        //     self.name,
+        //     self.symbols.len(),
+        //     self.sub_tables.len()
+        // );
+        // write!(f, "symbols:\n");
+        // for (key, value) in self.symbols.iter() {
+        //     write!(f, "key:{:?},value:{:?}\n", key, value);
+        // }
+        // write!(f, "subtable is:\n");
+        // write!(f, "symbols222:\n");
+        // for (idx, table) in self.sub_tables.iter().enumerate() {
+        //     write!(f, "table idx {:?} is {:?}\n", idx, table);
+        // }
 
-        write!(f, "table name:{:?} end:\n", self.name)
+        write!(f, "table name:{:?}", self.name)
     }
 }
 
@@ -346,7 +346,7 @@ impl SymbolTableBuilder {
                 // }
 
                 ast::SourceUnitPart::StructDefinition(def) => {
-                    println!("StructDefinition is {:?}", def);
+                   // println!("StructDefinition is {:?}", def);
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute)?;
                     for generic in &def.generics {
@@ -403,8 +403,7 @@ impl SymbolTableBuilder {
                     if def.impls.is_some() {
                         if let Struct(mut ty) = cty.clone() {
                             resolve_bounds(self, &mut ty, &def.impls.as_ref().unwrap())?;
-                            let cty = Struct(ty);
-                            self.register_name(&def.name.name.clone(), cty, SymbolUsage::Assigned)?;
+                            self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned)?;
                         }
                     } else {
                         self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned)?;
@@ -568,7 +567,7 @@ impl SymbolTableBuilder {
         return false;
     }
     fn scan_statement(&mut self, statement: &ast::Statement) -> SymbolTableResult {
-        println!("statement is {:?}", statement);
+        // println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(loc, stmts) => {
@@ -1033,7 +1032,6 @@ impl SymbolTableBuilder {
         Ok(())
     }
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
-        println!("ty:{:?},name:{:?}",ty,name);
         match ty {
             CType::Struct(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {
@@ -1050,10 +1048,31 @@ impl SymbolTableBuilder {
                         }
                     }
                 }
-                return Err(SymbolTableError {
-                    error: format!("{} 中找不到{}函数", name, method),
-                    location: Loc(0, 0, 0),
-                });
+                for (method_name, ftype, ..) in ty.static_fields.iter() {
+                    if method_name.eq(&method) {
+                        if let CType::Fn(fntype) = ftype {
+                            if fntype.is_pub || fntype.is_static {
+                                return Ok(());
+                            } else {
+                                return Err(SymbolTableError {
+                                    error: format!("{} 中的{}函数的可见性是私有的", name, method),
+                                    location: Loc(0, 0, 0),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                for base in ty.bases.iter() {
+                    let ty = self.lookup_name_ty(base);
+                    if let Bound(BoundType { methods, is_pub,.. }) = ty {
+
+                    }
+                }
+                // return Err(SymbolTableError {
+                //     error: format!("{} 中找不到{}函数", name, method),
+                //     location: Loc(0, 0, 0),
+                // });
             }
             CType::Enum(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {
@@ -1147,7 +1166,7 @@ impl SymbolTableBuilder {
         return false;
     }
     pub fn lookup_name_ty(&self, name: &String) -> &CType {
-        println!("Looking up {:?}", name);
+       // println!("Looking up {:?}", name);
         let len: usize = self.tables.len();
         for i in (0..len).rev() {
             let symbol = self.tables[i].lookup(name);
@@ -1160,7 +1179,7 @@ impl SymbolTableBuilder {
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage) -> SymbolTableResult {
         let location = Loc(0, 0, 0);
-        println!("register name={:?}, ty: {:?}", name, ty);
+       // println!("register name={:?}, ty: {:?}", name, ty);
         if self.in_struct_func && self.in_struct_scope(name.clone()) {
             if name.ne("self") {
                 return Err(SymbolTableError {
@@ -1170,9 +1189,9 @@ impl SymbolTableBuilder {
             }
         }
         let table = self.tables.last_mut().unwrap();
-        for (a, b) in table.symbols.iter() {
-            println!("aa:{:?},bb{:?}", a, b);
-        }
+        // for (a, b) in table.symbols.iter() {
+        //     println!("aa:{:?},bb{:?}", a, b);
+        // }
         // Some checks:
         let containing = table.symbols.contains_key(name);
         if containing {

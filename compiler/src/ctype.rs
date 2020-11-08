@@ -119,6 +119,7 @@ pub struct StructType {
     pub fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
     pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
     pub methods: Vec<(String, CType)>,
+    pub bases: Vec<String>,
     pub is_pub: bool,
 }
 

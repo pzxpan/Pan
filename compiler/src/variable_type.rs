@@ -100,10 +100,17 @@ impl HasType for StructDefinition {
             }
         }
         let name = self.name.name.clone();
+        let mut bases = Vec::new();
+        if self.impls.is_some() {
+            for im in self.impls.as_ref().unwrap().iter() {
+                // bases.push((im.expr_name(), self.get_type(tables)));
+                bases.push(im.expr_name());
+            }
+        }
         if type_args.is_empty() {
-            CType::Struct(StructType { name, generics: None, fields, static_fields: vec![], is_pub: self.is_pub, methods })
+            CType::Struct(StructType { name, generics: None, bases, fields, static_fields: vec![], is_pub: self.is_pub, methods })
         } else {
-            CType::Struct(StructType { name, generics: Some(type_args), fields, static_fields: vec![], is_pub: self.is_pub, methods })
+            CType::Struct(StructType { name, generics: Some(type_args), bases, fields, static_fields: vec![], is_pub: self.is_pub, methods })
         }
     }
 }

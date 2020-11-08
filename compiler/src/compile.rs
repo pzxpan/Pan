@@ -117,7 +117,7 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        println!("sybmol{:?}", symbol_table);
+        // println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
     })
 }
@@ -741,7 +741,6 @@ impl<O: OutputStream> Compiler<O> {
                 _ => {}
             }
         }
-
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
 
@@ -1220,7 +1219,13 @@ impl<O: OutputStream> Compiler<O> {
                             bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
                         self.emit(Instruction::LoadBuildEnum(2));
                     } else {
-                        self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+                        if self.is_struct_item_def(value, name) {
+                            self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+                        } else {
+                         //   println!("1111value:{:?}, name:{:?}", value,name);
+                            self.emit(Instruction::LoadName("Add".to_string(), NameScope::Local));
+                            self.emit(Instruction::LoadAttr("swap".to_string()));
+                        }
                     }
                 } else {
                     self.emit(Instruction::LoadConst(
@@ -1311,7 +1316,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_compare(&*v, &*ops);
             }
             Assign(loc, a, b) => {
-                println!("a:{:?},b:{:?}", a, b);
+                // println!("a:{:?},b:{:?}", a, b);
                 self.compile_expression(b)?;
                 self.compile_store(a)?;
             }
@@ -1711,7 +1716,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-        println!("Looking up {:?}", name);
+       // println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
@@ -1722,6 +1727,65 @@ impl<O: OutputStream> Compiler<O> {
         unreachable!()
     }
 
+    fn is_struct_item_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
+        let mut name_str = "";
+        let mut attri = "";
+        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
+            name_str = name;
+        }
+        if let Some(ident) = attribute {
+            attri = &ident.name;
+        }
+
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name_str);
+            if let Some(s) = symbol {
+                if let CType::Struct(StructType { fields, static_fields, methods, bases, .. }) = &s.ty {
+                    for (a_name, ..) in fields {
+                        if a_name.eq(attri) {
+                            return true;
+                        }
+                    }
+                    for (a_name, ..) in static_fields {
+                        if a_name.eq(attri) {
+                            return true;
+                        }
+                    }
+                    for (a_name, ..) in methods {
+                        if a_name.eq(attri) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // fn get_base_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
+    //     let mut name_str = "";
+    //     let mut attri = "";
+    //     if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
+    //         name_str = name;
+    //     }
+    //     if let Some(ident) = attribute {
+    //         attri = &ident.name;
+    //     }
+    //
+    //     let len: usize = self.symbol_table_stack.len();
+    //     for i in (0..len).rev() {
+    //         let symbol = self.symbol_table_stack[i].lookup(name_str);
+    //         if let Some(s) = symbol {
+    //             if let CType::Struct(StructType { bases, .. }) = &s.ty {
+    //                 for (n,tty) in bases.iter() {
+    //                     if let BoundType(b) =
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     return false;
+    // }
     fn is_enum_variant_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
         let mut name_str = "";
         let mut attri = "";
