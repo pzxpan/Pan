@@ -200,7 +200,6 @@ pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: 
                 if let CType::Fn(fnty) = bty {
                     for (stfn_name, ssty) in &sty.methods {
                         if let CType::Fn(sfnty) = ssty {
-                            println!("fn:{:?},bound fn2:{:?}", fnty, sfnty);
                             if stfn_name.eq(name) {
                                 found = true;
                                 if !sfnty.is_instance_type(fnty) {

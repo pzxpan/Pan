@@ -55,7 +55,6 @@ impl FnType {
         let mut generics: HashMap<String, CType> = HashMap::new();
         if self.name.eq(&boundfn.name) {
             for (fnty, bound) in self.arg_types.iter().zip(boundfn.arg_types.iter()) {
-                println!("sss:{:?},222:{:?}", fnty.1, bound.1);
                 match (fnty.1.clone(), bound.1.clone()) {
                     (ty, CType::Generic(name, param)) => {
                         if generics.contains_key(&name) {

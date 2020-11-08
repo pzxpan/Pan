@@ -12,6 +12,11 @@ pub struct XPoint {
 pub struct Point impl Add {
     pub x: i32,
     pub y: i32,
+    pub fun swap(p:Point) : Point {
+        x += p.x;
+        y += p.y;
+        return self;
+    }
 }
 
 fun main() {

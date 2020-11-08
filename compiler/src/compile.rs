@@ -1219,12 +1219,12 @@ impl<O: OutputStream> Compiler<O> {
                             bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
                         self.emit(Instruction::LoadBuildEnum(2));
                     } else {
-                        if self.is_struct_item_def(value, name) {
+                        let (def_current, base_name) = self.is_struct_item_def(value, name);
+                        if def_current {
                             self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
                         } else {
-                         //   println!("1111value:{:?}, name:{:?}", value,name);
-                            self.emit(Instruction::LoadName("Add".to_string(), NameScope::Local));
-                            self.emit(Instruction::LoadAttr("swap".to_string()));
+                            self.emit(Instruction::LoadName(base_name, NameScope::Local));
+                            self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
                         }
                     }
                 } else {
@@ -1716,7 +1716,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-       // println!("Looking up {:?}", name);
+        // println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
@@ -1727,7 +1727,7 @@ impl<O: OutputStream> Compiler<O> {
         unreachable!()
     }
 
-    fn is_struct_item_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
+    fn is_struct_item_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> (bool, String) {
         let mut name_str = "";
         let mut attri = "";
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
@@ -1744,23 +1744,35 @@ impl<O: OutputStream> Compiler<O> {
                 if let CType::Struct(StructType { fields, static_fields, methods, bases, .. }) = &s.ty {
                     for (a_name, ..) in fields {
                         if a_name.eq(attri) {
-                            return true;
+                            return (true, "".to_string());
                         }
                     }
                     for (a_name, ..) in static_fields {
                         if a_name.eq(attri) {
-                            return true;
+                            return (true, "".to_string());
                         }
                     }
                     for (a_name, ..) in methods {
                         if a_name.eq(attri) {
-                            return true;
+                            return (true, "".to_string());
+                        }
+                    }
+                    //如果在父bound中,则返回
+                    for base in bases.iter() {
+                        let symbol = self.lookup_name(base);
+                        let base_ty = &symbol.ty;
+                        if let CType::Bound(BoundType { methods, .. }) = base_ty {
+                            for (a_name, ..) in methods {
+                                if a_name.eq(attri) {
+                                    return (false, base.clone());
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-        return false;
+        unreachable!()
     }
 
     // fn get_base_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
