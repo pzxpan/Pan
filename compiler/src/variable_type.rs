@@ -37,6 +37,36 @@ impl HasType for FunctionDefinition {
     }
 }
 
+impl HasType for BoundDefinition {
+    fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
+        let mut type_args = Vec::new();
+        let mut local_tables = tables.clone();
+        let table = local_tables.last_mut().unwrap();
+        for ty in &self.generics {
+            let mut cty = get_register_type(&tables, ty.name.name.clone());
+            let mut g_ty = CType::Generic(ty.name.name.clone(), Box::new(cty.clone()));
+            if cty == CType::Unknown {
+                g_ty = CType::Generic(ty.name.name.clone(), Box::new(CType::Any));
+            }
+            type_args.push(g_ty.clone());
+            let symbol = Symbol::new(&ty.name.name.clone(), g_ty.clone());
+            table.symbols.insert(ty.name.name.clone(), symbol);
+        }
+
+        let mut methods: Vec<(String, CType)> = Vec::new();
+
+        for f in &self.parts {
+            methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(&local_tables)));
+        }
+        let name = self.name.name.clone();
+        if type_args.is_empty() {
+            CType::Bound(BoundType { name, generics: None, is_pub: self.is_pub, methods })
+        } else {
+            CType::Bound(BoundType { name, generics: Some(type_args), is_pub: self.is_pub, methods })
+        }
+    }
+}
+
 impl HasType for StructDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         let mut type_args = Vec::new();
@@ -229,8 +259,8 @@ impl HasType for Expression {
                 }
             }
             // Expression::FunctionCall(_, s, _) => {
-            //     s.get_type()
-            // }
+//     s.get_type()
+// }
             Expression::NumberLiteral(_, _) => {
                 CType::I32
             }
@@ -297,8 +327,8 @@ impl HasType for Expression {
             }
 
             // Expression::Attribute(_, obj_name, attri, idx) {
-            //
-            // }
+//
+// }
             _ => { CType::Unknown }
         }
     }

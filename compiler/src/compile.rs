@@ -227,6 +227,12 @@ impl<O: OutputStream> Compiler<O> {
                     let is_async = false;
                     self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
                 }
+                ast::SourceUnitPart::BoundDefinition(def) => {
+                    let name = &def.name.name;
+                    let body = &def.parts;
+                    let generics = &def.generics;
+                    self.compile_bound_def(name.as_str(), &body, &generics);
+                }
                 _ => (),
             }
         }
@@ -735,6 +741,78 @@ impl<O: OutputStream> Compiler<O> {
                 _ => {}
             }
         }
+
+        self.emit(Instruction::LoadConst(bytecode::Constant::None));
+        self.emit(Instruction::ReturnValue);
+
+        let mut code = self.pop_code_object();
+        code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
+        self.leave_scope();
+        let ty = TypeValue { name: qualified_name, methods, static_fields };
+        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
+        self.store_name(name);
+        self.current_qualified_path = old_qualified_path;
+        self.ctx = prev_ctx;
+        Ok(())
+    }
+
+    fn compile_bound_def(
+        &mut self,
+        name: &str,
+        body: &[Box<ast::FunctionDefinition>],
+        generics: &[ast::Generic],
+    ) -> Result<(), CompileError> {
+        let prev_ctx = self.ctx;
+        self.ctx = CompileContext {
+            func: FunctionContext::NoFunction,
+            in_loop: false,
+            in_lambda: false,
+        };
+
+        let qualified_name = self.create_qualified_name(name, "");
+        let old_qualified_path = self.current_qualified_path.take();
+        self.current_qualified_path = Some(qualified_name.clone());
+
+        let line_number = self.get_source_line_number();
+        self.push_output(CodeObject::new(
+            Default::default(),
+            vec![],
+            Varargs::None,
+            self.source_path.as_ref().unwrap().to_string(),
+            line_number,
+            name.to_owned(),
+        ));
+        self.enter_scope();
+
+        self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
+        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
+        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
+        self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
+
+        let mut methods: Vec<(String, CodeObject)> = Vec::new();
+        let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
+        for def in body {
+            let name = &def.name.as_ref().unwrap().name;
+            let mut args = vec![];
+            for para in def.params.iter() {
+                let p = para.1.as_ref().unwrap().to_owned();
+                args.push(p.clone());
+            }
+            // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
+            let returns = &def.returns;
+            let is_async = false;
+            if def.body.is_some() {
+                let body = &def.body.as_ref().unwrap();
+                // let decorator_list = vec![];
+                if *&def.is_static {
+                    self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                } else {
+                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                }
+            }
+        }
+
 
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
@@ -1633,7 +1711,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-        trace!("Looking up {:?}", name);
+        println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);

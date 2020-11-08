@@ -156,7 +156,7 @@ pub struct BoundDefinition {
     pub loc: Loc,
     pub name: Identifier,
     pub generics: Vec<Generic>,
-    pub parts: Vec<FunctionDefinition>,
+    pub parts: Vec<Box<FunctionDefinition>>,
     pub is_pub: bool,
 }
 

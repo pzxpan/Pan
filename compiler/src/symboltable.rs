@@ -170,22 +170,22 @@ impl SymbolTable {
 
 impl std::fmt::Debug for SymbolTable {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // write!(
-        //     f,
-        //     "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
-        //     self.name,
-        //     self.symbols.len(),
-        //     self.sub_tables.len()
-        // );
-        // write!(f, "symbols:\n");
-        // for (key, value) in self.symbols.iter() {
-        //     write!(f, "key:{:?},value:{:?}\n", key, value);
-        // }
-        // write!(f, "subtable is:\n");
-        // write!(f, "symbols222:\n");
-        // for (idx, table) in self.sub_tables.iter().enumerate() {
-        //     write!(f, "table idx {:?} is {:?}\n", idx, table);
-        // }
+        write!(
+            f,
+            "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
+            self.name,
+            self.symbols.len(),
+            self.sub_tables.len()
+        );
+        write!(f, "symbols:\n");
+        for (key, value) in self.symbols.iter() {
+            write!(f, "key:{:?},value:{:?}\n", key, value);
+        }
+        write!(f, "subtable is:\n");
+        write!(f, "symbols222:\n");
+        for (idx, table) in self.sub_tables.iter().enumerate() {
+            write!(f, "table idx {:?} is {:?}\n", idx, table);
+        }
 
         write!(f, "table name:{:?} end:\n", self.name)
     }
@@ -417,6 +417,49 @@ impl SymbolTableBuilder {
                         self.leave_scope();
                     }
                 }
+                ast::SourceUnitPart::BoundDefinition(def) => {
+                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
+                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute)?;
+                    for generic in &def.generics {
+                        if let Some(ident) = &generic.bounds {
+                            let bound_type = self.get_register_type(ident.name.clone());
+                            if bound_type == CType::Unknown {
+                                return Err(SymbolTableError {
+                                    error: format!("找不到{}的定义", ident.name.clone()),
+                                    location: generic.loc.clone(),
+                                });
+                            } else {
+                                self.register_name(&generic.name.name.clone(), CType::Generic(generic.name.name.clone(), Box::new(bound_type)), SymbolUsage::Used)?;
+                            }
+                        } else {
+                            self.register_name(&generic.name.name.clone(), CType::Generic(generic.name.name.clone(), Box::new(CType::Any)), SymbolUsage::Used)?;
+                        }
+                    }
+
+                    for part in &def.parts {
+                        let tt = part.get_type(&self.tables);
+                        let func_name = &part.name.as_ref().unwrap().name;
+                        self.register_name(&func_name, tt, SymbolUsage::Attribute)?;
+                        if let Some(expression) = &part.as_ref().returns {
+                            self.scan_expression(expression, &ExpressionContext::Load)?;
+                        }
+                        self.enter_function(&func_name, &part.as_ref().params, part.loc.1)?;
+                        self.in_struct_func = true;
+                        if part.body.is_some() {
+                            self.scan_statement(&part.body.as_ref().unwrap())?;
+                        }
+                        self.in_struct_func = false;
+                        self.leave_scope();
+                    }
+                    self.leave_scope();
+                    // self.scan_expressions(bases, &ExpressionContext::Load)?;
+                    // for keyword in keywords {
+                    //     self.scan_expression(&keyword.value, &ExpressionContext::Load)?;
+                    // }
+                    // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
+                    self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
+                }
+
                 _ => (),
             }
         }
@@ -467,7 +510,11 @@ impl SymbolTableBuilder {
                         self.register_name(&name.name, ty, SymbolUsage::Assigned)?;
                     }
                 }
-                _ => (),
+                ast::SourceUnitPart::BoundDefinition(def) => {
+                    let ty = def.get_type(&self.tables);
+                    self.register_name(&def.name.name, ty, SymbolUsage::Assigned)?;
+                }
+                _ => {}
             }
         }
         Ok(())
@@ -1104,9 +1151,9 @@ impl SymbolTableBuilder {
             }
         }
         let table = self.tables.last_mut().unwrap();
-        // for (a, b) in table.symbols.iter() {
-        //     println!("aa:{:?},bb{:?}", a, b);
-        // }
+        for (a, b) in table.symbols.iter() {
+            println!("aa:{:?},bb{:?}", a, b);
+        }
         // Some checks:
         let containing = table.symbols.contains_key(name);
         if containing {

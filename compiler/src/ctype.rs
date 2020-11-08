@@ -33,6 +33,7 @@ pub enum CType {
     Struct(StructType),
     Enum(EnumType),
     Lambda(LambdaType),
+    Bound(BoundType),
     Generic(/* name: */ String, Box<CType>),
     Reference(/* name: */ String, /* type_args: */ Vec<CType>),
     Any,
@@ -64,6 +65,14 @@ pub struct StructType {
     pub generics: Option<Vec<CType>>,
     pub fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
     pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
+    pub methods: Vec<(String, CType)>,
+    pub is_pub: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct BoundType {
+    pub name: String,
+    pub generics: Option<Vec<CType>>,
     pub methods: Vec<(String, CType)>,
     pub is_pub: bool,
 }
@@ -137,6 +146,14 @@ impl PartialOrd for EnumType {
 }
 
 impl PartialOrd for LambdaType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (_, _) => None
+        }
+    }
+}
+
+impl PartialOrd for BoundType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
             (_, _) => None

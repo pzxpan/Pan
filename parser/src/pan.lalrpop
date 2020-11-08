@@ -20,6 +20,7 @@ SourceUnitPart: SourceUnitPart = {
     EnumDefinition => SourceUnitPart::EnumDefinition(<>),
     DataDefinition => SourceUnitPart::DataDefinition(<>),
     FunctionDefinition => SourceUnitPart::FunctionDefinition(<>),
+    BoundDefinition => SourceUnitPart::BoundDefinition(<>),
     <err: !>  => { errors.push(err); SourceUnitPart::Error},
 }
 
@@ -93,7 +94,7 @@ DataDefinition: Box<DataDefinition> = {
 
 StructTy: StructTy = {
     <l:@L> "struct" <r:@R> => StructTy::Struct(Loc(file_no, l, r)),
-    <l:@L> "bound" <r:@R> => StructTy::Bound(Loc(file_no, l, r)),
+   // <l:@L> "bound" <r:@R> => StructTy::Bound(Loc(file_no, l, r)),
 }
 
 StructPart: StructPart = {
@@ -109,7 +110,6 @@ Generics: Vec<Generic> = {
     => Vec::new(),
     "<" <CommaOne<Generic>> ">" => <>,
 }
-
 
 Generic: Generic = {
     <l:@L> <name:Identifier> <bounds: (":" <Identifier>)?> <r:@R> => {
@@ -137,6 +137,13 @@ StructDefinition: Box<StructDefinition> = {
     }
 }
 
+BoundDefinition: Box<BoundDefinition> = {
+     <doc:DocComments> <l:@L> <is_pub:"pub"?> "bound" <name:Identifier> <generics:Generics>
+     "{" <parts:(<FunctionDefinition>)*> "}"  <r:@R> => {
+           let is_pub = is_pub.is_some();
+           Box::new(BoundDefinition{doc, loc: Loc(file_no, l, r), name, is_pub,generics, parts})
+     }
+}
 EnumDefinition: Box<EnumDefinition> = {
     <doc:DocComments> <l:@L> <is_pub:"pub"?> "enum" <name:Identifier> <generics:Generics> "{" <parts:(<EnumPart>)*> "}" <r:@R> => {
         let is_pub = is_pub.is_some();
