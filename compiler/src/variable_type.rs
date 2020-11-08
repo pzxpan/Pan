@@ -33,7 +33,7 @@ impl HasType for FunctionDefinition {
         }
         // self.returns.as_ref().unwrap().get_type()
         let name = self.name.as_ref().unwrap().name.clone();
-        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static })
+        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some() })
     }
 }
 

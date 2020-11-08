@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_import_symbol::{scan_import_symbol, resovle_generic};
+use crate::resolve_import_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
 use crate::builtin::builtin_type::get_builtin_type;
 use crate::builtin::builtin_fun::get_builtin_fun;
 use pan_parser::ast::Expression::Variable;
@@ -399,7 +399,16 @@ impl SymbolTableBuilder {
                     //     self.scan_expression(&keyword.value, &ExpressionContext::Load)?;
                     // }
                     // self.scan_expressions(decorator_list, &ExpressionContext::Load)?;
-                    self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
+                    let mut cty = &def.get_type(&self.tables);
+                    if def.impls.is_some() {
+                        if let Struct(mut ty) = cty.clone() {
+                            resolve_bounds(self, &mut ty, &def.impls.as_ref().unwrap())?;
+                            let cty = Struct(ty);
+                            self.register_name(&def.name.name.clone(), cty, SymbolUsage::Assigned)?;
+                        }
+                    } else {
+                        self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned)?;
+                    }
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {
                     //处理文件各项内容时，不需要处理import， import在扫描文件顶层symbol的时候处理;
@@ -1024,7 +1033,7 @@ impl SymbolTableBuilder {
         Ok(())
     }
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
-        //println!("ty:{:?},name:{:?}",ty,name);
+        println!("ty:{:?},name:{:?}",ty,name);
         match ty {
             CType::Struct(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {
@@ -1137,7 +1146,17 @@ impl SymbolTableBuilder {
         }
         return false;
     }
-
+    pub fn lookup_name_ty(&self, name: &String) -> &CType {
+        println!("Looking up {:?}", name);
+        let len: usize = self.tables.len();
+        for i in (0..len).rev() {
+            let symbol = self.tables[i].lookup(name);
+            if symbol.is_some() {
+                return &symbol.unwrap().ty;
+            }
+        }
+        unreachable!()
+    }
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage) -> SymbolTableResult {
         let location = Loc(0, 0, 0);

@@ -1,11 +1,9 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
-    Unit,
-
     None,
-    Union(Vec<CType>),
     Char,
     Bool,
     I8,
@@ -49,6 +47,61 @@ pub struct FnType {
     pub ret_type: Box<CType>,
     pub is_pub: bool,
     pub is_static: bool,
+    pub has_body: bool,
+}
+
+impl FnType {
+    pub fn is_instance_type(&self, boundfn: &FnType) -> bool {
+        let mut generics: HashMap<String, CType> = HashMap::new();
+        if self.name.eq(&boundfn.name) {
+            for (fnty, bound) in self.arg_types.iter().zip(boundfn.arg_types.iter()) {
+                println!("sss:{:?},222:{:?}", fnty.1, bound.1);
+                match (fnty.1.clone(), bound.1.clone()) {
+                    (ty, CType::Generic(name, param)) => {
+                        if generics.contains_key(&name) {
+                            let ge = generics.get(&name);
+                            if ty != ge.unwrap().clone() {
+                                return false;
+                            }
+                        } else {
+                            generics.insert(name, ty);
+                        }
+                    }
+                    (ty, oty) => {
+                        if ty != oty {
+                            return false;
+                        }
+                    }
+                    (_, _) => {
+                        return false;
+                    }
+                }
+            }
+            match (self.ret_type.as_ref(), boundfn.ret_type.as_ref()) {
+                (ty, CType::Generic(name, param)) => {
+                    if generics.contains_key(name) {
+                        let ge = generics.get(name);
+                        if ty != ge.unwrap() {
+                            return false;
+                        }
+                    }
+                }
+                (ty, oty) => {
+                    if ty != oty {
+                        return false;
+                    }
+                }
+                (_, _) => {
+                    return false;
+                }
+            }
+        } else {
+            return false;
+        }
+
+
+        return true;
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -90,10 +143,31 @@ pub struct EnumType {
 impl CType {
     pub fn name(&self) -> String {
         match self {
-            CType::Unit => "unit".to_string(),
             CType::Float => "f64".to_string(),
+            CType::I8 => "i8".to_string(),
+            CType::I16 => "i16".to_string(),
             CType::I32 => "i32".to_string(),
+            CType::I64 => "i64".to_string(),
+            CType::I128 => "i128".to_string(),
+            CType::ISize => "isize".to_string(),
+            CType::U8 => "u8".to_string(),
+            CType::U16 => "u16".to_string(),
+            CType::U32 => "u32".to_string(),
+            CType::U64 => "u64".to_string(),
+            CType::U128 => "u128".to_string(),
+            CType::USize => "usize".to_string(),
+            CType::Str => "string".to_string(),
+            CType::TSelf => "Self".to_string(),
+
+            CType::Enum(nty) => nty.name.clone(),
             CType::Generic(name, ..) => name.clone(),
+            CType::Struct(st) => st.name.clone(),
+            CType::Fn(fty) => fty.name.clone(),
+            CType::Bound(bty) => bty.name.clone(),
+            CType::Bool => "bool".to_string(),
+            CType::None => "None".to_string(),
+            CType::Any => "Any".to_string(),
+            CType::Reference(name, ..) => name.clone(),
             _ => "unknown".to_string()
         }
     }
@@ -106,7 +180,7 @@ impl CType {
     }
 
     pub fn attri_type(&self, index: usize, name: String) -> &CType {
-        //struct的属性类型需要名称，而tuple需要索引值;
+//struct的属性类型需要名称，而tuple需要索引值;
         match self {
             CType::Tuple(s) => s.as_ref().get(index).unwrap(),
             _ => self
@@ -123,40 +197,51 @@ impl CType {
 
 impl PartialOrd for FnType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (_, _) => None
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
         }
     }
 }
 
+
 impl PartialOrd for StructType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (_, _) => None
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
         }
     }
 }
 
 impl PartialOrd for EnumType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (_, _) => None
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
         }
     }
 }
 
 impl PartialOrd for LambdaType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (_, _) => None
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
         }
     }
 }
 
 impl PartialOrd for BoundType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (_, _) => None
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
         }
     }
 }

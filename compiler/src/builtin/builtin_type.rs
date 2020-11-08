@@ -38,6 +38,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
         ret_type: Box::from(CType::Any),
         is_pub: true,
         is_static: false,
+        has_body: true,
     });
     vec.push(("print".to_owned(), tt, SymbolUsage::Builtin));
     vec

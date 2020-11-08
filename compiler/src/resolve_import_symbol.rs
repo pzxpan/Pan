@@ -14,7 +14,8 @@ use walkdir::WalkDir;
 use std::io::Read;
 use pan_parser::ast::Expression;
 use crate::variable_type::HasType;
-use crate::ctype::{CType, StructType, FnType};
+use crate::ctype::{CType, StructType, FnType, BoundType};
+use crate::ctype::CType::Bound;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> SymbolTableResult {
     let mut whole_name = "demo".to_string();
@@ -126,6 +127,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                         ret_type: fn_ret_ty,
                         is_pub: fnty.is_pub,
                         is_static: fnty.is_static,
+                        has_body: fnty.has_body,
                     })));
                 }
             }
@@ -164,6 +166,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                         ret_type: fn_ret_ty,
                         is_pub: fnty.is_pub,
                         is_static: fnty.is_static,
+                        has_body: fnty.has_body,
                     }), fty.2));
                 }
             }
@@ -184,3 +187,46 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
     println!("result_ty:{:?}", result_ty);
     return result_ty;
 }
+// fn:FnType { name: "add", arg_types: [("rhs", Generic("T", Any), true)], type_args: [], ret_type: Generic("T", Any), is_pub: false, is_static: false },
+// fn2:FnType { name: "add", arg_types: [("p", Struct(StructType { name: "Point", generics: None, fields: [("x", I32, true), ("y", I32, true)], static_fields: [],
+// methods: [("add", Fn(FnType { name: "add", arg_types: [("p", Unknown, true)], type_args: [], ret_type: Unknown, is_pub: true, is_static: false }))], is_pub: true }), true)], type_args: [], ret_type: Struct(StructType { name: "Point", generics: None, fields: [("x", I32, true), ("y", I32, true)], static_fields: [], methods: [("add", Fn(FnType { name: "add", arg_types: [("p", Unknown, true)], type_args: [], ret_type: Unknown, is_pub: true, is_static: false }))], is_pub: true }), is_pub: true, is_static: false }
+
+pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &mut StructType, bounds: &Vec<Expression>) -> SymbolTableResult {
+    for expression in bounds {
+        let cty = build.lookup_name_ty(&expression.expr_name());
+        if let Bound(bound_type) = cty {
+            for (name, bty) in &bound_type.methods {
+                let mut found = false;
+                if let CType::Fn(fnty) = bty {
+                    for (stfn_name, ssty) in &sty.methods {
+                        if let CType::Fn(sfnty) = ssty {
+                            println!("fn:{:?},bound fn2:{:?}", fnty, sfnty);
+                            if stfn_name.eq(name) {
+                                found = true;
+                                if !sfnty.is_instance_type(fnty) {
+                                    return Err(SymbolTableError {
+                                        error: format!("与bound{:?}中定义的函数{:?},类型不匹配", &expression.expr_name(), name),
+                                        location: expression.loc(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    if !found {
+                        if fnty.has_body {
+                            sty.methods.push((fnty.name.clone(), CType::Fn(fnty.clone())));
+                        } else {
+                            return Err(SymbolTableError {
+                                error: format!("找不到bound{:?}中定义的函数{:?}", &expression.expr_name(), name),
+                                location: expression.loc(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+

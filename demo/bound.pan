@@ -1,15 +1,15 @@
 pub bound Add<T:Self> {
-    fun add(rhs: T) : T {
-        self + rhs;
+    pub fun add(rhs: T) : T {
+        return rhs;
     }
 }
 
+pub struct XPoint {
+    pub x: i32,
+    pub y: i32,
+}
+
 pub struct Point impl Add {
-   pub fun add(p: Point): Point {
-        x = p.x + x;
-        y = p.y + y;
-        return self;
-    }
     pub x: i32,
     pub y: i32,
 }
