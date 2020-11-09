@@ -2,6 +2,7 @@ use pan_parser::ast::*;
 
 use crate::symboltable::*;
 use crate::ctype::*;
+use crate::ctype::CType::Bool;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -24,7 +25,7 @@ impl HasType for FunctionDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let type_args = Vec::new();
-        let mut ret_type = Box::new(CType::Unknown);
+        let mut ret_type = Box::new(CType::Any);
         if let Some(ty) = self.returns.as_ref() {
             ret_type = Box::new(ty.get_type(tables));
         }
@@ -340,6 +341,17 @@ impl HasType for Expression {
                     Char(_) => CType::Char,
                 }
             }
+            Expression::Equal(_, _, _) |
+            Expression::NotEqual(_, _, _) |
+            Expression::More(_, _, _) |
+            Expression::MoreEqual(_, _, _) |
+            Expression::Less(_, _, _) |
+            Expression::LessEqual(_, _, _) |
+            Expression::And(_, _, _) |
+            Expression::Or(_, _, _) |
+            Expression::Not(_, _) |
+            Expression::BoolLiteral(_, _)
+            => { CType::Bool }
             _ => { CType::Unknown }
         }
     }

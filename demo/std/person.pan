@@ -19,7 +19,6 @@ pub struct Person {
   //  money: i32,
     //pub house: House,
     pub fun is_older(): bool {
-
         return age > 40;
     }
     pub fun older_than(a: i32): bool {

@@ -14,9 +14,16 @@ use pan_compiler::error::CompileErrorType;
 use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
 
+
 fn main() {
     env_logger::init();
-    //test_one_file(&env::current_dir().unwrap().join("demo").join("bound.pan"));
+    // let args = std::env::args();
+    // {
+    //     for arg in args.skip(1) {
+    //         test_one_file(&env::current_dir().unwrap().join(arg));
+    //     }
+    // }
+    //test_one_file(&env::current_dir().unwrap().join("demo").join("person.pan"));
     test_all_demo_file();
 }
 

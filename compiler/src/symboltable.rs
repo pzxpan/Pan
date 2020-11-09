@@ -235,6 +235,24 @@ impl SymbolTableBuilder {
         self.tables.last_mut().unwrap().sub_tables.push(table);
     }
 
+    fn get_body_return_ty(&self, body: &Statement, ty: &CType) -> SymbolTableResult {
+        let mut r_ty = CType::Any;
+        if let ast::Statement::Block(_, statements) = body {
+            let s = statements.last();
+            if let Some(ast::Statement::Return(_, expression)) = s {
+                if expression.is_some() {
+                    r_ty = expression.as_ref().unwrap().get_type(&self.tables);
+                }
+            }
+        }
+        if &r_ty != ty {
+            return Err(SymbolTableError {
+                error: format!("返回值的类型{:?}与定义的类型{:?}不匹配", r_ty, ty.ret_type()),
+                location: body.loc().clone(),
+            });
+        }
+        Ok(())
+    }
     pub fn scan_program(&mut self, program: &SourceUnit) -> SymbolTableResult {
         for part in &program.0 {
             match part {
@@ -247,12 +265,14 @@ impl SymbolTableBuilder {
                             EnumPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables);
+                                    let ret_ty = tt.ret_type().clone();
                                     self.register_name(&name.name, tt, SymbolUsage::Assigned, def.loc)?;
                                     if let Some(expression) = &def.as_ref().returns {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                                     self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                                    self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &ret_ty)?;
                                     self.leave_scope();
                                 }
                             }
@@ -302,6 +322,7 @@ impl SymbolTableBuilder {
                             StructPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables);
+                                    let r_ty = tt.ret_type().clone();
                                     self.register_name(&name.name, tt, SymbolUsage::Attribute, def.loc)?;
                                     if let Some(expression) = &def.as_ref().returns {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
@@ -310,6 +331,7 @@ impl SymbolTableBuilder {
                                     self.in_struct_func = true;
                                     if def.body.is_some() {
                                         self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                                        self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &r_ty)?;
                                     }
                                     self.in_struct_func = false;
                                     self.leave_scope();
@@ -334,6 +356,7 @@ impl SymbolTableBuilder {
                 // }
                 // SourceUnitPart::ConstDefinition(def) => {}
                 SourceUnitPart::FunctionDefinition(def) => {
+                    let tt = def.get_type(&self.tables);
                     if let Some(name) = &def.name {
                         if let Some(expression) = &def.as_ref().returns {
                             self.scan_expression(expression, &ExpressionContext::Load)?;
@@ -341,6 +364,7 @@ impl SymbolTableBuilder {
                         self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
+                            self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), tt.ret_type())?;
                         }
                         self.leave_scope();
                     }
@@ -366,6 +390,7 @@ impl SymbolTableBuilder {
 
                     for part in &def.parts {
                         let tt = part.get_type(&self.tables);
+                        let r_ty = tt.ret_type().clone();
                         let func_name = &part.name.as_ref().unwrap().name;
                         self.register_name(&func_name, tt, SymbolUsage::Attribute, part.loc)?;
                         if let Some(expression) = &part.as_ref().returns {
@@ -375,6 +400,7 @@ impl SymbolTableBuilder {
                         self.in_struct_func = true;
                         if part.body.is_some() {
                             self.scan_statement(&part.body.as_ref().unwrap())?;
+                            self.get_body_return_ty(&part.body.as_ref().unwrap(), &r_ty)?;
                         }
                         self.in_struct_func = false;
                         self.leave_scope();
@@ -860,7 +886,7 @@ impl SymbolTableBuilder {
             NamedFunctionCall(_, exp, args) => {
                 let mut ty = self.get_register_type(exp.as_ref().expr_name());
                 if let CType::Struct(sty) = ty.clone() {
-                    let mut struct_ty = resovle_generic(sty, args.clone(), &self.tables);
+                    let struct_ty = resovle_generic(sty, args.clone(), &self.tables);
                     ty = CType::Struct(struct_ty);
                     for arg in args {
                         //不在struct当前作用域，则需要检查Named参数的可见性
@@ -1089,14 +1115,14 @@ impl SymbolTableBuilder {
             }
         }
         let mut symbol = Symbol::new(name, ty.clone());
-        table.symbols.insert(name.to_owned(), symbol);
-        let symbol = table.symbols.get_mut(name).unwrap();
         match role {
             SymbolUsage::Attribute => {
                 symbol.is_attribute = true;
             }
             _ => {}
         }
+        table.symbols.insert(name.to_owned(), symbol);
+
         Ok(())
     }
 }
