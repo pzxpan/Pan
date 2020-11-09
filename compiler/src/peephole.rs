@@ -1,6 +1,7 @@
-use crate::output_stream::OutputStream;
 use arrayvec::ArrayVec;
 use pan_bytecode::bytecode::{CodeObject, Instruction, Label, Location};
+
+use crate::output_stream::OutputStream;
 
 pub mod optimizations;
 

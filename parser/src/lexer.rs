@@ -1,17 +1,19 @@
 //词法处理，按设计，取出其中合法的token，
-use phf::phf_map;
+
 use std::fmt;
 use std::iter::Peekable;
 use std::str::CharIndices;
-use unicode_xid::UnicodeXID;
-
-use crate::ast::Loc;
+use std::str::FromStr;
 use std::ops::Deref;
+
+use unicode_xid::UnicodeXID;
+use phf::phf_map;
 use num_bigint::BigInt;
 use num_traits::identities::Zero;
 use num_traits::{Num, ToPrimitive};
-use std::str::FromStr;
+
 use crate::diagnostics::Location;
+use crate::ast::Loc;
 
 pub type Spanned<Token, Loc, Error> = Result<(Loc, Token, Loc), Error>;
 

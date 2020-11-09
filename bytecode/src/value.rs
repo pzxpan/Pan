@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde::ser::Serializer;
+
 use crate::bytecode::CodeObject;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]

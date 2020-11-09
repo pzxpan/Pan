@@ -1,21 +1,21 @@
 /// 从入口文件开始，递归import所有依赖的Symbol,用来分析类型；解析执行时，编译之后，这数据不需要；但在JIT时，会需要，因为链接时需要这些信息
 /// 以减少二进制文件的大小;
 ///
-use crate::symboltable::*;
-use pan_parser::ast::*;
 use std::collections::HashMap;
 use std::env;
-use pan_parser::parse;
-
 use std::fs;
 use std::fs::File;
-use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 use std::io::Read;
+use std::path::{Path, PathBuf};
+
+use walkdir::WalkDir;
 use pan_parser::ast::Expression;
+use pan_parser::ast::*;
+use pan_parser::parse;
+
+use crate::symboltable::*;
 use crate::variable_type::HasType;
 use crate::ctype::{CType, StructType, FnType, BoundType};
-use crate::ctype::CType::Bound;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> SymbolTableResult {
     let mut whole_name = "demo".to_string();
@@ -189,7 +189,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
 pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: &Vec<Expression>) -> SymbolTableResult {
     for expression in bounds {
         let cty = build.lookup_name_ty(&expression.expr_name());
-        if let Bound(bound_type) = cty {
+        if let CType::Bound(bound_type) = cty {
             for (name, bty) in &bound_type.methods {
                 let mut found = false;
                 if let CType::Fn(fnty) = bty {

@@ -1,8 +1,9 @@
+use std::error::Error;
+use std::fmt;
+
 use pan_parser::ast::Loc;
 use pan_parser::lexer::Token;
 use pan_parser::diagnostics::ErrorType;
-use std::error::Error;
-use std::fmt;
 
 #[derive(Debug)]
 pub struct CompileError {

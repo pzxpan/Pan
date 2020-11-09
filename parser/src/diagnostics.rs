@@ -1,7 +1,7 @@
-use crate::file_cache::FileCache;
+use std::fmt::{Display, Debug, Formatter, Error, Result};
+
 use serde::Serialize;
-use std::fmt::{Display, Debug, Formatter, Error};
-use core::fmt;
+use crate::file_cache::FileCache;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Location(pub String, pub usize, pub usize);
@@ -173,7 +173,7 @@ impl Diagnostic {
 }
 
 impl Display for Diagnostic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let title = match self.level {
             Level::Error => {
                 "错误".to_string()

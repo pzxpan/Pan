@@ -1,5 +1,6 @@
-use num_bigint::BigInt;
 use std::fmt;
+use num_bigint::BigInt;
+
 use crate::lexer::Lexer;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]

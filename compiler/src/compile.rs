@@ -1,32 +1,26 @@
+use num_bigint::BigInt;
+use num_traits::FromPrimitive;
+use log::*;
+use std::borrow::Borrow;
+use itertools::Itertools;
+use num_complex::Complex64;
+
+use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
+use pan_bytecode::value::*;
+use pan_parser::ast::Loc;
+use pan_parser::diagnostics::ErrorType;
+use pan_parser::{ast, parse};
+use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType, Import};
+
 use crate::error::{CompileError, CompileErrorType};
 use crate::output_stream::{CodeObjectStream, OutputStream};
 use crate::peephole::PeepholeOptimizer;
-use crate::symboltable::{
-    make_symbol_table, Symbol, SymbolScope, SymbolTable,
-};
-use itertools::Itertools;
-use num_complex::Complex64;
-use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
-use pan_bytecode::value::*;
-use pan_parser::{ast, parse};
-use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType, Import};
-use std::borrow::Borrow;
-use pan_bytecode::bytecode::CallType::Positional;
-use pan_bytecode::bytecode::NameScope::Global;
-use std::process::exit;
-use num_bigint::BigInt;
-use num_traits::FromPrimitive;
-use pan_bytecode::bytecode::ComparisonOperator::In;
-use pan_parser::lexer::Token::Identifier;
-use pan_parser::ast::Loc;
+use crate::symboltable::{make_symbol_table, Symbol, SymbolScope, SymbolTable};
 use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use pan_parser::diagnostics::ErrorType;
-use pan_parser::ast::VariableAttribute::Constant;
 use crate::util::get_number_type;
-use log::*;
 
 pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -186,8 +180,7 @@ impl<O: OutputStream> Compiler<O> {
 
         for part in &program.0 {
             match part {
-                ast::SourceUnitPart::DataDefinition(def) => {
-                }
+                ast::SourceUnitPart::DataDefinition(def) => {}
                 ast::SourceUnitPart::EnumDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
@@ -242,7 +235,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         if found_main {
             self.emit(Instruction::LoadName("main".to_string(), NameScope::Local));
-            self.emit(Instruction::CallFunction(Positional(0)));
+            self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
         }
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
@@ -527,7 +520,6 @@ impl<O: OutputStream> Compiler<O> {
         is_async: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
-
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
             in_lambda,
@@ -549,8 +541,7 @@ impl<O: OutputStream> Compiler<O> {
             ast::Statement::Block(_, statements) => {
                 let s = statements.last();
                 match s {
-                    Some(ast::Statement::Return(..)) => {
-                    }
+                    Some(ast::Statement::Return(..)) => {}
                     _ => {
                         self.emit(Instruction::LoadConst(bytecode::Constant::None));
                         self.emit(Instruction::ReturnValue);
@@ -611,8 +602,7 @@ impl<O: OutputStream> Compiler<O> {
             ast::Statement::Block(_, statements) => {
                 let s = statements.last();
                 match s {
-                    Some(ast::Statement::Return(..)) => {
-                    }
+                    Some(ast::Statement::Return(..)) => {}
                     _ => {
                         self.emit(Instruction::LoadConst(bytecode::Constant::None));
                         self.emit(Instruction::ReturnValue);

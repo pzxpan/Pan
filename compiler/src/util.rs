@@ -1,6 +1,6 @@
 use pan_bytecode::bytecode::Constant;
-use crate::ctype::CType;
 use pan_parser::ast::Number;
+use crate::ctype::CType;
 
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {

@@ -1,20 +1,22 @@
 //根据import，生成各种Value,最好是有个中间的代码形式，直接读取就好，不要重新编译;跟java的class中间字节码一样;
-use crate::compile::*;
-use pan_parser::ast::*;
-use pan_bytecode::bytecode::{CodeObject, Instruction, Constant};
-use std::collections::HashMap;
-use std::env;
-use pan_parser::parse;
-use crate::error::*;
-
 use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 use std::io::Read;
+use std::collections::HashMap;
+use std::env;
+
+use walkdir::WalkDir;
+
+use pan_parser::ast::*;
+use pan_parser::parse;
+use pan_bytecode::bytecode::{CodeObject, Instruction, Constant};
+
+use crate::error::*;
 use crate::symboltable::make_symbol_table;
 use crate::output_stream::OutputStream;
 use crate::builtin::builtin_fun::get_builtin_fun;
+use crate::compile::*;
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> Result<(), CompileError> {
     let mut whole_name = "demo".to_string();

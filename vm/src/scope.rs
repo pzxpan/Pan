@@ -1,12 +1,13 @@
 use std::fmt;
-use pan_bytecode::bytecode::CodeObject;
-
-use crate::vm::VirtualMachine;
-use std::collections::{hash_map::DefaultHasher, HashMap};
-use pan_bytecode::value::Value;
-use crate::frame::FrameResult;
 use std::cell::{RefCell, Ref};
 use std::borrow::BorrowMut;
+use std::collections::{hash_map::DefaultHasher, HashMap};
+
+use pan_bytecode::bytecode::CodeObject;
+use pan_bytecode::value::Value;
+
+use crate::frame::FrameResult;
+use crate::vm::VirtualMachine;
 
 /*
  * 作用域中的数据链表

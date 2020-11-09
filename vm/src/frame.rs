@@ -2,21 +2,22 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::rc::Rc;
 use std::error::Error;
+use std::borrow::{Borrow, BorrowMut};
+use std::collections::HashMap;
+use std::sync::Arc;
+use log::*;
 
 use indexmap::IndexMap;
 use itertools::Itertools;
 
 use pan_bytecode::bytecode;
-use crate::vm::VirtualMachine;
-use crate::scope::{Scope, NameProtocol};
 use pan_bytecode::bytecode::CodeObject;
 use pan_bytecode::value::{Value, FnValue, Obj, InstanceObj, TypeValue};
-use std::borrow::{Borrow, BorrowMut};
-use std::collections::HashMap;
-use std::sync::Arc;
-use log::*;
-use crate::util::change_to_primitive_type;
 
+use crate::vm::VirtualMachine;
+use crate::scope::{Scope, NameProtocol};
+
+use crate::util::change_to_primitive_type;
 
 #[derive(Clone, Debug)]
 struct Block {

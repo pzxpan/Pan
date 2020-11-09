@@ -1,12 +1,16 @@
 //! Pan中间代码实现
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 use bitflags::bitflags;
 use num_bigint::BigInt;
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt;
+
 use crate::value::*;
+use self::Instruction::*;
+
 
 /// 源代码代码位置
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -148,8 +152,7 @@ pub enum Instruction {
     GetANext,
 }
 
-use self::Instruction::*;
-use std::cmp::Ordering;
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CallType {

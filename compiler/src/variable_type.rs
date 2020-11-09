@@ -1,10 +1,10 @@
+use std::collections::{HashSet, HashMap};
+use std::borrow::Borrow;
+
 use pan_parser::ast::*;
+
 use crate::symboltable::*;
 use crate::ctype::*;
-use std::borrow::Borrow;
-use crate::ctype::CType::Unknown;
-use pan_bytecode::bytecode::Instruction::CallFunction;
-use std::collections::{HashSet, HashMap};
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;

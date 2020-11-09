@@ -1,22 +1,25 @@
 /* 文件扫描，symbol生成
 */
-use crate::error::{CompileError, CompileErrorType};
-use indexmap::map::IndexMap;
-use pan_parser::ast;
-use pan_parser::ast::*;
+
+
 use std::fmt;
 use std::borrow::Borrow;
-use num_bigint::BigInt;
-use num_traits::cast::ToPrimitive;
 use std::collections::HashSet;
 
+use indexmap::map::IndexMap;
+use num_bigint::BigInt;
+use num_traits::cast::ToPrimitive;
+
+use pan_parser::ast;
+use pan_parser::ast::*;
+
+use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
 use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
 use crate::builtin::builtin_type::get_builtin_type;
 use crate::builtin::builtin_fun::get_builtin_fun;
-use crate::error::CompileErrorType::SyntaxError;
 
 pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();

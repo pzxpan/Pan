@@ -1,24 +1,28 @@
-use pan_parser::lexer;
+use std::cell::RefCell;
+use std::env;
+use std::ops::Add;
 use std::fs::File;
 use std::io::Read;
+use std::fs;
+use std::path::Path;
+use std::collections::HashMap;
+
+use walkdir::WalkDir;
+use log::*;
+
+use pan_parser::lexer;
 use pan_parser::ast::*;
+
+use pan_bytecode::value::Value;
 use pan_bytecode::bytecode::Instruction;
+
 use pan_compiler::symboltable;
 use pan_compiler::symboltable::SymbolTable;
 use pan_compiler::compile::{compile_program, compile};
 use pan_compiler::error::CompileErrorType;
+
 use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
-use std::collections::HashMap;
-use pan_bytecode::value::Value;
-use std::cell::RefCell;
-use std::env;
-
-use std::fs;
-use std::path::Path;
-use walkdir::WalkDir;
-use log::*;
-use std::ops::Add;
 
 fn main() {
     env_logger::init();
