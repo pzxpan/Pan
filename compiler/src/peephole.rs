@@ -13,7 +13,7 @@ pub struct InstructionMetadata {
 
 impl From<Vec<InstructionMetadata>> for InstructionMetadata {
     fn from(metas: Vec<Self>) -> Self {
-        debug_assert!(!metas.is_empty(), "`metas` must not be empty");
+        debug_assert!(!metas.is_empty(), "meta不能为空");
         InstructionMetadata {
             loc: metas[0].loc.clone(),
             labels: metas
@@ -84,7 +84,7 @@ impl<O: OutputStream> PeepholeOptimizer<O> {
     fn pop(&mut self) -> (Instruction, InstructionMetadata) {
         self.buffer
             .pop()
-            .expect("Failed to pop instruction from PeepholeOptimizer buffer")
+            .expect("从PeepholeOptimizer中弹出指令失败")
     }
 
     fn flush(&mut self) {

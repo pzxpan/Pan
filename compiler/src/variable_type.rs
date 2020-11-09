@@ -31,7 +31,6 @@ impl HasType for FunctionDefinition {
         if let Some(ty) = self.returns.as_ref() {
             ret_type = Box::new(ty.get_type(tables));
         }
-        // self.returns.as_ref().unwrap().get_type()
         let name = self.name.as_ref().unwrap().name.clone();
         CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some() })
     }
@@ -70,7 +69,6 @@ impl HasType for BoundDefinition {
 impl HasType for StructDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         let mut type_args = Vec::new();
-        //let mut generics_map = HashMap::new();
         let mut local_tables = tables.clone();
         let table = local_tables.last_mut().unwrap();
         for ty in &self.generics {
@@ -103,7 +101,6 @@ impl HasType for StructDefinition {
         let mut bases = Vec::new();
         if self.impls.is_some() {
             for im in self.impls.as_ref().unwrap().iter() {
-                // bases.push((im.expr_name(), self.get_type(tables)));
                 bases.push(im.expr_name());
             }
         }
@@ -179,11 +176,7 @@ fn get_register_expr_type(tables: &Vec<SymbolTable>, name: String, depth: i32) -
 impl HasType for Expression {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match self {
-            Expression::Add(_, left, right) |
-            Expression::Subtract(_, left, right) |
-            Expression::Multiply(_, left, right) |
-            Expression::Divide(_, left, right) => {
-                //TODO 需要处理两个变量的四则运算的返回类型，需要在利用注册了的symbol进行处理;
+            Expression::Add(_, left, right) => {
                 let mut l = left.get_type(tables);
                 let mut r = right.get_type(tables);
                 if l == CType::Unknown {
@@ -195,7 +188,29 @@ impl HasType for Expression {
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
                 return if min < CType::I8 {
                     CType::Unknown
+                    //Str类型只能加，
                 } else if max <= CType::Str {
+                    max
+                } else {
+                    CType::Unknown
+                };
+            }
+            Expression::Subtract(_, left, right) |
+            Expression::Multiply(_, left, right) |
+            Expression::Divide(_, left, right) => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                if l == CType::Unknown {
+                    l = get_register_expr_type(tables, left.expr_name(), 0);
+                }
+                if r == CType::Unknown {
+                    r = get_register_expr_type(tables, right.expr_name(), 0);
+                }
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                return if min < CType::I8 {
+                    CType::Unknown
+                    //Str类型只能加，
+                } else if max <= CType::Float {
                     max
                 } else {
                     CType::Unknown
@@ -265,9 +280,6 @@ impl HasType for Expression {
                     return CType::Unknown;
                 }
             }
-            // Expression::FunctionCall(_, s, _) => {
-//     s.get_type()
-// }
             Expression::NumberLiteral(_, _) => {
                 CType::I32
             }
@@ -292,7 +304,6 @@ impl HasType for Expression {
                     let key_ty = dicts.get(0).unwrap().key.get_type(tables);
                     let value_ty = dicts.get(0).unwrap().value.get_type(tables);
                     for e in dicts {
-                        //TODO 是现在抛出错误提示，还是等到analyzer时抛出
                         if e.key.get_type(tables) != key_ty || e.value.get_type(tables) != value_ty {
                             return CType::Unknown;
                         }
@@ -332,10 +343,6 @@ impl HasType for Expression {
                     Char(char) => CType::Char,
                 }
             }
-
-            // Expression::Attribute(_, obj_name, attri, idx) {
-//
-// }
             _ => { CType::Unknown }
         }
     }

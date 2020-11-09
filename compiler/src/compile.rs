@@ -187,7 +187,6 @@ impl<O: OutputStream> Compiler<O> {
         for part in &program.0 {
             match part {
                 ast::SourceUnitPart::DataDefinition(def) => {
-                    //resolve_contract(&def, file_no, &mut delay, ns);
                 }
                 ast::SourceUnitPart::EnumDefinition(def) => {
                     let name = &def.name.name;
@@ -512,7 +511,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code))));
         self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name)));
 
-        // Turn code object into function object:
+
         self.emit(Instruction::MakeFunction);
         self.store_name(name);
         self.ctx = prev_ctx;
@@ -551,7 +550,6 @@ impl<O: OutputStream> Compiler<O> {
                 let s = statements.last();
                 match s {
                     Some(ast::Statement::Return(..)) => {
-                        // the last instruction is a ReturnValue already, we don't need to emit it
                     }
                     _ => {
                         self.emit(Instruction::LoadConst(bytecode::Constant::None));
@@ -593,33 +591,27 @@ impl<O: OutputStream> Compiler<O> {
         name: &str,
         args: &[ast::Parameter],
         body: &ast::Statement,
-        returns: &Option<ast::Expression>, // TODO: use type hint somehow..
+        returns: &Option<ast::Expression>,
         is_async: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
-        // Create bytecode for this function:
-        // remember to restore self.ctx.in_loop to the original after the function is compiled
         let prev_ctx = self.ctx;
-
         self.ctx = CompileContext {
             in_lambda,
             in_loop: false,
             func: FunctionContext::StructFunction,
         };
-
         let qualified_name = self.create_qualified_name(name, "");
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
 
         self.enter_function(name, args)?;
-        // self.prepare_decorators(decorator_list)?;
         self.compile_statements(body)?;
         match body {
             ast::Statement::Block(_, statements) => {
                 let s = statements.last();
                 match s {
                     Some(ast::Statement::Return(..)) => {
-                        // the last instruction is a ReturnValue already, we don't need to emit it
                     }
                     _ => {
                         self.emit(Instruction::LoadConst(bytecode::Constant::None));
@@ -630,14 +622,12 @@ impl<O: OutputStream> Compiler<O> {
 
             _ => {}
         }
-        // Emit None at end:
         let mut code = self.pop_code_object();
         self.leave_scope();
 
-        // Prepare type annotations:
+
         let mut num_annotations = 0;
 
-        // Return annotation:
         if let Some(annotation) = returns {
             // key:
             self.emit(Instruction::LoadConst(
@@ -667,7 +657,6 @@ impl<O: OutputStream> Compiler<O> {
         methods.push((name.to_string(), code.clone()));
         self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name)));
 
-        // Turn code object into function object:
         self.emit(Instruction::MakeFunction);
 
         self.store_name(name);
@@ -723,12 +712,10 @@ impl<O: OutputStream> Compiler<O> {
                         let p = para.1.as_ref().unwrap().to_owned();
                         args.push(p.clone());
                     }
-                    // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
                     let returns = &def.returns;
                     let is_async = false;
                     if def.body.is_some() {
                         let body = &def.body.as_ref().unwrap();
-                        // let decorator_list = vec![];
                         if *&def.is_static {
                             self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
                         } else {
@@ -796,12 +783,10 @@ impl<O: OutputStream> Compiler<O> {
                 let p = para.1.as_ref().unwrap().to_owned();
                 args.push(p.clone());
             }
-            // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
             let returns = &def.returns;
             let is_async = false;
             if def.body.is_some() {
                 let body = &def.body.as_ref().unwrap();
-                // let decorator_list = vec![];
                 if *&def.is_static {
                     self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
                 } else {
@@ -871,9 +856,7 @@ impl<O: OutputStream> Compiler<O> {
                         let p = para.1.as_ref().unwrap().to_owned();
                         args.push(p.clone());
                     }
-                    // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
                     let body = &def.body.as_ref().unwrap();
-                    // let decorator_list = vec![];
                     let returns = &def.returns;
                     let is_async = false;
                     if *&def.is_static {
@@ -900,20 +883,17 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn store_docstring(&mut self, doc_str: Option<String>) {
-        // Duplicate top of stack (the function or class object)
         self.emit(Instruction::Duplicate);
 
-        // Doc string value:
         self.emit(Instruction::LoadConst(
             match doc_str {
                 Some(doc) => bytecode::Constant::String(doc),
-                None => bytecode::Constant::None, // set docstring None if not declared
+                None => bytecode::Constant::None,
             },
         ));
 
         self.emit(Instruction::Rotate(2));
-        self.emit(Instruction::StoreAttr(
-            "__doc__".to_owned()));
+        self.emit(Instruction::StoreAttr("__doc__".to_owned()));
     }
 
     fn compile_while(
@@ -963,7 +943,6 @@ impl<O: OutputStream> Compiler<O> {
 
         self.set_label(start_label);
         self.emit(Instruction::ForIter(else_label));
-
 
         self.compile_store(target)?;
 
@@ -1146,25 +1125,6 @@ impl<O: OutputStream> Compiler<O> {
         op: &ast::Expression,
         values: &[ast::Expression],
     ) -> Result<(), CompileError> {
-        // let end_label = self.new_label();
-        //
-        // let (last_value, values) = values.split_last().unwrap();
-        // for value in values {
-        //     self.compile_expression(value)?;
-        //
-        //     match op {
-        //         ast::BooleanOperator::And => {
-        //             self.emit(Instruction::JumpIfFalseOrPop { target: end_label });
-        //         }
-        //         ast::BooleanOperator::Or => {
-        //             self.emit(Instruction::JumpIfTrueOrPop { target: end_label });
-        //         }
-        //     }
-        // }
-        //
-        // // If all values did not qualify, take the value of the last value:
-        // self.compile_expression(last_value)?;
-        // self.set_label(end_label);
         Ok(())
     }
 
@@ -1372,9 +1332,7 @@ impl<O: OutputStream> Compiler<O> {
                     let p = para.1.as_ref().unwrap().to_owned();
                     args.push(p.clone());
                 }
-                // let args = &def.params.iter().map(|ref s| s.1.as_ref().unwrap()).collect::<Vec<Parameter>>();
                 let body = &lambda.body.as_ref();
-                // let decorator_list = vec![];
                 let is_async = false;
                 self.compile_function_def(&name, args.as_slice(), body, &None, is_async, true);
             }
@@ -1383,10 +1341,10 @@ impl<O: OutputStream> Compiler<O> {
                 let no_label = self.new_label();
                 let end_label = self.new_label();
                 self.compile_jump_if(test, false, no_label)?;
-                // True case
+                // True
                 self.compile_expression(body)?;
                 self.emit(Instruction::Jump(end_label));
-                // False case
+                // False
                 self.set_label(no_label);
                 self.compile_expression(orelse)?;
                 // End
@@ -1500,14 +1458,12 @@ impl<O: OutputStream> Compiler<O> {
         }
         let count = args.len();
 
-        // Normal arguments:
+        // 正常的参数:
         let must_unpack = self.gather_elements(args)?;
 
         if must_unpack {
-            // Create a tuple with positional args:
             self.emit(Instruction::BuildTuple(args.len(), must_unpack));
         } else {
-            // Keyword arguments:
             if is_enum_item {
                 self.emit(Instruction::LoadBuildEnum(count + 2));
             } else {
@@ -1555,7 +1511,6 @@ impl<O: OutputStream> Compiler<O> {
         kind: &ast::ComprehensionKind,
         generators: &[ast::Comprehension],
     ) -> Result<(), CompileError> {
-        // We must have at least one generator:
         assert!(!generators.is_empty());
 
         let name = match kind {
@@ -1577,7 +1532,6 @@ impl<O: OutputStream> Compiler<O> {
         ));
         self.enter_scope();
 
-        // Create empty object of proper type:
         match kind {
             ast::ComprehensionKind::GeneratorExpression { .. } => {}
             ast::ComprehensionKind::List { .. } => {
@@ -1598,17 +1552,12 @@ impl<O: OutputStream> Compiler<O> {
             }
 
             if loop_labels.is_empty() {
-                // Load iterator onto stack (passed as first argument):
                 self.emit(Instruction::LoadName(String::from(".0"), bytecode::NameScope::Local));
             } else {
-                // Evaluate iterated item:
                 self.compile_expression(&generator.iter)?;
-
-                // Get iterator / turn item into an iterator
                 self.emit(Instruction::GetIter);
             }
 
-            // Setup for loop:
             let start_label = self.new_label();
             let end_label = self.new_label();
             loop_labels.push((start_label, end_label));
@@ -1617,8 +1566,6 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::ForIter(end_label));
 
             self.compile_store(&generator.target)?;
-
-            // Now evaluate the ifs:
             for if_condition in &generator.ifs {
                 self.compile_jump_if(if_condition, false, start_label)?
             }
@@ -1648,40 +1595,29 @@ impl<O: OutputStream> Compiler<O> {
         }
 
         for (start_label, end_label) in loop_labels.iter().rev() {
-            // Repeat:
             self.emit(Instruction::Jump(*start_label));
 
-            // End of for loop:
             self.set_label(*end_label);
             self.emit(Instruction::PopBlock);
         }
-        // Fetch code for listcomp function:
         let code = self.pop_code_object();
 
-        // Pop scope
         self.leave_scope();
 
-        // List comprehension code:
         self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code))));
 
-        // List comprehension function name:
         self.emit(Instruction::LoadConst(bytecode::Constant::String(name)));
 
-        // Turn code object into function object:
         self.emit(Instruction::MakeFunction);
 
-        // Evaluate iterated item:
         self.compile_expression(&generators[0].iter)?;
 
-        // Get iterator / turn item into an iterator
         self.emit(Instruction::GetIter);
 
-        // Call just created <listcomp> function:
         self.emit(Instruction::CallFunction(CallType::Positional(1)));
         Ok(())
     }
 
-    // Scope helpers:
     fn enter_scope(&mut self) {
         let table = self
             .symbol_table_stack
@@ -1755,30 +1691,6 @@ impl<O: OutputStream> Compiler<O> {
         }
         unreachable!()
     }
-
-    // fn get_base_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
-    //     let mut name_str = "";
-    //     let mut attri = "";
-    //     if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
-    //         name_str = name;
-    //     }
-    //     if let Some(ident) = attribute {
-    //         attri = &ident.name;
-    //     }
-    //
-    //     let len: usize = self.symbol_table_stack.len();
-    //     for i in (0..len).rev() {
-    //         let symbol = self.symbol_table_stack[i].lookup(name_str);
-    //         if let Some(s) = symbol {
-    //             if let CType::Struct(StructType { bases, .. }) = &s.ty {
-    //                 for (n,tty) in bases.iter() {
-    //                     if let BoundType(b) =
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     return false;
-    // }
     fn is_enum_variant_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
         let mut name_str = "";
         let mut attri = "";
@@ -1851,7 +1763,7 @@ impl<O: OutputStream> Compiler<O> {
     fn current_output(&mut self) -> &mut O {
         self.output_stack
             .last_mut()
-            .expect("No OutputStream on stack")
+            .expect("没有栈可弹出")
     }
 
     fn new_label(&mut self) -> Label {

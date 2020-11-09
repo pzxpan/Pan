@@ -1,7 +1,6 @@
 use pan_parser::ast::Loc;
 use pan_parser::lexer::Token;
 use pan_parser::diagnostics::ErrorType;
-
 use std::error::Error;
 use std::fmt;
 
@@ -24,84 +23,30 @@ impl CompileError {
     }
 }
 
-// impl From<ParseError> for CompileError {
-//     fn from(error: ParseError) -> Self {
-//         CompileError {
-//             statement: None,
-//             error: CompileErrorType::Parse(error.error),
-//             location: error.location,
-//             source_path: None,
-//         }
-//     }
-// }
-
 #[derive(Debug)]
 pub enum CompileErrorType {
     Assign(&'static str),
     Delete(&'static str),
-    ExpectExpr,
     Parse(ErrorType),
     SyntaxError(String),
-    StarArgs,
     InvalidBreak,
 
     InvalidContinue,
     InvalidReturn,
-    InvalidYield,
-}
-
-impl CompileError {
-    pub fn is_indentation_error(&self) -> bool {
-        if let CompileErrorType::Parse(parse) = &self.error {
-            match parse {
-                // ParseErrorType::Lexical(LexicalErrorType::IndentationError) => true,
-                // ParseErrorType::UnrecognizedToken(token, expected) => {
-                //     *token == Tok::Indent || expected.clone() == Some("Indent".to_owned())
-                // }
-                _ => false,
-            }
-        } else {
-            false
-        }
-    }
-
-    pub fn is_tab_error(&self) -> bool {
-        if let CompileErrorType::Parse(parse) = &self.error {
-            // if let ParseErrorType::Lexical(lex) = parse {
-            //     if let LexicalErrorType::TabError = lex {
-            //         return true;
-            //     }
-            // }
-        }
-        false
-    }
 }
 
 impl fmt::Display for CompileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let error_desc = match &self.error {
-            CompileErrorType::Assign(target) => format!("can't assign to {}", target),
-            CompileErrorType::Delete(target) => format!("can't delete {}", target),
-            CompileErrorType::ExpectExpr => "Expecting expression, got statement".to_owned(),
+            CompileErrorType::Assign(target) => format!("无法赋值 {}", target),
+            CompileErrorType::Delete(target) => format!("无法删除 {}", target),
             CompileErrorType::Parse(err) => "".to_string(),
             CompileErrorType::SyntaxError(err) => err.to_string(),
-            CompileErrorType::StarArgs => "Two starred expressions in assignment".to_owned(),
-            CompileErrorType::InvalidBreak => "'break' outside loop".to_owned(),
-            CompileErrorType::InvalidContinue => "'continue' outside loop".to_owned(),
-            CompileErrorType::InvalidReturn => "'return' outside function".to_owned(),
-            CompileErrorType::InvalidYield => "'yield' outside function".to_owned(),
+
+            CompileErrorType::InvalidBreak => "break不在循环块中".to_owned(),
+            CompileErrorType::InvalidContinue => "continue不在循环块中".to_owned(),
+            CompileErrorType::InvalidReturn => "return不在函数中".to_owned(),
         };
-
-        // if let Some(statement) = &self.statement {
-        //     if self.location.2 > 0 {
-        //         if let Some(line) = statement.lines().nth(self.1 - 1) {
-        //             // visualize the error, when location and statement are provided
-        //             return write!(f, "\n{}\n{}", line, self.location.2);
-        //         }
-        //     }
-        // }
-
-        // print line number
         write!(f, "{} at {}", error_desc, self.location.1)
     }
 }

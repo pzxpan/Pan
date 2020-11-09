@@ -19,9 +19,8 @@ pub enum CType {
     U128,
     I128,
     Float,
-
-    // Int,
     Str,
+    //-----以上的类型顺序不能变，因为有用来比较大小,确定如何转型
     Type,
 
     Tuple(Box<Vec<CType>>),
@@ -32,8 +31,8 @@ pub enum CType {
     Enum(EnumType),
     Lambda(LambdaType),
     Bound(BoundType),
-    Generic(/* name: */ String, Box<CType>),
-    Reference(/* name: */ String, /* type_args: */ Vec<CType>),
+    Generic(String, Box<CType>),
+    Reference(String, Vec<CType>),
     Any,
     TSelf,
     Unknown,
@@ -42,7 +41,7 @@ pub enum CType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FnType {
     pub name: String,
-    pub arg_types: Vec<(/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool)>,
+    pub arg_types: Vec<(String, CType, bool)>,
     pub type_args: Vec<String>,
     pub ret_type: Box<CType>,
     pub is_pub: bool,
@@ -98,7 +97,6 @@ impl FnType {
             return false;
         }
 
-
         return true;
     }
 }
@@ -108,15 +106,15 @@ pub struct LambdaType {
     pub name: String,
     pub ret_type: Box<CType>,
     pub captures: Vec<String>,
-    pub arg_types: Vec<(/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool)>,
+    pub arg_types: Vec<(String, CType, bool)>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct StructType {
     pub name: String,
     pub generics: Option<Vec<CType>>,
-    pub fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
-    pub static_fields: Vec<(/* name: */ String, /* type: */ CType, /* has_default_value: */ bool)>,
+    pub fields: Vec<(String, CType, bool)>,
+    pub static_fields: Vec<(String, CType, bool)>,
     pub methods: Vec<(String, CType)>,
     pub bases: Vec<String>,
     pub is_pub: bool,
@@ -134,7 +132,7 @@ pub struct BoundType {
 pub struct EnumType {
     pub name: String,
     pub type_args: Vec<(String, CType)>,
-    pub variants: Vec<(/* name: */ String, /* type: */ CType)>,
+    pub variants: Vec<(String, CType)>,
     pub methods: Vec<(String, CType)>,
     pub is_pub: bool,
 }
@@ -180,7 +178,7 @@ impl CType {
     }
 
     pub fn attri_type(&self, index: usize, name: String) -> &CType {
-//struct的属性类型需要名称，而tuple需要索引值;
+        //struct的属性类型需要名称，而tuple需要索引值;
         match self {
             CType::Tuple(s) => s.as_ref().get(index).unwrap(),
             _ => self

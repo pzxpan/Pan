@@ -1,11 +1,11 @@
 use pan_bytecode::bytecode::{CodeFlags, CodeObject, Instruction, Label, Location};
 
 pub trait OutputStream: From<CodeObject> + Into<CodeObject> {
-    /// Output an instruction
+    ///弹出指令
     fn emit(&mut self, instruction: Instruction, location: Location);
-    /// Set a label on an instruction
+    /// 设置标签
     fn set_label(&mut self, label: Label);
-    /// Mark the inner CodeObject as a generator
+    /// 设为迭代器
     fn mark_generator(&mut self);
 }
 

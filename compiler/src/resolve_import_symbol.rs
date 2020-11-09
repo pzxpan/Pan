@@ -62,7 +62,6 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, as_name: &Op
 
 pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
     let mut result_ty = st.clone();
-    //println!("result_ty:{:?}", result_ty);
     if st.generics.is_some() {
         let mut generics = st.generics.clone().unwrap();
         let mut fields = st.fields.clone();
@@ -187,10 +186,6 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
    // println!("result_ty:{:?}", result_ty);
     return result_ty;
 }
-// fn:FnType { name: "add", arg_types: [("rhs", Generic("T", Any), true)], type_args: [], ret_type: Generic("T", Any), is_pub: false, is_static: false },
-// fn2:FnType { name: "add", arg_types: [("p", Struct(StructType { name: "Point", generics: None, fields: [("x", I32, true), ("y", I32, true)], static_fields: [],
-// methods: [("add", Fn(FnType { name: "add", arg_types: [("p", Unknown, true)], type_args: [], ret_type: Unknown, is_pub: true, is_static: false }))], is_pub: true }), true)], type_args: [], ret_type: Struct(StructType { name: "Point", generics: None, fields: [("x", I32, true), ("y", I32, true)], static_fields: [], methods: [("add", Fn(FnType { name: "add", arg_types: [("p", Unknown, true)], type_args: [], ret_type: Unknown, is_pub: true, is_static: false }))], is_pub: true }), is_pub: true, is_static: false }
-
 pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: &Vec<Expression>) -> SymbolTableResult {
     for expression in bounds {
         let cty = build.lookup_name_ty(&expression.expr_name());
