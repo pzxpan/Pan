@@ -1133,11 +1133,14 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(value)?;
                 //按名字取，还是下标取
                 if name.is_some() {
+                    //is_enum_item元组表示是静态构造方法，还是普通属性;
                     let is_enum_item = self.is_enum_variant_def(value, name);
-                    if is_enum_item {
+                    if is_enum_item.0 {
                         self.emit(Instruction::LoadConst(
                             bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
                         self.emit(Instruction::LoadBuildEnum(2));
+                    } else if is_enum_item.1 {
+                        self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
                     } else {
                         let (def_current, base_name) = self.is_struct_item_def(value, name);
                         if def_current {
@@ -1394,7 +1397,7 @@ impl<O: OutputStream> Compiler<O> {
         function: &ast::Expression,
         args: &[ast::Expression],
     ) -> Result<(), CompileError> {
-        let mut is_enum_item = false;
+        let mut is_enum_item = (false, false);
         if let ast::Expression::Attribute(_, variable, attribute, _) = function {
             is_enum_item = self.is_enum_variant_def(variable, attribute);
         }
@@ -1417,7 +1420,7 @@ impl<O: OutputStream> Compiler<O> {
             self.compile_expression(function)?;
         }
 
-        if is_enum_item {
+        if is_enum_item.0 {
             if let ast::Expression::Attribute(_, variable, attribute, _) = function {
                 self.emit(Instruction::LoadName(
                     variable.expr_name().to_string(),
@@ -1435,7 +1438,7 @@ impl<O: OutputStream> Compiler<O> {
         if must_unpack {
             self.emit(Instruction::BuildTuple(args.len(), must_unpack));
         } else {
-            if is_enum_item {
+            if is_enum_item.0 {
                 self.emit(Instruction::LoadBuildEnum(count + 2));
             } else {
                 self.emit(Instruction::CallFunction(CallType::Positional(count)));
@@ -1662,7 +1665,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         unreachable!()
     }
-    fn is_enum_variant_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
+    fn is_enum_variant_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> (bool, bool) {
         let mut name_str = "";
         let mut attri = "";
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
@@ -1676,16 +1679,21 @@ impl<O: OutputStream> Compiler<O> {
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name_str);
             if let Some(s) = symbol {
-                if let CType::Enum(EnumType { variants, .. }) = &s.ty {
+                if let CType::Enum(EnumType { variants, methods, .. }) = &s.ty {
                     for (a_name, _) in variants {
                         if a_name.eq(attri) {
-                            return true;
+                            return (true, false);
+                        }
+                    }
+                    for (a_name, _) in methods {
+                        if a_name.eq(attri) {
+                            return (false, true);
                         }
                     }
                 }
             }
         }
-        return false;
+        return (false, false);
     }
 
     fn is_constructor(&self, name: &str) -> bool {

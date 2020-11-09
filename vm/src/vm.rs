@@ -11,7 +11,7 @@ use pan_bytecode::bytecode::*;
 use pan_bytecode::value::*;
 
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
-use crate::scope::{Scope};
+use crate::scope::Scope;
 
 pub struct VirtualMachine {
     pub frames: Vec<FrameRef>,
@@ -175,6 +175,10 @@ impl VirtualMachine {
         match (a, b) {
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a == b)
+            }
+            //TODO
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(true)
             }
             _ => unreachable!()
         }

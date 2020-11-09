@@ -137,6 +137,7 @@ pub enum Instruction {
     SetAdd(usize),
     MapAdd(usize),
     Print,
+    //感觉不靠谱，得换这两个指令
     LoadBuildStruct,
     LoadBuildEnum(usize),
     LoadBuildModule,
