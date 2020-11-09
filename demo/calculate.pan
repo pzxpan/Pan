@@ -12,7 +12,7 @@ fun main() {
    let c = 0b1100110;
    let d = 0b1010101;
 
-
+   let ff = 20;
    ff += 10;
    print(ff);
 
@@ -34,8 +34,7 @@ fun main() {
 
     print(20000);
     print(ff);
-    ff = 0;
-    ff %= 10;
+
     print(ff);
 
     let a = 100;
@@ -45,10 +44,10 @@ fun main() {
     let aa = 100_i128;
     let bb = 200_i128;
     //向上转型默认安全，向下转型需要明确指定
-       let cc: i32 = aa as i32 + bb as i32;
-       let cc = aa + bb;
-       let cc = "我们是" + cc;
-       print(cc);
+    let cc: i32 = aa as i32 + bb as i32;
+    let cc = aa + bb;
+
+    print(cc);
 
 
 

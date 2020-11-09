@@ -3,22 +3,22 @@
 use crate::error::{CompileError, CompileErrorType};
 use indexmap::map::IndexMap;
 use pan_parser::ast;
-use pan_parser::ast::{Loc, Identifier, Import, Parameter, Expression, LambdaDefinition, MultiVariableDeclaration, MultiDeclarationPart};
+use pan_parser::ast::*;
 use std::fmt;
 use std::borrow::Borrow;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use std::collections::HashSet;
+
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
 use crate::resolve_import_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
 use crate::builtin::builtin_type::get_builtin_type;
 use crate::builtin::builtin_fun::get_builtin_fun;
-use pan_parser::ast::Expression::Variable;
 use crate::error::CompileErrorType::SyntaxError;
 
-pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
+pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
     builder.insert_builtin_symbol();
@@ -28,7 +28,7 @@ pub fn make_symbol_table(program: &ast::SourceUnit) -> Result<SymbolTable, Symbo
 }
 
 pub fn statements_to_symbol_table(
-    statements: &ast::Statement,
+    statements: &Statement,
 ) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
@@ -36,7 +36,7 @@ pub fn statements_to_symbol_table(
     builder.finish()
 }
 
-pub fn file_top_symbol(program: &ast::SourceUnit) -> Result<SymbolTable, SymbolTableError> {
+pub fn file_top_symbol(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
     builder.scan_top_symbol_types(program, false)?;
@@ -275,16 +275,16 @@ impl SymbolTableBuilder {
         self.tables.last_mut().unwrap().sub_tables.push(table);
     }
 
-    pub fn scan_program(&mut self, program: &ast::SourceUnit) -> SymbolTableResult {
+    pub fn scan_program(&mut self, program: &SourceUnit) -> SymbolTableResult {
         for part in &program.0 {
             match part {
-                ast::SourceUnitPart::DataDefinition(def) => {}
-                ast::SourceUnitPart::EnumDefinition(def) => {
+                SourceUnitPart::DataDefinition(def) => {}
+                SourceUnitPart::EnumDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Enum, def.loc.1);
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Used)?;
                     for part in &def.parts {
                         match part {
-                            ast::EnumPart::FunctionDefinition(def) => {
+                            EnumPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables);
                                     self.register_name(&name.name, tt, SymbolUsage::Assigned)?;
@@ -296,7 +296,7 @@ impl SymbolTableBuilder {
                                     self.leave_scope();
                                 }
                             }
-                            ast::EnumPart::EnumVariableDefinition(def) => {
+                            EnumPart::EnumVariableDefinition(def) => {
                                 let mut ref_type: Vec<CType> = Vec::new();
                                 if let Some(tys) = &def.tys {
                                     for ty in tys {
@@ -312,7 +312,7 @@ impl SymbolTableBuilder {
                     self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
 
-                ast::SourceUnitPart::StructDefinition(def) => {
+                SourceUnitPart::StructDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute)?;
                     for generic in &def.generics {
@@ -332,7 +332,7 @@ impl SymbolTableBuilder {
                     }
                     for part in &def.parts {
                         match part {
-                            ast::StructPart::StructVariableDefinition(def) => {
+                            StructPart::StructVariableDefinition(def) => {
                                 self.register_name(&def.name.name, def.ty.get_type(&self.tables), SymbolUsage::Attribute)?;
                             }
                             _ => {}
@@ -340,7 +340,7 @@ impl SymbolTableBuilder {
                     }
                     for part in &def.parts {
                         match part {
-                            ast::StructPart::FunctionDefinition(def) => {
+                            StructPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables);
                                     self.register_name(&name.name, tt, SymbolUsage::Attribute)?;
@@ -370,11 +370,11 @@ impl SymbolTableBuilder {
                         self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned)?;
                     }
                 }
-                ast::SourceUnitPart::ImportDirective(def) => {
+                SourceUnitPart::ImportDirective(def) => {
                     //处理文件各项内容时，不需要处理import， import在扫描文件顶层symbol的时候已处理;
                 }
-                ast::SourceUnitPart::ConstDefinition(def) => {}
-                ast::SourceUnitPart::FunctionDefinition(def) => {
+                SourceUnitPart::ConstDefinition(def) => {}
+                SourceUnitPart::FunctionDefinition(def) => {
                     if let Some(name) = &def.name {
                         if let Some(expression) = &def.as_ref().returns {
                             self.scan_expression(expression, &ExpressionContext::Load)?;
@@ -386,7 +386,7 @@ impl SymbolTableBuilder {
                         self.leave_scope();
                     }
                 }
-                ast::SourceUnitPart::BoundDefinition(def) => {
+                SourceUnitPart::BoundDefinition(def) => {
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute)?;
                     for generic in &def.generics {
@@ -435,6 +435,7 @@ impl SymbolTableBuilder {
         self.leave_scope();
         Ok(())
     }
+
     pub fn insert_builtin_symbol(&mut self) {
         let types = get_builtin_type();
         for t in types.iter() {
@@ -443,19 +444,19 @@ impl SymbolTableBuilder {
     }
 
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
-    pub fn scan_top_symbol_types(&mut self, program: &ast::SourceUnit, in_import: bool) -> SymbolTableResult {
+    pub fn scan_top_symbol_types(&mut self, program: &SourceUnit, in_import: bool) -> SymbolTableResult {
         for part in &program.0 {
             match part {
-                ast::SourceUnitPart::DataDefinition(def) => {
+                SourceUnitPart::DataDefinition(def) => {
                     //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
-                ast::SourceUnitPart::EnumDefinition(def) => {
+                SourceUnitPart::EnumDefinition(def) => {
                     self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
-                ast::SourceUnitPart::StructDefinition(def) => {
+                SourceUnitPart::StructDefinition(def) => {
                     self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
-                ast::SourceUnitPart::ImportDirective(def) => {
+                SourceUnitPart::ImportDirective(def) => {
                     if !in_import {
                         match def {
                             Import::Plain(mod_path, all) => {
@@ -466,14 +467,14 @@ impl SymbolTableBuilder {
                         }
                     }
                 }
-                ast::SourceUnitPart::ConstDefinition(def) => {}
-                ast::SourceUnitPart::FunctionDefinition(def) => {
+                SourceUnitPart::ConstDefinition(def) => {}
+                SourceUnitPart::FunctionDefinition(def) => {
                     let ty = def.get_type(&self.tables);
                     if let Some(name) = &def.name {
                         self.register_name(&name.name, ty, SymbolUsage::Assigned)?;
                     }
                 }
-                ast::SourceUnitPart::BoundDefinition(def) => {
+                SourceUnitPart::BoundDefinition(def) => {
                     let ty = def.get_type(&self.tables);
                     self.register_name(&def.name.name, ty, SymbolUsage::Assigned)?;
                 }
@@ -521,7 +522,7 @@ impl SymbolTableBuilder {
         }
         return false;
     }
-    fn scan_statement(&mut self, statement: &ast::Statement) -> SymbolTableResult {
+    fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
         trace!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
@@ -686,7 +687,7 @@ impl SymbolTableBuilder {
                         }
                     }
                 }
-            } else if let Variable(ident) = name.as_ref() {
+            } else if let Expression::Variable(ident) = name.as_ref() {
                 if let CType::Reference(_, tys) = item_ty {
                     if args.len() == tys.len() {
                         for i in 0..args.len() {
@@ -740,7 +741,7 @@ impl SymbolTableBuilder {
     }
     fn scan_expressions(
         &mut self,
-        expressions: &[ast::Expression],
+        expressions: &[Expression],
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         for expression in expressions {
@@ -751,11 +752,10 @@ impl SymbolTableBuilder {
 
     fn scan_expression(
         &mut self,
-        expression: &ast::Expression,
+        expression: &Expression,
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
-        use ast::Identifier;
         match &expression {
             Subscript(loc, a, b) => {
                 self.scan_expression(a, context)?;
@@ -946,7 +946,7 @@ impl SymbolTableBuilder {
     fn enter_function(
         &mut self,
         name: &String,
-        args: &Vec<(Loc, Option<ast::Parameter>)>,
+        args: &Vec<(Loc, Option<Parameter>)>,
         line_number: usize,
     ) -> SymbolTableResult {
         self.enter_scope(name, SymbolTableType::Function, line_number);
