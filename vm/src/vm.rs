@@ -1,4 +1,4 @@
-//! 虚拟机指令执行
+//! 执行指令的虚拟机
 //!
 
 use std::borrow::Borrow;
@@ -51,11 +51,7 @@ impl fmt::Display for TraceEvent {
     }
 }
 
-/// Sensible default settings.
-
-
 impl VirtualMachine {
-    /// Create a new `VirtualMachine` structure.
     pub fn new() -> VirtualMachine {
         let initialize_parameter = InitParameter::NoInitialize;
         let mut vm = VirtualMachine {
@@ -71,7 +67,7 @@ impl VirtualMachine {
             InitParameter::NoInitialize => {}
             _ => {
                 if self.initialized {
-                    panic!("Double Initialize Error");
+                    panic!("重复初始化");
                 }
                 self.initialized = true;
             }
@@ -92,7 +88,6 @@ impl VirtualMachine {
     }
 
     pub fn run_frame(&mut self, frame: Frame) -> FrameResult {
-        // self.check_recursive_call("")?;
         self.frames.push(Rc::from(frame.clone()));
         let result = frame.run(self);
         self.frames.pop();
@@ -101,11 +96,6 @@ impl VirtualMachine {
 
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
         None
-        // if self.frames.borrow().len() > self.recursion_limit.get() {
-        //     Err(self.new_recursion_error(format!("maximum recursion depth exceeded {}", _where)))
-        // } else {
-        //     Ok(())
-        // }
     }
     pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
         match obj {
@@ -813,10 +803,4 @@ impl Default for VirtualMachine {
     fn default() -> Self {
         VirtualMachine::new()
     }
-}
-
-static REPR_GUARDS: Lazy<Mutex<HashSet<usize>>> = Lazy::new(Mutex::default);
-
-pub struct ReprGuard {
-    id: usize,
 }

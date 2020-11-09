@@ -20,9 +20,7 @@ use crate::util::change_to_primitive_type;
 
 #[derive(Clone, Debug)]
 struct Block {
-    /// The type of block.
     typ: BlockType,
-    /// The level of the value stack when the block was entered.
     level: usize,
 }
 
@@ -36,37 +34,27 @@ enum BlockType {
 
 pub type FrameRef = Rc<Frame>;
 
-/// The reason why we might be unwinding a block.
-/// This could be return of function, exception being
-/// raised, a break or continue being hit, etc..
+/// break，continue处理
 #[derive(Clone, Debug)]
 enum UnwindReason {
-    /// We are returning a value from a return statement.
-    // Returning { value: CodeObject },
-
-    // NoWorries,
-    /// We are unwinding blocks, since we hit break
     Break,
-
-    /// We are unwinding blocks since we hit a continue statements.
     Continue,
 }
 
 #[derive(Clone)]
 pub struct Frame {
     pub code: CodeObject,
-    // We need 1 stack per frame
-    /// The main data frame of the stack machine
+    /// 数据栈
     stack: RefCell<Vec<Value>>,
-    /// Block frames, for controlling loops and exceptions
+    /// 循环块等
     blocks: RefCell<Vec<Block>>,
-    /// Variables
+    /// 变量
     pub scope: Scope,
-    /// index of last instruction ran
+    /// PC计数
     pub lasti: Cell<usize>,
 }
 
-// Running a frame can result in one of the below:
+// 栈处理结果
 pub enum ExecutionResult {
     Return(Value),
     Yield(Value),
@@ -74,71 +62,19 @@ pub enum ExecutionResult {
 }
 
 pub type FrameResult = Option<ExecutionResult>;
-
-// impl ExecutionResult {
-//     /// Extract an ExecutionResult from a PanResult returned from e.g. gen.__next__() or gen.send()
-//     pub fn from_result(vm: &VirtualMachine, res: PanResult) -> PanResult<Self> {
-//         match res {
-//             Ok(val) => Ok(ExecutionResult::Yield(val)),
-//             Err(err) => {
-//                 if objtype::isinstance(&err, &vm.ctx.exceptions.stop_iteration) {
-//                     objiter::stop_iter_value(vm, &err).map(ExecutionResult::Return)
-//                 } else {
-//                     Err(err)
-//                 }
-//             }
-//         }
-//     }
-//
-//     /// Turn an ExecutionResult into a PanResult that would be returned from a generator or coroutine
-//     pub fn into_result(self, vm: &VirtualMachine) -> PanResult {
-//         match self {
-//             ExecutionResult::Yield(value) => Ok(value),
-//             ExecutionResult::Return(value) => {
-//                 let stop_iteration = vm.ctx.exceptions.stop_iteration.clone();
-//                 let args = if vm.is_none(&value) {
-//                     vec![]
-//                 } else {
-//                     vec![value]
-//                 };
-//                 Err(vm.new_exception(stop_iteration, args))
-//             }
-//         }
-//     }
-// }
-
-/// A valid execution result, or an exception
-// pub type FrameResult = PanResult<Option<ExecutionResult>>;
-
 impl Frame {
     pub fn new(code: CodeObject, scope: Scope) -> Frame {
-        //populate the globals and locals
-        //TODO: This is wrong, check https://github.com/nedbat/byterun/blob/31e6c4a8212c35b5157919abff43a7daa0f377c6/byterun/pyvm2.py#L95
-        /*
-        let globals = match globals {
-            Some(g) => g,
-            None => HashMap::new(),
-        };
-        */
-        // let locals = globals;
-        // locals.extend(callargs);
-
         Frame {
             code,
             stack: RefCell::new(vec![]),
             blocks: RefCell::new(vec![]),
-            // save the callargs as locals
-            // globals: locals.clone(),
             scope,
             lasti: Cell::new(0),
         }
     }
 
-    // #[cfg_attr(feature = "flame-it", flame("Frame"))]
     pub fn run(&self, vm: &mut VirtualMachine) -> FrameResult {
-        // Execute until return or exception:
         loop {
-            // let lineno = self.get_lineno();
             let result = self.execute_instruction(vm);
             match result {
                 None => {}
@@ -156,30 +92,16 @@ impl Frame {
         ins2
     }
 
-    /// Execute a single instruction.
+    /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
-        //  vm.check_signals()?;
         let instruction = self.fetch_instruction();
         //println!("instruction is:{:?}", instruction);
-        #[cfg(feature = "vm-tracing-logging")]
-            {
-                trace!("=======");
-                /* TODO:
-                for frame in self.frames.iter() {
-                    trace!("  {:?}", frame);
-                }
-                */
-                trace!("  {:?}", self);
-                trace!("  Executing op code: {:?}", instruction);
-                trace!("=======");
-            }
         match instruction {
             bytecode::Instruction::LoadConst(ref value) => {
                 let obj = vm.unwrap_constant(value);
                 self.push_value(obj);
                 None
             }
-
             bytecode::Instruction::LoadName(
                 ref name,
                 ref scope,
@@ -188,31 +110,20 @@ impl Frame {
                 ref name,
                 ref scope,
             ) => self.store_name(vm, name, scope),
-            //  bytecode::Instruction::DeleteName { ref name } => self.delete_name(vm, name),
             bytecode::Instruction::Subscript => self.execute_subscript(vm),
             bytecode::Instruction::StoreSubscript => self.execute_store_subscript(vm),
             bytecode::Instruction::DeleteSubscript => self.execute_delete_subscript(vm),
             bytecode::Instruction::Pop => {
-                // Pop value from stack and ignore.
                 self.pop_value();
                 None
             }
             bytecode::Instruction::Duplicate => {
-                // Duplicate top of stack
                 let value = self.pop_value();
                 self.push_value(value.clone());
                 self.push_value(value);
                 None
             }
-            // bytecode::Instruction::Rotate { amount } => self.execute_rotate(*amount),
             bytecode::Instruction::BuildString(size) => {
-                // let s = self
-                //     .pop_multiple(*size)
-                //     .into_iter()
-                //     .map(|pyobj| objstr::clone_value(&pyobj))
-                //     .collect::<String>();
-                // let str_obj = Value::Str(s);
-                // self.push_value(str_obj);
                 None
             }
             bytecode::Instruction::BuildList(size, unpack) => {
@@ -245,26 +156,6 @@ impl Frame {
                 self.build_struct(vm, *size);
                 None
             }
-            // bytecode::Instruction::BuildSlice { size } => self.execute_build_slice(vm, *size),
-            // bytecode::Instruction::ListAppend { i } => {
-            //     let list_obj = self.nth_value(*i);
-            //     let item = self.pop_value();
-            //     objlist::PyListRef::try_from_object(vm, list_obj)?.append(item);
-            //     None
-            // }
-            // bytecode::Instruction::SetAdd { i } => {
-            //     let set_obj = self.nth_value(*i);
-            //     let item = self.pop_value();
-            //     vm.call_method(&set_obj, "add", vec![item])?;
-            //     None
-            // }
-            // bytecode::Instruction::MapAdd { i } => {
-            //     let dict_obj = self.nth_value(*i + 1);
-            //     let key = self.pop_value();
-            //     let value = self.pop_value();
-            //     vm.call_method(&dict_obj, "__setitem__", vec![key, value])?;
-            //     None
-            // }
             bytecode::Instruction::BinaryOperation(ref op, inplace) => {
                 self.execute_binop(vm, op, *inplace)
             }
@@ -276,17 +167,10 @@ impl Frame {
             bytecode::Instruction::ReturnValue => {
                 let value = self.pop_value();
                 Some(ExecutionResult::Return(value))
-                // self.unwind_blocks(vm, UnwindReason::Returning { value })
             }
             bytecode::Instruction::Ignore => {
                 Some(ExecutionResult::Ignore)
-                // self.unwind_blocks(vm, UnwindReason::Returning { value })
             }
-            // bytecode::Instruction::YieldValue => {
-            //     let value = self.pop_value();
-            //     Ok(Some(ExecutionResult::Yield(value)))
-            // }
-            // bytecode::Instruction::YieldFrom => self.execute_yield_from(vm),
             bytecode::Instruction::SetupLoop(start, end) => {
                 self.push_block(BlockType::Loop {
                     start: *start,
@@ -302,19 +186,6 @@ impl Frame {
                 self.continue_break(UnwindReason::Break);
                 None
             }
-            // bytecode::Instruction::BeforeAsyncWith => {
-            //     let mgr = self.pop_value();
-            //     let aexit = vm.get_attribute(mgr.clone(), "__aexit__")?;
-            //     self.push_value(aexit);
-            //     let aenter_res = vm.call_method(&mgr, "__aenter__", vec![])?;
-            //     self.push_value(aenter_res);
-            //
-            //     None
-            // }
-            // bytecode::Instruction::SetupAsyncWith { end } => {
-            //     self.push_block(BlockType::Finally { handler: *end });
-            //     None
-            // }
             bytecode::Instruction::PopBlock => {
                 self.pop_block();
                 None
@@ -331,35 +202,6 @@ impl Frame {
                 } else {
                     self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), Value::Bool(false)));
                 }
-                None
-            }
-            bytecode::Instruction::GetAwaitable => {
-                // let awaited_obj = self.pop_value();
-                // let awaitable = if awaited_obj.payload_is::<PyCoroutine>() {
-                //     awaited_obj
-                // } else {
-                //     let await_method =
-                //         vm.get_method_or_type_error(awaited_obj.clone(), "__await__", || {
-                //             format!(
-                //                 "object {} can't be used in 'await' expression",
-                //                 awaited_obj.class().name,
-                //             )
-                //         })?;
-                //     vm.invoke(&await_method, vec![])?
-                // };
-                // self.push_value(awaitable);
-                None
-            }
-
-            bytecode::Instruction::GetANext => {
-                // let aiter = self.last_value();
-                // let awaitable = vm.call_method(&aiter, "__anext__", vec![])?;
-                // let awaitable = if awaitable.payload_is::<PyCoroutine>() {
-                //     awaitable
-                // } else {
-                //     vm.call_method(&awaitable, "__await__", vec![])?
-                // };
-                // self.push_value(awaitable);
                 None
             }
             bytecode::Instruction::ForIter(target) => self.execute_for_iter(vm, *target),
@@ -410,10 +252,8 @@ impl Frame {
             }
 
             bytecode::Instruction::Match => {
-                //TOTO match 不是简单的值比较，应该类型匹配即可
                 let a = self.pop_value();
                 let b = self.last_value();
-                // println!("a:{:?},b:{:?}", a, b);
                 if let Value::Obj(_) = b {
                     let (matched, values) = vm._match(b, a);
                     for i in values {
@@ -426,20 +266,6 @@ impl Frame {
 
                 None
             }
-
-            // bytecode::Instruction::Break => self.unwind_blocks(vm, UnwindReason::Break),
-            // bytecode::Instruction::Continue => self.unwind_blocks(vm, UnwindReason::Continue),
-            // bytecode::Instruction::PrintExpr => {
-            //     let expr = self.pop_value();
-            //     if !expr.is(&vm.get_none()) {
-            //         let repr = vm.to_repr(&expr)?;
-            //         // TODO: implement sys.displayhook
-            //         if let Ok(ref print) = vm.get_attribute(vm.builtins.clone(), "print") {
-            //             vm.invoke(print, vec![repr.into_object()])?;
-            //         }
-            //     }
-            //     None
-            // }
             bytecode::Instruction::LoadBuildStruct => {
                 self.excute_make_struct_instance(vm);
                 None
@@ -447,7 +273,6 @@ impl Frame {
 
             bytecode::Instruction::LoadBuildEnum(count) => {
                 self.excute_make_enum_instance(vm, *count);
-                // self.push_value(vm.get_attribute(vm.builtins.clone(), "__build_class__")?);
                 None
             }
 
@@ -456,42 +281,6 @@ impl Frame {
                 vm.run_code_obj(value.code(), self.scope.clone());
                 None
             }
-            // bytecode::Instruction::UnpackSequence { size } => {
-            //     let value = self.pop_value();
-            //     let elements = vm.extract_elements(&value)?;
-            //     if elements.len() != *size {
-            //         Err(vm.new_value_error("Wrong number of values to unpack".to_owned()))
-            //     } else {
-            //         for element in elements.into_iter().rev() {
-            //             self.push_value(element);
-            //         }
-            //         None
-            //     }
-            // }
-            // bytecode::Instruction::UnpackEx { before, after } => {
-            //     self.execute_unpack_ex(vm, *before, *after)
-            // }
-            // bytecode::Instruction::FormatValue { conversion } => {
-            //     use bytecode::ConversionFlag::*;
-            //     let value = match conversion {
-            //         Some(Str) => vm.to_str(&self.pop_value())?.into_object(),
-            //         Some(Repr) => vm.to_repr(&self.pop_value())?.into_object(),
-            //         Some(Ascii) => vm.to_ascii(&self.pop_value())?,
-            //         None => self.pop_value(),
-            //     };
-            //
-            //     let spec = vm.to_str(&self.pop_value())?.into_object();
-            //     let formatted = vm.call_method(&value, "__format__", vec![spec])?;
-            //     self.push_value(formatted);
-            //     None
-            // }
-
-            // bytecode::Instruction::Reverse { amount } => {
-            //     let mut stack = self.stack.borrow_mut();
-            //     let stack_len = stack.len();
-            //     stack[stack_len - amount..stack_len].reverse();
-            //     None
-            // }
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());
                 None
@@ -526,8 +315,6 @@ impl Frame {
         None
     }
 
-
-    // #[cfg_attr(feature = "flame-it", flame("Frame"))]
     fn get_elements(
         &self,
         vm: &VirtualMachine,
@@ -537,85 +324,6 @@ impl Frame {
         let elements = self.pop_multiple(size);
         Value::new_array_obj(elements)
     }
-
-    #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    fn import(
-        &self,
-        vm: &VirtualMachine,
-        module: &Option<String>,
-        symbols: &[String],
-        level: usize,
-    ) -> FrameResult {
-        let module = module.clone().unwrap_or_default();
-        // let module = vm.import(&module, symbols, level)?;
-
-        // self.push_value(module);
-        None
-    }
-
-// #[cfg_attr(feature = "flame-it", flame("Frame"))]
-// fn import_from(&self, vm: &VirtualMachine, name: &str) -> FrameResult {
-//     let module = self.last_value();
-//     // Load attribute, and transform any error into import error.
-//     let obj = vm
-//         .get_attribute(module, name)
-//         .map_err(|_| vm.new_import_error(format!("cannot import name '{}'", name)))?;
-//     self.push_value(obj);
-//     None
-// }
-
-// #[cfg_attr(feature = "flame-it", flame("Frame"))]
-// fn import_star(&self, vm: &VirtualMachine) -> FrameResult {
-//     let module = self.pop_value();
-//
-//     // Grab all the names from the module and put them in the context
-//     if let Some(dict) = &module.dict {
-//         for (k, v) in &*dict.borrow() {
-//             let k = vm.to_str(&k)?;
-//             let k = k.as_str();
-//             if !k.starts_with('_') {
-//                 self.scope.store_name(&vm, k, v);
-//             }
-//         }
-//     }
-//     None
-// }
-
-    /// Unwind blocks.
-    /// The reason for unwinding gives a hint on what to do when
-    /// unwinding a block.
-    /// Optionally returns an exception.
-// #[cfg_attr(feature = "flame-it", flame("Frame"))]
-// fn unwind_blocks(&self, vm: &VirtualMachine, reason: UnwindReason) -> FrameResult {
-//     // First unwind all existing blocks on the block stack:
-//     while let Some(block) = self.current_block() {
-//         match block.typ {
-//             BlockType::Loop { start, end } => match &reason {
-//                 UnwindReason::Break => {
-//                     self.pop_block();
-//                     self.jump(end);
-//                     return None;
-//                 }
-//                 UnwindReason::Continue => {
-//                     self.jump(start);
-//                     return None;
-//                 }
-//                 _ => {
-//                     self.pop_block();
-//                 }
-//             },
-//
-//     }
-//
-//     // We do not have any more blocks to unwind. Inspect the reason we are here:
-//     match reason {
-//         UnwindReason::Raising { exception } => Err(exception),
-//         UnwindReason::Returning { value } => Ok(Some(ExecutionResult::Return(value))),
-//         UnwindReason::Break | UnwindReason::Continue => {
-//             panic!("Internal error: break or continue must occur within a loop block.")
-//         } // UnwindReason::NoWorries => None,
-//     }
-// }
 
     fn store_name(
         &self,
@@ -632,9 +340,6 @@ impl Frame {
             bytecode::NameScope::Local => {
                 self.scope.store_name(name.to_string(), obj);
             }
-            // bytecode::NameScope::Free => {
-            //     self.scope.store_global(name.to_string(), obj);
-            // }
         }
         None
     }
@@ -647,11 +352,9 @@ impl Frame {
         name: &str,
         name_scope: &bytecode::NameScope,
     ) -> FrameResult {
-        // let optional_value = self.scope.load_global(name.to_string());
         let optional_value = match name_scope {
             bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
             bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
-            // bytecode::NameScope::Free => self.scope.load_name(name.to_string()),
         };
 
         let value = match optional_value {
@@ -664,30 +367,6 @@ impl Frame {
         self.push_value(value.clone());
         None
     }
-
-// fn execute_rotate(&self, amount: usize) -> FrameResult {
-//     // Shuffles top of stack amount down
-//     if amount < 2 {
-//         panic!("Can only rotate two or more values");
-//     }
-//
-//     let mut values = Vec::new();
-//
-//     // Pop all values from stack:
-//     for _ in 0..amount {
-//         values.push(self.pop_value());
-//     }
-//
-//     // Push top of stack back first:
-//     self.push_value(values.remove(0));
-//
-//     // Push other value back in order:
-//     values.reverse();
-//     for value in values {
-//         self.push_value(value);
-//     }
-//     None
-// }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let subscript = self.pop_value();
@@ -708,11 +387,9 @@ impl Frame {
     fn execute_delete_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let idx = self.pop_value();
         let obj = self.pop_value();
-        // obj.del_item(&idx, vm)?;
         None
     }
 
-    // #[allow(clippy::collapsible_if)]
     fn execute_build_map(
         &self,
         vm: &VirtualMachine,
@@ -722,58 +399,12 @@ impl Frame {
     ) -> FrameResult {
         let mut hash_map: HashMap<String, Value> = HashMap::new();
         let mut map_obj = Value::new_map_obj(hash_map);
-        // if unpack {
-        //     for obj in self.pop_multiple(size) {
-        //         // Take all key-value pairs from the dict:
-        //         let dict: PyDictRef = obj.downcast().expect("Need a dictionary to build a map.");
-        //         for (key, value) in dict {
-        //             if for_call {
-        //                 if map_obj.contains_key(&key, vm) {
-        //                     let key_repr = vm.to_repr(&key)?;
-        //                     let msg = format!(
-        //                         "got multiple values for keyword argument {}",
-        //                         key_repr.as_str()
-        //                     );
-        //                     return Err(vm.new_type_error(msg));
-        //                 }
-        //             }
-        //             map_obj.set_item(&key, value, vm).unwrap();
-        //         }
-        //     }
-        // } else {
-        //     for (key, value) in self.pop_multiple(2 * size).into_iter().tuples() {
-        //         map_obj.set_item(&key, value, vm).unwrap();
-        //     }
-        // }
-
         for (key, value) in self.pop_multiple(2 * size).into_iter().tuples() {
             vm.set_item(&map_obj, key, value);
         }
-
         self.push_value(map_obj);
         None
     }
-
-// fn execute_build_slice(&self, vm: &VirtualMachine, size: usize) -> FrameResult {
-//     assert!(size == 2 || size == 3);
-//
-//     let step = if size == 3 {
-//         Some(self.pop_value())
-//     } else {
-//         None
-//     };
-//     let stop = self.pop_value();
-//     let start = self.pop_value();
-//
-//     let obj = PySlice {
-//         start: Some(start),
-//         stop,
-//         step,
-//     }
-//         .into_ref(vm);
-//     self.push_value(obj.into_object());
-//     None
-// }
 
     fn execute_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
         let mut named_call = false;
@@ -791,41 +422,6 @@ impl Frame {
             }
             _ => { vec![Value::Nil] }
         };
-        //     bytecode::CallType::Keyword(count) => {
-        //         // let kwarg_names = self.pop_value();
-        //         // let args: Vec<CodeObject> = self.pop_multiple(*count);
-        //
-        //         // let kwarg_names = vm
-        //         //     .extract_elements(&kwarg_names)?
-        //         //     .iter()
-        //         //     .map(|pyobj| objstr::clone_value(pyobj))
-        //         //     .collect();
-        //         // PyFuncArgs::new(args, kwarg_names)
-        //     }
-        //     bytecode::CallType::Ex(has_kwargs) => {
-        //         // let kwargs = if *has_kwargs {
-        //         //     let kw_dict: PyDictRef =
-        //         //         self.pop_value().downcast().expect("Kwargs must be a dict.");
-        //         //     let mut kwargs = IndexMap::new();
-        //         //     for (key, value) in kw_dict.into_iter() {
-        //         //         if let Some(key) = key.payload_if_subclass::<objstr::PyString>(vm) {
-        //         //             kwargs.insert(key.as_str().to_owned(), value);
-        //         //         } else {
-        //         //             return Err(vm.new_type_error("keywords must be strings".to_owned()));
-        //         //         }
-        //         //     }
-        //         //     kwargs
-        //         // } else {
-        //         //     IndexMap::new()
-        //         // };
-        //         // let args = self.pop_value();
-        //         // let args = vm.extract_elements(&args)?;
-        //         // PyFuncArgs { args, kwargs }
-        //     }
-        // };
-
-        // Call function:
-        // let args = self.pop_value();
         let func_ref = self.pop_value();
         // println!("func_ref:{:?},",func_ref);
         let code = func_ref.code();
@@ -872,95 +468,19 @@ impl Frame {
         None
     }
 
-// fn _send(&self, coro: CodeObject, val: CodeObject, vm: &VirtualMachine) -> PanResult {
-//     // if let Some(gen) = coro.payload::<PyGenerator>() {
-//     //     gen.send(val, vm)
-//     // } else if let Some(coro) = coro.payload::<PyCoroutine>() {
-//     //     coro.send(val, vm)
-//     // } else if vm.is_none(&val) {
-//     //     objiter::call_next(vm, &coro)
-//     // } else {
-//     //     vm.call_method(&coro, "send", vec![val])
-//     // }
-// }
-
-// fn execute_yield_from(&self, vm: &VirtualMachine) -> FrameResult {
-// Value send into iterator:
-// let val = self.pop_value();
-//
-// let coro = self.last_value();
-//
-// let result = self._send(coro, val, vm);
-//
-// let result = ExecutionResult::from_result(vm, result)?;
-//
-// match result {
-//     ExecutionResult::Yield(value) => {
-//         // Set back program counter:
-//         self.lasti.set(self.lasti.get() - 1);
-//         Ok(Some(ExecutionResult::Yield(value)))
-//     }
-//     ExecutionResult::Return(value) => {
-//         self.pop_value();
-//         self.push_value(value);
-//         None
-//     }
-// }
-//    }
-
-    fn execute_unpack_ex(&self, vm: &VirtualMachine, before: usize, after: usize) -> FrameResult {
-        // let value = self.pop_value();
-        // let elements = vm.extract_elements::<CodeObject>(&value)?;
-        // let min_expected = before + after;
-        // if elements.len() < min_expected {
-        //     Err(vm.new_value_error(format!(
-        //         "Not enough values to unpack (expected at least {}, got {}",
-        //         min_expected,
-        //         elements.len()
-        //     )))
-        // } else {
-        //     let middle = elements.len() - before - after;
-        //
-        //     // Elements on stack from right-to-left:
-        //     for element in elements[before + middle..].iter().rev() {
-        //         self.push_value(element.clone());
-        //     }
-        //
-        //     let middle_elements = elements.iter().skip(before).take(middle).cloned().collect();
-        //     let t = vm.ctx.new_list(middle_elements);
-        //     self.push_value(t);
-        //
-        //     // Lastly the first reversed values:
-        //     for element in elements[..before].iter().rev() {
-        //         self.push_value(element.clone());
-        //     }
-        //
-        //     None
-        // }
-        None
-    }
-
     fn jump(&self, label: bytecode::Label) {
         let target_pc = self.code.label_map[&label];
-        #[cfg(feature = "vm-tracing-logging")]
-        trace!("jump from {:?} to {:?}", self.lasti, target_pc);
         self.lasti.set(target_pc);
     }
 
     fn build_struct(&self, vm: &VirtualMachine, size: usize) -> FrameResult {
-        // let name = self.pop_value();
-        // let ty = self.pop_value();
-        // let type_value = TypeValue { name: name.name(), methods: vec![ty.code()], static_fields: vec![] };
-        // self.push_value(Value::Type(type_value));
         None
     }
 
-    /// The top of stack contains the iterator, lets push it forward
     fn execute_for_iter(&self, vm: &VirtualMachine, target: bytecode::Label) -> FrameResult {
         let top_of_stack = self.last_value();
         let next_obj = vm.get_next_iter(top_of_stack);
 
-        // Check the next object:
         if Value::Nil != next_obj {
             self.push_value(next_obj);
             None
@@ -974,54 +494,7 @@ impl Frame {
     fn execute_make_function(&self, vm: &VirtualMachine) -> FrameResult {
         let qualified_name = self.pop_value();
         let code_obj = self.pop_value();
-
-        // let flags = code_obj.flags;
-
-        // let annotations = if flags.contains(bytecode::CodeFlags::HAS_ANNOTATIONS) {
-        //     self.pop_value()
-        // } else {
-        //     vm.ctx.new_dict().into_object()
-        // };
-        //
-        // let kw_only_defaults = if flags.contains(bytecode::CodeFlags::HAS_KW_ONLY_DEFAULTS) {
-        //     Some(
-        //         self.pop_value()
-        //             .downcast::<PyDict>()
-        //             .expect("Stack value for keyword only defaults expected to be a dict"),
-        //     )
-        // } else {
-        //     None
-        // };
-        //
-        // let defaults = if flags.contains(bytecode::CodeFlags::HAS_DEFAULTS) {
-        //     Some(
-        //         self.pop_value()
-        //             .downcast::<PyTuple>()
-        //             .expect("Stack value for defaults expected to be a tuple"),
-        //     )
-        // } else {
-        //     None
-        // };
-
-        // pop argc arguments
-        // argument: name, args, globals
-
         let func = FnValue { name: qualified_name.name(), code: code_obj.code(), has_return: true };
-        // let func_obj = vm
-        //     .ctx
-        //     .new_pyfunction(code_obj, scope, defaults, kw_only_defaults);
-        //
-        // let name = qualified_name.as_str().split('.').next_back().unwrap();
-        // vm.set_attr(&func_obj, "__name__", vm.new_str(name.to_owned()))?;
-        // vm.set_attr(&func_obj, "__qualname__", qualified_name)?;
-        // let module = self
-        //     .scope
-        //     .globals
-        //     .get_item_option("__name__", vm)?
-        //     .unwrap_or_else(|| vm.get_none());
-        // vm.set_attr(&func_obj, "__module__", module)?;
-        // vm.set_attr(&func_obj, "__annotations__", annotations)?;
-
         self.push_value(Value::Fn(func));
         None
     }
@@ -1045,7 +518,6 @@ impl Frame {
         }
 
         let v = Value::new_enum_obj(typ, fields, item_name);
-        //  let func = Obj { name: qualified_name.name(), code: code_obj.code(), has_return: true };
         self.push_value(v);
         None
     }
@@ -1106,63 +578,6 @@ impl Frame {
         None
     }
 
-// fn _id(&self, a: CodeObject) -> usize {
-//     a.get_id()
-// }
-
-// fn _in(
-//     &self,
-//     vm: &VirtualMachine,
-//     needle: CodeObject,
-//     haystack: CodeObject,
-// ) -> PanResult<bool> {
-//     // let found = vm._membership(haystack.clone(), needle)?;
-//     // Ok(objbool::boolval(vm, found)?)
-// }
-
-// fn _not_in(
-//     &self,
-//     vm: &VirtualMachine,
-//     needle: CodeObject,
-//     haystack: CodeObject,
-// ) -> PanResult<bool> {
-//     // let found = vm._membership(haystack.clone(), needle)?;
-//     // Ok(!objbool::boolval(vm, found)?)
-// }
-
-// fn _is(&self, a: CodeObject, b: CodeObject) -> bool {
-//     // Pointer equal:
-//     true
-//     // a.is(&b)
-// }
-//
-// fn _is_not(&self, a: CodeObject, b: CodeObject) -> bool {
-//
-//     // !a.is(&b)
-//     false
-// }
-
-// fn exc_match(
-//     &self,
-//     vm: &VirtualMachine,
-//     exc: CodeObject,
-//     exc_type: CodeObject,
-// ) -> bool {
-//     // single_or_tuple_any(
-//     //     exc_type,
-//     //     |cls: PanClassRef| vm.isinstance(&exc, &cls),
-//     //     |o| {
-//     //         format!(
-//     //             "isinstance() arg 2 must be a type or tuple of types, not {}",
-//     //             o.class()
-//     //         )
-//     //     },
-//     //     vm,
-//     // )
-//
-//     false
-// }
-
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     fn execute_compare(
         &self,
@@ -1178,12 +593,6 @@ impl Frame {
             bytecode::ComparisonOperator::LessOrEqual => vm._le(a, b),
             bytecode::ComparisonOperator::Greater => vm._gt(a, b),
             bytecode::ComparisonOperator::GreaterOrEqual => vm._ge(a, b),
-            // bytecode::ComparisonOperator::Is => vm._is(a, b)?;
-            // bytecode::ComparisonOperator::Is => vm.new_bool(self._is(a, b)),
-            // bytecode::ComparisonOperator::IsNot => vm.new_bool(self._is_not(a, b)),
-            // bytecode::ComparisonOperator::In => vm.new_bool(self._in(vm, a, b)?),
-            // bytecode::ComparisonOperator::NotIn => vm.new_bool(self._not_in(vm, a, b)?),
-            //     bytecode::ComparisonOperator::ExceptionMatch => vm.new_bool(self.exc_match(vm, a, b)?),
             _ => unreachable!()
         };
 
@@ -1195,7 +604,7 @@ impl Frame {
         let parent = self.last_value();
         let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
 
-        //true 是struct方法， false 为属性
+        //true 是struct方法， false 为字段
         if !obj.0 {
             self.pop_value();
         }
@@ -1212,8 +621,6 @@ impl Frame {
 
     fn delete_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let parent = self.pop_value();
-        //  let name = vm.ctx.new_str(attr_name.to_owned());
-        //  vm.del_attr(&parent, name)?;
         None
     }
 
@@ -1233,7 +640,7 @@ impl Frame {
             .blocks
             .borrow_mut()
             .pop()
-            .expect("No more blocks to pop!");
+            .expect("没有块可弹出!");
         self.stack.borrow_mut().truncate(block.level);
         block
     }
@@ -1250,7 +657,7 @@ impl Frame {
         self.stack
             .borrow_mut()
             .pop()
-            .expect("Tried to pop value but there was nothing on the stack")
+            .expect("栈中没有数据")
     }
 
     fn pop_multiple(&self, count: usize) -> Vec<Value> {
@@ -1276,12 +683,7 @@ impl fmt::Debug for Frame {
             .borrow()
             .iter()
             .map(|elem| {
-// if elem.payload.as_any().is::<Frame>() {
-//     "\n  > {frame}".to_owned()
-// } else {
-//     format!("\n  > {:?}", elem)
-// }
-                "ssss"
+               elem.to_string()
             })
             .collect::<String>();
         let block_str = self
@@ -1297,7 +699,7 @@ impl fmt::Debug for Frame {
             .collect::<String>();
         write!(
             f,
-            "Frame Object {{ \n Stack:{}\n Blocks:{}\n Locals:{}\n}}",
+            "栈中有 {{ \n 数据栈:{}\n 块:{}\n 局部变量:{}\n}}",
             stack_str, block_str, local_str
         )
     }

@@ -1,6 +1,6 @@
 use pan_bytecode::value::*;
 use num_traits::ToPrimitive;
-
+//得用宏来写这些代码
 pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
     return match value {
         Value::I8(v) => {
