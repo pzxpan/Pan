@@ -2,7 +2,6 @@ use std::error::Error;
 use std::fmt;
 
 use pan_parser::ast::Loc;
-use pan_parser::lexer::Token;
 use pan_parser::diagnostics::ErrorType;
 
 #[derive(Debug)]
@@ -41,7 +40,7 @@ impl fmt::Display for CompileError {
         let error_desc = match &self.error {
             CompileErrorType::Assign(target) => format!("无法赋值 {}", target),
             CompileErrorType::Delete(target) => format!("无法删除 {}", target),
-            CompileErrorType::Parse(err) => "".to_string(),
+            CompileErrorType::Parse(_) => "".to_string(),
             CompileErrorType::SyntaxError(err) => err.to_string(),
 
             CompileErrorType::InvalidBreak => "break不在循环块中".to_owned(),

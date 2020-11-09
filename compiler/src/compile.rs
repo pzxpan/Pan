@@ -1,11 +1,6 @@
-use num_bigint::BigInt;
-use num_traits::FromPrimitive;
 use log::*;
 use std::borrow::Borrow;
-use itertools::Itertools;
-use num_complex::Complex64;
-
-use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, CodeFlags};
+use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope};
 use pan_bytecode::value::*;
 use pan_parser::ast::Loc;
 use pan_parser::diagnostics::ErrorType;
@@ -36,7 +31,6 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
     ctx: CompileContext,
     optimize: u8,
     lambda_name: String,
-    is_import: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -142,7 +136,6 @@ impl<O: OutputStream> Compiler<O> {
             },
             optimize,
             lambda_name: "".to_string(),
-            is_import: false,
         }
     }
 
@@ -151,14 +144,13 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn push_new_code_object(&mut self, obj_name: String) {
-        let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             Default::default(),
             Vec::new(),
             Varargs::None,
             self.source_path.clone().unwrap(),
             1,
-            self.source_path.clone().unwrap(),
+            obj_name,
         ));
     }
 
@@ -180,18 +172,18 @@ impl<O: OutputStream> Compiler<O> {
 
         for part in &program.0 {
             match part {
-                ast::SourceUnitPart::DataDefinition(def) => {}
+                ast::SourceUnitPart::DataDefinition(_) => {}
                 ast::SourceUnitPart::EnumDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_enum_def(name.as_str(), &body, &generics);
+                    self.compile_enum_def(name.as_str(), &body, &generics)?;
                 }
                 ast::SourceUnitPart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_class_def(name.as_str(), &body, &generics);
+                    self.compile_class_def(name.as_str(), &body, &generics)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {
                     match def {
@@ -201,7 +193,7 @@ impl<O: OutputStream> Compiler<O> {
                         _ => {}
                     }
                 }
-                ast::SourceUnitPart::ConstDefinition(def) => {}
+                ast::SourceUnitPart::ConstDefinition(_) => {}
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
                     if name.eq("main") {
@@ -217,13 +209,13 @@ impl<O: OutputStream> Compiler<O> {
                     let body = &def.body.as_ref().unwrap();
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false);
+                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false)?;
                 }
                 ast::SourceUnitPart::BoundDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_bound_def(name.as_str(), &body, &generics);
+                    self.compile_bound_def(name.as_str(), &body, &generics)?;
                 }
                 _ => (),
             }
@@ -361,21 +353,21 @@ impl<O: OutputStream> Compiler<O> {
             }
 
             For(_, target, iter, end, body) => {
-                self.compile_for(target, iter, end, body.as_ref().unwrap());
+                self.compile_for(target, iter, end, body.as_ref().unwrap())?;
             }
             MultiVariableDefinition(_, decl, expression) => {
                 self.compile_expression(expression)?;
                 self.compile_store_multi_value_def(decl)?;
             }
-            While(loc, expression, body) => {
+            While(_, expression, body) => {
                 self.compile_while(expression, body)?;
             }
-            Match(loc, test, bodies) => {
+            Match(_, test, bodies) => {
                 self.compile_expression(test)?;
                 let end_label = self.new_label();
                 let mut labels = Vec::new();
                 let len = bodies.len();
-                for i in 0..bodies.len() {
+                for _ in 0..len {
                     labels.push(self.new_label());
                 }
                 for (index, expr) in bodies.iter().enumerate() {
@@ -401,7 +393,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_match_item(&mut self, expression: &Expression) -> Result<(), CompileError> {
-        if let Expression::FunctionCall(loc, name, args) = expression {
+        if let Expression::FunctionCall(_, name, _) = expression {
             if let Expression::Attribute(_, _, Some(ident), _) = name.as_ref() {
                 self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
             } else if let Expression::Variable(ident) = name.as_ref() {
@@ -414,7 +406,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn store_match_content(&mut self, expression: &Expression) -> Result<(), CompileError> {
-        if let Expression::FunctionCall(loc, name, args) = expression {
+        if let Expression::FunctionCall(_, _, args) = expression {
             for arg in args.iter() {
                 self.emit(Instruction::StoreName(arg.expr_name(), NameScope::Local));
             }
@@ -425,7 +417,7 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_store_multi_value_def(&mut self, decl: &MultiVariableDeclaration) -> Result<(), CompileError> {
         for (i, parts) in decl.variables.iter().enumerate() {
             self.emit(Instruction::Duplicate);
-            self.compile_store_multi_value_part(i, parts, decl.clone().destruct_ty.borrow());
+            self.compile_store_multi_value_part(i, parts, decl.clone().destruct_ty.borrow())?;
         }
         Ok(())
     }
@@ -460,12 +452,8 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
-    fn compile_delete(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        Ok(())
-    }
-
     fn enter_function(&mut self, name: &str, args: &[ast::Parameter]) -> Result<(), CompileError> {
-        let mut flags = bytecode::CodeFlags::default();
+        let flags = bytecode::CodeFlags::default();
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             flags,
@@ -497,7 +485,7 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_function(name, &a)?;
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
-        let mut code = self.pop_code_object();
+        let code = self.pop_code_object();
         self.leave_scope();
         self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code))));
         self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name)));
@@ -707,7 +695,7 @@ impl<O: OutputStream> Compiler<O> {
                         if *&def.is_static {
                             self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
                         } else {
-                            self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                            self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
                         }
                     }
                 }
@@ -776,9 +764,9 @@ impl<O: OutputStream> Compiler<O> {
             if def.body.is_some() {
                 let body = &def.body.as_ref().unwrap();
                 if *&def.is_static {
-                    self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                    self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false)?;
                 } else {
-                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
                 }
             }
         }
@@ -848,9 +836,9 @@ impl<O: OutputStream> Compiler<O> {
                     let returns = &def.returns;
                     let is_async = false;
                     if *&def.is_static {
-                        self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                        self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false)?;
                     } else {
-                        self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false);
+                        self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
                     }
                 }
                 _ => {}
@@ -948,7 +936,7 @@ impl<O: OutputStream> Compiler<O> {
 
     fn compile_store(&mut self, target: &ast::Expression) -> Result<(), CompileError> {
         match &target {
-            ast::Expression::Variable(ast::Identifier { loc, name }) => {
+            ast::Expression::Variable(ast::Identifier { name, .. }) => {
                 let s = self.lookup_name(name);
                 if s.is_attribute {
                     self.load_name("self");
@@ -974,7 +962,7 @@ impl<O: OutputStream> Compiler<O> {
             }
             ast::Expression::List(_, elements) => {}
             ast::Expression::Tuple(_, elements) => {
-                let mut seen_star = false;
+                let seen_star = false;
                 if !seen_star {
                     self.emit(Instruction::UnpackSequence(elements.len()));
                 }
@@ -1141,7 +1129,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(b)?;
                 self.emit(Instruction::Subscript);
             }
-            Attribute(loc, value, name, idx) => {
+            Attribute(_, value, name, idx) => {
                 self.compile_expression(value)?;
                 //按名字取，还是下标取
                 if name.is_some() {
@@ -1165,37 +1153,37 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::Subscript);
                 }
             }
-            FunctionCall(loc, name, args) => {
+            FunctionCall(_, name, args) => {
                 self.compile_call(name, args)?;
             }
-            NamedFunctionCall(loc, name, args) => {
+            NamedFunctionCall(_, name, args) => {
                 self.compile_named_call(name, args)?;
             }
-            Not(loc, name) => {
+            Not(_, name) => {
                 self.compile_expression(name)?;
                 self.emit(Instruction::UnaryOperation(bytecode::UnaryOperator::Not));
             }
-            UnaryPlus(loc, name) => {
+            UnaryPlus(_, name) => {
                 self.compile_expression(name)?;
                 self.emit(Instruction::UnaryOperation(bytecode::UnaryOperator::Plus));
             }
-            UnaryMinus(loc, name) => {
+            UnaryMinus(_, name) => {
                 self.compile_expression(name)?;
                 self.emit(Instruction::UnaryOperation(bytecode::UnaryOperator::Minus));
             }
-            Power(loc, a, b) |
-            Multiply(loc, a, b) |
-            Divide(loc, a, b) |
-            Modulo(loc, a, b) |
-            Add(loc, a, b) |
-            Subtract(loc, a, b) |
-            ShiftLeft(loc, a, b) |
-            ShiftRight(loc, a, b) |
-            BitwiseAnd(loc, a, b) |
-            BitwiseXor(loc, a, b) |
-            BitwiseOr(loc, a, b) |
-            And(loc, a, b) |
-            Or(loc, a, b) => {
+            Power(_, a, b) |
+            Multiply(_, a, b) |
+            Divide(_, a, b) |
+            Modulo(_, a, b) |
+            Add(_, a, b) |
+            Subtract(_, a, b) |
+            ShiftLeft(_, a, b) |
+            ShiftRight(_, a, b) |
+            BitwiseAnd(_, a, b) |
+            BitwiseXor(_, a, b) |
+            BitwiseOr(_, a, b) |
+            And(_, a, b) |
+            Or(_, a, b) => {
                 let rt = expression.get_type(&self.symbol_table_stack);
                 let at = a.get_type(&self.symbol_table_stack);
                 let bt = b.get_type(&self.symbol_table_stack);
@@ -1226,53 +1214,53 @@ impl<O: OutputStream> Compiler<O> {
                     }
                 }
             }
-            As(loc, a, b) => {
+            As(_, a, b) => {
                 let bt = b.get_type(&self.symbol_table_stack);
                 self.compile_expression(a)?;
                 let idx = get_number_type(bt);
                 self.emit(Instruction::PrimitiveTypeChange(idx));
             }
-            Less(loc, a, b) |
-            More(loc, a, b) |
-            LessEqual(loc, a, b) |
-            MoreEqual(loc, a, b) |
-            Equal(loc, a, b) |
-            NotEqual(loc, a, b) |
-            Is(loc, a, b) |
-            In(loc, a, b) => {
+            Less(_, a, b) |
+            More(_, a, b) |
+            LessEqual(_, a, b) |
+            MoreEqual(_, a, b) |
+            Equal(_, a, b) |
+            NotEqual(_, a, b) |
+            Is(_, a, b) |
+            In(_, a, b) => {
                 let mut v = Vec::new();
                 v.push(a.as_ref().clone());
                 v.push(b.as_ref().clone());
                 let mut ops = Vec::new();
                 ops.push(expression.clone());
-                self.compile_compare(&*v, &*ops);
+                self.compile_compare(&*v, &*ops)?;
             }
-            Assign(loc, a, b) => {
+            Assign(_, a, b) => {
                 // println!("a:{:?},b:{:?}", a, b);
                 self.compile_expression(b)?;
                 self.compile_store(a)?;
             }
-            AssignOr(loc, a, b) |
-            AssignAnd(loc, a, b) |
-            AssignXor(loc, a, b) |
-            AssignShiftLeft(loc, a, b) |
-            AssignShiftRight(loc, a, b) |
-            AssignAdd(loc, a, b) |
-            AssignSubtract(loc, a, b) |
-            AssignMultiply(loc, a, b) |
-            AssignDivide(loc, a, b) |
-            AssignModulo(loc, a, b)
+            AssignOr(_, a, b) |
+            AssignAnd(_, a, b) |
+            AssignXor(_, a, b) |
+            AssignShiftLeft(_, a, b) |
+            AssignShiftRight(_, a, b) |
+            AssignAdd(_, a, b) |
+            AssignSubtract(_, a, b) |
+            AssignMultiply(_, a, b) |
+            AssignDivide(_, a, b) |
+            AssignModulo(_, a, b)
             => {
                 self.compile_expression(a)?;
                 self.compile_expression(b)?;
                 self.compile_op(expression, true);
                 self.compile_store(a)?;
             }
-            BoolLiteral(loc, value) => {
+            BoolLiteral(_, value) => {
                 self.emit(Instruction::LoadConst(
                     bytecode::Constant::Boolean(value.clone())));
             }
-            NumberLiteral(loc, value) => {
+            NumberLiteral(_, value) => {
                 self.emit(Instruction::LoadConst(
                     bytecode::Constant::Integer(value.clone())));
             }
@@ -1283,36 +1271,31 @@ impl<O: OutputStream> Compiler<O> {
                 });
                 self.emit(Instruction::LoadConst(bytecode::Constant::String(value)))
             }
-            ArrayLiteral(loc, elements) => {
+            ArrayLiteral(_, elements) => {
                 let size = elements.len();
                 let must_unpack = self.gather_elements(elements)?;
                 self.emit(Instruction::BuildList(size, must_unpack));
             }
-            List(loc, _) => {}
+            List(_, _) => {}
 
-            Variable(ast::Identifier { loc, name }) => {
-                self.load_name(name);
-            }
-            Yield(loc, _) => {}
-            In(loc, _, _) => {}
-            Is(loc, _, _) => {}
-            Slice(loc, _) => {}
-            Await(loc, _) => {}
-            Tuple(loc, elements) => {
+            Variable(ast::Identifier { name, .. }) => { self.load_name(name); }
+            Yield(_, _) => {}
+            Slice(_, _) => {}
+            Await(_, _) => {}
+            Tuple(_, elements) => {
                 let size = elements.len();
                 let must_unpack = self.gather_elements(elements)?;
                 self.emit(Instruction::BuildTuple(size, must_unpack));
             }
-            Dict(loc, entries) => {
-                self.compile_dict(entries);
+            Dict(_, entries) => {
+                self.compile_dict(entries)?;
             }
-            Set(loc, elements) => {
+            Set(_, elements) => {
                 let size = elements.len();
                 let must_unpack = self.gather_elements(elements)?;
                 self.emit(Instruction::BuildSet(size, must_unpack));
             }
-            Comprehension(loc, _, _) => {}
-            StringLiteral(v) => {}
+            Comprehension(_, _, _) => {}
             Lambda(_, lambda) => {
                 let name = self.lambda_name.clone();
                 let mut args = vec![];
@@ -1324,8 +1307,8 @@ impl<O: OutputStream> Compiler<O> {
                 let is_async = false;
                 self.compile_function_def(&name, args.as_slice(), body, &None, is_async, true);
             }
-            Number(loc, number) => { self.compile_load_constant_number(number.clone()); }
-            IfExpression(loc, test, body, orelse) => {
+            Number(_, number) => { self.compile_load_constant_number(number.clone())?; }
+            IfExpression(_, test, body, orelse) => {
                 let no_label = self.new_label();
                 let end_label = self.new_label();
                 self.compile_jump_if(test, false, no_label)?;
@@ -1335,7 +1318,7 @@ impl<O: OutputStream> Compiler<O> {
                 // False
                 self.set_label(no_label);
                 self.compile_expression(orelse)?;
-                // End
+
                 self.set_label(end_label);
             }
             _ => {}
@@ -1515,7 +1498,7 @@ impl<O: OutputStream> Compiler<O> {
             vec![".0".to_owned()],
             Varargs::None,
             "pan".to_string(),
-            0,
+            line_number,
             self.source_path.clone().unwrap(),
         ));
         self.enter_scope();
@@ -1617,7 +1600,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn leave_scope(&mut self) {
-        let table = self.symbol_table_stack.pop().unwrap();
+        self.symbol_table_stack.pop().unwrap();
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {

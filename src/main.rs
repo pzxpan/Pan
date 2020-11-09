@@ -1,24 +1,14 @@
-use std::cell::RefCell;
 use std::env;
-use std::ops::Add;
 use std::fs::File;
 use std::io::Read;
-use std::fs;
 use std::path::Path;
 use std::collections::HashMap;
 
 use walkdir::WalkDir;
-use log::*;
-
-use pan_parser::lexer;
-use pan_parser::ast::*;
 
 use pan_bytecode::value::Value;
-use pan_bytecode::bytecode::Instruction;
 
-use pan_compiler::symboltable;
-use pan_compiler::symboltable::SymbolTable;
-use pan_compiler::compile::{compile_program, compile};
+use pan_compiler::compile::{compile};
 use pan_compiler::error::CompileErrorType;
 
 use pan_vm::vm::VirtualMachine;
@@ -48,8 +38,8 @@ fn test_one_file(home_path: &Path) {
     let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0, false);
     if code_object.is_ok() {
         let mut vm = VirtualMachine::new();
-        let mut global_value = HashMap::new();
-        let mut local_value: HashMap<String, Value> = HashMap::new();
+        let global_value = HashMap::new();
+        let local_value: HashMap<String, Value> = HashMap::new();
         let mut v = Vec::new();
         v.push(local_value);
         let scope = Scope::with_builtins(v, global_value, &vm);

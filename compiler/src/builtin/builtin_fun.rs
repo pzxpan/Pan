@@ -1,8 +1,4 @@
-use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope, Constant};
-use pan_bytecode::bytecode::Varargs;
-
-use crate::ctype::CType;
-use crate::symboltable::SymbolUsage;
+use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 
 pub fn get_builtin_fun() -> Vec<(String, CodeObject)> {
     let mut vec = Vec::new();

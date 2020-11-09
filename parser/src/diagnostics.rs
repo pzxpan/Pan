@@ -1,7 +1,4 @@
-use std::fmt::{Display, Debug, Formatter, Error, Result};
-
-use serde::Serialize;
-use crate::file_cache::FileCache;
+use std::fmt::{Display, Debug, Formatter, Result};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Location(pub String, pub usize, pub usize);

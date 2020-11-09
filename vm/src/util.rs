@@ -1,4 +1,3 @@
-use num_traits::ToPrimitive;
 use pan_bytecode::value::*;
 
 //得用宏来写这些代码
@@ -17,7 +16,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -34,7 +33,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -51,7 +50,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -68,7 +67,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -85,7 +84,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -102,7 +101,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -119,7 +118,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -136,7 +135,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -153,7 +152,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -170,7 +169,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }
@@ -187,7 +186,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::Str(((*v.to_string()).parse().unwrap())),
+                2000 => Value::Str((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }
         }

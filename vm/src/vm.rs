@@ -1,25 +1,17 @@
 //! 执行指令的虚拟机
 //!
 use std::borrow::Borrow;
-use std::cell::{Cell, Ref, RefCell};
-use std::collections::hash_map::HashMap;
-use std::collections::hash_set::HashSet;
-use std::fmt;
 use std::rc::Rc;
-use std::sync::{Mutex, MutexGuard};
 use std::ops::Add;
 
-use arr_macro::arr;
-use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use once_cell::sync::Lazy;
 
 use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::*;
 use pan_bytecode::value::*;
 
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
-use crate::scope::{Scope, NameProtocol};
+use crate::scope::{Scope};
 
 pub struct VirtualMachine {
     pub frames: Vec<FrameRef>,
@@ -33,22 +25,6 @@ pub enum InitParameter {
     NoInitialize,
     InitializeInternal,
     InitializeExternal,
-}
-
-
-enum TraceEvent {
-    Call,
-    Return,
-}
-
-impl fmt::Display for TraceEvent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use TraceEvent::*;
-        match self {
-            Call => write!(f, "call"),
-            Return => write!(f, "return"),
-        }
-    }
 }
 
 impl VirtualMachine {
@@ -146,7 +122,7 @@ impl VirtualMachine {
                         return (true, Value::Code(v.clone()));
                     }
                 }
-                for (k,v) in ty.methods.iter() {
+                for (k, v) in ty.methods.iter() {
                     if k.eq(&attr.to_string()) {
                         return (true, Value::Code(v.clone()));
                     }
@@ -159,10 +135,10 @@ impl VirtualMachine {
 
     pub fn set_attribute(&self, obj: Value, attr: String, value: Value) {
         match obj {
-            Value::Obj(mut e) => {
+            Value::Obj(e) => {
                 match &*e.borrow_mut() {
                     Obj::InstanceObj(o) => {
-                        if let InstanceObj { typ, field_map } = o {
+                        if let InstanceObj { field_map, .. } = o {
                             if let Value::Obj(map) = field_map {
                                 let mut cc = field_map.hash_map_value();
                                 cc.insert(attr, value);
@@ -182,11 +158,11 @@ impl VirtualMachine {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
                     Obj::EnumObj(EnumObj { item_name, field_map, .. }) => {
-                        if item_name == &b {
-                            return (Value::Bool(true), field_map.as_ref().cloned().unwrap());
+                        return if item_name == &b {
+                            (Value::Bool(true), field_map.as_ref().cloned().unwrap())
                         } else {
-                            return (Value::Bool(false), vec![]);
-                        }
+                            (Value::Bool(false), vec![])
+                        };
                     }
                     _ => unreachable!()
                 }
@@ -304,7 +280,7 @@ impl VirtualMachine {
     }
     pub fn get_next_iter(&self, v: Value) -> Value {
         let mut ret = Value::Nil;
-        if let Value::Obj(mut e) = v {
+        if let Value::Obj(e) = v {
             match *e.borrow_mut() {
                 Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
                     if let Value::I32(_) = start {
@@ -371,9 +347,7 @@ impl VirtualMachine {
             (Value::U16(a), Value::U16(b)) => {
                 Value::U16(a - b)
             }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a - b)
-            }
+
             (Value::U32(a), Value::U32(b)) => {
                 Value::U32(a - b)
             }

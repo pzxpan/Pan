@@ -4,7 +4,6 @@ use std::fmt;
 use std::iter::Peekable;
 use std::str::CharIndices;
 use std::str::FromStr;
-use std::ops::Deref;
 
 use unicode_xid::UnicodeXID;
 use phf::phf_map;
@@ -13,7 +12,6 @@ use num_traits::identities::Zero;
 use num_traits::{Num, ToPrimitive};
 
 use crate::diagnostics::Location;
-use crate::ast::Loc;
 
 pub type Spanned<Token, Loc, Error> = Result<(Loc, Token, Loc), Error>;
 
@@ -387,7 +385,7 @@ impl<'input> Lexer<'input> {
     }
 
     pub fn row(&self) -> usize {
-        self.row()
+        self.row
     }
 
     pub fn column(&self) -> usize {
@@ -450,7 +448,7 @@ impl<'input> Lexer<'input> {
                            end: usize,
                            ch0: char, ) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
         let mut end_pos = end;
-        let mut start_is_zero = ch0 == '0';
+        let start_is_zero = ch0 == '0';
         //正常的数字
         let mut value_text = String::new();
         value_text.push(ch0);
@@ -458,7 +456,7 @@ impl<'input> Lexer<'input> {
         let mut ch1 = '_';
         end_pos = start_pos + value_text.len();
 
-        if let Some((pos, ch)) = self.chars.peek() {
+        if let Some((_, ch)) = self.chars.peek() {
             ch1 = *ch;
         }
         // 浮点
@@ -583,7 +581,7 @@ impl<'input> Lexer<'input> {
     fn radix_run(&mut self, radix: u32) -> String {
         let mut value_text = String::new();
         loop {
-            if let Some((pos, ch)) = self.chars.peek() {
+            if let Some((_, ch)) = self.chars.peek() {
                 if Lexer::<'_>::is_digit_of_radix(*ch, radix) {
                     value_text.push(*ch);
                     self.chars.next();
@@ -647,12 +645,12 @@ impl<'input> Lexer<'input> {
         loop {
             self.go_right();
             match self.chars.next() {
-                Some((start, '\n')) => {
+                Some((_, '\n')) => {
                     self.newline();
                 }
                 Some((start, '\'')) => {
-                    if let Some((i, ch)) = self.chars.next() {
-                        if let Some((j, cc)) = self.chars.peek() {
+                    if let Some((_, ch)) = self.chars.next() {
+                        if let Some((_, cc)) = self.chars.peek() {
                             if *cc == '\'' {
                                 self.chars.next();
                                 return Some(Ok((self.row, Token::Char(ch), self.column)));
@@ -752,7 +750,6 @@ impl<'input> Lexer<'input> {
                                     )));
                                 }
                             }
-
                         }
                         Some((_, '*')) => {
                             // 多行注释
@@ -804,14 +801,14 @@ impl<'input> Lexer<'input> {
                 Some((start, ch)) if ch.is_ascii_digit() => {
                     return self.parse_number(start, start, ch);
                 }
-                Some((i, ';')) => return Some(Ok((self.row, Token::Semicolon, self.column))),
-                Some((i, ',')) => return Some(Ok((self.row, Token::Comma, self.column))),
-                Some((i, '(')) => return Some(Ok((self.row, Token::OpenParenthesis, self.column))),
-                Some((i, ')')) => return Some(Ok((self.row, Token::CloseParenthesis, self.column))),
-                Some((i, '{')) => return Some(Ok((self.row, Token::OpenCurlyBrace, self.column))),
-                Some((i, '}')) => return Some(Ok((self.row, Token::CloseCurlyBrace, self.column))),
-                Some((i, '~')) => return Some(Ok((self.row, Token::Complement, self.column))),
-                Some((i, '=')) => match self.chars.peek() {
+                Some((_, ';')) => return Some(Ok((self.row, Token::Semicolon, self.column))),
+                Some((_, ',')) => return Some(Ok((self.row, Token::Comma, self.column))),
+                Some((_, '(')) => return Some(Ok((self.row, Token::OpenParenthesis, self.column))),
+                Some((_, ')')) => return Some(Ok((self.row, Token::CloseParenthesis, self.column))),
+                Some((_, '{')) => return Some(Ok((self.row, Token::OpenCurlyBrace, self.column))),
+                Some((_, '}')) => return Some(Ok((self.row, Token::CloseCurlyBrace, self.column))),
+                Some((_, '~')) => return Some(Ok((self.row, Token::Complement, self.column))),
+                Some((_, '=')) => match self.chars.peek() {
                     Some((_, '=')) => {
                         self.chars.next();
                         return Some(Ok((self.row, Token::Equal, self.column)));
@@ -824,7 +821,7 @@ impl<'input> Lexer<'input> {
                         return Some(Ok((self.row, Token::Assign, self.column)));
                     }
                 },
-                Some((i, '!')) => {
+                Some((_, '!')) => {
                     if let Some((_, '=')) = self.chars.peek() {
                         self.chars.next();
                         return Some(Ok((self.row, Token::NotEqual, self.column)));
@@ -832,7 +829,7 @@ impl<'input> Lexer<'input> {
                         return Some(Ok((self.row, Token::Not, self.column)));
                     }
                 }
-                Some((i, '|')) => {
+                Some((_, '|')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
@@ -845,7 +842,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::BitwiseOr, self.column))),
                     };
                 }
-                Some((i, '&')) => {
+                Some((_, '&')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
@@ -858,7 +855,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::BitwiseAnd, self.column))),
                     };
                 }
-                Some((i, '^')) => {
+                Some((_, '^')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
@@ -867,7 +864,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::BitwiseXor, self.column))),
                     };
                 }
-                Some((i, '+')) => {
+                Some((_, '+')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
@@ -876,7 +873,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::Add, self.column + 1)))
                     };
                 }
-                Some((i, '-')) => {
+                Some((_, '-')) => {
                     if let Some((_, '>')) = self.chars.peek() {
                         self.chars.next();
                         return Some(Ok((self.row, Token::ThinArrow, self.column + 2)));
@@ -889,10 +886,10 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::Subtract, self.column + 1)))
                     };
                 }
-                Some((i, '_')) => {
+                Some((_, '_')) => {
                     return Some(Ok((self.row, Token::Hole, self.column)));
                 }
-                Some((i, '*')) => {
+                Some((_, '*')) => {
                     return match self.chars.peek() {
                         Some((_, '*')) => {
                             self.chars.next();
@@ -905,7 +902,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::Mul, self.column))),
                     };
                 }
-                Some((i, '%')) => {
+                Some((_, '%')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
@@ -914,7 +911,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::Modulo, self.column)))
                     };
                 }
-                Some((i, '<')) => {
+                Some((_, '<')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
@@ -933,7 +930,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::Less, self.column))),
                     };
                 }
-                Some((i, '>')) => {
+                Some((_, '>')) => {
                     return match self.chars.peek() {
                         Some((_, '=')) => {
                             self.chars.next();
@@ -952,7 +949,7 @@ impl<'input> Lexer<'input> {
                         _ => Some(Ok((self.row, Token::More, self.column))),
                     };
                 }
-                Some((i, '.')) => if let Some((pos, ch)) = self.chars.peek() {
+                Some((_, '.')) => if let Some((_, ch)) = self.chars.peek() {
                     match *ch {
                         '.' => {
                             self.chars.next();
@@ -966,16 +963,16 @@ impl<'input> Lexer<'input> {
                     }
                 }
 
-                Some((i, '[')) => return Some(Ok((self.row, Token::OpenBracket, self.column))),
-                Some((i, ']')) => return Some(Ok((self.row, Token::CloseBracket, self.column))),
-                Some((i, ':')) => {
-                    if let Some((i, ':')) = self.chars.peek() {
+                Some((_, '[')) => return Some(Ok((self.row, Token::OpenBracket, self.column))),
+                Some((_, ']')) => return Some(Ok((self.row, Token::CloseBracket, self.column))),
+                Some((_, ':')) => {
+                    if let Some((_, ':')) = self.chars.peek() {
                         self.chars.next();
                         return Some(Ok((self.row, Token::TwoColon, self.column)));
                     }
                     return Some(Ok((self.row, Token::Colon, self.column)));
                 }
-                Some((i, '?')) => return Some(Ok((self.row, Token::Question, self.column))),
+                Some((_, '?')) => return Some(Ok((self.row, Token::Question, self.column))),
                 Some((_, ch)) if ch.is_whitespace() => (),
                 Some((start, _)) => {
                     let mut end;

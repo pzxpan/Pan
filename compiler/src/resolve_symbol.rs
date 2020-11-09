@@ -1,24 +1,21 @@
 /// 从入口文件开始，递归import所有依赖的Symbol,用来分析类型；解析执行时，编译之后，这数据不需要；但在JIT时，会需要，因为链接时需要这些信息
 /// 以减少二进制文件的大小;
 ///
-use std::collections::HashMap;
 use std::env;
-use std::fs;
 use std::fs::File;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
-use walkdir::WalkDir;
 use pan_parser::ast::Expression;
 use pan_parser::ast::*;
 use pan_parser::parse;
 
 use crate::symboltable::*;
 use crate::variable_type::HasType;
-use crate::ctype::{CType, StructType, FnType, BoundType};
+use crate::ctype::{CType, StructType, FnType};
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> SymbolTableResult {
-    let mut whole_name = "demo".to_string();
+    let whole_name = "demo".to_string();
     let mut path_str = idents.iter().fold(whole_name, |mut ss, s| {
         ss.push_str("/");
         ss.push_str(&s.name);
@@ -68,7 +65,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
         let mut methods = st.methods.clone();
         let mut static_fields = st.static_fields.clone();
         for arg in args {
-            let mut expected_ty = arg.expr.get_type(tables);
+            let expected_ty = arg.expr.get_type(tables);
             let arg_name = &arg.name.name;
             let mut generic_type_name = "".to_string();
             for (idx, content) in st.fields.iter().enumerate()
@@ -85,7 +82,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
             }
             let mut generics_copy = generics.clone();
             for (idx, generic) in generics.iter().enumerate() {
-                if let CType::Generic(name, cty) = generic {
+                if let CType::Generic(name, _) = generic {
                     if name.eq(&generic_type_name) {
                         generics_copy.remove(idx);
                     }
@@ -95,13 +92,11 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
             //抹去函数中的泛型
             for (i, fty) in st.methods.iter().enumerate() {
                 if let CType::Fn(fnty) = fty.1.clone() {
-                    let mut need_replace = false;
                     let mut fn_arg_tys = fnty.arg_types.clone();
                     for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
-                        if let CType::Generic(n, cty) = fnarg.1.clone() {
+                        if let CType::Generic(n, _) = fnarg.1.clone() {
                             if n.eq(&generic_type_name) {
                                 if expected_ty < fnarg.1 {
-                                    need_replace = true;
                                     fn_arg_tys.swap_remove(idx);
                                     fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone()));
                                 }
@@ -110,10 +105,9 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                     }
 
                     let mut fn_ret_ty = fnty.ret_type.clone();
-                    if let CType::Generic(n, cty) = fnty.ret_type.as_ref() {
+                    if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
                         if n.eq(&generic_type_name) {
                             if expected_ty < *fn_ret_ty.as_ref() {
-                                need_replace = true;
                                 fn_ret_ty = Box::new(expected_ty.clone());
                             }
                         }
@@ -134,13 +128,11 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
             //抹去静态方法中的泛型
             for (i, fty) in st.static_fields.iter().enumerate() {
                 if let CType::Fn(fnty) = fty.1.clone() {
-                    let mut need_replace = false;
                     let mut fn_arg_tys = fnty.arg_types.clone();
                     for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
-                        if let CType::Generic(n, cty) = fnarg.1.clone() {
+                        if let CType::Generic(n, _) = fnarg.1.clone() {
                             if n.eq(&generic_type_name) {
                                 if expected_ty < fnarg.1 {
-                                    need_replace = true;
                                     fn_arg_tys.remove(idx);
                                     fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2));
                                 }
@@ -149,10 +141,9 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                     }
 
                     let mut fn_ret_ty = fnty.ret_type.clone();
-                    if let CType::Generic(n, cty) = fnty.ret_type.as_ref() {
+                    if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
                         if n.eq(&generic_type_name) {
                             if expected_ty < *fn_ret_ty.as_ref() {
-                                need_replace = true;
                                 fn_ret_ty = Box::new(expected_ty.clone());
                             }
                         }
@@ -183,9 +174,10 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
         }
     }
 
-   // println!("result_ty:{:?}", result_ty);
+    // println!("result_ty:{:?}", result_ty);
     return result_ty;
 }
+
 pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: &Vec<Expression>) -> SymbolTableResult {
     for expression in bounds {
         let cty = build.lookup_name_ty(&expression.expr_name());

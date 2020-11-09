@@ -1,11 +1,9 @@
 use std::fmt::{Display, Formatter, Error};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::cell::RefCell;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use serde::ser::Serializer;
 
 use crate::bytecode::CodeObject;
 
@@ -96,11 +94,11 @@ impl Value {
         return match &*self {
             Value::Obj(v) => {
                 match &*v.borrow() {
-                    Obj::InstanceObj(map) => {
+                    Obj::InstanceObj(_) => {
                         //1为struct
                         1
                     }
-                    Obj::EnumObj(map) => {
+                    Obj::EnumObj(_) => {
                         //2为enum
                         2
                     }

@@ -1,18 +1,14 @@
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::rc::Rc;
-use std::error::Error;
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::{BorrowMut};
 use std::collections::HashMap;
-use std::sync::Arc;
-use log::*;
 
-use indexmap::IndexMap;
 use itertools::Itertools;
 
 use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::CodeObject;
-use pan_bytecode::value::{Value, FnValue, Obj, InstanceObj, TypeValue};
+use pan_bytecode::value::{Value, FnValue};
 
 use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
@@ -63,6 +59,7 @@ pub enum ExecutionResult {
 }
 
 pub type FrameResult = Option<ExecutionResult>;
+
 impl Frame {
     pub fn new(code: CodeObject, scope: Scope) -> Frame {
         Frame {
@@ -124,7 +121,7 @@ impl Frame {
                 self.push_value(value);
                 None
             }
-            bytecode::Instruction::BuildString(size) => {
+            bytecode::Instruction::BuildString(_) => {
                 None
             }
             bytecode::Instruction::BuildList(size, unpack) => {
@@ -133,8 +130,8 @@ impl Frame {
                 None
             }
             bytecode::Instruction::BuildSet(size, unpack) => {
-                let mut hash_map: HashMap<String, Value> = HashMap::new();
-                let mut map_obj = Value::new_map_obj(hash_map);
+                let hash_map: HashMap<String, Value> = HashMap::new();
+                let map_obj = Value::new_map_obj(hash_map);
                 for key in self.pop_multiple(*size).into_iter() {
                     vm.set_item(&map_obj, key, Value::Nil);
                 }
@@ -151,12 +148,7 @@ impl Frame {
                 unpack,
                 for_call,
             ) => self.execute_build_map(vm, *size, *unpack, *for_call),
-            bytecode::Instruction::BuildTypeValue(
-                size
-            ) => {
-                self.build_struct(vm, *size);
-                None
-            }
+
             bytecode::Instruction::BinaryOperation(ref op, inplace) => {
                 self.execute_binop(vm, op, *inplace)
             }
@@ -193,7 +185,7 @@ impl Frame {
             }
             bytecode::Instruction::GetIter => {
                 let end = self.pop_value();
-                if let Value::I32(value) = end {
+                if let Value::I32(_) = end {
                     let start = self.pop_value();
                     if vm._gt(end.clone(), start.clone()).bool_value() {
                         self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(true)));
@@ -294,6 +286,7 @@ impl Frame {
             _ => { None }
         }
     }
+
     fn continue_break(&self, reason: UnwindReason) -> FrameResult {
         while let Some(block) = self.current_block() {
             match block.typ {
@@ -306,9 +299,6 @@ impl Frame {
                     UnwindReason::Continue => {
                         self.jump(start);
                         return None;
-                    }
-                    _ => {
-                        self.pop_block();
                     }
                 },
             }
@@ -398,8 +388,8 @@ impl Frame {
         unpack: bool,
         for_call: bool,
     ) -> FrameResult {
-        let mut hash_map: HashMap<String, Value> = HashMap::new();
-        let mut map_obj = Value::new_map_obj(hash_map);
+        let hash_map: HashMap<String, Value> = HashMap::new();
+        let map_obj = Value::new_map_obj(hash_map);
         for (key, value) in self.pop_multiple(2 * size).into_iter().tuples() {
             vm.set_item(&map_obj, key, value);
         }
@@ -447,7 +437,7 @@ impl Frame {
             }
         }
 
-        let mut s = self.scope.new_child_scope_with_locals();
+        let s = self.scope.new_child_scope_with_locals();
         if named_call {
             for (name, value) in args[0].hash_map_value().iter() {
                 s.store_name(name.to_string(), value.clone());
@@ -472,10 +462,6 @@ impl Frame {
     fn jump(&self, label: bytecode::Label) {
         let target_pc = self.code.label_map[&label];
         self.lasti.set(target_pc);
-    }
-
-    fn build_struct(&self, vm: &VirtualMachine, size: usize) -> FrameResult {
-        None
     }
 
     fn execute_for_iter(&self, vm: &VirtualMachine, target: bytecode::Label) -> FrameResult {
@@ -684,7 +670,7 @@ impl fmt::Debug for Frame {
             .borrow()
             .iter()
             .map(|elem| {
-               elem.to_string()
+                elem.to_string()
             })
             .collect::<String>();
         let block_str = self

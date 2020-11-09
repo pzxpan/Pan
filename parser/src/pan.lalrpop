@@ -1,7 +1,5 @@
-use std::str::FromStr;
 use num_bigint::BigInt;
-use num_traits::identities::Zero;
-use num_traits::{Num, ToPrimitive};
+use num_traits::{ToPrimitive};
 use crate::ast::*;
 use crate::lexer::{Token, LexicalError, CommentType};
 use crate::doc::tags;
@@ -371,20 +369,20 @@ Precedence0: Expression = {
 }
 
 Number: Number = {
-    <value:i8> => { Number::I8(value)  },
-    <value:i16> => { Number::I16(value)  },
-    <value:i32> => { Number::I32(value)  },
-    <value:i64> => { Number::I64(value)  },
-    <value:i128> => { Number::I128(value)  },
-    <value:isize> => { Number::ISize(value)  },
-    <value:u8> => { Number::U8(value)  },
-    <value:u16> => { Number::U16(value)  },
-    <value:u32> => { Number::U32(value)  },
-    <value:u64> => { Number::U64(value)  },
-    <value:u128> => { Number::U128(value)  },
-    <value:usize> => { Number::USize(value)  },
-    <value:float> => { Number::Float( value ) },
-    <value:char> => { Number::Char( value ) },
+    <value:i8> =>  Number::I8(value),
+    <value:i16> =>  Number::I16(value),
+    <value:i32> =>  Number::I32(value),
+    <value:i64> =>  Number::I64(value),
+    <value:i128> => Number::I128(value),
+    <value:isize> => Number::ISize(value),
+    <value:u8> => Number::U8(value),
+    <value:u16> => Number::U16(value),
+    <value:u32> => Number::U32(value),
+    <value:u64> => Number::U64(value),
+    <value:u128> => Number::U128(value),
+    <value:usize> => Number::USize(value),
+    <value:float> => Number::Float(value),
+    <value:char> => Number::Char(value),
 };
 
 StringLiteral: StringLiteral = {

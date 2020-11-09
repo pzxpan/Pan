@@ -1,7 +1,4 @@
 use std::fmt;
-use num_bigint::BigInt;
-
-use crate::lexer::Lexer;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Default)]
 pub struct Loc(pub usize, pub usize, pub usize);
@@ -551,7 +548,6 @@ impl Statement {
             | Statement::VariableDefinition(loc, _, _)
             | Statement::MultiVariableDefinition(loc, _, _)
             | Statement::For(loc, _, _, _, _)
-            | Statement::While(loc, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)
             | Statement::ConstDefinition(loc, _, _)

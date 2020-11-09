@@ -1,25 +1,19 @@
 //根据import，生成各种Value,最好是有个中间的代码形式，直接读取就好，不要重新编译;跟java的class中间字节码一样;
-use std::fs;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::io::Read;
-use std::collections::HashMap;
 use std::env;
 
-use walkdir::WalkDir;
-
 use pan_parser::ast::*;
-use pan_parser::parse;
-use pan_bytecode::bytecode::{CodeObject, Instruction, Constant};
+use pan_bytecode::bytecode::{Instruction, Constant};
 
 use crate::error::*;
-use crate::symboltable::make_symbol_table;
 use crate::output_stream::OutputStream;
 use crate::builtin::builtin_fun::get_builtin_fun;
 use crate::compile::*;
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> Result<(), CompileError> {
-    let mut whole_name = "demo".to_string();
+    let whole_name = "demo".to_string();
     let mut path_str = idents.iter().fold(whole_name, |mut ss, s| {
         ss.push_str("/");
         ss.push_str(&s.name);
@@ -50,12 +44,12 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
     let mut file = File::open(path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let code_object = compile(&contents, String::from(path.clone().to_str().unwrap()), 0,true);
+    let code_object = compile(&contents, String::from(path.clone().to_str().unwrap()), 0, true);
     if code_object.is_ok() {
         compiler.import_instructions.extend(code_object.unwrap().instructions);
         Ok(())
     } else {
-        Err((code_object.err().unwrap()))
+        Err(code_object.err().unwrap())
     }
 }
 

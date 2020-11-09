@@ -1,7 +1,12 @@
-#[macro_use]
 extern crate log;
 
 use lalrpop_util::lalrpop_mod;
+use lalrpop_util::ParseError;
+use lalrpop_util::ErrorRecovery;
+use crate::diagnostics::Diagnostic;
+use crate::diagnostics::Location;
+use crate::lexer::Token;
+use crate::lexer::LexicalError;
 
 pub mod doc;
 pub mod lexer;
@@ -14,12 +19,6 @@ lalrpop_mod!(
     pan
 );
 
-use lalrpop_util::ParseError;
-use lalrpop_util::ErrorRecovery;
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::Location;
-use crate::lexer::Token;
-use crate::lexer::LexicalError;
 
 pub fn parse(src: &str, file_name: String) -> Result<ast::SourceUnit, Vec<Diagnostic>> {
     let mut lex = lexer::Lexer::new(src);
@@ -59,9 +58,6 @@ pub fn parse(src: &str, file_name: String) -> Result<ast::SourceUnit, Vec<Diagno
                     Location(file_name.clone(), location, location),
                     format!("文件结束错误{}", expected.join(", ")),
                 ),
-                ParseError::User { error } => {
-                    Diagnostic::parser_error(error.loc(file_name.clone()), error.to_string())
-                }
             });
         }
         return Err(errors);

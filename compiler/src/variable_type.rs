@@ -1,6 +1,3 @@
-use std::collections::{HashSet, HashMap};
-use std::borrow::Borrow;
-
 use pan_parser::ast::*;
 
 use crate::symboltable::*;
@@ -42,7 +39,7 @@ impl HasType for BoundDefinition {
         let mut local_tables = tables.clone();
         let table = local_tables.last_mut().unwrap();
         for ty in &self.generics {
-            let mut cty = get_register_type(&tables, ty.name.name.clone());
+            let cty = get_register_type(&tables, ty.name.name.clone());
             let mut g_ty = CType::Generic(ty.name.name.clone(), Box::new(cty.clone()));
             if cty == CType::Unknown {
                 g_ty = CType::Generic(ty.name.name.clone(), Box::new(CType::Any));
@@ -91,7 +88,7 @@ impl HasType for StructDefinition {
                     methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(&local_tables)));
                 }
                 StructPart::StructVariableDefinition(v) => {
-                    let mut ty = v.ty.get_type(&local_tables);
+                    let ty = v.ty.get_type(&local_tables);
                     fields.push((v.name.name.clone(), ty, v.is_pub))
                 }
                 _ => {}
@@ -240,8 +237,8 @@ impl HasType for Expression {
             }
 
             Expression::As(_, left, right) => {
-                let mut l = left.get_type(tables);
-                let mut r = right.get_type(tables);
+                let l = left.get_type(tables);
+                let r = right.get_type(tables);
                 return if r > CType::Str || l > CType::Str {
                     CType::Unknown
                 } else {
@@ -271,7 +268,7 @@ impl HasType for Expression {
             Expression::Variable(s) => {
                 return get_register_type(tables, s.name.clone());
             }
-            Expression::IfExpression(loc, test, body, orelse) => {
+            Expression::IfExpression(_, _, body, orelse) => {
                 let if_type = body.get_type(tables);
                 let else_type = orelse.get_type(tables);
                 if if_type == else_type {
@@ -283,7 +280,7 @@ impl HasType for Expression {
             Expression::NumberLiteral(_, _) => {
                 CType::I32
             }
-            Expression::StringLiteral(s) => {
+            Expression::StringLiteral(_) => {
                 CType::Str
             }
             Expression::ArrayLiteral(_, elements) | Expression::Set(_, elements) => {
@@ -339,8 +336,8 @@ impl HasType for Expression {
                     U64(_) => CType::U64,
                     U128(_) => CType::U128,
                     USize(_) => CType::USize,
-                    Float(f64) => CType::Float,
-                    Char(char) => CType::Char,
+                    Float(_) => CType::Float,
+                    Char(_) => CType::Char,
                 }
             }
             _ => { CType::Unknown }
@@ -352,7 +349,7 @@ impl HasType for LambdaDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let name = "lambda".to_string();
-        let mut ret_type = Box::from(match *self.body.clone() {
+        let ret_type = Box::from(match *self.body.clone() {
             Statement::Block(_, statements) => {
                 let s = statements.last();
                 match s {

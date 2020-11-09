@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use bitflags::bitflags;
-use num_bigint::BigInt;
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
 
@@ -141,7 +140,6 @@ pub enum Instruction {
     LoadBuildStruct,
     LoadBuildEnum(usize),
     LoadBuildModule,
-    BuildTypeValue(usize),
     UnpackSequence(usize),
     UnpackEx(usize, usize),
     Reverse(usize),
@@ -438,7 +436,6 @@ impl Instruction {
             GetAwaitable => w!(GetAwaitable),
             GetAIter => w!(GetAIter),
             GetANext => w!(GetANext),
-            BuildTypeValue(size) => w!(BuildTypeValue,size)
         }
     }
 }
@@ -491,10 +488,4 @@ impl fmt::Debug for CodeObject {
             self.obj_name, self.source_path, self.first_line_number
         )
     }
-}
-
-
-pub struct FrozenModule {
-    pub code: CodeObject,
-    pub package: bool,
 }

@@ -1,12 +1,10 @@
 use std::fmt;
-use std::cell::{RefCell, Ref};
+use std::cell::{RefCell};
 use std::borrow::BorrowMut;
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::{HashMap};
 
-use pan_bytecode::bytecode::CodeObject;
 use pan_bytecode::value::Value;
 
-use crate::frame::FrameResult;
 use crate::vm::VirtualMachine;
 
 /*
@@ -54,7 +52,7 @@ impl Scope {
 
     pub fn new_child_scope_with_locals(&self) -> Scope {
         let mut new_locals = Vec::with_capacity(self.locals.borrow_mut().len() + 1);
-        let mut v = HashMap::new();
+        let v = HashMap::new();
         new_locals.push(RefCell::new(v));
         for a in self.locals.borrow_mut().iter() {
             new_locals.push(a.clone());
@@ -91,7 +89,7 @@ impl NameProtocol for Scope {
     }
 
     fn store_name(&self, key: String, value: Value) {
-        let mut a = self.locals.borrow_mut();
+        let a = self.locals.borrow_mut();
         a.first().unwrap().borrow_mut().insert(key.to_string(), value);
     }
 

@@ -55,7 +55,7 @@ impl FnType {
         if self.name.eq(&boundfn.name) {
             for (fnty, bound) in self.arg_types.iter().zip(boundfn.arg_types.iter()) {
                 match (fnty.1.clone(), bound.1.clone()) {
-                    (ty, CType::Generic(name, param)) => {
+                    (ty, CType::Generic(name, _)) => {
                         if generics.contains_key(&name) {
                             let ge = generics.get(&name);
                             if ty != ge.unwrap().clone() {
@@ -70,13 +70,10 @@ impl FnType {
                             return false;
                         }
                     }
-                    (_, _) => {
-                        return false;
-                    }
                 }
             }
             match (self.ret_type.as_ref(), boundfn.ret_type.as_ref()) {
-                (ty, CType::Generic(name, param)) => {
+                (ty, CType::Generic(name, _)) => {
                     if generics.contains_key(name) {
                         let ge = generics.get(name);
                         if ty != ge.unwrap() {
@@ -88,9 +85,6 @@ impl FnType {
                     if ty != oty {
                         return false;
                     }
-                }
-                (_, _) => {
-                    return false;
                 }
             }
         } else {
