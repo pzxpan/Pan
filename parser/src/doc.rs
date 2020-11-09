@@ -1,11 +1,9 @@
-// Parse the fields f
+// 注释处理
 use crate::lexer::CommentType;
 use crate::ast::DocComment;
 
-/// Convert the comment to lines, stripping
 fn to_lines<'a>(comments: &[(usize, CommentType, &'a str)]) -> Vec<(usize, &'a str)> {
     let mut res = Vec::new();
-
     for (start, ty, comment) in comments.iter() {
         match ty {
             CommentType::Line => res.push((*start, comment.trim())),
@@ -29,16 +27,11 @@ fn to_lines<'a>(comments: &[(usize, CommentType, &'a str)]) -> Vec<(usize, &'a s
     res
 }
 
-// Parse the DocComments tags
 pub fn tags(lines: &[(usize, CommentType, &str)]) -> Vec<DocComment> {
-    // first extract the tags
     let mut tags = Vec::new();
-
     for (start_offset, line) in to_lines(&lines).into_iter() {
         let mut chars = line.char_indices().peekable();
-
         if let Some((_, '@')) = chars.peek() {
-            // step over @
             let (tag_start, _) = chars.next().unwrap();
             let mut tag_end = tag_start;
 
@@ -46,13 +39,10 @@ pub fn tags(lines: &[(usize, CommentType, &str)]) -> Vec<DocComment> {
                 if c.is_whitespace() {
                     break;
                 }
-
                 tag_end = *offset;
-
                 chars.next();
             }
 
-            // tag value
             tags.push(DocComment {
                 offset: tag_start,
                 tag: line[tag_start + 1..tag_end + 1].to_owned(),
@@ -67,7 +57,7 @@ pub fn tags(lines: &[(usize, CommentType, &str)]) -> Vec<DocComment> {
         } else {
             tags.push(DocComment {
                 offset: start_offset,
-                tag: String::from("notice"),
+                tag: String::from("注意"),
                 value: line.trim().to_owned(),
             });
         }

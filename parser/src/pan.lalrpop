@@ -51,8 +51,6 @@ ArrayDimension: Option<Expression> = {
     "[" <Expression> "]" => Some(<>)
 }
 
-
-
 Identifier: Identifier = {
     <l:@L> <n:LexIdentifier> <r:@R> => Identifier{loc: Loc(file_no, l, r), name: n.to_string()}
 }
@@ -93,7 +91,6 @@ DataDefinition: Box<DataDefinition> = {
 
 StructTy: StructTy = {
     <l:@L> "struct" <r:@R> => StructTy::Struct(Loc(file_no, l, r)),
-   // <l:@L> "bound" <r:@R> => StructTy::Bound(Loc(file_no, l, r)),
 }
 
 StructPart: StructPart = {
@@ -339,13 +336,11 @@ Precedence0: Expression = {
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),
 
 
-    // Solidity has ".address" members on external function types. Address is a keyword, so special casing needed
 
     <a:@L> "true" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), true),
     <a:@L> "false" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), false),
     <StringLiteral+> => Expression::StringLiteral(<>),
 
-  //  <l:@L> <ty:Type> <r:@R> => Expression::Type(Loc(file_no, l, r), ty),
     <a:@L> "[" <v:CommaOne<Expression>> "]" <b:@R> => {
         Expression::ArrayLiteral(Loc(file_no, a, b), v)
     },
@@ -363,7 +358,6 @@ Precedence0: Expression = {
     <l:@L> <a:ParameterList> <r:@R> => {
         if a.len() == 1 {
             if let Some(Parameter{ ty,  name: None, .. }) = &a[0].1 {
-                // this means "(" Expression ")"
                 return ty.clone();
             }
         }
@@ -372,7 +366,6 @@ Precedence0: Expression = {
     },
 
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
- //  <l:@L> "{" <v:CommaOne<Expression>> "}" <r:@R> => Expression::Set(Loc(file_no, l, r), v),
     <LambdaDefinition> => <>,
     <!> => {errors.push(<>); Expression::Error}
 }
@@ -392,7 +385,6 @@ Number: Number = {
     <value:usize> => { Number::USize(value)  },
     <value:float> => { Number::Float( value ) },
     <value:char> => { Number::Char( value ) },
-   // <s:complex> => { Number::Complex { real: s.0, imag: s.1 } },
 };
 
 StringLiteral: StringLiteral = {
@@ -401,10 +393,6 @@ StringLiteral: StringLiteral = {
     }
 }
 
-// A parameter list is used for function arguments, returns, and destructuring statements.
-// In destructuring statements, parameters can be optional. So, we make parameters optional
-// and as an added bonus we can generate error messages about missing parameters/returns
-// to functions
 Parameter: Parameter = {
     <l:@L><name:Identifier?> ":"  "ref"  <ty:Expression>   <r:@R> => {
             let loc = Loc(file_no, l, r);

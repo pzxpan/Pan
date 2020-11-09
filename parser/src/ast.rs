@@ -52,7 +52,7 @@ pub enum Import {
 
     //import std.math {sqrt,floor};
     //import std.math {sqrt as Sqrt, floor as Floor};
-    //import std { math as Math, math.foolor as Floor};
+    //import std { math as Math, math.floor as Floor};
     Rename(Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
 }
 
@@ -298,7 +298,6 @@ pub enum Expression {
     FunctionCall(Loc, Box<Expression>, Vec<Expression>),
     NamedFunctionCall(Loc, Box<Expression>, Vec<NamedArgument>),
 
-    //新加
     //异步 迭代器
     Await(Loc, Box<Expression>),
     Yield(Loc, Option<Box<Expression>>),
@@ -308,8 +307,6 @@ pub enum Expression {
     StringLiteral(Vec<StringLiteral>),
     ArrayLiteral(Loc, Vec<Expression>),
     Number(Loc, Number),
-
-    // Type(Loc, BuiltinType),
     Variable(Identifier),
 
     //新增
