@@ -3,7 +3,6 @@ use num_bigint::BigInt;
 use num_traits::identities::Zero;
 use num_traits::{Num, ToPrimitive};
 use crate::ast::*;
-use crate::box_option;
 use crate::lexer::{Token, LexicalError, CommentType};
 use crate::doc::tags;
 use lalrpop_util::ErrorRecovery;

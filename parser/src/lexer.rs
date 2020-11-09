@@ -1,8 +1,4 @@
-//
-// Solidity custom lexer. Solidity needs a custom lexer for two reasons:
-//  - comments and doc comments
-//  - pragma value is [^;]+
-//
+//词法处理，按设计，取出其中合法的token，
 use phf::phf_map;
 use std::fmt;
 use std::iter::Peekable;
@@ -172,7 +168,6 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Number(n) => write!(f, "{}", n),
 
             Token::Float(ff) => write!(f, "{:?}", ff),
-            // Token::Int(n) => write!(f, "{:?}", n),
             Token::I8(n) => write!(f, "{:?}", n),
             Token::I16(n) => write!(f, "{:?}", n),
             Token::I32(n) => write!(f, "{:?}", n),
@@ -436,12 +431,6 @@ impl<'input> Lexer<'input> {
         } else {
             self.parse_normal_number(start_pos, end, ch)
         }
-        // println!("result is {:?}", &self.input[start_pos..=end]);
-        // Some(Ok((
-        //     self.row,
-        //     Token::Number(&self.input[start_pos..=end]),
-        //     self.column,
-        // )))
     }
 
     fn lex_number_radix(&mut self, start_pos: usize, radix: u32) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
@@ -458,10 +447,9 @@ impl<'input> Lexer<'input> {
                            start_pos: usize,
                            end: usize,
                            ch0: char, ) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
-        // let start_pos = self.get_pos();
         let mut end_pos = end;
         let mut start_is_zero = ch0 == '0';
-        // Normal number:
+        //正常的数字
         let mut value_text = String::new();
         value_text.push(ch0);
         value_text.push_str(&self.radix_run(10));
@@ -471,10 +459,9 @@ impl<'input> Lexer<'input> {
         if let Some((pos, ch)) = self.chars.peek() {
             ch1 = *ch;
         }
-        // If float:
+        // 浮点
 
         if (ch1 == '.' && !self.in_range((end_pos + 1) as usize)) || self.at_exponent() {
-            // Take '.':
             if ch1 == '.' {
                 self.chars.next();
                 if let Some((_, '_')) = self.chars.peek() {
@@ -484,11 +471,11 @@ impl<'input> Lexer<'input> {
                 value_text.push_str(&self.radix_run(10));
             }
 
-            // 1e6 for example:
+            // 1e6 :
             if ch1 == 'e' || ch1 == 'E' {
                 value_text.push(ch1.to_ascii_lowercase());
 
-                // Optional +/-
+                //  +/-
                 if ch1 == '-' || ch1 == '+' {
                     value_text.push(ch1);
                 }
@@ -497,7 +484,7 @@ impl<'input> Lexer<'input> {
 
             let value = f64::from_str(&value_text).unwrap();
             end_pos = start_pos + value_text.len();
-            // Parse trailing 'j':
+            // 实数 'j':
             if ch1 == 'j' || ch1 == 'J' {
                 self.chars.next();
                 end_pos = end_pos + 1;
@@ -587,7 +574,6 @@ impl<'input> Lexer<'input> {
                 return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
                 )));
             }
-            // }
             return Some(Ok((self.row, Token::Number(&self.input[start_pos..end_pos]), self.column)));
         }
     }
@@ -605,13 +591,6 @@ impl<'input> Lexer<'input> {
                     break;
                 }
             }
-            // if let Some(c) = self.take_number(radix) {
-            //     value_text.push(c);
-            // } else if self.chr0 == Some('_') && self.is_digit_of_radix(self.chr1, radix) {
-            //     self.chars.next();
-            // } else {
-            //     break;
-            // }
         }
         value_text
     }
@@ -670,7 +649,6 @@ impl<'input> Lexer<'input> {
                     self.newline();
                 }
                 Some((start, '\'')) => {
-                    //let mut end = start;
                     if let Some((i, ch)) = self.chars.next() {
                         if let Some((j, cc)) = self.chars.peek() {
                             if *cc == '\'' {
@@ -688,7 +666,6 @@ impl<'input> Lexer<'input> {
                 }
                 Some((start, ch)) if ch == '_' || UnicodeXID::is_xid_start(ch) => {
                     let end;
-
                     loop {
                         if let Some((i, ch)) = self.chars.peek() {
                             if !UnicodeXID::is_xid_continue(*ch) {
@@ -712,9 +689,7 @@ impl<'input> Lexer<'input> {
                 }
                 Some((start, '"')) => {
                     let mut end;
-
                     let mut last_was_escape = false;
-
                     loop {
                         if let Some((i, ch)) = self.chars.next() {
                             end = i;
@@ -747,7 +722,7 @@ impl<'input> Lexer<'input> {
                             return Some(Ok((self.row, Token::DivideAssign, self.column)));
                         }
                         Some((_, '/')) => {
-                            // line comment
+                            // 注释
                             self.chars.next();
                             let doc_comment_start = match self.chars.peek() {
                                 Some((i, '/')) => Some(i + 1),
@@ -755,7 +730,6 @@ impl<'input> Lexer<'input> {
                             };
 
                             let mut last = start + 3;
-
                             while let Some((i, ch)) = self.chars.next() {
                                 if ch == '\n' || ch == '\r' {
                                     self.newline();
@@ -779,9 +753,8 @@ impl<'input> Lexer<'input> {
 
                         }
                         Some((_, '*')) => {
-                            // multiline comment
+                            // 多行注释
                             self.chars.next();
-
                             let doc_comment_start = match self.chars.peek() {
                                 Some((i, '*')) => Some(i + 1),
                                 _ => None,
@@ -1024,47 +997,7 @@ impl<'input> Lexer<'input> {
                         self.input[start..end].to_owned(),
                     )));
                 }
-                None => return None, // End of file
-            }
-        }
-    }
-
-    /// Next token is pragma value. Return it
-    fn pragma_value(&mut self) -> Option<Result<(usize, Token<'input>, usize), LexicalError>> {
-        // special parser for pragma solidity >=0.4.22 <0.7.0;
-        let mut start = None;
-        let mut end = 0;
-
-        // solc will include anything upto the next semicolon, whitespace
-        // trimmed on left and right
-        loop {
-            match self.chars.peek() {
-                Some((_, ';')) | None => {
-                    return if let Some(start) = start {
-                        Some(Ok((
-                            start,
-                            Token::StringLiteral(&self.input[start..end]),
-                            end,
-                        )))
-                    } else {
-                        self.next()
-                    };
-                }
-                Some((_, ch)) if ch.is_whitespace() => {
-                    self.chars.next();
-                }
-                Some((i, _)) => {
-                    if start.is_none() {
-                        start = Some(*i);
-                    }
-                    self.chars.next();
-
-                    // end should point to the byte _after_ the character
-                    end = match self.chars.peek() {
-                        Some((i, _)) => *i,
-                        None => self.input.len(),
-                    }
-                }
+                None => return None, // 文件结束
             }
         }
     }
@@ -1073,7 +1006,7 @@ impl<'input> Lexer<'input> {
 impl<'input> Iterator for Lexer<'input> {
     type Item = Spanned<Token<'input>, usize, LexicalError>;
 
-    /// Return the next token
+    /// 下一个Token
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.next();
         self.last_tokens = [

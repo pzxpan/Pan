@@ -528,10 +528,8 @@ impl<O: OutputStream> Compiler<O> {
         is_async: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
-        // Create bytecode for this function:
-        // remember to restore self.ctx.in_loop to the original after the function is compiled
-        let prev_ctx = self.ctx;
 
+        let prev_ctx = self.ctx;
         self.ctx = CompileContext {
             in_lambda,
             in_loop: false,
@@ -950,25 +948,23 @@ impl<O: OutputStream> Compiler<O> {
         end: &Option<ast::Expression>,
         body: &ast::Statement,
     ) -> Result<(), CompileError> {
-        // Start loop
         let start_label = self.new_label();
         let else_label = self.new_label();
         let end_label = self.new_label();
 
         self.emit(Instruction::SetupLoop(start_label, end_label));
 
-        // The thing iterated:
         self.compile_expression(start)?;
         if let Some(e) = end {
             self.compile_expression(e)?;
         }
-        // Retrieve Iterator
+
         self.emit(Instruction::GetIter);
 
         self.set_label(start_label);
         self.emit(Instruction::ForIter(else_label));
 
-        // Start of loop iteration, set targets:
+
         self.compile_store(target)?;
 
         let was_in_loop = self.ctx.in_loop;
@@ -1076,27 +1072,21 @@ impl<O: OutputStream> Compiler<O> {
         let break_label = self.new_label();
         let last_label = self.new_label();
 
-        // for all comparisons except the last (as the last one doesn't need a conditional jump)
         let ops_slice = &ops[0..ops.len()];
         let vals_slice = &vals[1..ops.len()];
         for (op, val) in ops_slice.iter().zip(vals_slice.iter()) {
             self.compile_expression(val)?;
-            // store rhs for the next comparison in chain
             self.emit(Instruction::Duplicate);
             self.emit(Instruction::Rotate(3));
 
             self.emit(Instruction::CompareOperation(to_operator(op)));
-
-            // if comparison result is false, we break with this value; if true, try the next one.
             self.emit(Instruction::JumpIfFalseOrPop(break_label));
         }
 
-        // handle the last comparison
         self.compile_expression(vals.last().unwrap())?;
         self.emit(Instruction::CompareOperation(to_operator(ops.last().unwrap())));
         self.emit(Instruction::Jump(last_label));
 
-        // early exit left us with stack: `rhs, comparison_result`. We need to clean up rhs.
         self.set_label(break_label);
         self.emit(Instruction::Rotate(2));
         self.emit(Instruction::Pop);
@@ -1112,17 +1102,14 @@ impl<O: OutputStream> Compiler<O> {
         target_label: Label,
     ) -> Result<(), CompileError> {
         match &expression {
+            //计算短路情况
             Expression::And(_, a, b) => {
                 if condition {
-                    // If all values are true.
                     let end_label = self.new_label();
-                    // If any of the values is false, we can short-circuit.
                     self.compile_jump_if(b, false, end_label)?;
-                    // It depends upon the last value now: will it be true?
                     self.compile_jump_if(a, true, target_label)?;
                     self.set_label(end_label);
                 } else {
-                    // If any value is false, the whole condition is false.
                     self.compile_jump_if(a, false, target_label)?;
                     self.compile_jump_if(b, false, target_label)?;
                 }
@@ -1131,12 +1118,9 @@ impl<O: OutputStream> Compiler<O> {
                 if condition {
                     self.compile_jump_if(a, false, target_label)?;
                     self.compile_jump_if(b, false, target_label)?;
-                    // If all values are true.
                 } else {
                     let end_label = self.new_label();
-                    // If any of the values is false, we can short-circuit.
                     self.compile_jump_if(b, true, end_label)?;
-                    // It depends upon the last value now: will it be true?
                     self.compile_jump_if(a, false, target_label)?;
                     self.set_label(end_label);
                 }
@@ -1144,8 +1128,8 @@ impl<O: OutputStream> Compiler<O> {
             Expression::Not(_, a) => {
                 self.compile_jump_if(a, !condition, target_label)?;
             }
+            //非短路
             _ => {
-                // Fall back case which always will work!
                 self.compile_expression(expression)?;
                 if condition {
                     self.emit(Instruction::JumpIfTrue(target_label));
@@ -1465,10 +1449,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::LoadConst(
                     bytecode::Constant::USize(value)));
             }
-            I32(value) => {
-                self.emit(Instruction::LoadConst(
-                    bytecode::Constant::Integer(value.clone())));
-            }
+
             Float(value) => {
                 self.emit(Instruction::LoadConst(
                     bytecode::Constant::Float(value),
@@ -1903,28 +1884,6 @@ impl<O: OutputStream> Compiler<O> {
         self.current_output().mark_generator();
     }
 }
-
-
-// fn try_get_constant_string(string: &ast::StringGroup) -> Option<String> {
-//     fn get_constant_string_inner(out_string: &mut String, string: &ast::StringGroup) -> bool {
-//         match string {
-//             ast::StringGroup::Constant { value } => {
-//                 out_string.push_str(&value);
-//                 true
-//             }
-//             ast::StringGroup::Joined { values } => values
-//                 .iter()
-//                 .all(|value| get_constant_string_inner(out_string, value)),
-//             ast::StringGroup::FormattedValue { .. } => false,
-//         }
-//     }
-//     let mut out_string = String::new();
-//     if get_constant_string_inner(&mut out_string, string) {
-//         Some(out_string)
-//     } else {
-//         None
-//     }
-// }
 
 fn compile_location(location: &ast::Loc) -> bytecode::Location {
     bytecode::Location::new(location.1, location.2)

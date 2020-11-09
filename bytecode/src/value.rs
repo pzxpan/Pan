@@ -12,8 +12,6 @@ use crate::bytecode::CodeObject;
 pub struct FnValue {
     pub name: String,
     pub code: CodeObject,
-    // pub upvalues: Vec<Upvalue>,
-    // pub receiver: Option<Arc<RefCell<Obj>>>,
     pub has_return: bool,
 }
 
@@ -21,8 +19,6 @@ pub struct FnValue {
 pub struct ClosureValue {
     pub name: String,
     pub code: Vec<u8>,
-    // pub captures: Vec<Arc<RefCell<vm::Upvalue>>>,
-    // pub receiver: Option<Arc<RefCell<Obj>>>,
     pub has_return: bool,
 }
 

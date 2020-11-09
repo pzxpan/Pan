@@ -68,10 +68,3 @@ pub fn parse(src: &str, file_name: String) -> Result<ast::SourceUnit, Vec<Diagno
     }
 }
 
-pub fn box_option<T>(o: Option<T>) -> Option<Box<T>> {
-    match o {
-        None => None,
-        Some(x) => Some(Box::new(x)),
-    }
-}
-

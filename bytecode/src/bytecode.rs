@@ -212,8 +212,6 @@ pub enum BinaryOperator {
     Power,
     Multiply,
     Divide,
-    FloorDivide,
-
     Modulo,
     Add,
     Subtract,
