@@ -22,7 +22,7 @@ use pan_parser::ast::Loc;
 use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
-use crate::resolve_builtinfun_import::{resolve_import_compile, resolve_builtin_fun};
+use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
 use pan_parser::diagnostics::ErrorType;
 use pan_parser::ast::VariableAttribute::Constant;
 use crate::util::get_number_type;

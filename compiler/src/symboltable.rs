@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_import_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
+use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
 use crate::builtin::builtin_type::get_builtin_type;
 use crate::builtin::builtin_fun::get_builtin_fun;
 use crate::error::CompileErrorType::SyntaxError;
