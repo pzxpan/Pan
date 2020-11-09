@@ -1,7 +1,5 @@
-/* 文件扫描，symbol生成
+/* 静态类型验证，符号表生成，
 */
-
-
 use std::fmt;
 use std::borrow::Borrow;
 use std::collections::HashSet;
@@ -29,23 +27,6 @@ pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTabl
     builder.scan_program(program)?;
     builder.finish()
 }
-
-pub fn statements_to_symbol_table(
-    statements: &Statement,
-) -> Result<SymbolTable, SymbolTableError> {
-    let mut builder: SymbolTableBuilder = Default::default();
-    builder.prepare();
-    builder.scan_statement(statements)?;
-    builder.finish()
-}
-
-pub fn file_top_symbol(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
-    let mut builder: SymbolTableBuilder = Default::default();
-    builder.prepare();
-    builder.scan_top_symbol_types(program, false)?;
-    builder.finish()
-}
-
 
 #[derive(Clone)]
 pub struct SymbolTable {
@@ -76,18 +57,20 @@ impl SymbolTable {
 #[derive(Clone, Copy, PartialEq)]
 pub enum SymbolTableType {
     Module,
-    Class,
+    Struct,
     Function,
     Enum,
+    Bound,
 }
 
 impl fmt::Display for SymbolTableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             SymbolTableType::Module => write!(f, "module"),
-            SymbolTableType::Class => write!(f, "class"),
+            SymbolTableType::Struct => write!(f, "struct"),
             SymbolTableType::Function => write!(f, "function"),
             SymbolTableType::Enum => write!(f, "enum"),
+            SymbolTableType::Bound => write!(f, "bound")
         }
     }
 }
@@ -96,6 +79,7 @@ impl fmt::Display for SymbolTableType {
 pub enum SymbolScope {
     Global,
     Local,
+    Capture,
 }
 
 /// 符号表中的符号，有作用域等属性，由于可以重新绑定，作用域在重新绑定之后会被修改，
@@ -103,11 +87,7 @@ pub enum SymbolScope {
 pub struct Symbol {
     pub name: String,
     pub scope: SymbolScope,
-    pub is_param: bool,
     pub is_referenced: bool,
-    pub is_assigned: bool,
-    pub is_parameter: bool,
-    pub is_free: bool,
     pub is_attribute: bool,
     pub ty: CType,
 }
@@ -117,29 +97,9 @@ impl Symbol {
         Symbol {
             name: name.to_owned(),
             scope: SymbolScope::Local,
-            is_param: false,
             is_referenced: false,
-            is_assigned: false,
-            is_parameter: false,
-            is_free: false,
             is_attribute: false,
             ty,
-        }
-    }
-
-    pub fn is_global(&self) -> bool {
-        if let SymbolScope::Global = self.scope {
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn is_local(&self) -> bool {
-        if let SymbolScope::Local = self.scope {
-            true
-        } else {
-            false
         }
     }
 }
@@ -316,7 +276,7 @@ impl SymbolTableBuilder {
                 }
 
                 SourceUnitPart::StructDefinition(def) => {
-                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
+                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Struct, def.loc.1);
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute)?;
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
@@ -390,7 +350,7 @@ impl SymbolTableBuilder {
                     }
                 }
                 SourceUnitPart::BoundDefinition(def) => {
-                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Class, def.loc.1);
+                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Struct, def.loc.1);
                     self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute)?;
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
@@ -1133,6 +1093,12 @@ impl SymbolTableBuilder {
                         location,
                     });
                 }
+                SymbolUsage::Builtin => {
+                    return Err(SymbolTableError {
+                        error: format!("'{}'内建类型,不能重新绑定 ", name),
+                        location,
+                    });
+                }
                 _ => {}
             }
         }
@@ -1140,17 +1106,8 @@ impl SymbolTableBuilder {
         table.symbols.insert(name.to_owned(), symbol);
         let symbol = table.symbols.get_mut(name).unwrap();
         match role {
-            SymbolUsage::Parameter => {
-                symbol.is_parameter = true;
-            }
-            SymbolUsage::Assigned => {
-                symbol.is_assigned = true;
-            }
             SymbolUsage::Attribute => {
                 symbol.is_attribute = true;
-            }
-            SymbolUsage::Used => {
-                symbol.is_referenced = true;
             }
             _ => {}
         }
