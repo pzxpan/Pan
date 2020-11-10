@@ -139,9 +139,9 @@ BoundDefinition: Box<BoundDefinition> = {
      }
 }
 EnumDefinition: Box<EnumDefinition> = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?> "enum" <name:Identifier> <generics:Generics> "{" <parts:(<EnumPart>)*> "}" <r:@R> => {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "enum" <name:Identifier> <generics:Generics> <im: ("impl" <CommaOne<Precedence0>>)?> "{" <parts:(<EnumPart>)*> "}" <r:@R> => {
         let is_pub = is_pub.is_some();
-        Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, generics,parts,is_pub})
+        Box::new(EnumDefinition{loc: Loc(file_no, l, r), doc, name, generics,parts,is_pub,impls:im})
     }
 }
 

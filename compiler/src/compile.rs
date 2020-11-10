@@ -1646,7 +1646,7 @@ impl<O: OutputStream> Compiler<O> {
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name_str);
             if let Some(s) = symbol {
-                if let CType::Struct(StructType { fields, static_fields, methods, bases, .. }) = &s.ty {
+                if let CType::Struct(StructType { fields, static_methods: static_fields, methods, bases, .. }) = &s.ty {
                     for (a_name, ..) in fields {
                         if a_name.eq(attri) {
                             return (true, "".to_string());
@@ -1693,8 +1693,8 @@ impl<O: OutputStream> Compiler<O> {
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name_str);
             if let Some(s) = symbol {
-                if let CType::Enum(EnumType { variants, methods, .. }) = &s.ty {
-                    for (a_name, _) in variants {
+                if let CType::Enum(EnumType { items, methods, .. }) = &s.ty {
+                    for (a_name, _) in items {
                         if a_name.eq(attri) {
                             return (true, false);
                         }

@@ -82,11 +82,16 @@ impl HasType for StructDefinition {
 
         let mut fields: Vec<(String, CType, bool)> = Vec::new();
         let mut methods: Vec<(String, CType)> = Vec::new();
+        let mut static_methods: Vec<(String, CType)> = Vec::new();
 
         for field in &self.parts {
             match field {
                 StructPart::FunctionDefinition(f) => {
-                    methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(&local_tables)));
+                    if f.is_static {
+                        static_methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(&local_tables)));
+                    } else {
+                        methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(&local_tables)));
+                    }
                 }
                 StructPart::StructVariableDefinition(v) => {
                     let ty = v.ty.get_type(&local_tables);
@@ -103,9 +108,9 @@ impl HasType for StructDefinition {
             }
         }
         if type_args.is_empty() {
-            CType::Struct(StructType { name, generics: None, bases, fields, static_fields: vec![], is_pub: self.is_pub, methods })
+            CType::Struct(StructType { name, generics: None, bases, fields, static_methods, is_pub: self.is_pub, methods })
         } else {
-            CType::Struct(StructType { name, generics: Some(type_args), bases, fields, static_fields: vec![], is_pub: self.is_pub, methods })
+            CType::Struct(StructType { name, generics: Some(type_args), bases, fields, static_methods, is_pub: self.is_pub, methods })
         }
     }
 }
@@ -124,20 +129,30 @@ fn get_register_type(tables: &Vec<SymbolTable>, name: String) -> CType {
 impl HasType for EnumDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         let mut type_args = Vec::new();
+        let mut local_tables = tables.clone();
+        let table = local_tables.last_mut().unwrap();
         for ty in &self.generics {
-            let cty = get_register_type(&tables, ty.name.name.clone());
+            let mut cty = get_register_type(&tables, ty.name.name.clone());
+            let mut g_ty = CType::Generic(ty.name.name.clone(), Box::new(cty.clone()));
             if cty == CType::Unknown {
-                type_args.push((ty.name.name.clone(), CType::Any))
-            } else {
-                type_args.push((ty.name.name.clone(), cty))
+                g_ty = CType::Generic(ty.name.name.clone(), Box::new(CType::Any));
             }
+            type_args.push(g_ty.clone());
+            let symbol = Symbol::new(&ty.name.name.clone(), g_ty.clone());
+            table.symbols.insert(ty.name.name.clone(), symbol);
         }
-        let mut variants: Vec<(String, CType)> = Vec::new();
+
         let mut methods: Vec<(String, CType)> = Vec::new();
+        let mut static_methods: Vec<(String, CType)> = Vec::new();
+        let mut variants: Vec<(String, CType)> = Vec::new();
         for field in &self.parts {
             match field {
                 EnumPart::FunctionDefinition(f) => {
-                    methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(tables)));
+                    if f.is_static {
+                        static_methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(&local_tables)));
+                    } else {
+                        methods.push((f.name.as_ref().unwrap().name.clone(), f.get_type(&local_tables)));
+                    }
                 }
                 EnumPart::EnumVariableDefinition(v) => {
                     let mut ref_type: Vec<CType> = Vec::new();
@@ -151,7 +166,17 @@ impl HasType for EnumDefinition {
             }
         }
         let name = self.name.name.clone();
-        CType::Enum(EnumType { name, type_args, variants, is_pub: self.is_pub, methods })
+        let mut bases = Vec::new();
+        if self.impls.is_some() {
+            for im in self.impls.as_ref().unwrap().iter() {
+                bases.push(im.expr_name());
+            }
+        }
+        if type_args.is_empty() {
+            CType::Enum(EnumType { name, items: variants, generics: None, bases, static_methods, is_pub: self.is_pub, methods })
+        } else {
+            CType::Enum(EnumType { name, items: variants, generics: Some(type_args), bases, static_methods, is_pub: self.is_pub, methods })
+        }
     }
 }
 

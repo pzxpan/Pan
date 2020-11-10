@@ -146,6 +146,7 @@ pub struct EnumDefinition {
     pub generics: Vec<Generic>,
     pub parts: Vec<EnumPart>,
     pub is_pub: bool,
+    pub impls: Option<Vec<Expression>>,
 }
 
 #[derive(Debug, PartialEq)]

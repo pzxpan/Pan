@@ -108,7 +108,7 @@ pub struct StructType {
     pub name: String,
     pub generics: Option<Vec<CType>>,
     pub fields: Vec<(String, CType, bool)>,
-    pub static_fields: Vec<(String, CType, bool)>,
+    pub static_methods: Vec<(String, CType)>,
     pub methods: Vec<(String, CType)>,
     pub bases: Vec<String>,
     pub is_pub: bool,
@@ -125,12 +125,13 @@ pub struct BoundType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EnumType {
     pub name: String,
-    pub type_args: Vec<(String, CType)>,
-    pub variants: Vec<(String, CType)>,
+    pub generics: Option<Vec<CType>>,
+    pub items: Vec<(String, CType)>,
+    pub static_methods: Vec<(String, CType)>,
     pub methods: Vec<(String, CType)>,
+    pub bases: Vec<String>,
     pub is_pub: bool,
 }
-
 
 impl CType {
     pub fn name(&self) -> String {

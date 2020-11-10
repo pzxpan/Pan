@@ -63,7 +63,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
         let mut generics = st.generics.clone().unwrap();
         let mut fields = st.fields.clone();
         let mut methods = st.methods.clone();
-        let mut static_fields = st.static_fields.clone();
+        let mut static_fields = st.static_methods.clone();
         for arg in args {
             let expected_ty = arg.expr.get_type(tables);
             let arg_name = &arg.name.name;
@@ -126,7 +126,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
             }
 
             //抹去静态方法中的泛型
-            for (i, fty) in st.static_fields.iter().enumerate() {
+            for (i, fty) in st.static_methods.iter().enumerate() {
                 if let CType::Fn(fnty) = fty.1.clone() {
                     let mut fn_arg_tys = fnty.arg_types.clone();
                     for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
@@ -157,14 +157,14 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                         is_pub: fnty.is_pub,
                         is_static: fnty.is_static,
                         has_body: fnty.has_body,
-                    }), fty.2));
+                    })));
                 }
             }
 
             println!("arg:{:?}, arg_ty:{:?},arg.expr:{:?}", arg.name, arg.expr.get_type(tables), arg.expr);
         }
 
-        result_ty.static_fields = static_fields;
+        result_ty.static_methods = static_fields;
         result_ty.methods = methods;
         result_ty.fields = fields;
         if generics.len() > 0 {
