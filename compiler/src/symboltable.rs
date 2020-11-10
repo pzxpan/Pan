@@ -259,11 +259,24 @@ impl SymbolTableBuilder {
                 }
             }
         }
+
         if &r_ty != ty {
-            return Err(SymbolTableError {
-                error: format!("返回值的类型{:?}与定义的类型{:?}不匹配", r_ty, ty),
-                location: body.loc().clone(),
-            });
+            if let Generic(name, ..) = ty {
+                return Err(SymbolTableError {
+                    error: format!("函数缺少范型{:?}的定义", name),
+                    location: body.loc().clone(),
+                });
+            } else if let Generic(name, ..) = r_ty {
+                return Err(SymbolTableError {
+                    error: format!("函数缺少范型{:?}的定义", name),
+                    location: body.loc().clone(),
+                });
+            } else {
+                return Err(SymbolTableError {
+                    error: format!("函数返回值的类型{:?}与定义的类型{:?}不匹配", r_ty, ty),
+                    location: body.loc().clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -289,7 +302,10 @@ impl SymbolTableBuilder {
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                                     self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
-                                    self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &ret_ty, self_name.eq(&return_name))?;
+                                    //函数范型又调用方确定类型再验证，不然验证的流程太长;
+                                    if def.generics.is_empty() {
+                                        self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &ret_ty, self_name.eq(&return_name))?;
+                                    }
                                     self.leave_scope();
                                 }
                             }
@@ -351,7 +367,9 @@ impl SymbolTableBuilder {
                                     self.in_struct_func = true;
                                     if def.body.is_some() {
                                         self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
-                                        self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
+                                        if def.generics.is_empty() {
+                                            self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
+                                        }
                                     }
                                     self.in_struct_func = false;
                                     self.leave_scope();
@@ -384,7 +402,9 @@ impl SymbolTableBuilder {
                         self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
-                            self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), tt.ret_type(), false)?;
+                            if def.generics.is_empty() {
+                                self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), tt.ret_type(), false)?;
+                            }
                         }
                         self.leave_scope();
                     }
@@ -423,7 +443,9 @@ impl SymbolTableBuilder {
                         self.in_struct_func = true;
                         if part.body.is_some() {
                             self.scan_statement(&part.body.as_ref().unwrap())?;
-                            self.get_body_return_ty(&part.body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
+                            if part.generics.is_empty() {
+                                self.get_body_return_ty(&part.body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
+                            }
                         }
                         self.in_struct_func = false;
                         self.leave_scope();

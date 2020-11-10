@@ -208,6 +208,15 @@ impl HasType for Expression {
                 if r == CType::Unknown {
                     r = get_register_expr_type(tables, right.expr_name(), 0);
                 }
+                if l == r {
+                    if let CType::Generic(l_name, ..) = l.clone() {
+                        if let CType::Generic(r_name, ..) = r.clone() {
+                            if l_name.eq(&r_name) {
+                                return l.clone();
+                            }
+                        }
+                    }
+                }
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
                 return if min < CType::I8 {
                     CType::Unknown
