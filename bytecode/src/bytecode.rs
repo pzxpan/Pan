@@ -102,7 +102,12 @@ pub enum Instruction {
     BinaryOperation(BinaryOperator, bool),
     LoadAttr(String),
     Match,
+
+    //值操作
     CompareOperation(ComparisonOperator),
+
+    //只比较类型，浅比较
+    ShallowOperation(ComparisonOperator),
     Pop,
     Rotate(usize),
     Duplicate,
@@ -150,7 +155,6 @@ pub enum Instruction {
     GetAIter,
     GetANext,
 }
-
 
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -389,6 +393,7 @@ impl Instruction {
             BinaryOperation(op, inplace) => w!(BinaryOperation, format!("{:?}", op), inplace),
             LoadAttr(name) => w!(LoadAttr, name),
             CompareOperation(op) => w!(CompareOperation, format!("{:?}", op)),
+            ShallowOperation(op) => w!(CompareOperation, format!("{:?}", op)),
             Pop => w!(Pop),
             Rotate(amount) => w!(Rotate, amount),
             Ignore => w!(Ignore),

@@ -472,7 +472,7 @@ impl<O: OutputStream> Compiler<O> {
                 let end_label = self.new_label();
                 self.load_name(&arg.name.as_ref().unwrap().name);
                 self.emit(Instruction::LoadConst(bytecode::Constant::None));
-                self.emit(Instruction::CompareOperation(bytecode::ComparisonOperator::Equal));
+                self.emit(Instruction::ShallowOperation(bytecode::ComparisonOperator::Equal));
                 self.emit(Instruction::JumpIfFalse(end_label));
                 self.compile_expression(&arg.default.as_ref().unwrap())?;
                 self.store_name(&arg.name.as_ref().unwrap().name);

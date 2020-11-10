@@ -93,7 +93,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        println!("instruction is:{:?}", instruction);
+        // println!("instruction is:{:?}", instruction);
         match instruction {
             bytecode::Instruction::LoadConst(ref value) => {
                 let obj = vm.unwrap_constant(value);
@@ -157,6 +157,7 @@ impl Frame {
             bytecode::Instruction::DeleteAttr(ref name) => self.delete_attr(vm, name),
             bytecode::Instruction::UnaryOperation(ref op) => self.execute_unop(vm, op),
             bytecode::Instruction::CompareOperation(ref op) => self.execute_compare(vm, op),
+            bytecode::Instruction::ShallowOperation(ref op) => self.execute_compare_shallow(op),
             bytecode::Instruction::ReturnValue => {
                 let value = self.pop_value();
                 Some(ExecutionResult::Return(value))
@@ -575,7 +576,6 @@ impl Frame {
     ) -> FrameResult {
         let b = self.pop_value();
         let a = self.pop_value();
-        println!("a==b:{:?}", a == b);
         let value = match *op {
             bytecode::ComparisonOperator::Equal => vm._eq(a, b),
             bytecode::ComparisonOperator::NotEqual => vm._ne(a, b),
@@ -587,6 +587,27 @@ impl Frame {
         };
 
         self.push_value(value);
+        None
+    }
+
+    #[cfg_attr(feature = "flame-it", flame("Frame"))]
+    fn execute_compare_shallow(
+        &self,
+        op: &bytecode::ComparisonOperator,
+    ) -> FrameResult {
+        let b = self.pop_value();
+        let a = self.pop_value();
+        let value = match *op {
+            bytecode::ComparisonOperator::Equal => a == b,
+            bytecode::ComparisonOperator::NotEqual => a != b,
+            bytecode::ComparisonOperator::Less => a < b,
+            bytecode::ComparisonOperator::LessOrEqual => a <= b,
+            bytecode::ComparisonOperator::Greater => a > b,
+            bytecode::ComparisonOperator::GreaterOrEqual => a >= b,
+            _ => unreachable!()
+        };
+
+        self.push_value(Value::Bool(value));
         None
     }
 
