@@ -772,23 +772,24 @@ impl SymbolTableBuilder {
 
                 self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                 let args_type = ty.param_type();
-
-                for (i, ..) in args_type.iter().enumerate() {
+                for (i, (ety, is_default)) in args_type.iter().enumerate() {
                     if let Some(e) = args.get(i) {
-                        match e.clone() {
-                            Expression::Variable(s) => {
-                                let cty = self.get_register_type(s.name);
-                                let expect_ty = args_type.get(i).unwrap().clone();
-                                if expect_ty != cty {
-                                    if expect_ty != CType::Any {
-                                        return Err(SymbolTableError {
-                                            error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i, expect_ty, cty),
-                                            location: loc.clone(),
-                                        });
-                                    }
-                                }
+                        let cty = e.get_type(&self.tables);
+                        let ret_ty = cty.ret_type();
+                        if ety != ret_ty {
+                            if ety != &CType::Any {
+                                return Err(SymbolTableError {
+                                    error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
+                                    location: loc.clone(),
+                                });
                             }
-                            _ => {}
+                        }
+                    } else {
+                        if !*is_default {
+                            return Err(SymbolTableError {
+                                error: format!("缺少第{:?}个参数，参数类型为{:?}", i + 1, ety),
+                                location: loc.clone(),
+                            });
                         }
                     }
                 }

@@ -239,8 +239,9 @@ impl HasType for Expression {
 
             Expression::As(_, left, right) => {
                 let l = left.get_type(tables);
+                let ret_ty = l.ret_type();
                 let r = right.get_type(tables);
-                return if r > CType::Str || l > CType::Str {
+                return if r > CType::Str || ret_ty > &CType::Str {
                     CType::Unknown
                 } else {
                     r
@@ -352,6 +353,7 @@ impl HasType for Expression {
             Expression::Not(_, _) |
             Expression::BoolLiteral(_, _)
             => { CType::Bool }
+            Expression::FunctionCall(_, name, _) => { name.get_type(&tables) }
             _ => { CType::Unknown }
         }
     }
