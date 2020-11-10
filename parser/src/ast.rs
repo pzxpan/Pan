@@ -423,6 +423,7 @@ pub struct Parameter {
     pub is_ref: bool,
     pub is_mut: bool,
     pub name: Option<Identifier>,
+    pub default: Option<Expression>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
