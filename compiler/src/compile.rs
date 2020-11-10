@@ -16,6 +16,7 @@ use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
 use crate::util::get_number_type;
+use pan_parser::lexer::Token::Constant;
 
 pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -246,6 +247,7 @@ impl<O: OutputStream> Compiler<O> {
             SymbolScope::Global => bytecode::NameScope::Global,
             SymbolScope::Local => bytecode::NameScope::Local,
             SymbolScope::Capture => bytecode::NameScope::Global,
+            SymbolScope::Parameter => bytecode::NameScope::Local,
         }
     }
 
@@ -464,7 +466,19 @@ impl<O: OutputStream> Compiler<O> {
             name.to_owned(),
         ));
         self.enter_scope();
-
+        for arg in args.iter() {
+            if arg.default.is_some() {
+                //这里应该需要修改，跳转指令感觉不爽
+                let end_label = self.new_label();
+                self.load_name(&arg.name.as_ref().unwrap().name);
+                self.emit(Instruction::LoadConst(bytecode::Constant::None));
+                self.emit(Instruction::CompareOperation(bytecode::ComparisonOperator::Equal));
+                self.emit(Instruction::JumpIfFalse(end_label));
+                self.compile_expression(&arg.default.as_ref().unwrap())?;
+                self.store_name(&arg.name.as_ref().unwrap().name);
+                self.set_label(end_label);
+            }
+        }
         Ok(())
     }
 

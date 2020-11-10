@@ -16,6 +16,7 @@ use crate::ctype::*;
 use crate::variable_type::*;
 use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
 use crate::builtin::builtin_type::get_builtin_type;
+use std::sync::atomic::Ordering::SeqCst;
 
 pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -78,6 +79,7 @@ pub enum SymbolScope {
     Global,
     Local,
     Capture,
+    Parameter,
 }
 
 /// 符号表中的符号，有作用域等属性，由于可以重新绑定，作用域在重新绑定之后会被修改，
@@ -87,6 +89,7 @@ pub struct Symbol {
     pub scope: SymbolScope,
     pub is_referenced: bool,
     pub is_attribute: bool,
+    pub is_parameter: bool,
     pub ty: CType,
 }
 
@@ -97,6 +100,7 @@ impl Symbol {
             scope: SymbolScope::Local,
             is_referenced: false,
             is_attribute: false,
+            is_parameter: false,
             ty,
         }
     }
@@ -1118,6 +1122,9 @@ impl SymbolTableBuilder {
         match role {
             SymbolUsage::Attribute => {
                 symbol.is_attribute = true;
+            }
+            SymbolUsage::Parameter => {
+                symbol.scope = SymbolScope::Parameter;
             }
             _ => {}
         }

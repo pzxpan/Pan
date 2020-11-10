@@ -17,7 +17,7 @@ impl HasType for Parameter {
 pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
     let ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
-    let is_optional = true;
+    let is_optional = s.1.as_ref().unwrap().default.is_some();
     (arg_name, ty, is_optional)
 }
 

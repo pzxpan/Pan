@@ -93,7 +93,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        //println!("instruction is:{:?}", instruction);
+        println!("instruction is:{:?}", instruction);
         match instruction {
             bytecode::Instruction::LoadConst(ref value) => {
                 let obj = vm.unwrap_constant(value);
@@ -444,7 +444,9 @@ impl Frame {
             }
         } else {
             for (i, name) in code.arg_names.iter().enumerate() {
-                s.store_name(name.to_string(), args.get(i).unwrap().to_owned());
+                if i < args.len() {
+                    s.store_name(name.to_string(), args.get(i).unwrap().to_owned());
+                }
             }
         }
 
@@ -573,6 +575,7 @@ impl Frame {
     ) -> FrameResult {
         let b = self.pop_value();
         let a = self.pop_value();
+        println!("a==b:{:?}", a == b);
         let value = match *op {
             bytecode::ComparisonOperator::Equal => vm._eq(a, b),
             bytecode::ComparisonOperator::NotEqual => vm._ne(a, b),

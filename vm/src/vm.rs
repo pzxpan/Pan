@@ -180,6 +180,12 @@ impl VirtualMachine {
             (Value::Obj(a), Value::Obj(b)) => {
                 Value::Bool(true)
             }
+            (Value::Nil, Value::Nil) => {
+                Value::Bool(true)
+            }
+            (Value::Nil, _) | (_, Value::Nil) => {
+                Value::Bool(false)
+            }
             _ => unreachable!()
         }
     }
