@@ -317,6 +317,7 @@ pub enum Expression {
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
     IfExpression(Loc, Box<Expression>, Box<Expression>, Box<Expression>),
     MatchExpression(Loc, Box<Expression>, Vec<(Box<Expression>, Box<Expression>)>),
+    Hole(Loc),
     Error,
 }
 

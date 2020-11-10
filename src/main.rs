@@ -23,7 +23,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("default.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("enum.pan"));
     //test_all_demo_file();
 }
 

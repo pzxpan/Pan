@@ -334,6 +334,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "in" => Token::In,
     "pub" => Token::Pub,
     ".." => Token::TwoDot,
+    "_" => Token::Hole,
     "ref" => Token::ReadOnlyRef,
 };
 

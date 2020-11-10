@@ -348,7 +348,8 @@ Precedence0: Expression = {
     },
 
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
-    <LambdaDefinition> => <>,
+   <LambdaDefinition> => <>,
+    <l:@L> "_" <r:@R> => Expression::Hole(Loc(file_no,l,r)),
     <!> => {errors.push(<>); Expression::Error}
 }
 

@@ -374,14 +374,18 @@ impl<O: OutputStream> Compiler<O> {
                 }
                 for (index, expr) in bodies.iter().enumerate() {
                     self.set_label(labels[index]);
-                    self.compile_match_item(expr.0.as_ref())?;
-                    self.emit(Instruction::Match);
-                    if index + 1 < len {
-                        self.emit(Instruction::JumpIfFalse(labels[index + 1]));
+                    self.emit(Instruction::Duplicate);
+                    if let ast::Expression::Hole(_) = expr.0.as_ref() {
                     } else {
-                        self.emit(Instruction::JumpIfFalse(end_label));
+                        self.compile_match_item(expr.0.as_ref())?;
+                        self.emit(Instruction::Match);
+                        if index + 1 < len {
+                            self.emit(Instruction::JumpIfFalse(labels[index + 1]));
+                        } else {
+                            self.emit(Instruction::JumpIfFalse(end_label));
+                        }
+                        self.store_match_content(expr.0.as_ref())?;
                     }
-                    self.store_match_content(expr.0.as_ref())?;
                     self.compile_statements(expr.1.as_ref())?;
                     self.emit(Instruction::Jump(end_label));
                 }
@@ -401,6 +405,8 @@ impl<O: OutputStream> Compiler<O> {
             } else if let Expression::Variable(ident) = name.as_ref() {
                 self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
             }
+        } else if let Expression::Attribute(_, _, Some(ident), _) = expression {
+            self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
         } else {
             self.compile_expression(expression)?;
         }
