@@ -34,6 +34,7 @@ pub enum SourceUnitPart {
     DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
+
     Error,
 }
 
@@ -159,13 +160,6 @@ pub struct BoundDefinition {
     pub is_pub: bool,
 }
 
-
-#[derive(Debug, PartialEq)]
-pub enum VariableAttribute {
-    Visibility(Visibility),
-    Constant(Loc),
-}
-
 #[derive(Debug, PartialEq)]
 pub struct StructVariableDefinition {
     pub doc: Vec<DocComment>,
@@ -187,8 +181,9 @@ pub struct EnumVariableDefinition {
 #[derive(Debug, PartialEq)]
 pub struct ConstVariableDefinition {
     pub doc: Vec<DocComment>,
+    pub is_pub: bool,
     pub loc: Loc,
-    pub ty: Expression,
+    pub ty: Option<Expression>,
     pub name: Identifier,
     pub initializer: Expression,
 }

@@ -18,6 +18,8 @@ SourceUnitPart: SourceUnitPart = {
     DataDefinition => SourceUnitPart::DataDefinition(<>),
     FunctionDefinition => SourceUnitPart::FunctionDefinition(<>),
     BoundDefinition => SourceUnitPart::BoundDefinition(<>),
+    ConstVariableDefinition => SourceUnitPart::ConstDefinition(<>),
+
     <err: !>  => { errors.push(err); SourceUnitPart::Error},
 }
 
@@ -91,6 +93,7 @@ StructTy: StructTy = {
 }
 
 StructPart: StructPart = {
+    ConstVariableDefinition => StructPart::ConstDefinition(<>),
     StructVariableDefinition => StructPart::StructVariableDefinition(<>),
     FunctionDefinition => StructPart::FunctionDefinition(<>),
 }
@@ -166,6 +169,14 @@ DataVariableDefinition: Box<StructVariableDefinition> = {
         Box::new(StructVariableDefinition {
             doc, loc: Loc(file_no, l, r), ty, is_pub:true, name, initializer: e,
         })
+    },
+}
+
+ConstVariableDefinition: Box<ConstVariableDefinition> = {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "const" <name:Identifier> <ty: (":" Precedence0)?> <e:("=" <Expression>)> <r:@R> ";" => {
+       let is_pub = is_pub.is_some();
+       Box::new(ConstVariableDefinition {
+            doc, loc: Loc(file_no, l, r), ty:ty.map(|s|s.1), is_pub, name, initializer: e})
     },
 }
 
