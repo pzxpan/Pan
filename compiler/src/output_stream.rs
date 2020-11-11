@@ -1,4 +1,4 @@
-use pan_bytecode::bytecode::{CodeFlags, CodeObject, Instruction, Label, Location};
+use pan_bytecode::bytecode::{CodeObject, Instruction, Label, Location};
 
 pub trait OutputStream: From<CodeObject> + Into<CodeObject> {
     ///弹出指令
@@ -18,6 +18,7 @@ impl From<CodeObject> for CodeObjectStream {
         CodeObjectStream { code }
     }
 }
+
 impl From<CodeObjectStream> for CodeObject {
     fn from(stream: CodeObjectStream) -> Self {
         stream.code
@@ -34,6 +35,6 @@ impl OutputStream for CodeObjectStream {
         self.code.label_map.insert(label, position);
     }
     fn mark_generator(&mut self) {
-        self.code.flags |= CodeFlags::IS_GENERATOR;
+        // self.code.flags = false;
     }
 }

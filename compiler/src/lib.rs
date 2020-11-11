@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod peephole;
 pub mod output_stream;
@@ -12,3 +14,4 @@ pub mod resolve_symbol;
 pub mod resolve_fns;
 pub mod builtin;
 pub mod util;
+pub mod const_value;

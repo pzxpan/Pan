@@ -81,6 +81,7 @@ pub enum SymbolScope {
     Local,
     Capture,
     Parameter,
+    Const,
 }
 
 /// 符号表中的符号，有作用域等属性，由于可以重新绑定，作用域在重新绑定之后会被修改，
@@ -91,6 +92,7 @@ pub struct Symbol {
     pub is_referenced: bool,
     pub is_attribute: bool,
     pub is_parameter: bool,
+    pub is_const: bool,
     pub ty: CType,
 }
 
@@ -102,6 +104,7 @@ impl Symbol {
             is_referenced: false,
             is_attribute: false,
             is_parameter: false,
+            is_const: false,
             ty,
         }
     }
@@ -1206,7 +1209,7 @@ impl SymbolTableBuilder {
     }
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-       // println!("register name={:?}, ty: {:?}", name, ty);
+        // println!("register name={:?}, ty: {:?}", name, ty);
         if self.in_struct_func && self.in_struct_scope(name.clone()) {
             return if role == SymbolUsage::Used {
                 Ok(())
@@ -1252,6 +1255,9 @@ impl SymbolTableBuilder {
             }
             SymbolUsage::Parameter => {
                 symbol.scope = SymbolScope::Parameter;
+            }
+            SymbolUsage::Const => {
+                symbol.scope = SymbolScope::Const;
             }
             _ => {}
         }

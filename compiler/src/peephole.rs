@@ -1,7 +1,8 @@
 use arrayvec::ArrayVec;
-use pan_bytecode::bytecode::{CodeObject, Instruction, Label, Location};
+use pan_bytecode::bytecode::{CodeObject, Instruction, Label, Location, Constant};
 
 use crate::output_stream::OutputStream;
+use std::collections::HashMap;
 
 pub mod optimizations;
 
@@ -37,6 +38,7 @@ impl From<Location> for InstructionMetadata {
 pub struct PeepholeOptimizer<O: OutputStream> {
     inner: O,
     buffer: ArrayVec<[(Instruction, InstructionMetadata); PEEPHOLE_BUFFER_SIZE]>,
+    pub const_map: HashMap<String, Constant>,
 }
 
 impl<O: OutputStream> From<CodeObject> for PeepholeOptimizer<O> {
@@ -64,6 +66,7 @@ impl<O: OutputStream> PeepholeOptimizer<O> {
         PeepholeOptimizer {
             inner,
             buffer: ArrayVec::default(),
+            const_map: HashMap::new(),
         }
     }
 
@@ -124,9 +127,19 @@ impl<O: OutputStream> OptimizationBuffer for PeepholeOptimizer<O> {
     fn pop(&mut self) -> (Instruction, InstructionMetadata) {
         self.pop()
     }
+
+    fn insert(&mut self, name: String, value: Constant) {
+        self.const_map.insert(name, value);
+    }
+
+    fn get(&mut self, name: String) -> Option<&Constant> {
+        self.const_map.get(&name)
+    }
 }
 
 pub trait OptimizationBuffer {
     fn emit(&mut self, instruction: Instruction, meta: InstructionMetadata);
     fn pop(&mut self) -> (Instruction, InstructionMetadata);
+    fn insert(&mut self, name: String, value: Constant);
+    fn get(&mut self, name: String) -> Option<&Constant>;
 }

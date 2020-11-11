@@ -38,37 +38,11 @@ pub struct CodeObject {
     /// 跳转指令;
     pub label_map: HashMap<Label, usize>,
     pub locations: Vec<Location>,
-    pub flags: CodeFlags,
     pub arg_names: Vec<String>,
     pub varargs: Varargs,
     pub source_path: String,
     pub first_line_number: usize,
     pub obj_name: String, // Name of the object that created this code object
-}
-
-
-bitflags! {
-    #[derive(Serialize, Deserialize)]
-    pub struct CodeFlags: u8 {
-        const HAS_DEFAULTS = 0x01;
-        const HAS_ANNOTATIONS = 0x02;
-        const NEW_LOCALS = 0x04;
-        const IS_GENERATOR = 0x08;
-        const IS_COROUTINE = 0x10;
-    }
-}
-
-impl Default for CodeFlags {
-    fn default() -> Self {
-        Self::NEW_LOCALS
-    }
-}
-
-impl CodeFlags {
-    pub const NAME_MAPPING: &'static [(&'static str, CodeFlags)] = &[
-        ("GENERATOR", CodeFlags::IS_GENERATOR),
-        ("COROUTINE", CodeFlags::IS_COROUTINE),
-    ];
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
@@ -84,11 +58,18 @@ impl Label {
 pub enum NameScope {
     Local,
     Global,
+    Const,
 }
 
 //指令集
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Instruction {
+    ///消除复杂常量
+    ConstStart,
+    ConstName,
+    DefineConstStart,
+    DefineConstEnd,
+
     LoadName(String, NameScope),
     StoreName(String, NameScope),
     Subscript,
@@ -246,7 +227,6 @@ pub enum Varargs {
 impl CodeObject {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        flags: CodeFlags,
         arg_names: Vec<String>,
         varargs: Varargs,
         source_path: String,
@@ -257,7 +237,6 @@ impl CodeObject {
             instructions: Vec::new(),
             label_map: HashMap::new(),
             locations: Vec::new(),
-            flags,
             arg_names,
             varargs,
             source_path,
@@ -274,7 +253,6 @@ impl CodeObject {
             instructions: Vec::new(),
             label_map: HashMap::new(),
             locations: Vec::new(),
-            flags: Default::default(),
             arg_names,
             varargs: Varargs::None,
             source_path: "".to_string(),
@@ -374,6 +352,10 @@ impl Instruction {
         }
 
         match self {
+            ConstStart => w!(LoadConstNameStart),
+            ConstName => w!(LoadConstNameEnd),
+            DefineConstEnd => w!(StoreConstName),
+            DefineConstStart => w!(StoreConstNameStart),
             LoadName(name, scope) => w!(LoadName, name, format!("{:?}", scope)),
             StoreName(name, scope) => w!(StoreName, name, format!("{:?}", scope)),
             Subscript => w!(Subscript),

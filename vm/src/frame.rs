@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::rc::Rc;
-use std::borrow::{BorrowMut};
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 use itertools::Itertools;
@@ -332,6 +332,7 @@ impl Frame {
             bytecode::NameScope::Local => {
                 self.scope.store_name(name.to_string(), obj);
             }
+            _ => {}
         }
         None
     }
@@ -347,6 +348,7 @@ impl Frame {
         let optional_value = match name_scope {
             bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
             bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
+            _ => { None }
         };
 
         let value = match optional_value {

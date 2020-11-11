@@ -1,6 +1,8 @@
-use pan_bytecode::bytecode::{self, Instruction};
+use pan_bytecode::bytecode::{self, Instruction, Constant};
 
 use super::{InstructionMetadata, OptimizationBuffer};
+use crate::compile::{insert, get};
+
 
 macro_rules! metas {
     [$($metas:expr),*$(,)?] => {
@@ -28,14 +30,15 @@ macro_rules! emitconst {
 
 pub fn operator(buf: &mut impl OptimizationBuffer) {
     let (instruction, meta) = buf.pop();
-    if let Instruction::BinaryOperation(op, inplace) = instruction {
-        let (rhs, rhs_meta) = buf.pop();
-        let (lhs, lhs_meta) = buf.pop();
-        macro_rules! op {
+    macro_rules! op {
             ($op:ident) => {
                 bytecode::BinaryOperator::$op
             };
         }
+    if let Instruction::BinaryOperation(op, inplace) = instruction {
+        let (rhs, rhs_meta) = buf.pop();
+        let (lhs, lhs_meta) = buf.pop();
+
         match (op, lhs, rhs) {
             (op!(Add), lc!(Integer, lhs), lc!(Integer, rhs)) => {
                 emitconst!(buf, [lhs_meta, rhs_meta], Integer, lhs + rhs)
@@ -68,6 +71,30 @@ pub fn operator(buf: &mut impl OptimizationBuffer) {
                 buf.emit(Instruction::BinaryOperation(op, inplace), meta);
             }
         }
+    } else if let Instruction::ConstName = instruction {
+        let mut ops = vec![];
+        loop {
+            let (operation, ometa) = buf.pop();
+            if let Instruction::ConstStart = operation {
+                break;
+            } else {
+                ops.push((operation, ometa));
+            }
+        }
+        let c = get("SS".to_string());
+        println!("const:{:?}", c);
+        buf.emit(Instruction::LoadConst(bytecode::Constant::I32(20)), meta);
+    } else if let Instruction::DefineConstEnd = instruction {
+        let mut ops = vec![];
+        loop {
+            let (operation, ometa) = buf.pop();
+            if let Instruction::DefineConstStart = operation {
+                break;
+            } else {
+                ops.push((operation, ometa));
+            }
+        }
+        insert("SS".to_string(), Constant::Tuple(vec![Constant::I32(20), Constant::I32(30)]));
     } else {
         buf.emit(instruction, meta)
     }

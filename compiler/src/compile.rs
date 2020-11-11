@@ -1,6 +1,9 @@
 use log::*;
 use std::borrow::Borrow;
-use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope};
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, Constant};
 use pan_bytecode::value::*;
 use pan_parser::ast::Loc;
 use pan_parser::diagnostics::ErrorType;
@@ -16,8 +19,27 @@ use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
 use crate::util::get_number_type;
-use pan_parser::lexer::Token::Constant;
-use pan_bytecode::bytecode::ComparisonOperator::In;
+
+
+lazy_static! {
+    static ref CONST_MAP: Mutex<HashMap<String,Constant>> = Mutex::new(HashMap::new());
+}
+
+pub fn insert(name: String, value: Constant) {
+    let ref mut map = CONST_MAP.lock().unwrap();
+    map.insert(name, value);
+}
+
+
+pub fn get(name: String) -> Option<Constant> {
+    let ref map = CONST_MAP.lock().unwrap();
+    let dd = map.get(&name);
+    if dd.is_some() {
+        Some(dd.unwrap().to_owned())
+    } else {
+        None
+    }
+}
 
 pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -147,7 +169,6 @@ impl<O: OutputStream> Compiler<O> {
 
     fn push_new_code_object(&mut self, obj_name: String) {
         self.push_output(CodeObject::new(
-            Default::default(),
             Vec::new(),
             Varargs::None,
             self.source_path.clone().unwrap(),
@@ -241,8 +262,9 @@ impl<O: OutputStream> Compiler<O> {
     }
     fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition) -> Result<(), CompileError> {
         println!("{:?}", const_def);
+        self.emit(Instruction::DefineConstStart);
         self.compile_expression(&const_def.initializer)?;
-        self.emit(Instruction::StoreName(const_def.name.name.clone(), bytecode::NameScope::Global));
+        self.emit(Instruction::DefineConstEnd);
         // let ty = self.lookup_name(&*const_def.name.name);
         // match ty {
         //     CType::i32 => {
@@ -258,11 +280,13 @@ impl<O: OutputStream> Compiler<O> {
 
     fn scope_for_name(&self, name: &str) -> bytecode::NameScope {
         let symbol = self.lookup_name(name);
+        println!("symbol:{:?},", symbol);
         match symbol.scope {
             SymbolScope::Global => bytecode::NameScope::Global,
             SymbolScope::Local => bytecode::NameScope::Local,
             SymbolScope::Capture => bytecode::NameScope::Global,
             SymbolScope::Parameter => bytecode::NameScope::Local,
+            SymbolScope::Const => bytecode::NameScope::Const,
         }
     }
 
@@ -484,10 +508,8 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn enter_function(&mut self, name: &str, args: &[ast::Parameter]) -> Result<(), CompileError> {
-        let flags = bytecode::CodeFlags::default();
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
-            flags,
             args.iter().map(|a| a.name.as_ref().unwrap().name.clone()).collect(),
             Varargs::None,
             self.source_path.clone().unwrap(),
@@ -589,9 +611,6 @@ impl<O: OutputStream> Compiler<O> {
                 bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
             self.compile_expression(&arg.ty)?;
         }
-        if is_async {
-            code.flags |= bytecode::CodeFlags::IS_COROUTINE;
-        }
 
         self.emit(Instruction::LoadConst(
             bytecode::Constant::Code(Box::new(code))));
@@ -664,12 +683,7 @@ impl<O: OutputStream> Compiler<O> {
         }
 
         if num_annotations > 0 {
-            code.flags |= bytecode::CodeFlags::HAS_ANNOTATIONS;
             self.emit(Instruction::BuildMap(num_annotations, false, false));
-        }
-
-        if is_async {
-            code.flags |= bytecode::CodeFlags::IS_COROUTINE;
         }
 
         self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code.clone()))));
@@ -704,7 +718,6 @@ impl<O: OutputStream> Compiler<O> {
 
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
-            Default::default(),
             vec![],
             Varargs::None,
             "pan".to_string(),
@@ -752,7 +765,6 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::ReturnValue);
 
         let mut code = self.pop_code_object();
-        code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
@@ -781,7 +793,6 @@ impl<O: OutputStream> Compiler<O> {
 
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
-            Default::default(),
             vec![],
             Varargs::None,
             self.source_path.as_ref().unwrap().to_string(),
@@ -822,7 +833,6 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::ReturnValue);
 
         let mut code = self.pop_code_object();
-        code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
@@ -851,7 +861,6 @@ impl<O: OutputStream> Compiler<O> {
 
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
-            Default::default(),
             vec![],
             Varargs::None,
             "".to_string(),
@@ -893,7 +902,6 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
         let mut code = self.pop_code_object();
-        code.flags &= !bytecode::CodeFlags::NEW_LOCALS;
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
@@ -1165,7 +1173,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        trace!("Compiling {:?}", expression);
+        println!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;
@@ -1176,6 +1184,9 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::Subscript);
             }
             Attribute(_, value, name, idx) => {
+                if self.scope_for_name(&value.expr_name()) == NameScope::Const {
+                    self.emit(Instruction::ConstStart);
+                }
                 self.compile_expression(value)?;
                 //按名字取，还是下标取
                 if name.is_some() {
@@ -1200,6 +1211,9 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::LoadConst(
                         bytecode::Constant::Integer(idx.unwrap() as i32)));
                     self.emit(Instruction::Subscript);
+                    if self.scope_for_name(&value.expr_name()) == NameScope::Const {
+                        self.emit(Instruction::ConstName);
+                    }
                 }
             }
             FunctionCall(_, name, args) => {
@@ -1543,7 +1557,6 @@ impl<O: OutputStream> Compiler<O> {
 
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
-            Default::default(),
             vec![".0".to_owned()],
             Varargs::None,
             "pan".to_string(),
