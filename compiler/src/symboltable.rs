@@ -202,6 +202,7 @@ pub enum SymbolUsage {
     Attribute,
     Parameter,
     Assigned,
+    Const,
     Used,
 }
 
@@ -390,10 +391,7 @@ impl SymbolTableBuilder {
                         self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned, def.loc)?;
                     }
                 }
-                // SourceUnitPart::ImportDirective(def) => {
-                //     //处理文件各项内容时，不需要处理import， import在扫描文件顶层symbol的时候已处理;
-                // }
-                // SourceUnitPart::ConstDefinition(def) => {}
+
                 SourceUnitPart::FunctionDefinition(def) => {
                     let tt = def.get_type(&self.tables);
                     if let Some(name) = &def.name {
@@ -486,7 +484,14 @@ impl SymbolTableBuilder {
                 }
                 SourceUnitPart::StructDefinition(def) => {
                     self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                    for part in &def.parts {
+                        if let StructPart::ConstDefinition(const_def) = part {
+                            let ty = const_def.initializer.get_type(&self.tables);
+                            self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                        }
+                    }
                 }
+                //处理文件各项内容时，不需要处理import和从const, const、import在扫描文件顶层symbol的时候已处理;
                 SourceUnitPart::ImportDirective(def) => {
                     if !in_import {
                         match def {
@@ -499,7 +504,10 @@ impl SymbolTableBuilder {
                         }
                     }
                 }
-                // SourceUnitPart::ConstDefinition(def) => {}
+                SourceUnitPart::ConstDefinition(def) => {
+                    let ty = def.initializer.get_type(&self.tables);
+                    self.register_name(&def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                }
                 SourceUnitPart::FunctionDefinition(def) => {
                     let ty = def.get_type(&self.tables);
                     if let Some(name) = &def.name {
@@ -1198,7 +1206,7 @@ impl SymbolTableBuilder {
     }
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        // println!("register name={:?}, ty: {:?}", name, ty);
+       // println!("register name={:?}, ty: {:?}", name, ty);
         if self.in_struct_func && self.in_struct_scope(name.clone()) {
             return if role == SymbolUsage::Used {
                 Ok(())
@@ -1225,6 +1233,12 @@ impl SymbolTableBuilder {
                 SymbolUsage::Builtin => {
                     return Err(SymbolTableError {
                         error: format!("'{}'内建类型,不能重新绑定 ", name),
+                        location,
+                    });
+                }
+                SymbolUsage::Const => {
+                    return Err(SymbolTableError {
+                        error: format!("'{}'是常量,不能重新赋值和定义", name),
                         location,
                     });
                 }

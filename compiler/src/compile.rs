@@ -195,7 +195,9 @@ impl<O: OutputStream> Compiler<O> {
                         _ => {}
                     }
                 }
-                ast::SourceUnitPart::ConstDefinition(_) => {}
+                ast::SourceUnitPart::ConstDefinition(def) => {
+                    self.calculate_const(def);
+                }
                 ast::SourceUnitPart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
                     if name.eq("main") {
@@ -237,7 +239,19 @@ impl<O: OutputStream> Compiler<O> {
 
         Ok(())
     }
-
+    fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition) -> Result<(), CompileError> {
+        println!("{:?}", const_def);
+        self.compile_expression(&const_def.initializer)?;
+        self.emit(Instruction::StoreName(const_def.name.name.clone(), bytecode::NameScope::Global));
+        // let ty = self.lookup_name(&*const_def.name.name);
+        // match ty {
+        //     CType::i32 => {
+        //         self.emit(Instruction::LoadConst(bytecode::Constant::Tuple()))
+        //     }
+        //     _ => {}
+        // }
+        Ok(())
+    }
     fn compile_statements(&mut self, statement: &ast::Statement) -> Result<(), CompileError> {
         self.compile_statement(statement)
     }
@@ -376,17 +390,14 @@ impl<O: OutputStream> Compiler<O> {
                 for (index, expr) in bodies.iter().enumerate() {
                     self.set_label(labels[index]);
                     self.emit(Instruction::Duplicate);
-                    if let ast::Expression::Hole(_) = expr.0.as_ref() {
-
-                    } else {
+                    if let ast::Expression::Hole(_) = expr.0.as_ref() {} else {
                         if expr.0.as_ref().is_compare_operation() {
                             self.emit(Instruction::Pop);
                             self.compile_match_item(expr.0.as_ref())?;
                         } else if expr.0.as_ref().is_logic_operation() {
                             //有问题，暂缓
-                          //  self.compile_jump_if(test, false, end_label)?;
-                        }
-                        else {
+                            //  self.compile_jump_if(test, false, end_label)?;
+                        } else {
                             self.compile_match_item(expr.0.as_ref())?;
                             self.emit(Instruction::Match);
                         }
@@ -730,6 +741,9 @@ impl<O: OutputStream> Compiler<O> {
                             self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
                         }
                     }
+                }
+                ast::StructPart::ConstDefinition(def) => {
+                    self.calculate_const(def)?;
                 }
                 _ => {}
             }
