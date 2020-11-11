@@ -1,9 +1,35 @@
-fun main() {
-   let a = 100;
-   match a {
-        100 -> { print(100); }
-        1000 ->{ print(1000); }
-        2000 -> {print(2000);}
-        3000 -> {print(2000);}
+pub enum Color {
+   Red(i32),
+   Green(float),
+   Blue(i32,i32,i32),
+   Black,
+   White,
+   pub fun is_warm(): bool {
+        return self == Color::Black;
    }
+}
+
+fun main() {
+   let color2 = Color::Black;
+   let color1 = Color::Red(10);
+
+   match color1 {
+     Color::White -> {print(40);}
+     Color::Black -> { print(50); }
+     Color::Red(a) -> {print(a);}
+     Color::Blue(a,b,cc) -> {print(a);print(b);}
+     _ -> {}
+   }
+   let bb = color2.is_warm();
+   print(bb);
+   
+   let num = 1000;
+   match num {
+        num < 100 -> {print(1);}
+        200 -> {print(2);}
+        1000 -> {print(1000);}
+        //没做完全匹配检查，通配符_必须要有,起保护作用
+        _ -> {print(200);}
+   }
+   return;
 }

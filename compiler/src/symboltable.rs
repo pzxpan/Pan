@@ -17,6 +17,7 @@ use crate::variable_type::*;
 use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
+use pan_bytecode::bytecode::Instruction::YieldFrom;
 
 pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -676,29 +677,64 @@ impl SymbolTableBuilder {
                 }
                 self.scan_multi_value_def(decls, &ty);
             }
-            Match(_, test, items) => {
+            Match(loc, test, items) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
-                for (expr, item) in items.iter() {
-                    self.scan_match_item(expr, &ExpressionContext::Load)?;
-                    self.scan_statement(item)?;
+                let ty = self.get_register_type(test.expr_name());
+                if let CType::Enum(enum_type) = ty {
+                    let mut hash_set = self.get_test_item(&enum_type);
+                    for (expr, item) in items.iter() {
+                        self.scan_match_item(expr, &ExpressionContext::Load, &mut hash_set)?;
+                        self.scan_statement(item)?;
+                    }
+                    if !hash_set.is_empty() {
+                        return Err(SymbolTableError {
+                            error: format!("未匹配到{:?}", hash_set),
+                            location: loc.clone(),
+                        });
+                    }
+                } else if ty >= CType::I8 && ty < CType::Float {
+                    let mut found_hole = false;
+                    for (expr, item) in items.iter() {
+                        self.scan_match_item(expr, &ExpressionContext::Load, &mut HashSet::new())?;
+                        if let ast::Expression::Hole(_) = expr.as_ref() {
+                            found_hole = true;
+                        }
+                        self.scan_statement(item)?;
+                    }
+                    if !found_hole {
+                        return Err(SymbolTableError {
+                            error: format!("{:?}的区间没有全部迭代，需要通配符'_'", test),
+                            location: loc.clone(),
+                        });
+                    }
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("关键字类型不是迭代类型{:?}", test),
+                        location: loc.clone(),
+                    });
                 }
             }
         }
         Ok(())
     }
-
-    fn scan_match_item(&mut self, expression: &Expression, context: &ExpressionContext) -> SymbolTableResult {
+    fn get_test_item(&self, enum_type: &EnumType) -> HashSet<String> {
+        let mut hash_set: HashSet<String> = HashSet::new();
+        for item in &enum_type.items {
+            hash_set.insert(item.0.clone());
+        }
+        return hash_set;
+    }
+    //剩下问题，tuple匹配，Variable匹配查找问题
+    fn scan_match_item(&mut self, expression: &Expression, context: &ExpressionContext, items: &mut HashSet<String>) -> SymbolTableResult {
         if let Expression::FunctionCall(_, name, args) = expression {
-            // println!("tables is {:?},",self.tables);
-            // for (name, value) in self.tables.get(0).unwrap().sub_tables.get(0).unwrap().symbols.clone() {
-            //     println!("name:{:?},value:{:?}", name,value);
-            // }
             let item_ty = self.get_register_type(name.expr_name());
             if let Expression::Attribute(_, name, Some(ident), _) = name.as_ref() {
                 if let Enum(enum_type) = item_ty {
+                    let mut found = false;
                     for (c, item_ty) in enum_type.items.iter() {
                         if ident.name.eq(c) {
-                            //TODO  个数比较
+                            found = true;
+                            items.remove(c);
                             if let CType::Reference(_, tys) = item_ty {
                                 if args.len() == tys.len() {
                                     for i in 0..args.len() {
@@ -708,9 +744,17 @@ impl SymbolTableBuilder {
                             }
                         }
                     }
+                    if !found {
+                        return Err(SymbolTableError {
+                            error: format!("未找到匹配项{:?},", ident.name.clone()),
+                            location: ident.loc.clone(),
+                        });
+                    }
                 }
-            } else if let Expression::Variable(_) = name.as_ref() {
+            } else if let Expression::Variable(v) = name.as_ref() {
+                //TODO
                 if let CType::Reference(_, tys) = item_ty {
+                    items.remove(&*v.name);
                     if args.len() == tys.len() {
                         for i in 0..args.len() {
                             self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Assigned, name.loc())?;
@@ -718,6 +762,32 @@ impl SymbolTableBuilder {
                     }
                 }
             }
+        } else if let Expression::Attribute(_, name, Some(ident), _) = expression {
+            let item_ty = self.get_register_type(name.expr_name());
+            if let Enum(enum_type) = item_ty {
+                let mut found = false;
+                for (c, item_ty) in enum_type.items.iter() {
+                    if ident.name.eq(c) {
+                        items.remove(&*ident.name);
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    return Err(SymbolTableError {
+                        error: format!("未找到匹配项{:?},", ident.name.clone()),
+                        location: ident.loc.clone(),
+                    });
+                }
+            }
+        } else if let Expression::Variable(name) = expression {
+            //TODO
+            let item_ty = self.get_register_type(name.clone().name);
+            if let CType::Reference(_, tys) = item_ty {
+                items.remove(&*name.name);
+            }
+        } else if let Expression::Hole(_) = expression {
+            items.clear();
         } else {
             self.scan_expression(expression, context);
         }

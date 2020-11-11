@@ -321,6 +321,7 @@ pub enum Expression {
     Error,
 }
 
+
 impl Expression {
     pub fn expr_name(&self) -> String {
         match self {
@@ -329,6 +330,25 @@ impl Expression {
             Expression::Variable(id) => id.clone().name,
             Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
             _ => "".to_string()
+        }
+    }
+    pub fn is_compare_operation(&self) -> bool {
+        match self {
+            Expression::More(_, _, _) |
+            Expression::MoreEqual(_, _, _) |
+            Expression::Less(_, _, _) |
+            Expression::LessEqual(_, _, _) |
+            Expression::Equal(_, _, _) |
+            Expression::NotEqual(_, _, _) => true,
+            _ => false
+        }
+    }
+    pub fn is_logic_operation(&self) -> bool {
+        match self {
+            Expression::Add(_, _, _) |
+            Expression::Or(_, _, _) |
+            Expression::Not(_, _) => true,
+            _ => false
         }
     }
 }

@@ -17,6 +17,7 @@ use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
 use crate::util::get_number_type;
 use pan_parser::lexer::Token::Constant;
+use pan_bytecode::bytecode::ComparisonOperator::In;
 
 pub type BasicOutputStream = PeepholeOptimizer<CodeObjectStream>;
 
@@ -376,9 +377,20 @@ impl<O: OutputStream> Compiler<O> {
                     self.set_label(labels[index]);
                     self.emit(Instruction::Duplicate);
                     if let ast::Expression::Hole(_) = expr.0.as_ref() {
+
                     } else {
-                        self.compile_match_item(expr.0.as_ref())?;
-                        self.emit(Instruction::Match);
+                        if expr.0.as_ref().is_compare_operation() {
+                            self.emit(Instruction::Pop);
+                            self.compile_match_item(expr.0.as_ref())?;
+                        } else if expr.0.as_ref().is_logic_operation() {
+                            //有问题，暂缓
+                          //  self.compile_jump_if(test, false, end_label)?;
+                        }
+                        else {
+                            self.compile_match_item(expr.0.as_ref())?;
+                            self.emit(Instruction::Match);
+                        }
+
                         if index + 1 < len {
                             self.emit(Instruction::JumpIfFalse(labels[index + 1]));
                         } else {
