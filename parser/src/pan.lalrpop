@@ -43,7 +43,6 @@ SingleDocComment: (usize, CommentType, &'input str)= {
     <l:@L> <c:DocComment> => (l, c.0, c.1)
 }
 
-
 ArrayDimension: Option<Expression> = {
     "[" "]" => None,
     "[" <Expression> "]" => Some(<>)
@@ -170,32 +169,22 @@ DataVariableDefinition: Box<StructVariableDefinition> = {
     },
 }
 
-Visibility: Visibility = {
-    <l:@L> "public" <r:@R> => Visibility::Public(Loc(file_no, l, r)),
-    <l:@L> "private" <r:@R> => Visibility::Private(Loc(file_no, l, r)),
-}
-
-VariableAttribute: VariableAttribute = {
-    Visibility => VariableAttribute::Visibility(<>),
-    <l:@L> "constant" <r:@R> => VariableAttribute::Constant(Loc(file_no, l, r))
-}
-
 Expression: Expression = {
-    Precedence15,
+    Precedence14,
 }
 
-Precedence15: Expression = {
-    <l:Precedence13> <a:@L> "=" <b:@R> <r:Precedence15> => Expression::Assign(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "|=" <b:@R> <r:Precedence15> => Expression::AssignOr(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "^=" <b:@R> <r:Precedence15> => Expression::AssignXor(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "&=" <b:@R> <r:Precedence15> => Expression::AssignAnd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "<<=" <b:@R> <r:Precedence15> => Expression::AssignShiftLeft(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> ">>=" <b:@R> <r:Precedence15> => Expression::AssignShiftRight(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "+=" <b:@R> <r:Precedence15> => Expression::AssignAdd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "-=" <b:@R> <r:Precedence15> => Expression::AssignSubtract(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "*=" <b:@R> <r:Precedence15> => Expression::AssignMultiply(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "/=" <b:@R> <r:Precedence15> => Expression::AssignDivide(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence13> <a:@L> "%=" <b:@R> <r:Precedence15> => Expression::AssignModulo(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+Precedence14: Expression = {
+    <l:Precedence13> <a:@L> "=" <b:@R> <r:Precedence14> => Expression::Assign(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "|=" <b:@R> <r:Precedence14> => Expression::AssignOr(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "^=" <b:@R> <r:Precedence14> => Expression::AssignXor(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "&=" <b:@R> <r:Precedence14> => Expression::AssignAnd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "<<=" <b:@R> <r:Precedence14> => Expression::AssignShiftLeft(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> ">>=" <b:@R> <r:Precedence14> => Expression::AssignShiftRight(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "+=" <b:@R> <r:Precedence14> => Expression::AssignAdd(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "-=" <b:@R> <r:Precedence14> => Expression::AssignSubtract(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "*=" <b:@R> <r:Precedence14> => Expression::AssignMultiply(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "/=" <b:@R> <r:Precedence14> => Expression::AssignDivide(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence13> <a:@L> "%=" <b:@R> <r:Precedence14> => Expression::AssignModulo(Loc(file_no, a, b), Box::new(l), Box::new(r)),
 
     Precedence13,
 }
@@ -304,7 +293,6 @@ DictEntry: DictEntry = {
      }
 }
 
-
 FunctionCall: Expression = {
     <a:@L> <i:Precedence0> "(" <v:Comma<Expression>> ")" <b:@R> => {
         Expression::FunctionCall(Loc(file_no, a, b), Box::new(i), v)
@@ -360,7 +348,8 @@ Precedence0: Expression = {
     },
 
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
-    <LambdaDefinition> => <>,
+   <LambdaDefinition> => <>,
+    <l:@L> "_" <r:@R> => Expression::Hole(Loc(file_no,l,r)),
     <!> => {errors.push(<>); Expression::Error}
 }
 
@@ -407,17 +396,6 @@ ParameterList: Vec<(Loc, Option<Parameter>)> = {
     "(" ")" => Vec::new(),
     "(" <l:@L> <p:Parameter> <r:@R> ")" => vec!((Loc(file_no, l, r), Some(p))),
     "(" <CommaTwo<OptParameter>> ")" => <>,
-}
-
-StateMutability: StateMutability = {
-    <l:@L> "pure" <r:@R> => StateMutability::Pure(Loc(file_no, l, r)),
-    <l:@L> "view" <r:@R> => StateMutability::View(Loc(file_no, l, r)),
-    <l:@L> "payable" <r:@R> => StateMutability::Payable(Loc(file_no, l, r)),
-}
-
-FunctionAttribute: FunctionAttribute = {
-    StateMutability => FunctionAttribute::StateMutability(<>),
-    Visibility => FunctionAttribute::Visibility(<>),
 }
 
 BlockStatementOrSemiColon: Option<Statement> = {
@@ -581,6 +559,11 @@ extern {
         "}" => Token::CloseCurlyBrace,
         "(" => Token::OpenParenthesis,
         ")" => Token::CloseParenthesis,
+        "[" => Token::OpenBracket,
+        "]" => Token::CloseBracket,
+        "." => Token::Member,
+        "," => Token::Comma,
+
         "=" => Token::Assign,
         "==" => Token::Equal,
         "=>" => Token::Arrow,
@@ -620,12 +603,8 @@ extern {
         "**" => Token::Power,
         "!" => Token::Not,
         "~" => Token::Complement,
-        "++" => Token::Increment,
-        "--" => Token::Decrement,
-        "[" => Token::OpenBracket,
-        "]" => Token::CloseBracket,
-        "." => Token::Member,
-        "," => Token::Comma,
+        "_" => Token::Hole,
+
         DocComment => Token::DocComment(<CommentType>, <&'input str>),
         float => Token::Float(<f64>),
         i8 => Token::I8(<i8>),
@@ -651,16 +630,11 @@ extern {
         "bound" => Token::Bound,
 
         "enum" => Token::Enum,
-        "public" => Token::Public,
-        "private" => Token::Private,
 
-        "constant" => Token::Constant,
+        "const" => Token::Constant,
         "true" => Token::True,
         "false" => Token::False,
         "pure" => Token::Pure,
-        "view" => Token::View,
-        "payable" => Token::Payable,
-        "constructor" => Token::Constructor,
         "fun" => Token::Function,
         "return" => Token::Return,
         "if" => Token::If,
@@ -674,7 +648,6 @@ extern {
 
         "as" => Token::As,
         "from" => Token::From,
-        "is" => Token::Is,
         "impl" => Token::Impl,
         "let" => Token::Let,
         "in" => Token::In,

@@ -158,8 +158,12 @@ impl VirtualMachine {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
                     Obj::EnumObj(EnumObj { item_name, field_map, .. }) => {
-                        return if item_name == &b {
-                            (Value::Bool(true), field_map.as_ref().cloned().unwrap())
+                        return if item_name.name().eq(&b.name()) {
+                            if field_map.is_some() {
+                                (Value::Bool(true), field_map.as_ref().cloned().unwrap())
+                            } else {
+                                (Value::Bool(true), vec![])
+                            }
                         } else {
                             (Value::Bool(false), vec![])
                         };

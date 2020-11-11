@@ -698,6 +698,7 @@ impl SymbolTableBuilder {
                 if let Enum(enum_type) = item_ty {
                     for (c, item_ty) in enum_type.items.iter() {
                         if ident.name.eq(c) {
+                            //TODO  个数比较
                             if let CType::Reference(_, tys) = item_ty {
                                 if args.len() == tys.len() {
                                     for i in 0..args.len() {

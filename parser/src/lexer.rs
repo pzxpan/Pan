@@ -36,20 +36,14 @@ pub enum Token<'input> {
     Data,
     Enum,
 
-    Public,
-    Private,
-
     Constant,
 
     Pure,
 
-    Do,
     Continue,
     Break,
 
-    Emit,
     Return,
-    Returns,
 
     Float(f64),
     I8(i8),
@@ -90,11 +84,9 @@ pub enum Token<'input> {
     And,
 
     AddAssign,
-    Increment,
     Add,
 
     SubtractAssign,
-    Decrement,
     Subtract,
     Hole,
 
@@ -130,8 +122,6 @@ pub enum Token<'input> {
     More,
     MoreEqual,
 
-    Constructor,
-
     Member,
     Colon,
     TwoColon,
@@ -140,7 +130,6 @@ pub enum Token<'input> {
     Complement,
     Question,
 
-    Mapping,
     Arrow,
     ThinArrow,
 
@@ -148,9 +137,6 @@ pub enum Token<'input> {
     From,
     Is,
     Impl,
-    View,
-    Virtual,
-    Payable,
     Let,
     In,
     Pub,
@@ -201,10 +187,8 @@ impl<'input> fmt::Display for Token<'input> {
             Token::BitwiseAndAssign => write!(f, "&="),
             Token::And => write!(f, "&&"),
             Token::AddAssign => write!(f, "+="),
-            Token::Increment => write!(f, "++"),
             Token::Add => write!(f, "+"),
             Token::SubtractAssign => write!(f, "-="),
-            Token::Decrement => write!(f, "--"),
             Token::Subtract => write!(f, "-"),
             Token::Hole => write!(f, "_"),
             Token::MulAssign => write!(f, "*="),
@@ -242,19 +226,13 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Import => write!(f, "import"),
             Token::Data => write!(f, "data"),
             Token::Enum => write!(f, "enum"),
-            Token::Public => write!(f, "public"),
-            Token::Private => write!(f, "private"),
 
-            Token::Constant => write!(f, "constant"),
-
+            Token::Constant => write!(f, "const"),
             Token::Pure => write!(f, "pure"),
 
-            Token::Do => write!(f, "do"),
             Token::Continue => write!(f, "continue"),
             Token::Break => write!(f, "break"),
-            Token::Emit => write!(f, "emit"),
             Token::Return => write!(f, "return"),
-            Token::Returns => write!(f, "returns"),
             Token::True => write!(f, "true"),
             Token::False => write!(f, "false"),
             Token::Else => write!(f, "else"),
@@ -263,8 +241,6 @@ impl<'input> fmt::Display for Token<'input> {
             Token::While => write!(f, "while"),
             Token::If => write!(f, "if"),
             Token::Match => write!(f, "match"),
-            Token::Constructor => write!(f, "constructor"),
-            Token::Mapping => write!(f, "mapping"),
             Token::Arrow => write!(f, "=>"),
             Token::ThinArrow => write!(f, "->"),
 
@@ -272,13 +248,10 @@ impl<'input> fmt::Display for Token<'input> {
             Token::From => write!(f, "from"),
             Token::Is => write!(f, "is"),
             Token::Impl => write!(f, "impl"),
-            Token::Virtual => write!(f, "virtual"),
             Token::Let => write!(f, "let"),
             Token::Lambda => write!(f, "lambda"),
             Token::In => write!(f, "in"),
             Token::Pub => write!(f, "pub"),
-            Token::Payable => write!(f, "payable"),
-            Token::View => write!(f, "view"),
         }
     }
 }
@@ -330,12 +303,10 @@ impl LexicalError {
 
 static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "break" => Token::Break,
-    "constant" => Token::Constant,
-    "constructor" => Token::Constructor,
+    "const" => Token::Constant,
     "continue" => Token::Continue,
     "struct" => Token::Struct,
     "bound" => Token::Bound,
-    "do" => Token::Do,
     "else" => Token::Else,
     "elif" => Token::Elif,
     "match" => Token::Match,
@@ -347,29 +318,23 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "if" => Token::If,
     "import" => Token::Import,
 
-    "mapping" => Token::Mapping,
-    "private" => Token::Private,
-    "public" => Token::Public,
     "pure" => Token::Pure,
-    "payable" => Token::Payable,
+
     "return" => Token::Return,
-    "returns" => Token::Returns,
     "data" => Token::Data,
     "true" => Token::True,
 
     "while" => Token::While,
-     "view" => Token::View,
 
     "as" => Token::As,
     "from" => Token::From,
-    "is" => Token::Is,
     "impl" => Token::Impl,
-    "virtual" => Token::Virtual,
     "let" => Token::Let,
     "lambda" => Token::Lambda,
     "in" => Token::In,
     "pub" => Token::Pub,
     ".." => Token::TwoDot,
+    "_" => Token::Hole,
     "ref" => Token::ReadOnlyRef,
 };
 
