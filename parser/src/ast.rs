@@ -47,12 +47,12 @@ pub enum Import {
 
     //import std.math.* as Math;
     //import std.math.sqrt as Sqrt
-    GlobalSymbol(Vec<Identifier>, Identifier, bool),
+    Rename(Vec<Identifier>, Identifier, bool),
 
     //import std.math {sqrt,floor};
     //import std.math {sqrt as Sqrt, floor as Floor};
     //import std { math as Math, math.floor as Floor};
-    Rename(Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
+    PartRename(Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
 }
 
 #[derive(Debug, PartialEq, Clone)]

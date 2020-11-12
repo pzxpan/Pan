@@ -15,18 +15,27 @@ use crate::variable_type::HasType;
 use crate::ctype::{CType, StructType, FnType};
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> SymbolTableResult {
-    let whole_name = "demo".to_string();
+    //顺序为系统目录，工作目录，当前子目录;
+    let import_paths: [String; 3] = ["/Users/cuiqingbo/Desktop/Pan/Pan/demo".to_string(), "/Users/cuiqingbo/Desktop/Pan/Pan/src".to_string(), "sub_dir".to_string()];
+    for s in import_paths.iter() {
+        let r = scan_import_symbol_inner(s.to_string(), build, idents, as_name, is_all);
+        if r.is_ok() {
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+
+fn scan_import_symbol_inner(whole_name: String, build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: &Option<String>, is_all: &bool) -> SymbolTableResult {
     let mut path_str = idents.iter().fold(whole_name, |mut ss, s| {
         ss.push_str("/");
         ss.push_str(&s.name);
         return ss;
     });
     path_str.push_str(".pan");
-    let mut path = env::current_dir().unwrap();
+    let mut path = PathBuf::new();
     path.push(path_str.clone());
-    if path.is_file() {
-        scan_import_file(build, &path, as_name, is_all)?;
-    } else {
+    if !path.exists() {
         //可能是文件中的定义项，删除名称、.pan后缀和/
         let len = path_str.len() - (idents.last().unwrap().name.len() + 4 + 1);
         let tmp = path_str.clone();
@@ -42,6 +51,10 @@ pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifie
                 location: idents.last().unwrap().loc,
             });
         }
+    } else if path.is_file() {
+        scan_import_file(build, &path, as_name, is_all)?;
+    } else if path.is_dir() {
+        //处理文件夹
     }
     Ok(())
 }

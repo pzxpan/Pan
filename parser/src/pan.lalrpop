@@ -25,9 +25,9 @@ SourceUnitPart: SourceUnitPart = {
 
 ImportDirective: Import = {
     "import" <s:Dot<Identifier>> <all:(".*")?> ";" => Import::Plain(s,all.is_some()),
-    "import" <s:Dot<Identifier>> <all:(".*")?> "as" <id:Identifier> ";" => Import::GlobalSymbol(s, id,all.is_some()),
+    "import" <s:Dot<Identifier>> <all:(".*")?> "as" <id:Identifier> ";" => Import::Rename(s, id,all.is_some()),
     "import" <s:Dot<Identifier>> "{" <rename:CommaOne<ImportRename>> "}" ";" => {
-        Import::Rename(s, rename)
+        Import::PartRename(s, rename)
     }
 }
 
