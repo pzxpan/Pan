@@ -30,8 +30,8 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("const.pan"));
-    //test_all_demo_file();
+   // test_one_file(&env::current_dir().unwrap().join("demo").join("color.pan"));
+    test_all_demo_file();
 }
 
 fn test_all_demo_file() {

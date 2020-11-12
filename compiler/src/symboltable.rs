@@ -290,8 +290,10 @@ impl SymbolTableBuilder {
             match part {
                 SourceUnitPart::DataDefinition(_) => {}
                 SourceUnitPart::EnumDefinition(def) => {
+                    let enum_ty = self.get_register_type(def.name.name.clone());
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Enum, def.loc.1);
-                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Used, Loc::default())?;
+                    self.register_name(&"self".to_string(), enum_ty, SymbolUsage::Used, Loc::default())?;
+
                     let self_name = &def.name.name.clone();
                     for part in &def.parts {
                         match part {
@@ -330,8 +332,9 @@ impl SymbolTableBuilder {
                 }
 
                 SourceUnitPart::StructDefinition(def) => {
+                    let struct_ty = self.get_register_type(def.name.name.clone());
                     self.enter_scope(&def.name.name.clone(), SymbolTableType::Struct, def.loc.1);
-                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute, def.loc)?;
+                    self.register_name(&"self".to_string(), struct_ty, SymbolUsage::Attribute, def.loc)?;
                     let self_name = def.name.name.clone();
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
@@ -690,7 +693,7 @@ impl SymbolTableBuilder {
             }
             Match(loc, test, items) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
-                let ty = self.get_register_type(test.expr_name());
+                let mut ty = self.get_register_type(test.expr_name());
                 if let CType::Enum(enum_type) = ty {
                     let mut hash_set = self.get_test_item(&enum_type);
                     for (expr, item) in items.iter() {
