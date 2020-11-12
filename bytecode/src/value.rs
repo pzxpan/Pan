@@ -17,7 +17,7 @@ pub struct FnValue {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ClosureValue {
     pub name: String,
-    pub code: Vec<u8>,
+    pub code: CodeObject,
     pub has_return: bool,
 }
 
@@ -352,7 +352,11 @@ pub fn get_item(a: Value, b: Value) -> Option<Value> {
         (Value::Obj(e), Value::I32(sub)) => {
             match &*e.borrow_mut() {
                 Obj::ArrayObj(arr) => {
-                    arr.get(sub as usize).cloned()
+                    if (sub as usize) < arr.len() {
+                        arr.get(sub as usize).cloned()
+                    } else {
+                        unreachable!()
+                    }
                 }
                 Obj::MapObj(map) => {
                     map.get(&sub.to_string()).cloned()
@@ -368,6 +372,20 @@ pub fn get_item(a: Value, b: Value) -> Option<Value> {
                 }
                 _ => unreachable!()
             }
+        }
+        _ => unreachable!()
+    }
+}
+
+pub fn get_map_item(a: Constant, b: Value) -> Option<Constant> {
+    match (a, b) {
+        (Constant::Map(elements), Value::String(sub)) => {
+            for e in elements {
+                if sub.eq(&e.0.to_string()) {
+                    return Some(e.1);
+                }
+            }
+            return None;
         }
         _ => unreachable!()
     }
@@ -394,6 +412,7 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         String(ref value) => Value::String(value.clone()),
         Bytes(ref value) => Value::Nil,
         Boolean(ref value) => Value::Bool(value.clone()),
+        Char(ref value) => Value::Char(value.clone()),
         Code(ref code) => {
             Value::Code(*code.to_owned())
         }
@@ -407,6 +426,7 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         None => Value::Nil,
         Ellipsis => Value::Nil,
         Struct(ref ty) => Value::Type(ty.clone()),
-        Enum(ref ty) => Value::Enum(ty.clone())
+        Enum(ref ty) => Value::Enum(ty.clone()),
+        Map(ref elements) => { Value::Nil }
     }
 }

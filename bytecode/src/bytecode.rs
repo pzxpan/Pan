@@ -64,7 +64,7 @@ pub enum NameScope {
 //指令集
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Instruction {
-    ///消除复杂常量
+    ///消除复杂常量的下标
     ConstStart,
     ConstEnd,
     DefineConstStart,
@@ -159,6 +159,7 @@ pub enum Constant {
     U64(u64),
     U128(u128),
     USize(usize),
+    Char(char),
     Integer(i32),
     Float(f64),
     Complex(Complex64),
@@ -167,6 +168,7 @@ pub enum Constant {
     Bytes(Vec<u8>),
     Code(Box<CodeObject>),
     Tuple(Vec<Constant>),
+    Map(Vec<(Constant, Constant)>),
     Struct(TypeValue),
     Enum(EnumValue),
     None,
@@ -451,6 +453,7 @@ impl fmt::Display for Constant {
             Constant::String(value) => write!(f, "{:?}", value),
             Constant::Bytes(value) => write!(f, "{:?}", value),
             Constant::Code(code) => write!(f, "{:?}", code),
+            Constant::Char(c) => write!(f, "{:?}", c),
             Constant::Tuple(elements) => write!(
                 f,
                 "({})",
@@ -464,6 +467,13 @@ impl fmt::Display for Constant {
             Constant::Ellipsis => write!(f, "Ellipsis"),
             Constant::Struct(ty) => write!(f, "Struct{:?}", ty),
             Constant::Enum(ty) => write!(f, "Enum{:?}", ty),
+            Constant::Map(elements) => write!(f,
+                                              "({})",
+                                              elements
+                                                  .iter()
+                                                  .map(|e| format!("{},{}", e.0, e.1))
+                                                  .collect::<Vec<_>>()
+                                                  .join(", "))
         }
     }
 }

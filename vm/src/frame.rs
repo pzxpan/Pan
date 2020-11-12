@@ -93,7 +93,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        println!("instruction is:{:?}", instruction);
+        // println!("instruction is:{:?}", instruction);
         match instruction {
             bytecode::Instruction::LoadConst(ref value) => {
                 let obj = vm.unwrap_constant(value);
@@ -332,7 +332,9 @@ impl Frame {
             bytecode::NameScope::Local => {
                 self.scope.store_name(name.to_string(), obj);
             }
-            _ => {}
+            bytecode::NameScope::Const => {
+                self.scope.store_global(name.to_string(), obj);
+            }
         }
         None
     }
@@ -348,7 +350,7 @@ impl Frame {
         let optional_value = match name_scope {
             bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
             bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
-            _ => { None }
+            bytecode::NameScope::Const => self.scope.load_global(name.to_string()),
         };
 
         let value = match optional_value {

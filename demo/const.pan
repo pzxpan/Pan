@@ -1,13 +1,11 @@
-pub const SS = (20,30);
 
-pub const DD = 20 + 30;
-
+pub const MAP = {"pan":10000,"zhen":40,"ddd":30};
 fun main() {
-  let ss = SS.0;
-  print(ss);
-
+  let a  = MAP["pan"];
+  print(a);
   return;
 }
+
 
 
 

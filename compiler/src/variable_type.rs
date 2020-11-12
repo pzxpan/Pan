@@ -388,6 +388,27 @@ impl HasType for Expression {
             Expression::BoolLiteral(_, _)
             => { CType::Bool }
             Expression::FunctionCall(_, name, _) => { name.get_type(&tables) }
+            Expression::Subscript(_, a, b) => {
+                let a_ty = a.get_type(&tables);
+                // Tuple(Box < Vec < CType >>),
+                // Array(Box < CType >),
+                // Dict(Box < CType >, Box < CType >),
+                if let CType::Tuple(tys) = a_ty {
+                    if let Expression::NumberLiteral(_, n) = b.as_ref() {
+                        let ty = tys.get(*n as usize);
+                        if ty.is_some() {
+                            return ty.unwrap().clone();
+                        }
+                    }
+                    return CType::Unknown;
+                } else if let CType::Array(ty) = a_ty {
+                    return ty.as_ref().clone();
+                } else if let CType::Dict(key, value) = a_ty {
+                    return value.as_ref().clone();
+                } else {
+                    return CType::Unknown;
+                }
+            }
             _ => { CType::Unknown }
         }
     }

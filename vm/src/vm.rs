@@ -772,6 +772,7 @@ impl VirtualMachine {
             Complex(ref value) => Value::Nil,
             String(ref value) => Value::String(value.clone()),
             Bytes(ref value) => Value::Nil,
+            Char(ref value) => Value::Char(*value),
             Boolean(ref value) => Value::Bool(value.clone()),
             Code(ref code) => {
                 Value::Code(*code.to_owned())
@@ -782,7 +783,8 @@ impl VirtualMachine {
             None => Value::Nil,
             Ellipsis => Value::Nil,
             Struct(ref ty) => Value::Type(ty.clone()),
-            Enum(ref ty) => Value::Enum(ty.clone())
+            Enum(ref ty) => Value::Enum(ty.clone()),
+            Map(ref ty) => { Value::Nil }
         }
     }
 }

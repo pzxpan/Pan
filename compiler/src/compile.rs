@@ -261,18 +261,10 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
     fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition) -> Result<(), CompileError> {
-        println!("{:?}", const_def);
         self.emit(Instruction::DefineConstStart);
         self.compile_expression(&const_def.initializer)?;
         self.store_name(&const_def.name.name);
         self.emit(Instruction::DefineConstEnd);
-        // let ty = self.lookup_name(&*const_def.name.name);
-        // match ty {
-        //     CType::i32 => {
-        //         self.emit(Instruction::LoadConst(bytecode::Constant::Tuple()))
-        //     }
-        //     _ => {}
-        // }
         Ok(())
     }
     fn compile_statements(&mut self, statement: &ast::Statement) -> Result<(), CompileError> {
@@ -281,7 +273,6 @@ impl<O: OutputStream> Compiler<O> {
 
     fn scope_for_name(&self, name: &str) -> bytecode::NameScope {
         let symbol = self.lookup_name(name);
-        println!("symbol:{:?},", symbol);
         match symbol.scope {
             SymbolScope::Global => bytecode::NameScope::Global,
             SymbolScope::Local => bytecode::NameScope::Local,
@@ -1174,15 +1165,21 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        println!("Compiling {:?}", expression);
+        trace!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;
         match &expression {
             Subscript(_, a, b) => {
+                if self.scope_for_name(&a.expr_name()) == NameScope::Const {
+                    self.emit(Instruction::ConstStart);
+                }
                 self.compile_expression(a)?;
                 self.compile_expression(b)?;
                 self.emit(Instruction::Subscript);
+                if self.scope_for_name(&a.expr_name()) == NameScope::Const {
+                    self.emit(Instruction::ConstEnd);
+                }
             }
             Attribute(_, value, name, idx) => {
                 if self.scope_for_name(&value.expr_name()) == NameScope::Const {
