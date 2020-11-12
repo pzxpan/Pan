@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
-use crate::bytecode::CodeObject;
+use crate::bytecode::{CodeObject, Constant};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FnValue {
@@ -43,7 +43,7 @@ pub enum Value {
     /// Represents a compile-time string constant (ie. the name of a function, or the key of a map).
     /// These are only transient values and should not remain on the stack. Compare to an actual,
     /// heap-allocated, run-time Value::Obj(Obj::StringObj) value.
-    Str(String),
+    String(String),
     Obj(Arc<RefCell<Obj>>),
     Fn(FnValue),
     Closure(ClosureValue),
@@ -53,6 +53,7 @@ pub enum Value {
     Code(CodeObject),
     Nil,
 }
+
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TypeValue {
@@ -71,7 +72,7 @@ pub struct EnumValue {
 impl Value {
     pub fn name(&self) -> String {
         match self {
-            Value::Str(v) => { v.to_string() }
+            Value::String(v) => { v.to_string() }
             _ => { "".to_string() }
         }
     }
@@ -87,6 +88,34 @@ impl Value {
             Value::I32(v) => { v }
             Value::Float(v) => { v as i32 }
             _ => unreachable!()
+        }
+    }
+
+    pub fn ty_name(&self) -> String {
+        match *self {
+            Value::I8(_) => { "I8".to_string() }
+            Value::I16(_) => { "I16".to_string() }
+            Value::I32(_) => { "I32".to_string() }
+            Value::I64(_) => { "I64".to_string() }
+            Value::I128(_) => { "I128".to_string() }
+            Value::U8(_) => { "U8".to_string() }
+            Value::U16(_) => { "U16".to_string() }
+            Value::U32(_) => { "U32".to_string() }
+            Value::U64(_) => { "U64".to_string() }
+            Value::U128(_) => { "U128".to_string() }
+            Value::Char(_) => { "Char".to_string() }
+            Value::ISize(_) => { "ISize".to_string() }
+            Value::USize(_) => { "USize".to_string() }
+            Value::String(_) => { "String".to_string() }
+            Value::Float(_) => { "Float".to_string() }
+            Value::Obj(_) => { "Obj".to_string() }
+            Value::Type(_) => { "Type".to_string() }
+            Value::Fn(_) => { "Fn".to_string() }
+            Value::Nil => { "Nil".to_string() }
+            Value::Code(_) => { "Code".to_string() }
+            Value::Enum(_) => { "Enum".to_string() }
+            Value::Closure(_) => { "Closure".to_string() }
+            Value::Bool(_) => { "Bool".to_string() }
         }
     }
 
@@ -162,7 +191,7 @@ impl Value {
             Value::USize(val) => format!("{}", val),
             Value::Float(val) => format!("{}", val),
             Value::Bool(val) => format!("{}", val),
-            Value::Str(val) => val.clone(),
+            Value::String(val) => val.clone(),
             Value::Obj(obj) => format!("{}", &obj.borrow().to_string()),
             Value::Fn(FnValue { name, .. }) |
             Value::Closure(ClosureValue { name, .. }) => format!("<func {}>", name),
@@ -225,7 +254,7 @@ impl Display for Value {
 
             Value::Float(v) => write!(f, "{}", v),
             Value::Bool(v) => write!(f, "{}", v),
-            Value::Str(val) => write!(f, "{}", val),
+            Value::String(val) => write!(f, "{}", val),
             Value::Obj(o) => match &*o.borrow() {
                 Obj::StringObj(value) => write!(f, "\"{}\"", value),
                 o @ _ => write!(f, "{}", o.to_string()),
@@ -315,5 +344,69 @@ impl PartialOrd for Obj {
             }
             (_, _) => None
         }
+    }
+}
+
+pub fn get_item(a: Value, b: Value) -> Option<Value> {
+    match (a, b) {
+        (Value::Obj(e), Value::I32(sub)) => {
+            match &*e.borrow_mut() {
+                Obj::ArrayObj(arr) => {
+                    arr.get(sub as usize).cloned()
+                }
+                Obj::MapObj(map) => {
+                    map.get(&sub.to_string()).cloned()
+                }
+                _ => unreachable!()
+            }
+        }
+
+        (Value::Obj(e), Value::String(sub)) => {
+            match *e.borrow_mut() {
+                Obj::MapObj(ref mut map) => {
+                    map.get(sub.as_str()).cloned()
+                }
+                _ => unreachable!()
+            }
+        }
+        _ => unreachable!()
+    }
+}
+
+pub fn unwrap_constant(value: &Constant) -> Value {
+    use Constant::*;
+    match value {
+        I8(ref value) => Value::I8(*value),
+        I16(ref value) => Value::I16(*value),
+        I32(ref value) => Value::I32(*value),
+        I64(ref value) => Value::I64(*value),
+        I128(ref value) => Value::I128(*value),
+        ISize(ref value) => Value::ISize(*value),
+        U8(ref value) => Value::U8(*value),
+        U16(ref value) => Value::U16(*value),
+        U32(ref value) => Value::U32(*value),
+        U64(ref value) => Value::U64(*value),
+        U128(ref value) => Value::U128(*value),
+        USize(ref value) => Value::USize(*value),
+        Integer(ref value) => Value::I32(*value),
+        Float(ref value) => Value::Float(*value),
+        Complex(ref value) => Value::Nil,
+        String(ref value) => Value::String(value.clone()),
+        Bytes(ref value) => Value::Nil,
+        Boolean(ref value) => Value::Bool(value.clone()),
+        Code(ref code) => {
+            Value::Code(*code.to_owned())
+        }
+        Tuple(ref elements) => {
+            let mut v = Vec::new();
+            for e in elements {
+                v.push(unwrap_constant(e));
+            }
+            Value::new_array_obj(v)
+        }
+        None => Value::Nil,
+        Ellipsis => Value::Nil,
+        Struct(ref ty) => Value::Type(ty.clone()),
+        Enum(ref ty) => Value::Enum(ty.clone())
     }
 }

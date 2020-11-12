@@ -217,7 +217,7 @@ impl VirtualMachine {
                 }
             }
 
-            (Value::Obj(e), Value::Str(sub)) => {
+            (Value::Obj(e), Value::String(sub)) => {
                 match *e.borrow_mut() {
                     Obj::MapObj(ref mut map) => {
                         map.get(sub.as_str()).cloned()
@@ -244,7 +244,7 @@ impl VirtualMachine {
                 }
             }
 
-            (Value::Obj(e), Value::Str(ref sub)) => {
+            (Value::Obj(e), Value::String(ref sub)) => {
                 match *e.borrow_mut() {
                     Obj::MapObj(ref mut map) => {
                         map.insert(sub.to_string(), value);
@@ -327,7 +327,7 @@ impl VirtualMachine {
                                 let idx = end.int_value() as usize;
                                 if idx < map.len() {
                                     let t = map.iter().next().unwrap();
-                                    ret = Value::new_array_obj(vec![Value::Str(t.0.clone()), t.1.clone()]);
+                                    ret = Value::new_array_obj(vec![Value::String(t.0.clone()), t.1.clone()]);
                                     *end = Value::I32(idx as i32 + 1);
                                 }
                             }
@@ -430,8 +430,8 @@ impl VirtualMachine {
             (Value::Float(a), Value::Float(b)) => {
                 Value::Float(a + b)
             }
-            (Value::Str(s1), Value::Str(s2)) => {
-                Value::Str(s1.add(s2.as_str()))
+            (Value::String(s1), Value::String(s2)) => {
+                Value::String(s1.add(s2.as_str()))
             }
             _ => unreachable!()
         }
@@ -770,7 +770,7 @@ impl VirtualMachine {
             Integer(ref value) => Value::I32(value.to_i32().unwrap()),
             Float(ref value) => Value::Float(*value),
             Complex(ref value) => Value::Nil,
-            String(ref value) => Value::Str(value.clone()),
+            String(ref value) => Value::String(value.clone()),
             Bytes(ref value) => Value::Nil,
             Boolean(ref value) => Value::Bool(value.clone()),
             Code(ref code) => {

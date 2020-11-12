@@ -264,6 +264,7 @@ impl<O: OutputStream> Compiler<O> {
         println!("{:?}", const_def);
         self.emit(Instruction::DefineConstStart);
         self.compile_expression(&const_def.initializer)?;
+        self.store_name(&const_def.name.name);
         self.emit(Instruction::DefineConstEnd);
         // let ty = self.lookup_name(&*const_def.name.name);
         // match ty {
@@ -1212,7 +1213,7 @@ impl<O: OutputStream> Compiler<O> {
                         bytecode::Constant::Integer(idx.unwrap() as i32)));
                     self.emit(Instruction::Subscript);
                     if self.scope_for_name(&value.expr_name()) == NameScope::Const {
-                        self.emit(Instruction::ConstName);
+                        self.emit(Instruction::ConstEnd);
                     }
                 }
             }

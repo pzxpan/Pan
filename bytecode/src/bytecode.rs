@@ -66,7 +66,7 @@ pub enum NameScope {
 pub enum Instruction {
     ///消除复杂常量
     ConstStart,
-    ConstName,
+    ConstEnd,
     DefineConstStart,
     DefineConstEnd,
 
@@ -352,10 +352,10 @@ impl Instruction {
         }
 
         match self {
-            ConstStart => w!(LoadConstNameStart),
-            ConstName => w!(LoadConstNameEnd),
-            DefineConstEnd => w!(StoreConstName),
-            DefineConstStart => w!(StoreConstNameStart),
+            ConstStart => w!(ConstStart),
+            ConstEnd => w!(ConstEnd),
+            DefineConstEnd => w!(DefineConstEnd),
+            DefineConstStart => w!(DefineConstStart),
             LoadName(name, scope) => w!(LoadName, name, format!("{:?}", scope)),
             StoreName(name, scope) => w!(StoreName, name, format!("{:?}", scope)),
             Subscript => w!(Subscript),
