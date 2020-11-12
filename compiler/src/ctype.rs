@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
+    //-----以下的类型顺序不能变，因为有用来比较大小,确定如何转型
     None,
     Char,
     Bool,
@@ -20,9 +21,9 @@ pub enum CType {
     I128,
     Float,
     Str,
-    //-----以上的类型顺序不能变，因为有用来比较大小,确定如何转型
+    //-----
+    Module,
     Type,
-
     Tuple(Box<Vec<CType>>),
     Array(Box<CType>),
     Dict(Box<CType>, Box<CType>),

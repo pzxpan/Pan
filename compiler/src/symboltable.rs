@@ -23,7 +23,7 @@ pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTabl
     let mut builder: SymbolTableBuilder = Default::default();
     builder.prepare();
     builder.insert_builtin_symbol();
-    builder.scan_top_symbol_types(program, false)?;
+    builder.scan_top_symbol_types(program, false, false, Option::None, Option::None)?;
     builder.scan_program(program)?;
     builder.finish()
 }
@@ -207,6 +207,7 @@ pub enum SymbolUsage {
     Assigned,
     Const,
     Used,
+    Import,
 }
 
 #[derive(Default)]
@@ -479,21 +480,52 @@ impl SymbolTableBuilder {
     }
 
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
-    pub fn scan_top_symbol_types(&mut self, program: &SourceUnit, in_import: bool) -> SymbolTableResult {
+    pub fn scan_top_symbol_types(&mut self, program: &SourceUnit, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
+        if in_import && is_all && as_name.clone().is_some() {
+            self.register_name(&as_name.clone().unwrap(), CType::Module, SymbolUsage::Import, Loc::default());
+        }
         for part in &program.0 {
             match part {
                 SourceUnitPart::DataDefinition(_) => {
                     //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 SourceUnitPart::EnumDefinition(def) => {
-                    self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                    if in_import && !is_all {
+                        if def.name.name.eq(&item_name.clone().unwrap()) {
+                            if as_name.clone().is_some() {
+                                self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                            } else {
+                                self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                            }
+                            return Ok(());
+                        }
+                    } else {
+                        self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                    }
                 }
                 SourceUnitPart::StructDefinition(def) => {
-                    self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
-                    for part in &def.parts {
-                        if let StructPart::ConstDefinition(const_def) = part {
-                            let ty = const_def.initializer.get_type(&self.tables);
-                            self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                    if in_import && !is_all {
+                        if def.name.name.eq(&item_name.clone().unwrap()) {
+                            if as_name.is_some() {
+                                self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                            } else {
+                                self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                            }
+                            for part in &def.parts {
+                                if let StructPart::ConstDefinition(const_def) = part {
+                                    let ty = const_def.initializer.get_type(&self.tables);
+                                    self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                                }
+                            }
+                            return Ok(());
+                        }
+                    } else {
+                        self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                        for part in &def.parts {
+                            if let StructPart::ConstDefinition(const_def) = part {
+                                let ty = const_def.initializer.get_type(&self.tables);
+                                self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                            }
                         }
                     }
                 }
@@ -502,10 +534,10 @@ impl SymbolTableBuilder {
                     if !in_import {
                         match def {
                             Import::Plain(mod_path, all) => {
-                                scan_import_symbol(self, mod_path, &Option::None, all)?;
+                                scan_import_symbol(self, mod_path, Option::None, all)?;
                             }
                             Import::Rename(mod_path, as_name, all) => {
-                                scan_import_symbol(self, mod_path, &Some(as_name.clone().name), all)?;
+                                scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
                             }
                             Import::PartRename(mod_path, as_part) => {
                                 for (name, a_name) in as_part {
@@ -516,7 +548,7 @@ impl SymbolTableBuilder {
                                     } else {
                                         Option::None
                                     };
-                                    scan_import_symbol(self, &path, &as_name, &false)?;
+                                    scan_import_symbol(self, &path, as_name, &false)?;
                                 }
                             }
                         }
@@ -524,17 +556,48 @@ impl SymbolTableBuilder {
                 }
                 SourceUnitPart::ConstDefinition(def) => {
                     let ty = def.initializer.get_type(&self.tables);
-                    self.register_name(&def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                    if in_import && !is_all {
+                        if def.as_ref().name.clone().name.eq(&item_name.clone().unwrap()) {
+                            if as_name.clone().is_some() {
+                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Const, def.loc)?;
+                            } else {
+                                self.register_name(&def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                            }
+                            return Ok(());
+                        }
+                    } else {
+                        self.register_name(&def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                    }
                 }
                 SourceUnitPart::FunctionDefinition(def) => {
                     let ty = def.get_type(&self.tables);
-                    if let Some(name) = &def.name {
-                        self.register_name(&name.name, ty, SymbolUsage::Assigned, def.loc)?;
+                    if in_import && !is_all {
+                        if def.as_ref().name.as_ref().unwrap().name.clone().eq(&item_name.clone().unwrap()) {
+                            if as_name.clone().is_some() {
+                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Assigned, def.loc)?;
+                            } else {
+                                self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty, SymbolUsage::Assigned, def.loc)?;
+                            }
+                            return Ok(());
+                        }
+                    } else {
+                        self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty, SymbolUsage::Assigned, def.loc)?;
                     }
                 }
                 SourceUnitPart::BoundDefinition(def) => {
                     let ty = def.get_type(&self.tables);
-                    self.register_name(&def.name.name, ty, SymbolUsage::Assigned, def.loc)?;
+                    if in_import && !is_all {
+                        if def.as_ref().name.name.eq(&item_name.clone().unwrap()) {
+                            if as_name.clone().is_some() {
+                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Assigned, def.loc)?;
+                            } else {
+                                self.register_name(&def.as_ref().name.name, ty, SymbolUsage::Assigned, def.loc)?;
+                            }
+                            return Ok(());
+                        }
+                    } else {
+                        self.register_name(&def.as_ref().name.name, ty, SymbolUsage::Assigned, def.loc)?;
+                    }
                 }
                 _ => {}
             }

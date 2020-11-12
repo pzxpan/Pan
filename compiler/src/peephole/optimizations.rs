@@ -7,8 +7,6 @@ use pan_bytecode::value::{Value, get_map_item};
 use pan_bytecode::value::{get_item, unwrap_constant};
 use log::Metadata;
 
-
-
 macro_rules! metas {
     [$($metas:expr),*$(,)?] => {
         InstructionMetadata::from(vec![$($metas),*])
@@ -168,7 +166,6 @@ pub fn operator(buf: &mut impl OptimizationBuffer) {
         let c = calculate_const_value(&mut ops);
         if c.is_some() {
             let value = c.unwrap();
-            println!("opt:{:?}", value);
             emit_const_value(buf, meta, value);
         } else {
             for i in ops {
