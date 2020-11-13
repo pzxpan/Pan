@@ -200,6 +200,20 @@ fn get_register_expr_type(tables: &Vec<SymbolTable>, name: String, depth: i32) -
 impl HasType for Expression {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match self {
+            Expression::AssignAdd(_, left, right) => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                return if min < CType::I8 {
+                    CType::Unknown
+                    //Str类型只能加，
+                } else if max <= CType::Str {
+                    max
+                } else {
+                    CType::Unknown
+                };
+                return CType::Unknown;
+            }
             Expression::Add(_, left, right) => {
                 let mut l = left.get_type(tables);
                 let mut r = right.get_type(tables);
@@ -410,7 +424,30 @@ impl HasType for Expression {
                     return CType::Unknown;
                 }
             }
-            _ => { CType::Unknown }
+            _ => { return CType::Unknown; }
+            // Expression::In(_, _, _) => {}
+            // Expression::Is(_, _, _) => {}
+            // Expression::Assign(_, _, _) => {}
+            // Expression::UnaryPlus(_, _) => {}
+            // Expression::AssignSubtract(_, _, _) => {}
+            // Expression::AssignMultiply(_, _, _) => {}
+            // Expression::AssignDivide(_, _, _) => {}
+            // Expression::AssignModulo(_, _, _) => {}
+            // Expression::AssignOr(_, _, _) => {}
+            // Expression::AssignAnd(_, _, _) => {}
+            // Expression::AssignXor(_, _, _) => {}
+            // Expression::AssignShiftLeft(_, _, _) => {}
+            // Expression::AssignShiftRight(_, _, _) => {}
+            // Expression::Slice(_, _) => {}
+            // Expression::Attribute(_, _, _, _) => {}
+            // Expression::NamedFunctionCall(_, _, _) => {}
+            // Expression::Await(_, _) => {}
+            // Expression::Yield(_, _) => {}
+            // Expression::List(_, _) => {}
+            // Expression::Comprehension(_, _, _) => {}
+            // Expression::MatchExpression(_, _, _) => {}
+            // Expression::Hole(_) => {}
+            // Expression::Error => {}
         }
     }
 }

@@ -634,7 +634,7 @@ impl SymbolTableBuilder {
         return false;
     }
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
-        trace!("statement is {:?}", statement);
+        println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(_, stmts) => {
@@ -942,13 +942,26 @@ impl SymbolTableBuilder {
                 self.scan_expression(a, context)?;
                 self.scan_expression(b, context)?;
             }
-            Attribute(_, obj, name, _) => {
+            //   Expression(Loc(1, 3, 20), AssignAdd(Loc(1, 3, 12), Variable(Identifier { loc: Loc(1, 3, 8), name: "sum" }),
+            // Attribute(Loc(1, 3, 20), Variable(Identifier { loc: Loc(1, 3, 18), name: "varargs" }), None, Some(0))))
+
+            Attribute(_, obj, name, idx) => {
                 if self.fun_call {
                     self.fun_call = false;
                 } else {
                     if name.is_some() && obj.expr_name().ne("self".clone()) {
                         let ty = self.get_register_type(obj.expr_name());
                         self.verify_field_visible(ty.borrow(), obj.expr_name(), name.as_ref().unwrap().clone().name)?
+                    } else if idx.is_some() {
+                        let ty = self.get_register_type(obj.expr_name());
+                        if let CType::Tuple(n) = ty {
+                            if idx.unwrap() >= n.len() as i32 {
+                                return Err(SymbolTableError {
+                                    error: format!("Tuple的长度是{:?}，访问的下标为:{:?}", n.len(), idx.unwrap()),
+                                    location: obj.loc().clone(),
+                                });
+                            }
+                        }
                     }
                 }
                 self.scan_expression(obj, context)?;
@@ -1028,20 +1041,27 @@ impl SymbolTableBuilder {
                 self.scan_expression(b, context)?;
             }
             Assign(_, a, b) => {
-                self.scan_expression(a, &ExpressionContext::Store)?;
                 self.scan_expression(b, &ExpressionContext::Load)?;
+                self.scan_expression(a, &ExpressionContext::Store)?;
             }
-            AssignOr(_, a, b) |
-            AssignAnd(_, a, b) |
-            AssignXor(_, a, b) |
-            AssignShiftLeft(_, a, b) |
-            AssignShiftRight(_, a, b) |
-            AssignAdd(_, a, b) |
-            AssignSubtract(_, a, b) |
-            AssignMultiply(_, a, b) |
-            AssignDivide(_, a, b) |
-            AssignModulo(_, a, b)
+            AssignOr(loc, a, b) |
+            AssignAnd(loc, a, b) |
+            AssignXor(loc, a, b) |
+            AssignShiftLeft(loc, a, b) |
+            AssignShiftRight(loc, a, b) |
+            AssignAdd(loc, a, b) |
+            AssignSubtract(loc, a, b) |
+            AssignMultiply(loc, a, b) |
+            AssignDivide(loc, a, b) |
+            AssignModulo(loc, a, b)
             => {
+                let ty = expression.get_type(&self.tables);
+                if ty == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("重新赋值,类型有问题,左边为:{:?},右边为:{:?}", a.get_type(&self.tables), b.get_type(&self.tables)),
+                        location: loc.clone(),
+                    });
+                }
                 self.scan_expression(b, &ExpressionContext::Load)?;
                 self.scan_expression(a, &ExpressionContext::Load)?;
                 self.scan_expression(a, &ExpressionContext::Store)?;

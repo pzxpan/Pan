@@ -15,6 +15,7 @@ use pan_parser::parse;
 use crate::symboltable::*;
 use crate::variable_type::HasType;
 use crate::ctype::{CType, StructType, FnType};
+use itertools::Tuples;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
@@ -155,7 +156,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                             if n.eq(&generic_type_name) {
                                 if expected_ty < fnarg.1 {
                                     fn_arg_tys.remove(idx);
-                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2,fnarg.3.clone()));
+                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2, fnarg.3.clone()));
                                 }
                             }
                         }
@@ -220,6 +221,7 @@ pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: 
                         }
                     }
                     if !found {
+                        //有默认实现
                         if fnty.has_body {
                             //sty.methods.push((fnty.name.clone(), CType::Fn(fnty.clone())));
                         } else {
@@ -233,7 +235,10 @@ pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: 
             }
         }
     }
+    Ok(())
+}
 
+pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, function: &FunctionDefinition, var_args: &Vec<Expression>) -> SymbolTableResult {
     Ok(())
 }
 
