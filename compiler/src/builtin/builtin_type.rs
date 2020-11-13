@@ -30,7 +30,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("Self".to_owned(), CType::TSelf, SymbolUsage::Builtin));
 
     let mut arg_types = Vec::new();
-    arg_types.push((String::from("value"), CType::Any, false));
+    arg_types.push((String::from("value"), CType::Any, false, true));
     let tt = CType::Fn(FnType {
         name: "print".to_string(),
         arg_types,

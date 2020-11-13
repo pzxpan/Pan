@@ -390,12 +390,16 @@ StringLiteral: StringLiteral = {
 Parameter: Parameter = {
     <l:@L><name:Identifier?> ":"  "ref"  <ty:Expression>   <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty, is_ref:true, is_mut: false, name,default:None}
+        Parameter{loc, ty, is_ref:true, is_mut: false, name,default:None,is_varargs:false}
     },
 
     <l:@L><name:Identifier?> ":" <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty, is_ref:false, is_mut: false, name,default:e}
+        Parameter{loc, ty, is_ref:false, is_mut: false, name,default:e,is_varargs:false}
+    },
+    <l:@L>".." <name:Identifier?> <r:@R> => {
+        let loc = Loc(file_no, l, r);
+        Parameter{loc, ty:Expression::Tuple(Loc(file_no, l, r), vec![]), is_ref:false, is_mut: false, name,default:None,is_varargs:true}
     }
 }
 

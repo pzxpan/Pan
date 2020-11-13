@@ -42,7 +42,7 @@ pub enum CType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FnType {
     pub name: String,
-    pub arg_types: Vec<(String, CType, bool)>,
+    pub arg_types: Vec<(String, CType, bool, bool)>,
     pub type_args: Vec<String>,
     pub ret_type: Box<CType>,
     pub is_pub: bool,
@@ -101,7 +101,7 @@ pub struct LambdaType {
     pub name: String,
     pub ret_type: Box<CType>,
     pub captures: Vec<String>,
-    pub arg_types: Vec<(String, CType, bool)>,
+    pub arg_types: Vec<(String, CType, bool, bool)>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -181,9 +181,9 @@ impl CType {
         }
     }
 
-    pub fn param_type(&self) -> Vec<(CType, bool)> {
+    pub fn param_type(&self) -> Vec<(CType, bool, bool)> {
         match self {
-            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2)).collect(),
+            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2, s.3.clone())).collect(),
             _ => Vec::new()
         }
     }

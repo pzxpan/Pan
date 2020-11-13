@@ -3,6 +3,7 @@ use pan_parser::ast::*;
 use crate::symboltable::*;
 use crate::ctype::*;
 use crate::ctype::CType::Bool;
+use std::ops::Deref;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -14,16 +15,16 @@ impl HasType for Parameter {
     }
 }
 
-pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */ bool) {
+pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool) {
     let ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
     let is_optional = s.1.as_ref().unwrap().default.is_some();
-    (arg_name, ty, is_optional)
+    (arg_name, ty, is_optional, s.1.as_ref().unwrap().is_varargs)
 }
 
 impl HasType for FunctionDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
-        let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let type_args = Vec::new();
         let mut ret_type = Box::new(CType::Any);
         if let Some(ty) = self.returns.as_ref() {
@@ -416,7 +417,7 @@ impl HasType for Expression {
 
 impl HasType for LambdaDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
-        let arg_types: Vec<(String, CType, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let name = "lambda".to_string();
         let ret_type = Box::from(match *self.body.clone() {
             Statement::Block(_, statements) => {

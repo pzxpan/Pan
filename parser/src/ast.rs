@@ -439,6 +439,7 @@ pub struct Parameter {
     pub ty: Expression,
     pub is_ref: bool,
     pub is_mut: bool,
+    pub is_varargs: bool,
     pub name: Option<Identifier>,
     pub default: Option<Expression>,
 }

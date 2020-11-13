@@ -119,7 +119,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                             if n.eq(&generic_type_name) {
                                 if expected_ty < fnarg.1 {
                                     fn_arg_tys.swap_remove(idx);
-                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone()));
+                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone(), fnarg.3.clone()));
                                 }
                             }
                         }
@@ -155,7 +155,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                             if n.eq(&generic_type_name) {
                                 if expected_ty < fnarg.1 {
                                     fn_arg_tys.remove(idx);
-                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2));
+                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2,fnarg.3.clone()));
                                 }
                             }
                         }

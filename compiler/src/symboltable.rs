@@ -973,14 +973,19 @@ impl SymbolTableBuilder {
 
                 self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                 let args_type = ty.param_type();
-                for (i, (ety, is_default)) in args_type.iter().enumerate() {
+                for (i, (ety, is_default, is_varargs)) in args_type.iter().enumerate() {
                     if let Some(e) = args.get(i) {
                         let cty = e.get_type(&self.tables);
                         let ret_ty = cty.ret_type();
                         if ety != ret_ty {
                             if ety != &CType::Any {
+                                if *is_varargs {
+                                    if let CType::Tuple(_) = ety {
+                                        continue;
+                                    }
+                                }
                                 return Err(SymbolTableError {
-                                    error: format!("第{:?}参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
+                                    error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
                                     location: loc.clone(),
                                 });
                             }
@@ -1133,7 +1138,7 @@ impl SymbolTableBuilder {
         line_number: usize,
     ) -> SymbolTableResult {
         self.enter_scope(name, SymbolTableType::Function, line_number);
-        let arg_types: Vec<(String, CType, bool)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter, Loc::default());
         }

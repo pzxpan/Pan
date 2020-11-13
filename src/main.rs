@@ -16,21 +16,21 @@ use pan_vm::scope::Scope;
 
 
 fn main() {
-    let num = 1000;
-    let num55 = 100000;
-    match (num,num55) {
-        (100,10) => {}
-        (2,120) => {}
-        _=>{}
-    }
-    env_logger::init();
+    // let num = 1000;
+    // let num55 = 100000;
+    // match (num,num55) {
+    //     (100,10) => {}
+    //     (2,120) => {}
+    //     _=>{}
+    // }
+    // env_logger::init();
     // let args = std::env::args();
     // {
     //     for arg in args.skip(1) {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("for.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("varargs.pan"));
    // test_all_demo_file();
 }
 
