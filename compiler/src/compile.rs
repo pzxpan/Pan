@@ -91,7 +91,6 @@ pub fn compile(
     if ast.is_ok() {
         compile_program(ast.unwrap(), source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
-                //err.update_source_path(&source_path);
                 err
             })
     } else {
@@ -1505,19 +1504,31 @@ impl<O: OutputStream> Compiler<O> {
                     attribute.as_ref().unwrap().name.clone())));
             }
         }
-        let count = args.len();
 
-        // 正常的参数:
-        let must_unpack = self.gather_elements(args)?;
-
-        if must_unpack {
-            self.emit(Instruction::BuildTuple(args.len(), must_unpack));
-        } else {
-            if is_enum_item.0 {
-                self.emit(Instruction::LoadBuildEnum(count + 2));
+        let ty = function.get_type(&self.symbol_table_stack);
+        let mut count = 0;
+        let mut must_unpack = false;
+        for (idx, arg_type) in ty.param_type().iter().enumerate() {
+            //is_varargs
+            if arg_type.2 {
+                must_unpack = true;
+                break;
             } else {
-                self.emit(Instruction::CallFunction(CallType::Positional(count)));
+                count += 1;
             }
+        }
+        self.gather_elements(args);
+        // 正常的参数:
+        if must_unpack {
+            self.emit(Instruction::BuildTuple(args.len() - count, must_unpack));
+            //合并之后 count需要加一，把tuple加进去;
+            count += 1;
+        }
+
+        if is_enum_item.0 {
+            self.emit(Instruction::LoadBuildEnum(count + 2));
+        } else {
+            self.emit(Instruction::CallFunction(CallType::Positional(count)));
         }
         Ok(())
     }
