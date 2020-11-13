@@ -211,7 +211,22 @@ impl<O: OutputStream> Compiler<O> {
                 ast::SourceUnitPart::ImportDirective(def) => {
                     match def {
                         Import::Plain(mod_path, all) => {
-                            resolve_import_compile(self, mod_path, &None, all)?;
+                            resolve_import_compile(self, mod_path, Option::None, all)?;
+                        }
+                        Import::Rename(mod_path, as_name, all) => {
+                            resolve_import_compile(self, mod_path, Some(as_name.clone().name), all)?;
+                        }
+                        Import::PartRename(mod_path, as_part) => {
+                            for (name, a_name) in as_part {
+                                let mut path = mod_path.clone();
+                                path.extend_from_slice(&name);
+                                let as_name = if a_name.is_some() {
+                                    Some(a_name.as_ref().unwrap().name.clone())
+                                } else {
+                                    Option::None
+                                };
+                                resolve_import_compile(self, &path, as_name, &false)?;
+                            }
                         }
                         _ => {}
                     }
