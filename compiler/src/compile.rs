@@ -91,7 +91,7 @@ pub fn compile(
     if ast.is_ok() {
         compile_program(ast.unwrap(), source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
-                err.update_source_path(&source_path);
+                //err.update_source_path(&source_path);
                 err
             })
     } else {

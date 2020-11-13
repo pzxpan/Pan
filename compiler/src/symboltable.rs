@@ -777,7 +777,7 @@ impl SymbolTableBuilder {
                     }
                     if !hash_set.is_empty() {
                         return Err(SymbolTableError {
-                            error: format!("未匹配到{:?}", hash_set),
+                            error: format!("match语句出错,未匹配到{:?}", hash_set),
                             location: loc.clone(),
                         });
                     }

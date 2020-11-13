@@ -18,9 +18,21 @@ pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, ident
         let r = resovle_import_compile_inner(s.to_string(), compiler, idents, as_name.clone(), is_all);
         if r.is_ok() {
             return Ok(());
+        } else {
+            let err = r.err().unwrap();
+            if err.error == CompileErrorType::ImportFileError {
+                continue;
+            } else {
+                return Err(err);
+            }
         }
     }
-    Ok(())
+    return Err(CompileError {
+        statement: None,
+        error: CompileErrorType::ImportFileError,
+        location: Default::default(),
+        source_path: None,
+    });
 }
 
 
@@ -45,6 +57,13 @@ pub fn resovle_import_compile_inner<O: OutputStream>(whole_name: String, compile
         path.push(slice);
         if path.is_file() {
             resovle_file_compile(compiler, &path, Some(item_name), as_name, is_all)?;
+        } else {
+            return Err(CompileError {
+                statement: None,
+                error: CompileErrorType::ImportFileError,
+                location: Default::default(),
+                source_path: None,
+            });
         }
     } else if path.is_file() {
         resovle_file_compile(compiler, &path, None, as_name, is_all)?;
@@ -85,38 +104,48 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
             }
         } else {
             if as_name.clone().is_some() {
-                for i in code_object.unwrap().instructions.iter() {
-                    let mut found = false;
+                let mut rev_instruction = Vec::new();
+                let mut found = false;
+                for i in code_object.unwrap().instructions.iter().rev() {
                     if let Instruction::StoreName(name, ns) = i {
                         if item_name.clone().unwrap().eq(name) {
                             found = true;
-                            compiler.import_instructions.push(Instruction::StoreName(as_name.clone().unwrap(), ns.clone()));
+                            rev_instruction.push(Instruction::StoreName(as_name.clone().unwrap(), ns.clone()));
                         } else {
                             found = false;
                         }
                     } else if found {
-                        compiler.import_instructions.push(i.clone());
+                        rev_instruction.push(i.clone());
                     }
                 }
+                rev_instruction.reverse();
+                compiler.import_instructions.extend(rev_instruction);
             } else {
-                for i in code_object.unwrap().instructions.iter() {
-                    let mut found = false;
+                let mut rev_instruction = Vec::new();
+                let mut found = false;
+                for i in code_object.unwrap().instructions.iter().rev() {
                     if let Instruction::StoreName(name, ns) = i {
                         if item_name.clone().unwrap().eq(name) {
                             found = true;
-                            compiler.import_instructions.push(i.clone());
+                            rev_instruction.push(i.clone());
+                            //compiler.import_instructions.push(i.clone());
                         } else {
                             found = false;
                         }
                     } else if found {
-                        compiler.import_instructions.push(i.clone());
+                        rev_instruction.push(i.clone());
+                        // compiler.import_instructions.push(i.clone());
                     }
                 }
+                rev_instruction.reverse();
+                compiler.import_instructions.extend(rev_instruction);
             }
         }
         Ok(())
     } else {
-        Err(code_object.err().unwrap())
+        let mut err = code_object.err().unwrap();
+        err.update_source_path(path.to_str().unwrap());
+        Err(err)
     }
 }
 

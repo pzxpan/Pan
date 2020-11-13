@@ -1,19 +1,18 @@
 pub enum Color {
    Red(i32),
    Single(i128),
-   Two(i32,string),
+   White(i32,string),
    Three(i32,i32,i32),
-   Green(i32),
-   Blue(i32,i32,i32),
    Black,
-   White,
-   pub fun is_warm() :bool{
-        match self {
-            Red(a) -> { print(a); return true;}
-            Single(a) -> { print(a); return true;}
-            Threed(a,b,c) -> {print(a); print(b);print(c);return false;}
-        }
-   }
+   pub fun is_warm() {
+           match self {
+               White(_,_)-> {print(20);}
+               Black -> {print(30);}
+               Red(a) -> { print(a); return true;}
+               Single(a) -> { print(a); return 1;}
+               Three(a,b,c) -> {print(a); print(b);print(c);return 2;}
+           }
+      }
 }
 
 

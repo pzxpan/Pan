@@ -18,21 +18,21 @@ impl CompileError {
     }
 
     pub fn update_source_path(&mut self, source_path: &str) {
-        debug_assert!(self.source_path.is_none());
+        // debug_assert!(self.source_path.is_none());
         self.source_path = Some(source_path.to_owned());
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum CompileErrorType {
     Assign(&'static str),
     Delete(&'static str),
     Parse(ErrorType),
     SyntaxError(String),
     InvalidBreak,
-
     InvalidContinue,
     InvalidReturn,
+    ImportFileError,
 }
 
 impl fmt::Display for CompileError {
@@ -46,6 +46,7 @@ impl fmt::Display for CompileError {
             CompileErrorType::InvalidBreak => "break不在循环块中".to_owned(),
             CompileErrorType::InvalidContinue => "continue不在循环块中".to_owned(),
             CompileErrorType::InvalidReturn => "return不在函数中".to_owned(),
+            CompileErrorType::ImportFileError => "import文件出错".to_owned()
         };
         write!(f, "{} at {}", error_desc, self.location.1)
     }

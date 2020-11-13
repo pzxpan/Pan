@@ -74,6 +74,7 @@ impl VirtualMachine {
         None
     }
     pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
+        println!("obj:{:?},attr:{:?}",obj,attr);
         match obj {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
