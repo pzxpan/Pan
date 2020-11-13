@@ -74,7 +74,6 @@ impl VirtualMachine {
         None
     }
     pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
-        println!("obj:{:?},attr:{:?}",obj,attr);
         match obj {
             Value::Obj(e) => {
                 match &*e.borrow_mut() {
@@ -303,18 +302,20 @@ impl VirtualMachine {
                 Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
                     if let Value::I32(_) = start {
                         if up.bool_value() {
-                            let a = start.int_value() + 1;
+                            let item = start.int_value();
+                            let a = item + 1;
                             let b = end.int_value();
-                            if a < b {
+                            if item < b {
                                 *start = Value::I32(a);
-                                ret = Value::I32(a);
+                                ret = Value::I32(item);
                             }
                         } else {
-                            let a = start.int_value() - 1;
+                            let item = start.int_value();
+                            let a = item - 1;
                             let b = end.int_value();
-                            if a > b {
+                            if item > b {
                                 *start = Value::I32(a);
-                                ret = Value::I32(a);
+                                ret = Value::I32(item);
                             }
                         }
                     }

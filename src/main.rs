@@ -30,7 +30,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("for.pan"));
    // test_all_demo_file();
 }
 
