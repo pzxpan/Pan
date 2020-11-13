@@ -69,7 +69,8 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
     if code_object.is_ok() {
         if *is_all {
             if as_name.clone().is_some() {
-                for i in code_object.unwrap().instructions.iter().rev() {
+                //删除ReturnValue和LoadConst(None)指令
+                for i in code_object.unwrap().instructions.iter() {
                     if let Instruction::StoreName(name, ns) = i {
                         let mut n = as_name.clone().unwrap().clone();
                         n.push('.');
@@ -84,7 +85,7 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
             }
         } else {
             if as_name.clone().is_some() {
-                for i in code_object.unwrap().instructions.iter().rev() {
+                for i in code_object.unwrap().instructions.iter() {
                     let mut found = false;
                     if let Instruction::StoreName(name, ns) = i {
                         if item_name.clone().unwrap().eq(name) {
@@ -98,7 +99,7 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
                     }
                 }
             } else {
-                for i in code_object.unwrap().instructions.iter().rev() {
+                for i in code_object.unwrap().instructions.iter() {
                     let mut found = false;
                     if let Instruction::StoreName(name, ns) = i {
                         if item_name.clone().unwrap().eq(name) {

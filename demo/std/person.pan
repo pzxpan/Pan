@@ -1,10 +1,10 @@
 pub struct House {
     pub size: f64,
     pub price: f64,
-    fun idea(): bool {
-        return price / size > 10000;
+    pub fun idea(): bool {
+        return price / size > 10000.0;
     }
-    fun ::static() :bool {
+    pub fun ::static() :bool {
         return true;
     }
 }

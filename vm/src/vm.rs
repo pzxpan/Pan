@@ -280,6 +280,9 @@ impl VirtualMachine {
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a > b)
             }
+            (Value::Float(a), Value::Float(b)) => {
+                Value::Bool(a > b)
+            }
             _ => unreachable!()
         }
     }

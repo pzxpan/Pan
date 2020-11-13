@@ -209,26 +209,27 @@ impl<O: OutputStream> Compiler<O> {
                     self.compile_class_def(name.as_str(), &body, &generics)?;
                 }
                 ast::SourceUnitPart::ImportDirective(def) => {
-                    match def {
-                        Import::Plain(mod_path, all) => {
-                            resolve_import_compile(self, mod_path, Option::None, all)?;
-                        }
-                        Import::Rename(mod_path, as_name, all) => {
-                            resolve_import_compile(self, mod_path, Some(as_name.clone().name), all)?;
-                        }
-                        Import::PartRename(mod_path, as_part) => {
-                            for (name, a_name) in as_part {
-                                let mut path = mod_path.clone();
-                                path.extend_from_slice(&name);
-                                let as_name = if a_name.is_some() {
-                                    Some(a_name.as_ref().unwrap().name.clone())
-                                } else {
-                                    Option::None
-                                };
-                                resolve_import_compile(self, &path, as_name, &false)?;
+                    if !is_import {
+                        match def {
+                            Import::Plain(mod_path, all) => {
+                                resolve_import_compile(self, mod_path, Option::None, all)?;
+                            }
+                            Import::Rename(mod_path, as_name, all) => {
+                                resolve_import_compile(self, mod_path, Some(as_name.clone().name), all)?;
+                            }
+                            Import::PartRename(mod_path, as_part) => {
+                                for (name, a_name) in as_part {
+                                    let mut path = mod_path.clone();
+                                    path.extend_from_slice(&name);
+                                    let as_name = if a_name.is_some() {
+                                        Some(a_name.as_ref().unwrap().name.clone())
+                                    } else {
+                                        Option::None
+                                    };
+                                    resolve_import_compile(self, &path, as_name, &false)?;
+                                }
                             }
                         }
-                        _ => {}
                     }
                 }
                 ast::SourceUnitPart::ConstDefinition(def) => {
@@ -270,9 +271,10 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
         }
-        self.emit(Instruction::LoadConst(bytecode::Constant::None));
-        self.emit(Instruction::ReturnValue);
-
+        if !is_import {
+            self.emit(Instruction::LoadConst(bytecode::Constant::None));
+            self.emit(Instruction::ReturnValue);
+        }
         Ok(())
     }
     fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition) -> Result<(), CompileError> {

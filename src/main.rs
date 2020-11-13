@@ -30,8 +30,8 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-   // test_one_file(&env::current_dir().unwrap().join("demo").join("color.pan"));
-    test_all_demo_file();
+    test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
+   // test_all_demo_file();
 }
 
 fn test_all_demo_file() {
@@ -55,6 +55,7 @@ fn test_one_file(home_path: &Path) {
         let global_value = HashMap::new();
         let local_value: HashMap<String, Value> = HashMap::new();
         let mut v = Vec::new();
+
         v.push(local_value);
         let scope = Scope::with_builtins(v, global_value, &vm);
         vm.run_code_obj(code_object.unwrap(), scope);
