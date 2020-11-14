@@ -7,6 +7,10 @@ fun main() {
   for a in arr {
       print(a);
   }
+
+  let a =30 - -20;
+  a = -a;
+  print(a);
   return;
 }
 

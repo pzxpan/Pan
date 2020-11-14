@@ -13,7 +13,21 @@ use crate::builtin::builtin_fun::get_builtin_fun;
 use crate::compile::*;
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> Result<(), CompileError> {
-    let import_paths: [String; 3] = ["/Users/cuiqingbo/Desktop/Pan/Pan/demo".to_string(), "/Users/cuiqingbo/Desktop/Pan/Pan/src".to_string(), "sub_dir".to_string()];
+    //顺序为系统目录，工作目录，当前子目录;
+    let system_path = "/usr/local/Cellar/";
+    let mut s1 = String::from(system_path);
+    s1.push_str("demo");
+
+    let work_dir = env::current_dir().unwrap();
+    let mut s2 = String::from(work_dir.to_str().unwrap());
+    s2.push_str("/demo");
+
+    let sub_dict = "..";
+    let mut s3 = String::from(sub_dict);
+    s3.push_str("/demo");
+
+    let import_paths: [String; 3] = [s2, s1, s3];
+
     for s in import_paths.iter() {
         let r = resovle_import_compile_inner(s.to_string(), compiler, idents, as_name.clone(), is_all);
         if r.is_ok() {

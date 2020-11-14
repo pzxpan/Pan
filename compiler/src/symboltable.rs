@@ -1030,33 +1030,66 @@ impl SymbolTableBuilder {
                 }
                 self.scan_expressions(args, &ExpressionContext::Load)?;
             }
-            Not(_, name) | UnaryPlus(_, name) | UnaryMinus(_, name)
-            => {
-                self.scan_expression(name, &ExpressionContext::Load)?;
+            Not(loc, name) => {
+                let ty = name.get_type(&self.tables);
+                if ty > CType::I8 && ty <= CType::U128 {
+                    self.scan_expression(name, &ExpressionContext::Load)?;
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("取反操作只能针对整型"),
+                        location: loc.clone(),
+                    });
+                }
             }
-            Power(_, a, b) |
-            Multiply(_, a, b) |
-            Divide(_, a, b) |
-            Modulo(_, a, b) |
-            Add(_, a, b) |
-            Subtract(_, a, b) |
-            ShiftLeft(_, a, b) |
-            ShiftRight(_, a, b) |
-            BitwiseAnd(_, a, b) |
-            BitwiseXor(_, a, b) |
-            BitwiseOr(_, a, b) |
-            Less(_, a, b) |
-            More(_, a, b) |
-            LessEqual(_, a, b) |
-            MoreEqual(_, a, b) |
-            Equal(_, a, b) |
-            NotEqual(_, a, b) |
-            And(_, a, b) |
-            Or(_, a, b) => {
+            UnaryPlus(loc, name) | UnaryMinus(loc, name) => {
+                let ty = name.get_type(&self.tables);
+                if ty > CType::I8 && ty <= CType::Float {
+                    self.scan_expression(name, &ExpressionContext::Load)?;
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("取正，取负操作只能针对数值类型"),
+                        location: loc.clone(),
+                    });
+                }
+            }
+            Power(loc, a, b) |
+            Multiply(loc, a, b) |
+            Divide(loc, a, b) |
+            Modulo(loc, a, b) |
+            Add(loc, a, b) |
+            Subtract(loc, a, b) |
+            ShiftLeft(loc, a, b) |
+            ShiftRight(loc, a, b) |
+            BitwiseAnd(loc, a, b) |
+            BitwiseXor(loc, a, b) |
+            BitwiseOr(loc, a, b) |
+            Less(loc, a, b) |
+            More(loc, a, b) |
+            LessEqual(loc, a, b) |
+            MoreEqual(loc, a, b) |
+            Equal(loc, a, b) |
+            NotEqual(loc, a, b) |
+            And(loc, a, b) |
+            Or(loc, a, b) => {
+                let ty = expression.get_type(&self.tables);
+                if ty == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("重新赋值,类型有问题,左边为:{:?},右边为:{:?}", a.get_type(&self.tables), b.get_type(&self.tables)),
+                        location: loc.clone(),
+                    });
+                }
                 self.scan_expression(a, context)?;
                 self.scan_expression(b, context)?;
             }
-            Assign(_, a, b) => {
+            Assign(loc, a, b) => {
+                //有重复
+                let ty = expression.get_type(&self.tables);
+                if ty == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("重新赋值,类型有问题,左边为:{:?},右边为:{:?}", a.get_type(&self.tables), b.get_type(&self.tables)),
+                        location: loc.clone(),
+                    });
+                }
                 self.scan_expression(b, &ExpressionContext::Load)?;
                 self.scan_expression(a, &ExpressionContext::Store)?;
             }

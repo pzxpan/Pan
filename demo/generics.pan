@@ -2,7 +2,7 @@
 
 pub bound Add<T> {
     fun add<T>(rhs: T) : T {
-        return self + rhs;
+        return rhs;
     }
 }
 

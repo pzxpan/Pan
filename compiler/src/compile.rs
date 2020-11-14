@@ -169,7 +169,7 @@ impl<O: OutputStream> Compiler<O> {
     fn push_new_code_object(&mut self, obj_name: String) {
         self.push_output(CodeObject::new(
             Vec::new(),
-            Varargs::None,
+            false,
             self.source_path.clone().unwrap(),
             1,
             obj_name,
@@ -519,7 +519,7 @@ impl<O: OutputStream> Compiler<O> {
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             args.iter().map(|a| a.name.as_ref().unwrap().name.clone()).collect(),
-            Varargs::None,
+            false,
             self.source_path.clone().unwrap(),
             line_number,
             name.to_owned(),
@@ -727,7 +727,7 @@ impl<O: OutputStream> Compiler<O> {
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             vec![],
-            Varargs::None,
+            false,
             "pan".to_string(),
             line_number,
             name.to_owned(),
@@ -802,7 +802,7 @@ impl<O: OutputStream> Compiler<O> {
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             vec![],
-            Varargs::None,
+            false,
             self.source_path.as_ref().unwrap().to_string(),
             line_number,
             name.to_owned(),
@@ -870,7 +870,7 @@ impl<O: OutputStream> Compiler<O> {
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             vec![],
-            Varargs::None,
+            false,
             "".to_string(),
             line_number,
             name.to_owned(),
@@ -1519,7 +1519,7 @@ impl<O: OutputStream> Compiler<O> {
         }
 
         let ty = function.get_type(&self.symbol_table_stack);
-        let mut count = 0;
+        let mut need_count = 0;
         let mut must_unpack = false;
         for (idx, arg_type) in ty.param_type().iter().enumerate() {
             //is_varargs
@@ -1527,15 +1527,18 @@ impl<O: OutputStream> Compiler<O> {
                 must_unpack = true;
                 break;
             } else {
-                count += 1;
+                need_count += 1;
             }
         }
         self.gather_elements(args);
+        let mut count = 0;
         // 正常的参数:
         if must_unpack {
-            self.emit(Instruction::BuildTuple(args.len() - count, must_unpack));
+            self.emit(Instruction::BuildTuple(args.len() - need_count, must_unpack));
             //合并之后 count需要加一，把tuple加进去;
-            count += 1;
+            count = args.len() - need_count + 1;
+        } else {
+            count = args.len();
         }
 
         if is_enum_item.0 {
@@ -1597,7 +1600,7 @@ impl<O: OutputStream> Compiler<O> {
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             vec![".0".to_owned()],
-            Varargs::None,
+            false,
             "pan".to_string(),
             line_number,
             self.source_path.clone().unwrap(),

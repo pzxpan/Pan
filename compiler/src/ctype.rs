@@ -45,6 +45,7 @@ pub struct FnType {
     pub arg_types: Vec<(String, CType, bool, bool)>,
     pub type_args: Vec<String>,
     pub ret_type: Box<CType>,
+    pub is_varargs: bool,
     pub is_pub: bool,
     pub is_static: bool,
     pub has_body: bool,
@@ -183,7 +184,7 @@ impl CType {
 
     pub fn param_type(&self) -> Vec<(CType, bool, bool)> {
         match self {
-            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2, s.3.clone())).collect(),
+            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2.clone(), s.3.clone())).collect(),
             _ => Vec::new()
         }
     }

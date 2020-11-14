@@ -39,7 +39,7 @@ pub struct CodeObject {
     pub label_map: HashMap<Label, usize>,
     pub locations: Vec<Location>,
     pub arg_names: Vec<String>,
-    pub varargs: Varargs,
+    pub varargs: bool,
     pub source_path: String,
     pub first_line_number: usize,
     pub obj_name: String, // Name of the object that created this code object
@@ -232,7 +232,7 @@ impl CodeObject {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         arg_names: Vec<String>,
-        varargs: Varargs,
+        varargs: bool,
         source_path: String,
         first_line_number: usize,
         obj_name: String,
@@ -251,6 +251,7 @@ impl CodeObject {
 
     pub fn new_builtin(
         obj_name: String,
+        varargs: bool,
         arg_names: Vec<String>,
     ) -> CodeObject {
         CodeObject {
@@ -258,7 +259,7 @@ impl CodeObject {
             label_map: HashMap::new(),
             locations: Vec::new(),
             arg_names,
-            varargs: Varargs::None,
+            varargs,
             source_path: "".to_string(),
             first_line_number: 0,
             obj_name,

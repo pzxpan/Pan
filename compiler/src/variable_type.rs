@@ -31,7 +31,11 @@ impl HasType for FunctionDefinition {
             ret_type = Box::new(ty.get_type(tables));
         }
         let name = self.name.as_ref().unwrap().name.clone();
-        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some() })
+        let mut is_varargs = false;
+        if arg_types.len() > 0 {
+            is_varargs = arg_types.last().unwrap().3;
+        }
+        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some(), is_varargs })
     }
 }
 
@@ -200,20 +204,65 @@ fn get_register_expr_type(tables: &Vec<SymbolTable>, name: String, depth: i32) -
 impl HasType for Expression {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match self {
-            Expression::AssignAdd(_, left, right) => {
+            Expression::AssignAdd(_, left, right)
+            => {
                 let mut l = left.get_type(tables);
                 let mut r = right.get_type(tables);
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
-                return if min < CType::I8 {
-                    CType::Unknown
-                    //Str类型只能加，
-                } else if max <= CType::Str {
+                return if max == CType::Str {
+                    //String类型能加，且自动转型String
                     max
-                } else {
+                } else if min < CType::I8 || max > CType::Str || min != max {
                     CType::Unknown
+                } else {
+                    min
                 };
                 return CType::Unknown;
             }
+            Expression::AssignSubtract(_, left, right) |
+            Expression::AssignDivide(_, left, right) |
+            Expression::AssignMultiply(_, left, right)
+            => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                return if min < CType::I8 || max > CType::Float || min != max {
+                    CType::Unknown
+                } else {
+                    min
+                };
+            }
+            Expression::AssignAnd(_, left, right) |
+            Expression::AssignModulo(_, left, right) |
+            Expression::AssignOr(_, left, right) |
+            Expression::AssignShiftLeft(_, left, right) |
+            Expression::AssignShiftRight(_, left, right) |
+            Expression::AssignXor(_, left, right) => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                return if min < CType::I8 || max > CType::U128 || min != max {
+                    CType::Unknown
+                } else {
+                    min
+                };
+            }
+
+            Expression::Assign(_, left, right) => {
+                let mut l = left.get_type(tables);
+                let mut r = right.get_type(tables);
+                return if l != r {
+                    CType::Unknown
+                } else {
+                    l
+                };
+            }
+
+            Expression::NamedFunctionCall(_, name, _) => {
+                let ty = name.get_type(&tables).clone();
+                return ty.ret_type().clone();
+            }
+
             Expression::Add(_, left, right) => {
                 let mut l = left.get_type(tables);
                 let mut r = right.get_type(tables);
@@ -462,6 +511,27 @@ impl HasType for Expression {
                     return CType::Array(Box::new(ty));
                 }
             }
+            Expression::Attribute(loc, obj, name, idx) => {
+                if name.is_some() {
+                    let ty = obj.get_type(tables);
+                    if let CType::Struct(struct_ty) = ty {
+                        for attri in struct_ty.fields {
+                            if attri.0.eq(&name.as_ref().unwrap().name) {
+                                return attri.1;
+                            }
+                        }
+                    }
+                } else if idx.is_some() {
+                    let ty = obj.get_type(tables);
+                    if let CType::Tuple(tty) = ty {
+                        let t = tty.get(idx.unwrap() as usize);
+                        if t.is_some() {
+                            return t.unwrap().clone();
+                        }
+                    }
+                }
+                return CType::Unknown;
+            }
 
             _ => { return CType::Unknown; }
             // Expression::In(_, _, _) => {}
@@ -478,7 +548,7 @@ impl HasType for Expression {
             // Expression::AssignShiftLeft(_, _, _) => {}
             // Expression::AssignShiftRight(_, _, _) => {}
             // Expression::Slice(_, _) => {}
-            // Expression::Attribute(_, _, _, _) => {}
+
             // Expression::NamedFunctionCall(_, _, _) => {}
             // Expression::Await(_, _) => {}
             // Expression::Yield(_, _) => {}

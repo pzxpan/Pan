@@ -15,3 +15,4 @@ pub mod resolve_fns;
 pub mod builtin;
 pub mod util;
 pub mod const_value;
+pub mod format_string;

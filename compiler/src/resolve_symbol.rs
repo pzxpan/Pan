@@ -19,7 +19,19 @@ use itertools::Tuples;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
-    let import_paths: [String; 3] = ["/Users/cuiqingbo/Desktop/Pan/Pan/demo".to_string(), "/Users/cuiqingbo/Desktop/Pan/Pan/src".to_string(), "sub_dir".to_string()];
+    let system_path = "/usr/local/Cellar/";
+    let mut s1 = String::from(system_path);
+    s1.push_str("demo");
+
+    let work_dir = env::current_dir().unwrap();
+    let mut s2 = String::from(work_dir.to_str().unwrap());
+    s2.push_str("/demo");
+
+    let sub_dict = "..";
+    let mut s3 = String::from(sub_dict);
+    s3.push_str("/demo");
+
+    let import_paths: [String; 3] = [s2, s1, s3];
     for s in import_paths.iter() {
         let r = scan_import_symbol_inner(s.to_string(), build, idents, as_name.clone(), is_all);
         if r.is_ok() {
@@ -47,6 +59,7 @@ fn scan_import_symbol_inner(whole_name: String, build: &mut SymbolTableBuilder, 
         slice.push_str(".pan");
         let mut path = env::current_dir().unwrap();
         path.push(slice);
+       // println!("path{:?}", path);
         if path.is_file() {
             scan_import_file(build, &path, Some(item_name), as_name, is_all)?;
         } else {
@@ -135,6 +148,10 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                         }
                     }
                     methods.remove(i);
+                    let mut is_varargs = false;
+                    if fn_arg_tys.len() > 0 {
+                        is_varargs = fn_arg_tys.last().unwrap().3;
+                    }
                     methods.insert(i, (fty.0.clone(), CType::Fn(FnType {
                         name: fnty.name.clone(),
                         arg_types: fn_arg_tys,
@@ -143,6 +160,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                         is_pub: fnty.is_pub,
                         is_static: fnty.is_static,
                         has_body: fnty.has_body,
+                        is_varargs,
                     })));
                 }
             }
@@ -171,6 +189,10 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                         }
                     }
                     static_fields.remove(i);
+                    let mut is_varargs = false;
+                    if fn_arg_tys.len() > 0 {
+                        is_varargs = fn_arg_tys.last().unwrap().3;
+                    }
                     static_fields.insert(1, (fty.0.clone(), CType::Fn(FnType {
                         name: fnty.name.clone(),
                         arg_types: fn_arg_tys,
@@ -179,11 +201,10 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                         is_pub: fnty.is_pub,
                         is_static: fnty.is_static,
                         has_body: fnty.has_body,
+                        is_varargs,
                     })));
                 }
             }
-
-            println!("arg:{:?}, arg_ty:{:?},arg.expr:{:?}", arg.name, arg.expr.get_type(tables), arg.expr);
         }
 
         result_ty.static_methods = static_fields;
