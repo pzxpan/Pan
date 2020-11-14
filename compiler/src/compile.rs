@@ -401,8 +401,8 @@ impl<O: OutputStream> Compiler<O> {
                 self.store_name(&decl.name.name);
             }
 
-            For(_, target, iter, end, body) => {
-                self.compile_for(target, iter, end, body.as_ref().unwrap())?;
+            For(_, target, iter, body) => {
+                self.compile_for(target, iter, body.as_ref().unwrap())?;
             }
             MultiVariableDefinition(_, decl, expression) => {
                 self.compile_expression(expression)?;
@@ -962,8 +962,8 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_for(
         &mut self,
         target: &ast::Expression,
-        start: &ast::Expression,
-        end: &Option<ast::Expression>,
+        iter: &ast::Expression,
+        // end: &Option<ast::Expression>,
         body: &ast::Statement,
     ) -> Result<(), CompileError> {
         let start_label = self.new_label();
@@ -972,12 +972,12 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::SetupLoop(start_label, end_label));
 
-        self.compile_expression(start)?;
-        if let Some(e) = end {
-            self.compile_expression(e)?;
+        self.compile_expression(iter)?;
+        if let Expression::Range(_, _, _) = iter {
+            self.emit(Instruction::BuildRange);
+        } else {
+            self.emit(Instruction::GetIter);
         }
-
-        self.emit(Instruction::GetIter);
 
         self.set_label(start_label);
         self.emit(Instruction::ForIter(else_label));
@@ -1397,6 +1397,19 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(orelse)?;
 
                 self.set_label(end_label);
+            }
+            Range(loc, start, end) => {
+                if start.is_none() {
+                    self.emit(Instruction::LoadConst(Constant::I32(0)));
+                } else {
+                    self.compile_expression(start.as_ref().unwrap());
+                }
+
+                if end.is_none() {
+                    self.emit(Instruction::LoadConst(Constant::I32(2147483647)));
+                } else {
+                    self.compile_expression(end.as_ref().unwrap());
+                }
             }
             _ => {}
         }

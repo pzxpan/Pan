@@ -112,8 +112,10 @@ pub enum Instruction {
     YieldValue,
     YieldFrom,
     SetupLoop(Label, Label),
+
     PopBlock,
     BuildString(usize),
+    BuildRange,
     BuildTuple(usize, bool),
     BuildList(usize, bool),
     BuildSet(usize, bool),
@@ -404,6 +406,7 @@ impl Instruction {
             PrimitiveTypeChange(n) => w!(PrimitiveTypeChange, n),
             PopBlock => w!(PopBlock),
             BuildString(size) => w!(BuildString, size),
+            BuildRange => w!(BuildRange),
             BuildTuple(size, unpack) => w!(BuildTuple, size, unpack),
             BuildList(size, unpack) => w!(BuildList, size, unpack),
             BuildSet(size, unpack) => w!(BuildSet, size, unpack),

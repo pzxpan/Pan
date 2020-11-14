@@ -286,6 +286,7 @@ pub enum Expression {
     AssignShiftRight(Loc, Box<Expression>, Box<Expression>),
 
     Subscript(Loc, Box<Expression>, Box<Expression>),
+    Range(Loc, Option<Box<Expression>>, Option<Box<Expression>>),
     Slice(Loc, Vec<Expression>),
     Attribute(Loc, Box<Expression>, Option<Identifier>, Option<i32>),
 
@@ -544,7 +545,6 @@ pub enum Statement {
         Loc,
         Expression,
         Expression,
-        Option<Expression>,
         Option<Box<Statement>>,
     ),
 }
@@ -566,7 +566,7 @@ impl Statement {
             | Statement::Expression(loc, _)
             | Statement::VariableDefinition(loc, _, _)
             | Statement::MultiVariableDefinition(loc, _, _)
-            | Statement::For(loc, _, _, _, _)
+            | Statement::For(loc, _, _, _)
             | Statement::Continue(loc)
             | Statement::Break(loc)
             | Statement::ConstDefinition(loc, _, _)

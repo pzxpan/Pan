@@ -424,6 +424,45 @@ impl HasType for Expression {
                     return CType::Unknown;
                 }
             }
+            Expression::Range(_, start, end) => {
+                let mut l = CType::Unknown;
+                let mut r = CType::Unknown;
+                if start.is_some() {
+                    l = start.as_ref().unwrap().get_type(&tables);
+                }
+                if end.is_some() {
+                    r = end.as_ref().unwrap().get_type(&tables);
+                }
+                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                //0..100
+                if max < CType::Float && min >= CType::I8 {
+                    return CType::Array(Box::new(min));
+                }
+                // ..100
+                if start.is_none() || min >= CType::I8 && min < CType::Float {
+                    return CType::Array(Box::new(min));
+                }
+                // 2..
+                if end.is_none() || min >= CType::I8 && min < CType::Float {
+                    return CType::Array(Box::new(min));
+                }
+
+                return CType::Unknown;
+            }
+            Expression::List(_, elements) => {
+                if elements.is_empty() {
+                    return CType::Array(Box::new(CType::Any));
+                } else {
+                    let ty = elements.get(0).unwrap().1.as_ref().unwrap().get_type(&tables);
+                    for element in elements {
+                        if element.1.as_ref().unwrap().get_type(&tables) != ty {
+                            return CType::Unknown;
+                        }
+                    }
+                    return CType::Array(Box::new(ty));
+                }
+            }
+
             _ => { return CType::Unknown; }
             // Expression::In(_, _, _) => {}
             // Expression::Is(_, _, _) => {}
@@ -443,7 +482,7 @@ impl HasType for Expression {
             // Expression::NamedFunctionCall(_, _, _) => {}
             // Expression::Await(_, _) => {}
             // Expression::Yield(_, _) => {}
-            // Expression::List(_, _) => {}
+
             // Expression::Comprehension(_, _, _) => {}
             // Expression::MatchExpression(_, _, _) => {}
             // Expression::Hole(_) => {}

@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::CodeObject;
-use pan_bytecode::value::{Value, FnValue};
+use pan_bytecode::value::{Value, FnValue, Obj};
 
 use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
@@ -85,7 +85,6 @@ impl Frame {
     }
 
     pub fn fetch_instruction(&self) -> &bytecode::Instruction {
-
         let ins2 = &self.code.instructions[self.lasti.get()];
         self.lasti.set(self.lasti.get() + 1);
         ins2
@@ -187,19 +186,20 @@ impl Frame {
             }
             bytecode::Instruction::GetIter => {
                 let end = self.pop_value();
-                if let Value::I32(_) = end {
-                    let start = self.pop_value();
-                    if vm._gt(end.clone(), start.clone()).bool_value() {
-                        self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(true)));
-                    } else {
-                        self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
-                    }
-                } else {
-                    self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), Value::Bool(false)));
-                }
+                self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), Value::Bool(false)));
                 None
             }
             bytecode::Instruction::ForIter(target) => self.execute_for_iter(vm, *target),
+            bytecode::Instruction::BuildRange => {
+                let end = self.pop_value();
+                let start = self.pop_value();
+                if vm._gt(end.clone(), start.clone()).bool_value() {
+                    self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(true)));
+                } else {
+                    self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
+                }
+                None
+            }
             bytecode::Instruction::MakeFunction => self.execute_make_function(vm),
             bytecode::Instruction::CallFunction(typ) => self.execute_call_function(vm, typ),
             bytecode::Instruction::Jump(target) => {

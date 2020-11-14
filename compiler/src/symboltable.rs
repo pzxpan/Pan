@@ -634,7 +634,7 @@ impl SymbolTableBuilder {
         return false;
     }
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
-        println!("statement is {:?}", statement);
+        //println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(_, stmts) => {
@@ -642,32 +642,48 @@ impl SymbolTableBuilder {
                     self.scan_statement(stmt)?;
                 }
             }
-            For(loc, target, iter, end, body) => {
-                let ty = iter.get_type(&self.tables);
+            For(loc, target, iter, body) => {
+                let mut ty = iter.get_type(&self.tables);
                 let mut symbol_name = String::new();
                 if let ast::Expression::Variable(Identifier { name, .. }) = target {
                     symbol_name = name.clone();
                 }
                 //如果iter是基本的数据类型，能被推断，否则就是Variable(Identifier)，需要获取已注册到symboltable的类型;
-                if ty != CType::Unknown {
-                    self.register_name(symbol_name.borrow(), ty, SymbolUsage::Assigned, iter.loc())?;
-                } else {
-                    let ty = self.get_register_type(iter.expr_name());
-                    if let CType::Array(cty) = ty {
-                        self.register_name(symbol_name.borrow(), cty.as_ref().clone(), SymbolUsage::Assigned, iter.loc())?;
-                    } else if let CType::Dict(key, value) = ty {
-                        self.register_name(symbol_name.borrow(), CType::Tuple(Box::new(vec![key.as_ref().clone(), value.as_ref().clone()])), SymbolUsage::Assigned, iter.loc())?;
+                if ty == CType::Unknown {
+                    ty = self.get_register_type(iter.expr_name());
+                }
+                // println!("ty:{:?},iter.expr_name:{:?}", ty, iter.expr_name());
+                if let CType::Tuple(n) = ty {
+                    if n.is_empty() {
+                        self.register_name(symbol_name.borrow(), CType::Any, SymbolUsage::Assigned, iter.loc())?;
                     } else {
-                        return Err(SymbolTableError {
-                            error: format!("{:?}类型不正确,只有数组类型才能生成迭代器", iter.expr_name()),
-                            location: loc.clone(),
-                        });
+                        let cty = n.get(0).unwrap();
+                        for nty in n.iter() {
+                            if nty != cty {
+                                return Err(SymbolTableError {
+                                    error: format!("{:?}是Tuple类,且其中的各项类型不同，无法形成迭代器", iter.expr_name()),
+                                    location: loc.clone(),
+                                });
+                            }
+                        }
+                        //如果类型相同的Tuple,就退化为Array,允许对其中的元素进行迭代;
+                        self.register_name(symbol_name.borrow(), cty.clone(), SymbolUsage::Assigned, iter.loc())?;
                     }
+                } else if let CType::Array(cty) = ty {
+                    self.register_name(symbol_name.borrow(), cty.as_ref().clone(), SymbolUsage::Assigned, iter.loc())?;
+                } else if let CType::Dict(key, value) = ty {
+                    self.register_name(symbol_name.borrow(), CType::Tuple(Box::new(vec![key.as_ref().clone(), value.as_ref().clone()])), SymbolUsage::Assigned, iter.loc())?;
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("{:?}类型不正确,只有数组类型才能生成迭代器", iter.expr_name()),
+                        location: loc.clone(),
+                    });
                 }
+
                 self.scan_expression(iter, &ExpressionContext::Load)?;
-                if let Some(e) = end {
-                    self.scan_expression(e, &ExpressionContext::Load)?;
-                }
+                // if let Some(e) = end {
+                //     self.scan_expression(e, &ExpressionContext::Load)?;
+                // }
                 self.scan_statement(body.as_ref().unwrap())?;
             }
             While(_, test, body) => {
@@ -993,7 +1009,7 @@ impl SymbolTableBuilder {
                         if ety != ret_ty {
                             if ety != &CType::Any {
                                 if *is_varargs {
-                                    if let CType::Tuple(_) = ety {
+                                    if let CType::Array(_) = ety {
                                         continue;
                                     }
                                 }
@@ -1364,7 +1380,8 @@ impl SymbolTableBuilder {
             }
             _ => {}
         }
-        table.symbols.insert(name.to_owned(), symbol);
+        table.symbols.insert(name.to_owned(), symbol.clone());
+        // println!("after register name={:?}, ty: {:?}", name, symbol.clone());
 
         Ok(())
     }

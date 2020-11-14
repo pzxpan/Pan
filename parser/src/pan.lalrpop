@@ -399,7 +399,7 @@ Parameter: Parameter = {
     },
     <l:@L>".." <name:Identifier?> <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty:Expression::Tuple(Loc(file_no, l, r), vec![]), is_ref:false, is_mut: false, name,default:None,is_varargs:true}
+        Parameter{loc, ty:Expression::List(Loc(file_no, l, r), vec![]), is_ref:false, is_mut: false, name,default:None,is_varargs:true}
     }
 }
 
@@ -481,9 +481,12 @@ Statement: Statement = {
    <l:@L> "while"  <e:Expression>  <b:BlockStatement> <r:@R> => {
       Statement::While(Loc(file_no, l, r), e, Box::new(b))
     },
-   <l:@L> "for"  <b:Expression>  "in"  <c:Expression> <d: (".." <Expression>)?> <block:BlockStatement> <r:@R> => {
-      Statement::For(Loc(file_no, l, r), b, c, d,Some(Box::new(block)))
+   <l:@L> "for"  <b:Expression>  "in"  <c:Expression>  <block:BlockStatement> <r:@R> => {
+      Statement::For(Loc(file_no, l, r), b, c,Some(Box::new(block)))
    },
+   <l:@L> "for"  <b:Expression>  "in"  <c:Precedence0> ".." <d:Precedence0> <block:BlockStatement> <r:@R> => {
+         Statement::For(Loc(file_no, l, r), b, Expression::Range(Loc(file_no, l, r), Some(Box::new(c)),Some(Box::new(d))),Some(Box::new(block)))
+       },
    <l:@L> "match"  <e:Expression>  "{" <b1:( <Expression> "->"  <Statement>)*> "}" <r:@R> => {
         let a = b1.iter().map(|s| (Box::new(s.0.clone()),Box::new(s.1.clone()))).collect();
         Statement::Match(Loc(file_no, l, r),e,a)
