@@ -26,7 +26,6 @@ impl CompileError {
 #[derive(Debug,PartialEq)]
 pub enum CompileErrorType {
     Assign(&'static str),
-    Delete(&'static str),
     Parse(ErrorType),
     SyntaxError(String),
     InvalidBreak,
@@ -39,7 +38,6 @@ impl fmt::Display for CompileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let error_desc = match &self.error {
             CompileErrorType::Assign(target) => format!("无法赋值 {}", target),
-            CompileErrorType::Delete(target) => format!("无法删除 {}", target),
             CompileErrorType::Parse(_) => "".to_string(),
             CompileErrorType::SyntaxError(err) => err.to_string(),
 

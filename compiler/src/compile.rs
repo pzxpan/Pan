@@ -100,7 +100,7 @@ pub fn compile(
         Err(CompileError {
             statement: None,
             error: CompileErrorType::Parse(ErrorType::None),
-            location: Loc(0, 0, 0),
+            location: Loc::default(),
             source_path: Some(source_path.to_string()),
         })
     }
