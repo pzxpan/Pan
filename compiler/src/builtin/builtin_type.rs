@@ -33,7 +33,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     arg_types.push((String::from("value"), CType::Any, false, false));
     let tt = CType::Fn(FnType {
         name: "print".to_string(),
-        arg_types,
+        arg_types: arg_types.clone(),
         type_args: Vec::new(),
         ret_type: Box::from(CType::Any),
         is_pub: true,
@@ -42,5 +42,31 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
         is_varargs: true,
     });
     vec.push(("print".to_owned(), tt, SymbolUsage::Builtin));
+
+    let ty = CType::Fn(FnType {
+        name: "format".to_string(),
+        arg_types: arg_types.clone(),
+        type_args: Vec::new(),
+        ret_type: Box::from(CType::Str),
+        is_pub: true,
+        is_static: false,
+        has_body: true,
+        is_varargs: true,
+    });
+
+    vec.push(("format".to_owned(), ty, SymbolUsage::Builtin));
+
+    let ty = CType::Fn(FnType {
+        name: "typeof".to_string(),
+        arg_types: arg_types.clone(),
+        type_args: Vec::new(),
+        ret_type: Box::from(CType::Str),
+        is_pub: true,
+        is_static: false,
+        has_body: true,
+        is_varargs: true,
+    });
+
+    vec.push(("typeof".to_owned(), ty, SymbolUsage::Builtin));
     vec
 }

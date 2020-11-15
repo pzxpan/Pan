@@ -125,6 +125,7 @@ pub enum Instruction {
     SetAdd(usize),
     MapAdd(usize),
     Print,
+    TypeOf,
     //感觉不靠谱，得换这两个指令
     LoadBuildStruct,
     LoadBuildEnum(usize),
@@ -421,6 +422,7 @@ impl Instruction {
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),
             Print => w!(Print),
+            TypeOf => w!(TypeOf),
             LoadBuildStruct => w!(LoadBuildClass),
             LoadBuildEnum(size) => w!(LoadBuildEnum,size),
             LoadBuildModule => w!(LoadBuildModule),

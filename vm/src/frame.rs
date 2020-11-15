@@ -282,6 +282,11 @@ impl Frame {
                 vm.print(self.pop_value());
                 None
             }
+            bytecode::Instruction::TypeOf => {
+                let v = self.pop_value();
+                self.push_value(Value::String(v.ty_name()));
+                None
+            }
             bytecode::Instruction::PrimitiveTypeChange(idx) => {
                 let value = self.pop_value();
                 self.push_value(change_to_primitive_type(&value, *idx));

@@ -1194,12 +1194,25 @@ impl SymbolTableBuilder {
                 self.scan_expression(body, &ExpressionContext::Load)?;
                 self.scan_expression(orelse, &ExpressionContext::Load)?;
             }
-            MatchExpression(_, _, _) => {}
+
             As(_, a, b) => {
                 self.scan_expression(a, context)?;
                 self.scan_expression(b, context)?;
+                let ty = b.get_type(&self.tables);
+                if ty == CType::Char {
+                    let aty = a.get_type(&self.tables);
+                    if aty != CType::Char && aty != CType::U8 {
+                        return Err(SymbolTableError {
+                            error: format!("只有u8类型能转换为char型,其他类型回造成太大的精度损失"),
+                            location: a.loc().clone(),
+                        });
+                    }
+                }
             }
-            _ => {}
+            MatchExpression(_, _, _) => {}
+            Range(_, _, _) => {}
+            Hole(_) => {}
+            Error => {}
         }
         Ok(())
     }

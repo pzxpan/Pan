@@ -93,21 +93,21 @@ impl Value {
 
     pub fn ty_name(&self) -> String {
         match *self {
-            Value::I8(_) => { "I8".to_string() }
-            Value::I16(_) => { "I16".to_string() }
-            Value::I32(_) => { "I32".to_string() }
-            Value::I64(_) => { "I64".to_string() }
-            Value::I128(_) => { "I128".to_string() }
-            Value::U8(_) => { "U8".to_string() }
-            Value::U16(_) => { "U16".to_string() }
-            Value::U32(_) => { "U32".to_string() }
-            Value::U64(_) => { "U64".to_string() }
-            Value::U128(_) => { "U128".to_string() }
-            Value::Char(_) => { "Char".to_string() }
-            Value::ISize(_) => { "ISize".to_string() }
-            Value::USize(_) => { "USize".to_string() }
-            Value::String(_) => { "String".to_string() }
-            Value::Float(_) => { "Float".to_string() }
+            Value::I8(_) => { "i8".to_string() }
+            Value::I16(_) => { "i16".to_string() }
+            Value::I32(_) => { "i32".to_string() }
+            Value::I64(_) => { "i64".to_string() }
+            Value::I128(_) => { "i128".to_string() }
+            Value::U8(_) => { "u8".to_string() }
+            Value::U16(_) => { "u16".to_string() }
+            Value::U32(_) => { "u32".to_string() }
+            Value::U64(_) => { "u64".to_string() }
+            Value::U128(_) => { "u128".to_string() }
+            Value::Char(_) => { "char".to_string() }
+            Value::ISize(_) => { "isize".to_string() }
+            Value::USize(_) => { "usize".to_string() }
+            Value::String(_) => { "string".to_string() }
+            Value::Float(_) => { "float".to_string() }
             Value::Obj(_) => { "Obj".to_string() }
             Value::Type(_) => { "Type".to_string() }
             Value::Fn(_) => { "Fn".to_string() }
@@ -115,7 +115,7 @@ impl Value {
             Value::Code(_) => { "Code".to_string() }
             Value::Enum(_) => { "Enum".to_string() }
             Value::Closure(_) => { "Closure".to_string() }
-            Value::Bool(_) => { "Bool".to_string() }
+            Value::Bool(_) => { "bool".to_string() }
         }
     }
 

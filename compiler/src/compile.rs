@@ -1489,7 +1489,7 @@ impl<O: OutputStream> Compiler<O> {
             if args.len() > 1 {
                 self.emit(Instruction::FormatString(args.len() - 1));
             }
-            self.emit(Instruction::CallFunction(CallType::Positional(1)));
+            self.emit(Instruction::Print);
         } else {
             self.emit(Instruction::FormatString(args.len() - 1));
         }
@@ -1522,10 +1522,23 @@ impl<O: OutputStream> Compiler<O> {
             }
         } else {
             self.compile_expression(function)?;
+            //内置函数处理
             if function.expr_name().eq("print") {
                 return self.compile_format(true, args);
             } else if function.expr_name().eq("format") {
-                return self.compile_format(true, args);
+                return self.compile_format(false, args);
+            } else if function.expr_name().eq("typeof") {
+                self.gather_elements(args)?;
+                if args.len() > 1 {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
+                        location: self.current_source_location.clone(),
+                        source_path: None,
+                    });
+                }
+                self.emit(Instruction::TypeOf);
+                return Ok(());
             }
         }
 
