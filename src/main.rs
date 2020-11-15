@@ -8,12 +8,11 @@ use walkdir::WalkDir;
 
 use pan_bytecode::value::Value;
 
-use pan_compiler::compile::{compile};
+use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
 
 use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
-
 
 fn main() {
     // let num = 1000;
@@ -30,8 +29,10 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    //test_one_file(&env::current_dir().unwrap().join("demo").join("bound.pan"));
-     test_all_demo_file();
+    let a = 212831831.3;
+    println!("{:.2}", a);
+    test_one_file(&env::current_dir().unwrap().join("demo").join("format.pan"));
+    // test_all_demo_file();
 }
 
 fn test_all_demo_file() {

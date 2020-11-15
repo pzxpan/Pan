@@ -14,6 +14,7 @@ use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
 
 use crate::util::change_to_primitive_type;
+use crate::util::get_string_value;
 
 #[derive(Clone, Debug)]
 struct Block {
@@ -121,7 +122,8 @@ impl Frame {
                 self.push_value(value);
                 None
             }
-            bytecode::Instruction::BuildString(_) => {
+            bytecode::Instruction::FormatString(size) => {
+                self.execute_format_string(size);
                 None
             }
             bytecode::Instruction::BuildList(size, unpack) => {
@@ -339,7 +341,13 @@ impl Frame {
         }
         None
     }
-
+    fn execute_format_string(&self, size: &usize) -> FrameResult {
+        let v = self.pop_multiple(*size);
+        let format_str = self.pop_value();
+        let value = get_string_value(format_str, v);
+        self.push_value(value);
+        None
+    }
 
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     fn load_name(

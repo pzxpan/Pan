@@ -114,7 +114,7 @@ pub enum Instruction {
     SetupLoop(Label, Label),
 
     PopBlock,
-    BuildString(usize),
+    FormatString(usize),
     BuildRange,
     BuildTuple(usize, bool),
     BuildList(usize, bool),
@@ -406,7 +406,7 @@ impl Instruction {
             SetupAsyncWith(end) => w!(SetupAsyncWith, label_map[end]),
             PrimitiveTypeChange(n) => w!(PrimitiveTypeChange, n),
             PopBlock => w!(PopBlock),
-            BuildString(size) => w!(BuildString, size),
+            FormatString(size) => w!(BuildString, size),
             BuildRange => w!(BuildRange),
             BuildTuple(size, unpack) => w!(BuildTuple, size, unpack),
             BuildList(size, unpack) => w!(BuildList, size, unpack),

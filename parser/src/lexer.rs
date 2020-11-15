@@ -656,6 +656,7 @@ impl<'input> Lexer<'input> {
                     let mut end;
                     let mut last_was_escape = false;
                     loop {
+                        self.go_right();
                         if let Some((i, ch)) = self.chars.next() {
                             end = i;
                             if !last_was_escape {

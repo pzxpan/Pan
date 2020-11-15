@@ -1,4 +1,6 @@
 use pan_bytecode::value::*;
+use dynformat::Formatter;
+use dynformat::strfmt_map;
 
 //得用宏来写这些代码
 pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
@@ -194,4 +196,70 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
             Value::Nil
         }
     };
+}
+
+pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
+    let f = |mut fmt: dynformat::Formatter| {
+        let vv = v[fmt.index].clone();
+        match vv {
+            Value::I8(value) => {
+                fmt.i8(value)
+            }
+            Value::U8(value) => {
+                fmt.u8(value)
+            }
+            Value::I16(value) => {
+                fmt.i16(value)
+            }
+            Value::U16(value) => {
+                fmt.u16(value)
+            }
+            Value::I32(value) => {
+                fmt.i32(value)
+            }
+            Value::U32(value) => {
+                fmt.u32(value)
+            }
+            Value::I64(value) => {
+                fmt.i64(value)
+            }
+            Value::U64(value) => {
+                fmt.u64(value)
+            }
+            Value::ISize(value) => {
+                fmt.isize(value)
+            }
+            Value::USize(value) => {
+                fmt.usize(value)
+            }
+            Value::I128(value) => {
+                fmt.i128(value)
+            }
+            Value::U128(value) => {
+                fmt.u128(value)
+            }
+            Value::Float(value) => {
+                fmt.f64(value)
+            }
+            Value::String(s) => { fmt.str(s.as_ref()) }
+            Value::Bool(_) |
+            Value::Char(_) |
+            Value::Obj(_) |
+            Value::Fn(_) |
+            Value::Closure(_) |
+            Value::Type(_) |
+            Value::Enum(_) |
+            Value::Code(_) => {
+                fmt.str(&vv.to_string())
+            }
+            Value::Nil => { fmt.str(&"None".to_string()) }
+        }
+    };
+    if let Value::String(s) = format_str {
+        let a = strfmt_map(s.as_ref(), &f);
+        if a.is_ok() {
+            return Value::String(a.unwrap());
+        }
+    }
+    Value::Nil
 }

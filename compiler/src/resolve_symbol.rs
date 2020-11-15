@@ -16,6 +16,7 @@ use crate::symboltable::*;
 use crate::variable_type::HasType;
 use crate::ctype::{CType, StructType, FnType};
 use itertools::Tuples;
+use dynformat::check;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
@@ -59,7 +60,7 @@ fn scan_import_symbol_inner(whole_name: String, build: &mut SymbolTableBuilder, 
         slice.push_str(".pan");
         let mut path = env::current_dir().unwrap();
         path.push(slice);
-       // println!("path{:?}", path);
+        // println!("path{:?}", path);
         if path.is_file() {
             scan_import_file(build, &path, Some(item_name), as_name, is_all)?;
         } else {
@@ -259,7 +260,62 @@ pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: 
     Ok(())
 }
 
-pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, function: &FunctionDefinition, var_args: &Vec<Expression>) -> SymbolTableResult {
+pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &Vec<Expression>) -> SymbolTableResult {
+    if var_args.is_empty() {
+        return Err(SymbolTableError {
+            error: format!("参数为空"),
+            location: loc.clone(),
+        });
+    }
+    let fmt_expr = var_args.get(0).unwrap();
+    let mut s = "".to_string();
+    if let Expression::StringLiteral(values) = fmt_expr {
+        s = values.iter().fold(String::new(), |mut s, x| {
+            s.push_str(&x.string);
+            s
+        });
+    } else if var_args.len() > 1 {
+        return Err(SymbolTableError {
+            error: format!("格式化参数需要静态字符串"),
+            location: fmt_expr.loc().clone(),
+        });
+    }
+
+    let a = check(&s);
+    if a.is_ok() {
+        let mut v = Vec::new();
+        v = a.unwrap();
+        for e in var_args.iter().skip(1).enumerate() {
+            let ty = e.1.get_type(&build.tables);
+            if v.len() > 0 {
+                let nty = v.get(0).unwrap();
+                if *nty == 1 {
+                    if ty < CType::I8 || ty > CType::U128 {
+                        return Err(SymbolTableError {
+                            error: format!("第{:?}个格式化参数需要整数类型", e.0 + 1),
+                            location: e.1.loc().clone(),
+                        });
+                    }
+                } else if *nty == 2 {
+                    if ty < CType::I8 || ty > CType::Float {
+                        return Err(SymbolTableError {
+                            error: format!("第{:?}个格式化参数需要浮点类型", e.0 + 1),
+                            location: e.1.loc().clone(),
+                        });
+                    }
+                }
+                v.remove(0);
+            }
+        }
+    } else {
+        return Err(SymbolTableError {
+            error: format!("格式化参数有误,请查看文档"),
+            location: fmt_expr.loc().clone(),
+        });
+    }
+
     Ok(())
 }
+
+
 

@@ -390,6 +390,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "dynformat"
+version = "0.1.0"
+
+[[package]]
 name = "either"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -800,6 +804,7 @@ name = "pan-compiler"
 version = "0.1.0"
 dependencies = [
  "arrayvec 0.5.1",
+ "dynformat",
  "indexmap",
  "itertools 0.8.2",
  "lazy_static",
@@ -844,6 +849,7 @@ dependencies = [
  "crc",
  "csv",
  "digest",
+ "dynformat",
  "getrandom",
  "hex",
  "hexf-parse",

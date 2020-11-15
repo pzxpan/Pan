@@ -1479,6 +1479,19 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
+    fn compile_format(&mut self, is_print: bool, args: &[ast::Expression]) -> Result<(), CompileError> {
+        self.gather_elements(args)?;
+        if is_print {
+            if args.len() > 1 {
+                self.emit(Instruction::FormatString(args.len() - 1));
+            }
+            self.emit(Instruction::CallFunction(CallType::Positional(1)));
+        } else {
+            self.emit(Instruction::FormatString(args.len() - 1));
+        }
+        return Ok(());
+    }
+
     fn compile_call(
         &mut self,
         function: &ast::Expression,
@@ -1505,6 +1518,11 @@ impl<O: OutputStream> Compiler<O> {
             }
         } else {
             self.compile_expression(function)?;
+            if function.expr_name().eq("print") {
+                return self.compile_format(true, args);
+            } else if function.expr_name().eq("format") {
+                return self.compile_format(true, args);
+            }
         }
 
         if is_enum_item.0 {

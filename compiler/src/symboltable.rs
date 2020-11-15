@@ -14,7 +14,7 @@ use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds};
+use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds, resovle_varargs_fun};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
@@ -212,7 +212,7 @@ pub enum SymbolUsage {
 
 #[derive(Default)]
 pub struct SymbolTableBuilder {
-    tables: Vec<SymbolTable>,
+    pub tables: Vec<SymbolTable>,
     lambda_name: String,
     fun_call: bool,
     in_struct_func: bool,
@@ -983,48 +983,52 @@ impl SymbolTableBuilder {
                 self.scan_expression(obj, context)?;
             }
             FunctionCall(loc, name, args) => {
-                let ty = self.get_register_type(name.expr_name());
-                if ty == CType::Unknown {
-                    return Err(SymbolTableError {
-                        error: format!("未定义{:?}的类型，", name.expr_name()),
-                        location: loc.clone(),
-                    });
-                }
-                if let Attribute(_, name, Some(ident), _) = name.as_ref() {
-                    if name.expr_name().ne("self".clone()) {
-                        if !self.is_enum_variant(&ty, ident.name.clone()) {
-                            self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
-                        }
+                if name.expr_name().eq("print") || name.expr_name().eq("format") {
+                    resovle_varargs_fun(self, &name.loc(), &args)?;
+                } else {
+                    let ty = self.get_register_type(name.expr_name());
+                    if ty == CType::Unknown {
+                        return Err(SymbolTableError {
+                            error: format!("未定义{:?}的类型，", name.expr_name()),
+                            location: loc.clone(),
+                        });
                     }
-                    //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分,不雅观;
-                    self.fun_call = true;
-                }
+                    if let Attribute(_, name, Some(ident), _) = name.as_ref() {
+                        if name.expr_name().ne("self".clone()) {
+                            if !self.is_enum_variant(&ty, ident.name.clone()) {
+                                self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
+                            }
+                        }
+                        //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分,不雅观;
+                        self.fun_call = true;
+                    }
 
-                self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
-                let args_type = ty.param_type();
-                for (i, (ety, is_default, is_varargs)) in args_type.iter().enumerate() {
-                    if let Some(e) = args.get(i) {
-                        let cty = e.get_type(&self.tables);
-                        let ret_ty = cty.ret_type();
-                        if ety != ret_ty {
-                            if ety != &CType::Any {
-                                if *is_varargs {
-                                    if let CType::Array(_) = ety {
-                                        continue;
+                    self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
+                    let args_type = ty.param_type();
+                    for (i, (ety, is_default, is_varargs)) in args_type.iter().enumerate() {
+                        if let Some(e) = args.get(i) {
+                            let cty = e.get_type(&self.tables);
+                            let ret_ty = cty.ret_type();
+                            if ety != ret_ty {
+                                if ety != &CType::Any {
+                                    if *is_varargs {
+                                        if let CType::Array(_) = ety {
+                                            continue;
+                                        }
                                     }
+                                    return Err(SymbolTableError {
+                                        error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
+                                        location: loc.clone(),
+                                    });
                                 }
+                            }
+                        } else {
+                            if !*is_default {
                                 return Err(SymbolTableError {
-                                    error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
+                                    error: format!("缺少第{:?}个参数，参数类型为{:?}", i + 1, ety),
                                     location: loc.clone(),
                                 });
                             }
-                        }
-                    } else {
-                        if !*is_default {
-                            return Err(SymbolTableError {
-                                error: format!("缺少第{:?}个参数，参数类型为{:?}", i + 1, ety),
-                                location: loc.clone(),
-                            });
                         }
                     }
                 }

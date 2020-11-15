@@ -17,8 +17,9 @@ pub enum CType {
     USize,
     I64,
     U64,
-    U128,
     I128,
+    U128,
+
     Float,
     Str,
     //-----

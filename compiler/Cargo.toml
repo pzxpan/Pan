@@ -17,5 +17,9 @@ itertools = "0.8.0"
 pan-bytecode = { path = "../bytecode", version = "0.1.0" }
 pan-parser = { path = "../parser", version = "0.1.0" }
 num-complex = { version = "0.2", features = ["serde"] }
+dynformat = {path= "../dynformat", version = "0.1.0"}
 log = "0.4"
 arrayvec = "0.5"
+
+
+
