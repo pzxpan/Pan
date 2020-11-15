@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, Constant};
 use pan_bytecode::value::*;
-use pan_parser::ast::Loc;
+use pan_parser::ast::{Loc, Number};
 use pan_parser::diagnostics::ErrorType;
 use pan_parser::{ast, parse};
 use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType, Import};
@@ -1313,7 +1313,6 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_compare(&*v, &*ops)?;
             }
             Assign(_, a, b) => {
-                // println!("a:{:?},b:{:?}", a, b);
                 self.compile_expression(b)?;
                 self.compile_store(a)?;
             }
@@ -1474,7 +1473,12 @@ impl<O: OutputStream> Compiler<O> {
                     bytecode::Constant::Float(value),
                 ));
             }
-            _ => {}
+
+            Char(value) => {
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Char(value),
+                ));
+            }
         }
         Ok(())
     }

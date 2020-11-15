@@ -30,7 +30,7 @@ fn main() {
     //     }
     // }
     test_one_file(&env::current_dir().unwrap().join("demo").join("format.pan"));
-    // test_all_demo_file();
+    //test_all_demo_file();
 }
 
 fn test_all_demo_file() {

@@ -24,6 +24,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
         }
         Value::U8(v) => {
             match ty_index {
+                4 => Value::Char(*v as char),
                 -8 => Value::I8(*v as i8),
                 8 => Value::U8(*v as u8),
                 -16 => Value::I16(*v as i16),
@@ -154,6 +155,23 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
+                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                _ => Value::Nil
+            }
+        }
+        Value::Char(v) => {
+            match ty_index {
+                -8 => Value::I8(*v as i8),
+                8 => Value::U8(*v as u8),
+                -16 => Value::I16(*v as i16),
+                16 => Value::U16(*v as u16),
+                -32 => Value::I32(*v as i32),
+                32 => Value::U32(*v as u32),
+                -64 => Value::I64(*v as i64),
+                64 => Value::U64(*v as u64),
+                -128 => Value::I128(*v as i128),
+                128 => Value::U128(*v as u128),
+                // 1000 => Value::Float(*v as f64),
                 2000 => Value::String((*v.to_string()).parse().unwrap()),
                 _ => Value::Nil
             }

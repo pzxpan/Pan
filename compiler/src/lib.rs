@@ -14,4 +14,3 @@ pub mod resolve_symbol;
 pub mod resolve_fns;
 pub mod builtin;
 pub mod util;
-pub mod const_value;

@@ -5,8 +5,8 @@ use std::collections::HashMap;
 pub enum CType {
     //-----以下的类型顺序不能变，因为有用来比较大小,确定如何转型
     None,
-    Char,
     Bool,
+    Char,
     I8,
     U8,
     I16,

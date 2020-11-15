@@ -290,6 +290,12 @@ pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: 
             if v.len() > 0 {
                 let nty = v.get(0).unwrap();
                 if *nty == 1 {
+                    if ty == CType::Char {
+                        return Err(SymbolTableError {
+                            error: format!("第{:?}个格式化参数需要整数类型,参数类型为char型! 可以用as转换成整型，或者直接按string输出", e.0 + 1),
+                            location: e.1.loc().clone(),
+                        });
+                    }
                     if ty < CType::I8 || ty > CType::U128 {
                         return Err(SymbolTableError {
                             error: format!("第{:?}个格式化参数需要整数类型", e.0 + 1),

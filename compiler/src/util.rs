@@ -3,7 +3,7 @@ use crate::ctype::CType;
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {
         CType::Bool => { 1 }
-        CType::Char => { 2 }
+        CType::Char => { 4 }
         CType::I8 => { -8 }
         CType::U8 => { 8 }
         CType::I16 => { -16 }
