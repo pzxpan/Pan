@@ -38,6 +38,7 @@ fn is_sign_element(c: char) -> bool {
 
 fn is_type_element(c: char) -> bool {
     match c {
+        'd' |
         'b' |
         'o' |
         'x' |
@@ -347,20 +348,21 @@ impl<'a, 'b> Formatter<'a, 'b> {
         match self.ty {
             None => false,
             Some(c) => match c {
-                'b' | 'o' | 'x' | 'X' => true,
+                'd' | 'b' | 'o' | 'x' | 'X' => true,
                 _ => false,
             }
         }
     }
 
     pub fn need_float_type(&self) -> bool {
-        match self.ty {
-            None => false,
-            Some(c) => match c {
-                'f' | 'e' | 'E' => true,
-                _ => false,
-            }
-        }
+        return self.pattern.find('.').is_some();
+        // match self.ty {
+        //     None => false,
+        //     Some(c) => match c {
+        //         'f' | 'e' | 'E' => true,
+        //         _ => false,
+        //     }
+        // }
     }
 }
 

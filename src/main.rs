@@ -29,8 +29,6 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    let a = 212831831.3;
-    println!("{:.2}", a);
     test_one_file(&env::current_dir().unwrap().join("demo").join("format.pan"));
     // test_all_demo_file();
 }

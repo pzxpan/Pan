@@ -37,6 +37,7 @@ macro_rules! fmtint {
                         'b' => self.write_str("0b").unwrap(),
                         'o' => self.write_str("0o").unwrap(),
                         'x' | 'X' => self.write_str("0x").unwrap(),
+                        'd' => self.write_str("").unwrap(),
                         _ => {
                             let mut msg = String::new();
                             write!(msg, "alternate ('#') cannot be used with type {:?}", ty).unwrap();
@@ -47,6 +48,7 @@ macro_rules! fmtint {
 
                 match ty {
                     ' ' => write!(s, "{}", x).unwrap(),
+                    'd' => write!(s, "{}", x).unwrap(),
                     'b' => write!(s, "{:b}", x).unwrap(),
                     'o' => write!(s, "{:o}", x).unwrap(),
                     'x' => write!(s, "{:x}", x).unwrap(),

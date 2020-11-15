@@ -297,9 +297,15 @@ pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: 
                         });
                     }
                 } else if *nty == 2 {
-                    if ty < CType::I8 || ty > CType::Float {
+                    if ty > CType::Float {
                         return Err(SymbolTableError {
                             error: format!("第{:?}个格式化参数需要浮点类型", e.0 + 1),
+                            location: e.1.loc().clone(),
+                        });
+                    }
+                    if ty < CType::Float {
+                        return Err(SymbolTableError {
+                            error: format!("第{:?}个格式化参数需要浮点类型,参数类型为{:?}! 也许不需要指定浮点输出,用string输出就好", e.0 + 1, ty),
                             location: e.1.loc().clone(),
                         });
                     }
