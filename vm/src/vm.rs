@@ -12,6 +12,8 @@ use pan_bytecode::value::*;
 
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
+use std::collections::HashMap;
+use std::thread;
 
 pub struct VirtualMachine {
     pub frames: Vec<FrameRef>,
@@ -798,4 +800,28 @@ impl Default for VirtualMachine {
     fn default() -> Self {
         VirtualMachine::new()
     }
+}
+
+pub fn run_code_in_thread(code: CodeObject) {
+    /// use std::thread;
+
+    let handler = thread::Builder::new()
+        .name("named thread".into())
+        .spawn(|| {
+            let mut vm = VirtualMachine::new();
+            let global_value = HashMap::new();
+            let local_value: HashMap<String, Value> = HashMap::new();
+            let mut v = Vec::new();
+
+            v.push(local_value);
+            let scope = Scope::with_builtins(v, global_value, &vm);
+            vm.run_code_obj(code, scope);
+            println!("handler:{:?}",thread::current());
+            let handle = thread::current();
+            assert_eq!(handle.name(), Some("named thread"));
+        })
+        .unwrap();
+    println!("handler:{:?}",thread::current());
+
+    handler.join().unwrap();
 }

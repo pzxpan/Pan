@@ -13,6 +13,7 @@ use pan_compiler::error::CompileErrorType;
 
 use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
+use pan_vm::vm::run_code_in_thread;
 
 fn main() {
     // let num = 1000;
@@ -57,7 +58,7 @@ fn test_one_file(home_path: &Path) {
 
         v.push(local_value);
         let scope = Scope::with_builtins(v, global_value, &vm);
-        vm.run_code_obj(code_object.unwrap(), scope);
+        run_code_in_thread(code_object.unwrap());
     } else {
         let error = code_object.err().unwrap();
         match error.error {
