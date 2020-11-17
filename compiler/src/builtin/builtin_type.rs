@@ -28,6 +28,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("None".to_owned(), CType::None, SymbolUsage::Builtin));
     vec.push(("Any".to_owned(), CType::Any, SymbolUsage::Builtin));
     vec.push(("Self".to_owned(), CType::TSelf, SymbolUsage::Builtin));
+    vec.push(("FunType".to_owned(), CType::Fn(FnType::new()), SymbolUsage::Builtin));
 
     let mut arg_types = Vec::new();
     arg_types.push((String::from("value"), CType::Any, false, false));

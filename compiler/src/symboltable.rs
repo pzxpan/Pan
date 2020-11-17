@@ -703,6 +703,7 @@ impl SymbolTableBuilder {
             }
             Args(_, _) => {}
             VariableDefinition(location, decl, expression) => {
+                println!("pan:{:?},", expression);
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
@@ -752,11 +753,17 @@ impl SymbolTableBuilder {
                             self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
                         }
                     } else {
+                        if let ast::Expression::Variable(Identifier { .. }) = e {
+                            //简单赋值，右侧如果是饮用语言直接拷贝类型；
+                            // TOTO 如果是值类型的话，拷贝类型，删除已注册的变量
+                            self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
+                            return Ok(());
+                        }
                         let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables);
-                        let right_ty = ty.ret_type().clone();
+                        let mut right_ty = ty.ret_type().clone();
                         if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
                             return Err(SymbolTableError {
-                                error: format!("类型不匹配,右侧类型 {:?}, 右侧类型 {:?}", right_ty, left_ty),
+                                error: format!("类型不匹配,右侧类型 {:?}\n, 左侧类型 {:?}", right_ty, left_ty),
                                 location: location.clone(),
                             });
                         }

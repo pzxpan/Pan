@@ -52,7 +52,20 @@ pub struct FnType {
     pub has_body: bool,
 }
 
+
 impl FnType {
+    pub fn new() -> Self {
+        FnType {
+            name: String::default(),
+            arg_types: vec![],
+            type_args: vec![],
+            ret_type: Box::new(CType::Any),
+            is_varargs: false,
+            is_pub: false,
+            is_static: false,
+            has_body: false,
+        }
+    }
     pub fn is_instance_type(&self, boundfn: &FnType) -> bool {
         let mut generics: HashMap<String, CType> = HashMap::new();
         if self.name.eq(&boundfn.name) {
