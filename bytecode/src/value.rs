@@ -15,6 +15,12 @@ pub struct FnValue {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct ThreadValue {
+    pub name: String,
+    pub code: CodeObject,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ClosureValue {
     pub name: String,
     pub code: CodeObject,
@@ -44,9 +50,10 @@ pub enum Value {
     /// These are only transient values and should not remain on the stack. Compare to an actual,
     /// heap-allocated, run-time Value::Obj(Obj::StringObj) value.
     String(String),
-    Obj(Arc<RefCell<Obj>>),
+    Obj(Box<Obj>),
     Fn(FnValue),
     Closure(ClosureValue),
+    Thread(ThreadValue),
     // NativeFn(NativeFn),
     Type(TypeValue),
     Enum(EnumValue),
@@ -114,6 +121,7 @@ impl Value {
             Value::Nil => { "Nil".to_string() }
             Value::Code(_) => { "Code".to_string() }
             Value::Enum(_) => { "Enum".to_string() }
+            Value::Thread(_) => { "Thread".to_string() }
             Value::Closure(_) => { "Closure".to_string() }
             Value::Bool(_) => { "bool".to_string() }
         }
@@ -122,7 +130,7 @@ impl Value {
     pub fn is_obj_instant(&self) -> i32 {
         return match &*self {
             Value::Obj(v) => {
-                match &*v.borrow() {
+                match v.as_ref() {
                     Obj::InstanceObj(_) => {
                         //1为struct
                         1
@@ -140,7 +148,7 @@ impl Value {
     pub fn hash_map_value(&self) -> HashMap<String, Value> {
         match &*self {
             Value::Obj(v) => {
-                match &*v.borrow() {
+                match v.as_ref() {
                     Obj::MapObj(map) => {
                         return map.clone();
                     }
@@ -192,9 +200,10 @@ impl Value {
             Value::Float(val) => format!("{}", val),
             Value::Bool(val) => format!("{}", val),
             Value::String(val) => val.clone(),
-            Value::Obj(obj) => format!("{}", &obj.borrow().to_string()),
+            Value::Obj(obj) => format!("{}", &obj.to_string()),
             Value::Fn(FnValue { name, .. }) |
             Value::Closure(ClosureValue { name, .. }) => format!("<func {}>", name),
+            Value::Thread(ThreadValue { name, .. }) => format!("<thread {}>", name),
 // Value::NativeFn(NativeFn { name, .. }) => format!("<func {}>", name),
             Value::Type(TypeValue { name, .. }) => format!("<type {}>", name),
             Value::Nil => format!("None"),
@@ -205,32 +214,32 @@ impl Value {
 
     pub fn new_string_obj(value: String) -> Value {
         let str = Obj::StringObj(value);
-        Value::Obj(Arc::new(RefCell::new(str)))
+        Value::Obj(Box::new(str))
     }
 
     pub fn new_array_obj(values: Vec<Value>) -> Value {
         let arr = Obj::ArrayObj(values);
-        Value::Obj(Arc::new(RefCell::new(arr)))
+        Value::Obj(Box::new(arr))
     }
 
     pub fn new_range_obj(start: Value, end: Value, up: Value) -> Value {
         let range = Obj::RangObj(start, end, up);
-        Value::Obj(Arc::new(RefCell::new(range)))
+        Value::Obj(Box::new(range))
     }
 
     pub fn new_map_obj(items: HashMap<String, Value>) -> Value {
         let map = Obj::MapObj(items);
-        Value::Obj(Arc::new(RefCell::new(map)))
+        Value::Obj(Box::new(map))
     }
 
     pub fn new_instance_obj(typ: Value, fields: Value) -> Value {
         let inst = Obj::InstanceObj(InstanceObj { typ: Box::new(typ), field_map: fields });
-        Value::Obj(Arc::new(RefCell::new(inst)))
+        Value::Obj(Box::new(inst))
     }
 
     pub fn new_enum_obj(typ: Value, fields: Option<Vec<Value>>, item_name: Value) -> Value {
         let inst = Obj::EnumObj(EnumObj { typ: Box::new(typ), field_map: fields, item_name });
-        Value::Obj(Arc::new(RefCell::new(inst)))
+        Value::Obj(Box::new(inst))
     }
 }
 
@@ -255,10 +264,11 @@ impl Display for Value {
             Value::Float(v) => write!(f, "{}", v),
             Value::Bool(v) => write!(f, "{}", v),
             Value::String(val) => write!(f, "{}", val),
-            Value::Obj(o) => match &*o.borrow() {
+            Value::Obj(o) => match o.as_ref() {
                 Obj::StringObj(value) => write!(f, "\"{}\"", value),
                 o @ _ => write!(f, "{}", o.to_string()),
             }
+            Value::Thread(ThreadValue { name, .. }) => write!(f, "<func {}>", name),
             Value::Fn(FnValue { name, .. }) |
             Value::Closure(ClosureValue { name, .. }) => write!(f, "<func {}>", name),
 // Value::NativeFn(NativeFn { name, .. }) => write!(f, "<func {}>", name),
@@ -349,8 +359,8 @@ impl PartialOrd for Obj {
 
 pub fn get_item(a: Value, b: Value) -> Option<Value> {
     match (a, b) {
-        (Value::Obj(e), Value::I32(sub)) => {
-            match &*e.borrow_mut() {
+        (Value::Obj(mut e), Value::I32(sub)) => {
+            match e.as_mut() {
                 Obj::ArrayObj(arr) => {
                     if (sub as usize) < arr.len() {
                         arr.get(sub as usize).cloned()
@@ -365,8 +375,8 @@ pub fn get_item(a: Value, b: Value) -> Option<Value> {
             }
         }
 
-        (Value::Obj(e), Value::String(sub)) => {
-            match *e.borrow_mut() {
+        (Value::Obj(mut e), Value::String(sub)) => {
+            match e.as_mut() {
                 Obj::MapObj(ref mut map) => {
                     map.get(sub.as_str()).cloned()
                 }

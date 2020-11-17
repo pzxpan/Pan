@@ -133,9 +133,9 @@ impl Frame {
             }
             bytecode::Instruction::BuildSet(size, unpack) => {
                 let hash_map: HashMap<String, Value> = HashMap::new();
-                let map_obj = Value::new_map_obj(hash_map);
+                let mut map_obj = Value::new_map_obj(hash_map);
                 for key in self.pop_multiple(*size).into_iter() {
-                    vm.set_item(&map_obj, key, Value::Nil);
+                    vm.set_item(&mut map_obj, key, Value::Nil);
                 }
                 self.push_value(map_obj);
                 None
@@ -388,9 +388,9 @@ impl Frame {
 
     fn execute_store_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let idx = self.pop_value();
-        let obj = self.pop_value();
+        let mut obj = self.pop_value();
         let value = self.pop_value();
-        vm.set_item(&obj, idx, value);
+        vm.set_item(&mut obj, idx, value);
         None
     }
 
@@ -408,9 +408,9 @@ impl Frame {
         for_call: bool,
     ) -> FrameResult {
         let hash_map: HashMap<String, Value> = HashMap::new();
-        let map_obj = Value::new_map_obj(hash_map);
+        let mut map_obj = Value::new_map_obj(hash_map);
         for (key, value) in self.pop_multiple(2 * size).into_iter().tuples() {
-            vm.set_item(&map_obj, key, value);
+            vm.set_item(&mut map_obj, key, value);
         }
         self.push_value(map_obj);
         None
