@@ -16,7 +16,7 @@ use crate::scope::{Scope, NameProtocol};
 use crate::util::change_to_primitive_type;
 use crate::util::get_string_value;
 use bitflags::_core::time::Duration;
-use crate::vm::run_code_in_thread;
+use crate::vm::run_code_in_sub_thread;
 
 #[derive(Clone, Debug)]
 struct Block {
@@ -96,7 +96,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-      //  println!("instruction is:{:?}", instruction);
+        // println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -446,7 +446,7 @@ impl Frame {
         None
     }
     fn create_new_thread(code: CodeObject, scope: Scope) -> FrameResult {
-        run_code_in_thread(code, scope);
+        run_code_in_sub_thread(code, scope);
         return None;
     }
 

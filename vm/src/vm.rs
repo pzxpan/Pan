@@ -14,6 +14,7 @@ use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
 use std::collections::HashMap;
 use std::thread;
+use std::thread::JoinHandle;
 
 pub struct VirtualMachine {
     pub frames: Vec<FrameRef>,
@@ -206,7 +207,7 @@ impl VirtualMachine {
 
     pub fn get_item(&self, a: Value, b: Value) -> Option<Value> {
         match (a, b) {
-            (Value::Obj( e), Value::I32(sub)) => {
+            (Value::Obj(e), Value::I32(sub)) => {
                 match e.as_ref() {
                     Obj::ArrayObj(arr) => {
                         arr.get(sub as usize).cloned()
@@ -220,7 +221,7 @@ impl VirtualMachine {
 
             (Value::Obj(e), Value::String(sub)) => {
                 match e.as_ref() {
-                    Obj::MapObj( map) => {
+                    Obj::MapObj(map) => {
                         map.get(sub.as_str()).cloned()
                     }
                     _ => unreachable!()
@@ -801,20 +802,22 @@ impl Default for VirtualMachine {
     }
 }
 
-pub fn run_code_in_thread(code: CodeObject,scope:Scope) {
-    /// use std::thread;
+pub fn run_code_in_thread(code: CodeObject, scope: Scope) -> JoinHandle<()> {
+    return thread::spawn(|| {
+        println!("handler:{:?}", thread::current().id());
+        let mut vm = VirtualMachine::new();
+        vm.run_code_obj(code, scope);
+        let handle = thread::current();
+    });
+}
 
-    let handler = thread::Builder::new()
-        .name("named thread".into())
-        .spawn(|| {
-            println!("handler:{:?}",thread::current());
-            let mut vm = VirtualMachine::new();
-            vm.run_code_obj(code, scope);
-            let handle = thread::current();
-            assert_eq!(handle.name(), Some("named thread"));
-        })
-        .unwrap();
+pub fn run_code_in_sub_thread(code: CodeObject, scope: Scope) {
+    thread::spawn(|| {
+        println!("handler:{:?}", thread::current().id());
+        let mut vm = VirtualMachine::new();
+        vm.run_code_obj(code, scope);
+        let handle = thread::current();
+    });
+
     // println!("handler:{:?}",thread::current());
-
-    handler.join().unwrap();
 }

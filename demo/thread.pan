@@ -21,12 +21,24 @@ fun main() {
     let bb = 30;
     let t = Thread::new(() => {
         let cc = add(aa,bb);
-        print("暂停4秒");
+        print("第一个子线程");
+        print("第一个子线程..暂停4秒");
         sleep(4000);
-        print("结束");
-        print(cc);
+        print("第一个子线程..暂停4秒结束");
+        print("{}+{}结果为:{}",aa,bb,cc);
     });
     t.run();
+
+    let t2 = Thread::new(() => {
+        let cc = add(1000,bb);
+        print("第二个子线程");
+        print("第二个子线程..暂停2秒");
+        sleep(2000);
+        print("第二个子线程..暂停2秒结束");
+        print("1000+{}结果为:{}",bb,cc);
+    });
+
+    t2.run();
 }
 
 
