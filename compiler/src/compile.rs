@@ -18,7 +18,8 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::get_number_type;
+use crate::util::{get_number_type, get_pos_lambda_name};
+use pan_bytecode::bytecode::ComparisonOperator::In;
 
 
 lazy_static! {
@@ -481,6 +482,9 @@ impl<O: OutputStream> Compiler<O> {
         for (i, parts) in decl.variables.iter().enumerate() {
             self.emit(Instruction::Duplicate);
             self.compile_store_multi_value_part(i, parts, decl.clone().destruct_ty.borrow())?;
+        }
+        if decl.variables.len() > 0 {
+            self.emit(Instruction::Pop);
         }
         Ok(())
     }
@@ -1011,15 +1015,18 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(a)?;
                 self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
+                self.store_name(&a.expr_name());
             }
             ast::Expression::Attribute(_, obj, attr, idx) => {
                 self.compile_expression(obj)?;
                 if attr.is_some() {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
+                    self.store_name(&obj.expr_name());
                 } else {
                     self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
                         idx.unwrap())));
                     self.emit(Instruction::StoreSubscript);
+                    self.store_name(&obj.expr_name());
                 }
             }
             ast::Expression::List(_, elements) => {}
@@ -1371,9 +1378,13 @@ impl<O: OutputStream> Compiler<O> {
                 let must_unpack = self.gather_elements(elements)?;
                 self.emit(Instruction::BuildSet(size, must_unpack));
             }
+
             Comprehension(_, _, _) => {}
             Lambda(_, lambda) => {
-                let name = self.lambda_name.clone();
+                let mut name = self.lambda_name.clone();
+                if name.is_empty() {
+                    name = get_pos_lambda_name(lambda.loc.clone());
+                }
                 let mut args = vec![];
                 for para in lambda.params.iter() {
                     let p = para.1.as_ref().unwrap().to_owned();
@@ -1502,8 +1513,12 @@ impl<O: OutputStream> Compiler<O> {
         args: &[ast::Expression],
     ) -> Result<(), CompileError> {
         let mut is_enum_item = (false, false);
+        let mut is_thread_start = false;
         if let ast::Expression::Attribute(_, variable, attribute, _) = function {
             is_enum_item = self.is_enum_variant_def(variable, attribute);
+            if !is_enum_item.0 {
+                is_thread_start = self.is_thread_run(variable, attribute);
+            }
         }
 
         if self.ctx.func == FunctionContext::StructFunction {
@@ -1521,14 +1536,14 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(function)?;
             }
         } else {
-            self.compile_expression(function)?;
             //内置函数处理
             if function.expr_name().eq("print") {
                 return self.compile_format(true, args);
             } else if function.expr_name().eq("format") {
                 return self.compile_format(false, args);
             } else if function.expr_name().eq("typeof") {
-                self.gather_elements(args)?;
+                //这些判断应该在语义分析阶段完成，那就要写两遍一样的逻辑，
+                // 分别在symboltable生成和compile阶段，因此放在这来完成对内置函数的特殊处理
                 if args.len() > 1 {
                     return Err(CompileError {
                         statement: None,
@@ -1537,11 +1552,34 @@ impl<O: OutputStream> Compiler<O> {
                         source_path: None,
                     });
                 }
+                self.gather_elements(args)?;
                 self.emit(Instruction::TypeOf);
+                return Ok(());
+            } else if function.expr_name().eq("sleep") {
+                if args.len() > 1 {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
+                        location: self.current_source_location.clone(),
+                        source_path: None,
+                    });
+                }
+                let arg = args.get(0).unwrap();
+                let ty = arg.get_type(&self.symbol_table_stack);
+                if ty <= CType::I8 || ty > CType::U64 {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
+                        location: self.current_source_location.clone(),
+                        source_path: None,
+                    });
+                }
+                self.gather_elements(args)?;
+                self.emit(Instruction::Sleep);
                 return Ok(());
             }
         }
-
+        self.compile_expression(function)?;
         if is_enum_item.0 {
             if let ast::Expression::Attribute(_, variable, attribute, _) = function {
                 self.emit(Instruction::LoadName(
@@ -1578,6 +1616,8 @@ impl<O: OutputStream> Compiler<O> {
 
         if is_enum_item.0 {
             self.emit(Instruction::LoadBuildEnum(count + 2));
+        } else if is_thread_start {
+            self.emit(Instruction::StartThread);
         } else {
             self.emit(Instruction::CallFunction(CallType::Positional(count)));
         }
@@ -1602,7 +1642,11 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::BuildMap(args.len(), false, false));
 
         if is_constructor {
-            self.emit(Instruction::LoadBuildStruct);
+            if function.expr_name().eq("Thread") {
+                self.emit(Instruction::BuildThread);
+            } else {
+                self.emit(Instruction::LoadBuildStruct);
+            }
         } else {
             self.emit(Instruction::CallFunction(CallType::Keyword(1)));
         }
@@ -1613,6 +1657,9 @@ impl<O: OutputStream> Compiler<O> {
     fn gather_elements(&mut self, elements: &[ast::Expression]) -> Result<bool, CompileError> {
         for element in elements {
             self.compile_expression(element)?;
+            if let Expression::Lambda(_, lambda) = element {
+                self.emit(Instruction::LoadName(get_pos_lambda_name(lambda.loc), NameScope::Local));
+            }
         }
         Ok(false)
     }
@@ -1830,6 +1877,35 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         return (false, false);
+    }
+
+    fn is_thread_run(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
+        let mut name_str = "";
+        let mut attri = "";
+        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
+            name_str = name;
+        }
+
+        if let Some(ident) = attribute {
+            attri = &ident.name;
+        }
+
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name_str);
+            if let Some(s) = symbol {
+                if let CType::Struct(StructType { name, methods, .. }) = &s.ty {
+                    if name.eq("Thread") {
+                        for (a_name, _) in methods {
+                            if a_name.eq(attri) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     fn is_constructor(&self, name: &str) -> bool {

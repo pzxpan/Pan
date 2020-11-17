@@ -28,6 +28,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("None".to_owned(), CType::None, SymbolUsage::Builtin));
     vec.push(("Any".to_owned(), CType::Any, SymbolUsage::Builtin));
     vec.push(("Self".to_owned(), CType::TSelf, SymbolUsage::Builtin));
+    vec.push(("FunType".to_owned(), CType::Fn(FnType::new()), SymbolUsage::Builtin));
 
     let mut arg_types = Vec::new();
     arg_types.push((String::from("value"), CType::Any, false, false));
@@ -68,5 +69,19 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     });
 
     vec.push(("typeof".to_owned(), ty, SymbolUsage::Builtin));
+
+    let ty = CType::Fn(FnType {
+        name: "sleep".to_string(),
+        arg_types: arg_types.clone(),
+        type_args: Vec::new(),
+        ret_type: Box::from(CType::Any),
+        is_pub: true,
+        is_static: false,
+        has_body: true,
+        is_varargs: true,
+    });
+
+    vec.push(("sleep".to_owned(), ty, SymbolUsage::Builtin));
+
     vec
 }

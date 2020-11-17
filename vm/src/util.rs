@@ -267,6 +267,7 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
             Value::Closure(_) |
             Value::Type(_) |
             Value::Enum(_) |
+            Value::Thread(_) |
             Value::Code(_) => {
                 fmt.str(&vv.to_string())
             }

@@ -12,6 +12,9 @@ use pan_bytecode::value::*;
 
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
+use std::collections::HashMap;
+use std::thread;
+use std::thread::JoinHandle;
 
 pub struct VirtualMachine {
     pub frames: Vec<FrameRef>,
@@ -75,8 +78,8 @@ impl VirtualMachine {
     }
     pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
         match obj {
-            Value::Obj(e) => {
-                match &*e.borrow_mut() {
+            Value::Obj(mut e) => {
+                match e.as_mut() {
                     Obj::InstanceObj(InstanceObj { typ, field_map }) => {
                         if let Value::Type(TypeValue { methods, static_fields, .. }) = typ.as_ref() {
                             for method in methods {
@@ -91,7 +94,7 @@ impl VirtualMachine {
                             }
                         }
                         if let Value::Obj(map) = field_map {
-                            match &*map.borrow_mut() {
+                            match map.as_mut() {
                                 Obj::MapObj(m) => {
                                     return (false, m.get(attr.as_str()).unwrap().clone());
                                 }
@@ -133,16 +136,18 @@ impl VirtualMachine {
         unreachable!()
     }
 
-    pub fn set_attribute(&self, obj: Value, attr: String, value: Value) {
+    pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
+        let mut update_value = Value::Nil;
         match obj {
-            Value::Obj(e) => {
-                match &*e.borrow_mut() {
+            Value::Obj(ref mut e) => {
+                match e.as_mut() {
                     Obj::InstanceObj(o) => {
-                        if let InstanceObj { field_map, .. } = o {
+                        if let InstanceObj { field_map, typ } = o {
                             if let Value::Obj(map) = field_map {
                                 let mut cc = field_map.hash_map_value();
                                 cc.insert(attr, value);
-                                map.replace(Obj::MapObj(cc));
+                                let field = Value::new_map_obj(cc);
+                                update_value = Value::new_instance_obj(typ.as_ref().clone(), field);
                             }
                         }
                     }
@@ -151,12 +156,13 @@ impl VirtualMachine {
             }
             _ => unreachable!()
         }
+        return update_value;
     }
 
     pub fn _match(&self, obj: Value, b: Value) -> (Value, Vec<Value>) {
         match obj {
-            Value::Obj(e) => {
-                match &*e.borrow_mut() {
+            Value::Obj(mut e) => {
+                match e.as_mut() {
                     Obj::EnumObj(EnumObj { item_name, field_map, .. }) => {
                         return if item_name.name().eq(&b.name()) {
                             if field_map.is_some() {
@@ -206,7 +212,7 @@ impl VirtualMachine {
     pub fn get_item(&self, a: Value, b: Value) -> Option<Value> {
         match (a, b) {
             (Value::Obj(e), Value::I32(sub)) => {
-                match &*e.borrow_mut() {
+                match e.as_ref() {
                     Obj::ArrayObj(arr) => {
                         arr.get(sub as usize).cloned()
                     }
@@ -218,8 +224,8 @@ impl VirtualMachine {
             }
 
             (Value::Obj(e), Value::String(sub)) => {
-                match *e.borrow_mut() {
-                    Obj::MapObj(ref mut map) => {
+                match e.as_ref() {
+                    Obj::MapObj(map) => {
                         map.get(sub.as_str()).cloned()
                     }
                     _ => unreachable!()
@@ -229,10 +235,42 @@ impl VirtualMachine {
         }
     }
 
-    pub fn set_item(&self, obj: &Value, idx: Value, value: Value) {
+    pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) -> Value {
+        let mut update_value = Value::Nil;
         match (obj, idx) {
-            (Value::Obj(e), Value::I32(sub)) => {
-                match *e.borrow_mut() {
+            (Value::Obj(ref mut e), Value::I32(sub)) => {
+                match e.as_mut() {
+                    Obj::ArrayObj(ref mut arr) => {
+                        arr.swap_remove(sub as usize);
+                        arr.insert(sub as usize, value);
+                        update_value = Value::new_array_obj(arr.clone());
+                    }
+                    Obj::MapObj(ref mut map) => {
+                        map.insert(sub.to_string(), value);
+                        update_value = Value::new_map_obj(map.clone());
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            (Value::Obj(ref mut e), Value::String(ref sub)) => {
+                match e.as_mut() {
+                    Obj::MapObj(ref mut map) => {
+                        map.insert(sub.to_string(), value);
+                        update_value = Value::new_map_obj(map.clone());
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            _ => unreachable!()
+        }
+        return update_value;
+    }
+    pub fn set_item(&self, obj: &mut Value, idx: Value, value: Value) {
+        match (obj, idx) {
+            (Value::Obj(ref mut e), Value::I32(sub)) => {
+                match e.as_mut() {
                     Obj::ArrayObj(ref mut arr) => {
                         arr.swap_remove(sub as usize);
                         arr.insert(sub as usize, value);
@@ -244,8 +282,8 @@ impl VirtualMachine {
                 }
             }
 
-            (Value::Obj(e), Value::String(ref sub)) => {
-                match *e.borrow_mut() {
+            (Value::Obj(ref mut e), Value::String(ref sub)) => {
+                match e.as_mut() {
                     Obj::MapObj(ref mut map) => {
                         map.insert(sub.to_string(), value);
                     }
@@ -295,10 +333,10 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
-    pub fn get_next_iter(&self, v: Value) -> Value {
+    pub fn get_next_iter(&self, v: &mut Value) -> Value {
         let mut ret = Value::Nil;
-        if let Value::Obj(e) = v {
-            match *e.borrow_mut() {
+        if let Value::Obj(ref mut e) = v {
+            match e.as_mut() {
                 Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
                     if let Value::I32(_) = start {
                         if up.bool_value() {
@@ -318,9 +356,9 @@ impl VirtualMachine {
                                 ret = Value::I32(item);
                             }
                         }
-                    }
-                    if let Value::Obj(iter) = start {
-                        match *iter.borrow_mut() {
+                        *v = Value::Obj(e.clone())
+                    } else if let Value::Obj(ref mut iter) = start {
+                        match iter.as_mut() {
                             Obj::ArrayObj(ref mut array) => {
                                 let idx = end.int_value() as usize;
                                 if idx < array.len() {
@@ -331,13 +369,14 @@ impl VirtualMachine {
                             Obj::MapObj(ref mut map) => {
                                 let idx = end.int_value() as usize;
                                 if idx < map.len() {
-                                    let t = map.iter().next().unwrap();
+                                    let t = map.iter().nth(idx).unwrap();
                                     ret = Value::new_array_obj(vec![Value::String(t.0.clone()), t.1.clone()]);
                                     *end = Value::I32(idx as i32 + 1);
                                 }
                             }
                             _ => {}
                         }
+                        *v = Value::Obj(e.clone())
                     }
                 }
                 _ => {}
@@ -798,4 +837,24 @@ impl Default for VirtualMachine {
     fn default() -> Self {
         VirtualMachine::new()
     }
+}
+
+pub fn run_code_in_thread(code: CodeObject, scope: Scope) -> JoinHandle<()> {
+    return thread::spawn(|| {
+        println!("handler:{:?}", thread::current().id());
+        let mut vm = VirtualMachine::new();
+        vm.run_code_obj(code, scope);
+        let handle = thread::current();
+    });
+}
+
+pub fn run_code_in_sub_thread(code: CodeObject, scope: Scope) {
+    thread::spawn(|| {
+        println!("handler:{:?}", thread::current().id());
+        let mut vm = VirtualMachine::new();
+        vm.run_code_obj(code, scope);
+        let handle = thread::current();
+    });
+
+    // println!("handler:{:?}",thread::current());
 }

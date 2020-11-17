@@ -1,6 +1,6 @@
 fun main() {
    let cc = 30;
-   let a = 0;
+   let a = 40;
    let b = 20;
 
   //  a +=b;
@@ -15,10 +15,13 @@ fun main() {
     //a |=b;
     //a &=b;
 
-    let cccc = (aaa:i32,bbb:i32) => {
-        return a  + aaa;
+    let add = (aa:i32,bb:i32) => {
+        return a  + aa + bb ;
     };
-
+   let ddd = add(20,30);
+   let d = typeof(ddd);
+   print(d);
+   print("lambda(aa=20,b=30),upvalue=40,值为:{:d}",ddd);
    if a > 10 && b < 30 {
         print("a>0,b<30");
    } elif cc > 10 {
