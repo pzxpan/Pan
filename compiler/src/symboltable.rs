@@ -246,8 +246,10 @@ impl SymbolTableBuilder {
     }
     fn get_body_return_ty(&self, body: &Statement, ty: &CType, self_ty: bool) -> SymbolTableResult {
         let mut r_ty = CType::Any;
+        println!("ssssbody:{:?},s", body);
         if let ast::Statement::Block(_, statements) = body {
             let s = statements.last();
+            println!("statementsss:{:?},s", s);
             if let Some(ast::Statement::Return(_, expression)) = s {
                 if expression.is_some() {
                     if expression.as_ref().unwrap().expr_name().eq("self") {
@@ -634,7 +636,7 @@ impl SymbolTableBuilder {
         return false;
     }
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
-        //println!("statement is {:?}", statement);
+        println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(_, stmts) => {
@@ -712,10 +714,12 @@ impl SymbolTableBuilder {
 
                         //需要在子域获取到相应变量的类型，才能计算出返回值的，因此需要在pop之前推断返回值类型;
                         //lambda中捕获的环境变量需要在其定义之前确定类型;
-                        let ty = lambda.get_type(&self.tables);
-                        self.leave_scope();
 
+                        let mut ty = lambda.get_type(&self.tables);
+
+                        self.leave_scope();
                         self.lambda_name = name.clone();
+                        println!("lambda Type:{:?}", ty);
                         self.register_name(name, ty, SymbolUsage::Assigned, decl.loc)?;
                     }
                     return Ok(());
@@ -750,7 +754,11 @@ impl SymbolTableBuilder {
                                 self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned, decl.loc)?;
                             }
                         } else {
-                            self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
+                            if let Some(ast::Expression::FunctionCall(..)) = expression {
+                                self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned, decl.loc)?;
+                            } else {
+                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
+                            }
                         }
                     } else {
                         if let ast::Expression::Variable(Identifier { .. }) = e {
@@ -1097,7 +1105,7 @@ impl SymbolTableBuilder {
                 let ty = expression.get_type(&self.tables);
                 if ty == CType::Unknown {
                     return Err(SymbolTableError {
-                        error: format!("重新赋值,类型有问题,左边为:{:?},右边为:{:?}", a.get_type(&self.tables), b.get_type(&self.tables)),
+                        error: format!("未定义变量{:?}",a.expr_name()),
                         location: loc.clone(),
                     });
                 }
@@ -1171,7 +1179,19 @@ impl SymbolTableBuilder {
             Comprehension(_, _, _) => {}
             StringLiteral(_) => {}
             Lambda(_, lambda) => {
-                self.scan_lambda(self.lambda_name.to_string(), *lambda.clone());
+                let mut ty = lambda.get_type(&self.tables);
+                if self.lambda_name.is_empty() {
+                    let mut name = "lambda".to_string();
+                    name.push_str("_");
+                    name.push_str(&*lambda.loc.1.to_string());
+                    name.push_str("_");
+                    name.push_str(&*lambda.loc.2.to_string());
+                    self.scan_lambda(name.clone(), *lambda.clone());
+                    self.register_name(&name, ty, SymbolUsage::Assigned, lambda.loc.clone());
+                } else {
+                    self.scan_lambda(self.lambda_name.clone(), *lambda.clone());
+                    self.register_name(&self.lambda_name.clone(), ty, SymbolUsage::Assigned, lambda.loc.clone());
+                }
             }
             Number(_, _) => {}
             NamedFunctionCall(_, exp, args) => {
@@ -1385,7 +1405,7 @@ impl SymbolTableBuilder {
     }
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        // println!("register name={:?}, ty: {:?}", name, ty);
+        println!("register name={:?}, ty: {:?}", name, ty);
         if self.in_struct_func && self.in_struct_scope(name.clone()) {
             return if role == SymbolUsage::Used {
                 Ok(())

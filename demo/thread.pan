@@ -13,22 +13,20 @@ pub struct Thread {
     }
 }
 
-pub fun sub(a:i32,b:i32) : i32 {
-    print("{}+{}={}",a,b,a-b);
-    return a - b;
+pub fun add(a:i32,b:i32) : i32 {
+    return a + b;
 }
-pub fun ddd() {
-    let aa = 10;
-    let bb = 20;
-    let a = sub(aa,bb);
-    print(a);
-}
-
-
 fun main() {
-    let t = Thread::new(ddd);
+    let aa = 20;
+    let bb = 30;
+    let t = Thread::new(() => {
+        let cc = add(aa,bb);
+        print(cc);
+    });
     t.run();
     t.stop();
+    cc = 1000;
+    print(cc);
 }
 
 

@@ -1,4 +1,5 @@
 use crate::ctype::CType;
+use pan_parser::ast::Loc;
 
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {
@@ -18,6 +19,15 @@ pub fn get_number_type(ty: CType) -> i32 {
         CType::Str => { 2000 }
         _ => { 20001 }
     };
+}
+
+pub fn get_pos_lambda_name(loc: Loc) -> String {
+    let mut name = "lambda".to_string();
+    name.push_str("_");
+    name.push_str(&*loc.1.to_string());
+    name.push_str("_");
+    name.push_str(&*loc.2.to_string());
+    return name;
 }
 
 

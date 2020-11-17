@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::get_number_type;
+use crate::util::{get_number_type, get_pos_lambda_name};
 
 
 lazy_static! {
@@ -1371,9 +1371,13 @@ impl<O: OutputStream> Compiler<O> {
                 let must_unpack = self.gather_elements(elements)?;
                 self.emit(Instruction::BuildSet(size, must_unpack));
             }
+
             Comprehension(_, _, _) => {}
             Lambda(_, lambda) => {
-                let name = self.lambda_name.clone();
+                let mut name = self.lambda_name.clone();
+                if name.is_empty() {
+                    name = get_pos_lambda_name(lambda.loc.clone());
+                }
                 let mut args = vec![];
                 for para in lambda.params.iter() {
                     let p = para.1.as_ref().unwrap().to_owned();
@@ -1613,6 +1617,9 @@ impl<O: OutputStream> Compiler<O> {
     fn gather_elements(&mut self, elements: &[ast::Expression]) -> Result<bool, CompileError> {
         for element in elements {
             self.compile_expression(element)?;
+            if let Expression::Lambda(_, lambda) = element {
+                self.emit(Instruction::LoadName(get_pos_lambda_name(lambda.loc), NameScope::Local));
+            }
         }
         Ok(false)
     }
