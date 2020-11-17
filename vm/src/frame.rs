@@ -15,6 +15,7 @@ use crate::scope::{Scope, NameProtocol};
 
 use crate::util::change_to_primitive_type;
 use crate::util::get_string_value;
+use bitflags::_core::time::Duration;
 
 #[derive(Clone, Debug)]
 struct Block {
@@ -96,6 +97,11 @@ impl Frame {
         let instruction = self.fetch_instruction();
         println!("instruction is:{:?}", instruction);
         match instruction {
+            bytecode::Instruction::Sleep => {
+                let time = self.pop_value();
+                std::thread::sleep(Duration::from_millis(time.u64()));
+                None
+            }
             bytecode::Instruction::LoadConst(ref value) => {
                 let obj = vm.unwrap_constant(value);
                 self.push_value(obj);

@@ -18,6 +18,7 @@ use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds,
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
+use crate::util::get_pos_lambda_name;
 
 pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -1105,7 +1106,7 @@ impl SymbolTableBuilder {
                 let ty = expression.get_type(&self.tables);
                 if ty == CType::Unknown {
                     return Err(SymbolTableError {
-                        error: format!("未定义变量{:?}",a.expr_name()),
+                        error: format!("未定义变量{:?}", a.expr_name()),
                         location: loc.clone(),
                     });
                 }
@@ -1181,11 +1182,7 @@ impl SymbolTableBuilder {
             Lambda(_, lambda) => {
                 let mut ty = lambda.get_type(&self.tables);
                 if self.lambda_name.is_empty() {
-                    let mut name = "lambda".to_string();
-                    name.push_str("_");
-                    name.push_str(&*lambda.loc.1.to_string());
-                    name.push_str("_");
-                    name.push_str(&*lambda.loc.2.to_string());
+                    let mut name = get_pos_lambda_name(lambda.loc);
                     self.scan_lambda(name.clone(), *lambda.clone());
                     self.register_name(&name, ty, SymbolUsage::Assigned, lambda.loc.clone());
                 } else {

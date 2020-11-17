@@ -21,12 +21,13 @@ fun main() {
     let bb = 30;
     let t = Thread::new(() => {
         let cc = add(aa,bb);
+        print("暂停4秒");
+        sleep(4000);
+        print("结束");
         print(cc);
     });
     t.run();
     t.stop();
-    cc = 1000;
-    print(cc);
 }
 
 

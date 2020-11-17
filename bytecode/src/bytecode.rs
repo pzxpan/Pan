@@ -123,6 +123,7 @@ pub enum Instruction {
     BuildSlice(usize),
     ListAppend(usize),
     SetAdd(usize),
+    Sleep,
     MapAdd(usize),
     Print,
     TypeOf,
@@ -403,6 +404,7 @@ impl Instruction {
             YieldValue => w!(YieldValue),
             YieldFrom => w!(YieldFrom),
             SetupLoop(start, end) => w!(SetupLoop, label_map[start], label_map[end]),
+            Sleep => w!(Sleep),
 
             BeforeAsyncWith => w!(BeforeAsyncWith),
             SetupAsyncWith(end) => w!(SetupAsyncWith, label_map[end]),

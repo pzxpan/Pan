@@ -97,6 +97,20 @@ impl Value {
             _ => unreachable!()
         }
     }
+    pub fn u64(&self) -> u64 {
+        match *self {
+            Value::I8(v) => { v as u64 }
+            Value::U8(v) => { v as u64 }
+            Value::I16(v) => { v as u64 }
+            Value::U16(v) => { v as u64 }
+            Value::U32(v) => { v as u64 }
+            Value::I32(v) => { v as u64 }
+            Value::U64(v) => { v }
+            Value::I64(v) => { v as u64 }
+            Value::Float(v) => { v as u64 }
+            _ => unreachable!()
+        }
+    }
 
     pub fn ty_name(&self) -> String {
         match *self {

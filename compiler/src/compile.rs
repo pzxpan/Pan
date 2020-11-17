@@ -19,6 +19,7 @@ use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
 use crate::util::{get_number_type, get_pos_lambda_name};
+use pan_bytecode::bytecode::ComparisonOperator::In;
 
 
 lazy_static! {
@@ -1532,7 +1533,8 @@ impl<O: OutputStream> Compiler<O> {
             } else if function.expr_name().eq("format") {
                 return self.compile_format(false, args);
             } else if function.expr_name().eq("typeof") {
-                self.gather_elements(args)?;
+                //这些判断应该在语义分析阶段完成，那就要写两遍一样的逻辑，
+                // 分别在symboltable生成和compile阶段，因此放在这来完成对内置函数的特殊处理
                 if args.len() > 1 {
                     return Err(CompileError {
                         statement: None,
@@ -1541,7 +1543,30 @@ impl<O: OutputStream> Compiler<O> {
                         source_path: None,
                     });
                 }
+                self.gather_elements(args)?;
                 self.emit(Instruction::TypeOf);
+                return Ok(());
+            } else if function.expr_name().eq("sleep") {
+                if args.len() > 1 {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
+                        location: self.current_source_location.clone(),
+                        source_path: None,
+                    });
+                }
+                let arg = args.get(0).unwrap();
+                let ty = arg.get_type(&self.symbol_table_stack);
+                if ty <= CType::I8 || ty > CType::U64 {
+                    return Err(CompileError {
+                        statement: None,
+                        error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
+                        location: self.current_source_location.clone(),
+                        source_path: None,
+                    });
+                }
+                self.gather_elements(args)?;
+                self.emit(Instruction::Sleep);
                 return Ok(());
             }
         }
