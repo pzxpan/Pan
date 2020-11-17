@@ -483,6 +483,9 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::Duplicate);
             self.compile_store_multi_value_part(i, parts, decl.clone().destruct_ty.borrow())?;
         }
+        if decl.variables.len() > 0 {
+            self.emit(Instruction::Pop);
+        }
         Ok(())
     }
 
@@ -1012,15 +1015,18 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(a)?;
                 self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
+                self.store_name(&a.expr_name());
             }
             ast::Expression::Attribute(_, obj, attr, idx) => {
                 self.compile_expression(obj)?;
                 if attr.is_some() {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
+                    self.store_name(&obj.expr_name());
                 } else {
                     self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
                         idx.unwrap())));
                     self.emit(Instruction::StoreSubscript);
+                    self.store_name(&obj.expr_name());
                 }
             }
             ast::Expression::List(_, elements) => {}
@@ -1530,7 +1536,6 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(function)?;
             }
         } else {
-            self.compile_expression(function)?;
             //内置函数处理
             if function.expr_name().eq("print") {
                 return self.compile_format(true, args);
@@ -1574,7 +1579,7 @@ impl<O: OutputStream> Compiler<O> {
                 return Ok(());
             }
         }
-
+        self.compile_expression(function)?;
         if is_enum_item.0 {
             if let ast::Expression::Attribute(_, variable, attribute, _) = function {
                 self.emit(Instruction::LoadName(

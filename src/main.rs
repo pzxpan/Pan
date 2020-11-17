@@ -31,8 +31,8 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("thread.pan"));
-    //test_all_demo_file();
+    //test_one_file(&env::current_dir().unwrap().join("demo").join("hashmap.pan"));
+    test_all_demo_file();
 }
 
 fn test_all_demo_file() {
@@ -62,8 +62,8 @@ fn test_one_file(home_path: &Path) {
         //vm.run_code_obj(code_object.unwrap(),scope);
 
         let handle = run_code_in_thread(code_object.unwrap(), scope);
-        // handle.join().unwrap();
-        std::thread::sleep(Duration::from_secs(10));
+        handle.join().unwrap();
+       // std::thread::sleep(Duration::from_secs(10));
 
     } else {
         let error = code_object.err().unwrap();

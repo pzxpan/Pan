@@ -9,6 +9,12 @@ fun main() {
     print(a.1);
     print(a);
   }
+  dict["Alice"] = 7890;
+  print(dict["Alice"]);
+
+  let a = [1,3,4];
+  a[1] = 10;
+  print(a[1]);
 }
 
 

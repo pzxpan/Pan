@@ -96,7 +96,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        // println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
+       // println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -402,7 +402,8 @@ impl Frame {
         let idx = self.pop_value();
         let mut obj = self.pop_value();
         let value = self.pop_value();
-        vm.set_item(&mut obj, idx, value);
+        let v = vm.update_item(&mut obj, idx, value);
+        self.push_value(v);
         None
     }
 
@@ -519,14 +520,15 @@ impl Frame {
     }
 
     fn execute_for_iter(&self, vm: &VirtualMachine, target: bytecode::Label) -> FrameResult {
-        let top_of_stack = self.last_value();
+        //不能用clone语义
+        let mut last_mut = self.stack.borrow_mut();
+        let top_of_stack = last_mut.last_mut().unwrap();
         let next_obj = vm.get_next_iter(top_of_stack);
-
         if Value::Nil != next_obj {
-            self.push_value(next_obj);
+            last_mut.push(next_obj);
             None
         } else {
-            self.pop_value();
+            last_mut.pop();
             self.jump(target);
             None
         }
@@ -682,9 +684,10 @@ impl Frame {
     }
 
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
-        let parent = self.pop_value();
+        let mut parent = self.pop_value();
         let value = self.pop_value();
-        vm.set_attribute(parent, attr_name.to_owned(), value);
+        let update_value = vm.set_attribute(&mut parent, attr_name.to_owned(), value);
+        self.push_value(update_value);
         None
     }
 

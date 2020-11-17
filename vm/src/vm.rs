@@ -136,15 +136,18 @@ impl VirtualMachine {
         unreachable!()
     }
 
-    pub fn set_attribute(&self, obj: Value, attr: String, value: Value) {
+    pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
+        let mut update_value = Value::Nil;
         match obj {
-            Value::Obj(mut e) => {
+            Value::Obj(ref mut e) => {
                 match e.as_mut() {
                     Obj::InstanceObj(o) => {
-                        if let InstanceObj { field_map, .. } = o {
+                        if let InstanceObj { field_map, typ } = o {
                             if let Value::Obj(map) = field_map {
                                 let mut cc = field_map.hash_map_value();
                                 cc.insert(attr, value);
+                                let field = Value::new_map_obj(cc);
+                                update_value = Value::new_instance_obj(typ.as_ref().clone(), field);
                             }
                         }
                     }
@@ -153,6 +156,7 @@ impl VirtualMachine {
             }
             _ => unreachable!()
         }
+        return update_value;
     }
 
     pub fn _match(&self, obj: Value, b: Value) -> (Value, Vec<Value>) {
@@ -231,6 +235,38 @@ impl VirtualMachine {
         }
     }
 
+    pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) -> Value {
+        let mut update_value = Value::Nil;
+        match (obj, idx) {
+            (Value::Obj(ref mut e), Value::I32(sub)) => {
+                match e.as_mut() {
+                    Obj::ArrayObj(ref mut arr) => {
+                        arr.swap_remove(sub as usize);
+                        arr.insert(sub as usize, value);
+                        update_value = Value::new_array_obj(arr.clone());
+                    }
+                    Obj::MapObj(ref mut map) => {
+                        map.insert(sub.to_string(), value);
+                        update_value = Value::new_map_obj(map.clone());
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            (Value::Obj(ref mut e), Value::String(ref sub)) => {
+                match e.as_mut() {
+                    Obj::MapObj(ref mut map) => {
+                        map.insert(sub.to_string(), value);
+                        update_value = Value::new_map_obj(map.clone());
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            _ => unreachable!()
+        }
+        return update_value;
+    }
     pub fn set_item(&self, obj: &mut Value, idx: Value, value: Value) {
         match (obj, idx) {
             (Value::Obj(ref mut e), Value::I32(sub)) => {
@@ -297,9 +333,9 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
-    pub fn get_next_iter(&self, v: Value) -> Value {
+    pub fn get_next_iter(&self, v: &mut Value) -> Value {
         let mut ret = Value::Nil;
-        if let Value::Obj(mut e) = v {
+        if let Value::Obj(ref mut e) = v {
             match e.as_mut() {
                 Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
                     if let Value::I32(_) = start {
@@ -320,8 +356,8 @@ impl VirtualMachine {
                                 ret = Value::I32(item);
                             }
                         }
-                    }
-                    if let Value::Obj(iter) = start {
+                        *v = Value::Obj(e.clone())
+                    } else if let Value::Obj(ref mut iter) = start {
                         match iter.as_mut() {
                             Obj::ArrayObj(ref mut array) => {
                                 let idx = end.int_value() as usize;
@@ -333,13 +369,14 @@ impl VirtualMachine {
                             Obj::MapObj(ref mut map) => {
                                 let idx = end.int_value() as usize;
                                 if idx < map.len() {
-                                    let t = map.iter().next().unwrap();
+                                    let t = map.iter().nth(idx).unwrap();
                                     ret = Value::new_array_obj(vec![Value::String(t.0.clone()), t.1.clone()]);
                                     *end = Value::I32(idx as i32 + 1);
                                 }
                             }
                             _ => {}
                         }
+                        *v = Value::Obj(e.clone())
                     }
                 }
                 _ => {}
