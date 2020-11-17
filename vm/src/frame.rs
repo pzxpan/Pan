@@ -16,6 +16,7 @@ use crate::scope::{Scope, NameProtocol};
 use crate::util::change_to_primitive_type;
 use crate::util::get_string_value;
 use bitflags::_core::time::Duration;
+use crate::vm::run_code_in_thread;
 
 #[derive(Clone, Debug)]
 struct Block {
@@ -95,7 +96,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        println!("instruction is:{:?}", instruction);
+      //  println!("instruction is:{:?}", instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -210,6 +211,7 @@ impl Frame {
             }
             bytecode::Instruction::MakeFunction => self.execute_make_function(vm),
             bytecode::Instruction::CallFunction(typ) => self.execute_call_function(vm, typ),
+            bytecode::Instruction::StartThread => self.start_thread(),
             bytecode::Instruction::Jump(target) => {
                 self.jump(*target);
                 None
@@ -270,6 +272,10 @@ impl Frame {
                 None
             }
             bytecode::Instruction::LoadBuildStruct => {
+                self.excute_make_struct_instance(vm);
+                None
+            }
+            bytecode::Instruction::BuildThread => {
                 self.excute_make_struct_instance(vm);
                 None
             }
@@ -421,6 +427,28 @@ impl Frame {
         self.push_value(map_obj);
         None
     }
+    fn start_thread(&self) -> FrameResult {
+        let func_ref = self.pop_value();
+        let code = func_ref.code();
+        self.scope.new_child_scope_with_locals();
+        if self.stack.borrow_mut().len() > 0 {
+            let last_value = self.last_value();
+            let map = last_value.hash_map_value();
+            for (k, v) in map {
+                self.scope.store_name(k, v);
+            }
+            self.scope.store_name("self".to_string(), last_value);
+            self.pop_value();
+        }
+        let s = self.scope.new_child_scope_with_locals();
+
+        Frame::create_new_thread(code, s);
+        None
+    }
+    fn create_new_thread(code: CodeObject, scope: Scope) -> FrameResult {
+        run_code_in_thread(code, scope);
+        return None;
+    }
 
     fn execute_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
         let mut named_call = false;
@@ -439,7 +467,6 @@ impl Frame {
             _ => { vec![Value::Nil] }
         };
         let func_ref = self.pop_value();
-        // println!("func_ref:{:?},",func_ref);
         let code = func_ref.code();
 
         self.scope.new_child_scope_with_locals();
@@ -517,6 +544,13 @@ impl Frame {
         let args = self.pop_value();
         let ty = self.pop_value();
         self.push_value(Value::new_instance_obj(ty, args));
+        None
+    }
+
+    fn excute_make_thread_instance(&self, vm: &VirtualMachine) -> FrameResult {
+        let args = self.pop_value();
+        let ty = self.pop_value();
+        self.push_value(Value::new_thread_obj(ty, args));
         None
     }
 

@@ -58,7 +58,7 @@ fn test_one_file(home_path: &Path) {
 
         v.push(local_value);
         let scope = Scope::with_builtins(v, global_value, &vm);
-        run_code_in_thread(code_object.unwrap());
+        run_code_in_thread(code_object.unwrap(), scope);
     } else {
         let error = code_object.err().unwrap();
         match error.error {

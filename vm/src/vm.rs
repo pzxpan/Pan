@@ -801,26 +801,20 @@ impl Default for VirtualMachine {
     }
 }
 
-pub fn run_code_in_thread(code: CodeObject) {
+pub fn run_code_in_thread(code: CodeObject,scope:Scope) {
     /// use std::thread;
 
     let handler = thread::Builder::new()
         .name("named thread".into())
         .spawn(|| {
-            let mut vm = VirtualMachine::new();
-            let global_value = HashMap::new();
-            let local_value: HashMap<String, Value> = HashMap::new();
-            let mut v = Vec::new();
-
-            v.push(local_value);
-            let scope = Scope::with_builtins(v, global_value, &vm);
-            vm.run_code_obj(code, scope);
             println!("handler:{:?}",thread::current());
+            let mut vm = VirtualMachine::new();
+            vm.run_code_obj(code, scope);
             let handle = thread::current();
             assert_eq!(handle.name(), Some("named thread"));
         })
         .unwrap();
-    println!("handler:{:?}",thread::current());
+    // println!("handler:{:?}",thread::current());
 
     handler.join().unwrap();
 }

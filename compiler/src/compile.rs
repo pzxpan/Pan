@@ -1507,8 +1507,12 @@ impl<O: OutputStream> Compiler<O> {
         args: &[ast::Expression],
     ) -> Result<(), CompileError> {
         let mut is_enum_item = (false, false);
+        let mut is_thread_start = false;
         if let ast::Expression::Attribute(_, variable, attribute, _) = function {
             is_enum_item = self.is_enum_variant_def(variable, attribute);
+            if !is_enum_item.0 {
+                is_thread_start = self.is_thread_run(variable, attribute);
+            }
         }
 
         if self.ctx.func == FunctionContext::StructFunction {
@@ -1607,6 +1611,8 @@ impl<O: OutputStream> Compiler<O> {
 
         if is_enum_item.0 {
             self.emit(Instruction::LoadBuildEnum(count + 2));
+        } else if is_thread_start {
+            self.emit(Instruction::StartThread);
         } else {
             self.emit(Instruction::CallFunction(CallType::Positional(count)));
         }
@@ -1631,7 +1637,11 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::BuildMap(args.len(), false, false));
 
         if is_constructor {
-            self.emit(Instruction::LoadBuildStruct);
+            if function.expr_name().eq("Thread") {
+                self.emit(Instruction::BuildThread);
+            } else {
+                self.emit(Instruction::LoadBuildStruct);
+            }
         } else {
             self.emit(Instruction::CallFunction(CallType::Keyword(1)));
         }
@@ -1862,6 +1872,35 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         return (false, false);
+    }
+
+    fn is_thread_run(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
+        let mut name_str = "";
+        let mut attri = "";
+        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
+            name_str = name;
+        }
+
+        if let Some(ident) = attribute {
+            attri = &ident.name;
+        }
+
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name_str);
+            if let Some(s) = symbol {
+                if let CType::Struct(StructType { name, methods, .. }) = &s.ty {
+                    if name.eq("Thread") {
+                        for (a_name, _) in methods {
+                            if a_name.eq(attri) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     fn is_constructor(&self, name: &str) -> bool {

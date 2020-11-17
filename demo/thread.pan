@@ -27,7 +27,6 @@ fun main() {
         print(cc);
     });
     t.run();
-    t.stop();
 }
 
 

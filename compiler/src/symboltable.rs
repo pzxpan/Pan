@@ -247,10 +247,8 @@ impl SymbolTableBuilder {
     }
     fn get_body_return_ty(&self, body: &Statement, ty: &CType, self_ty: bool) -> SymbolTableResult {
         let mut r_ty = CType::Any;
-        println!("ssssbody:{:?},s", body);
         if let ast::Statement::Block(_, statements) = body {
             let s = statements.last();
-            println!("statementsss:{:?},s", s);
             if let Some(ast::Statement::Return(_, expression)) = s {
                 if expression.is_some() {
                     if expression.as_ref().unwrap().expr_name().eq("self") {
@@ -637,7 +635,7 @@ impl SymbolTableBuilder {
         return false;
     }
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
-        println!("statement is {:?}", statement);
+       // println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(_, stmts) => {
@@ -706,7 +704,6 @@ impl SymbolTableBuilder {
             }
             Args(_, _) => {}
             VariableDefinition(location, decl, expression) => {
-                println!("pan:{:?},", expression);
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
@@ -720,7 +717,6 @@ impl SymbolTableBuilder {
 
                         self.leave_scope();
                         self.lambda_name = name.clone();
-                        println!("lambda Type:{:?}", ty);
                         self.register_name(name, ty, SymbolUsage::Assigned, decl.loc)?;
                     }
                     return Ok(());
@@ -1402,7 +1398,7 @@ impl SymbolTableBuilder {
     }
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        println!("register name={:?}, ty: {:?}", name, ty);
+        //println!("register name={:?}, ty: {:?}", name, ty);
         if self.in_struct_func && self.in_struct_scope(name.clone()) {
             return if role == SymbolUsage::Used {
                 Ok(())

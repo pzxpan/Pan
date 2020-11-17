@@ -14,10 +14,10 @@ pub struct FnValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct ThreadValue {
-    pub name: String,
-    pub code: CodeObject,
+    pub typ: Box<Value>,
+    pub field_map: Value,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -53,7 +53,7 @@ pub enum Value {
     Obj(Box<Obj>),
     Fn(FnValue),
     Closure(ClosureValue),
-    Thread(ThreadValue),
+    Thread(Box<ThreadValue>),
     // NativeFn(NativeFn),
     Type(TypeValue),
     Enum(EnumValue),
@@ -172,6 +172,9 @@ impl Value {
                     _ => unreachable!()
                 }
             }
+            Value::Thread(v) => {
+                return v.field_map.hash_map_value();
+            }
 
             _ => unreachable!()
         }
@@ -217,7 +220,7 @@ impl Value {
             Value::Obj(obj) => format!("{}", &obj.to_string()),
             Value::Fn(FnValue { name, .. }) |
             Value::Closure(ClosureValue { name, .. }) => format!("<func {}>", name),
-            Value::Thread(ThreadValue { name, .. }) => format!("<thread {}>", name),
+            Value::Thread(t) => format!("<thread {}>", t.field_map.to_string()),
 // Value::NativeFn(NativeFn { name, .. }) => format!("<func {}>", name),
             Value::Type(TypeValue { name, .. }) => format!("<type {}>", name),
             Value::Nil => format!("None"),
@@ -249,6 +252,11 @@ impl Value {
     pub fn new_instance_obj(typ: Value, fields: Value) -> Value {
         let inst = Obj::InstanceObj(InstanceObj { typ: Box::new(typ), field_map: fields });
         Value::Obj(Box::new(inst))
+    }
+    pub fn new_thread_obj(typ: Value, fields: Value) -> Value {
+        let inst = ThreadValue { typ: Box::new(typ), field_map: fields };
+        Value::Thread(Box::new(inst))
+        //  Value::Obj(Box::new(inst))
     }
 
     pub fn new_enum_obj(typ: Value, fields: Option<Vec<Value>>, item_name: Value) -> Value {
@@ -282,7 +290,7 @@ impl Display for Value {
                 Obj::StringObj(value) => write!(f, "\"{}\"", value),
                 o @ _ => write!(f, "{}", o.to_string()),
             }
-            Value::Thread(ThreadValue { name, .. }) => write!(f, "<func {}>", name),
+            Value::Thread(n) => write!(f, "<func {}>", n.field_map.to_string()),
             Value::Fn(FnValue { name, .. }) |
             Value::Closure(ClosureValue { name, .. }) => write!(f, "<func {}>", name),
 // Value::NativeFn(NativeFn { name, .. }) => write!(f, "<func {}>", name),
