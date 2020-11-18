@@ -204,15 +204,25 @@ impl CType {
             _ => self
         }
     }
-    pub fn attri_name_type(&self, name: String) -> &CType {
+    pub fn attri_name_type(&self, name: String) -> (i32, &CType) {
         if let CType::Struct(ty) = self {
             for (method_name, cty, is_pub) in ty.fields.iter() {
                 if method_name.eq(&name) {
-                    return cty;
+                    return (1, cty);
+                }
+            }
+            for (method_name, cty) in ty.static_methods.iter() {
+                if method_name.eq(&name) {
+                    return (2, cty);
+                }
+            }
+            for (method_name, cty) in ty.methods.iter() {
+                if method_name.eq(&name) {
+                    return (3, cty);
                 }
             }
         }
-        self
+        (0, self)
     }
 
     pub fn param_type(&self) -> Vec<(CType, bool, bool)> {

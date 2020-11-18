@@ -2,7 +2,7 @@ pub struct House {
     pub size: f64,
     pub price: f64,
     pub fun idea(): bool {
-        return price / size > 10000;
+        return price / size > 10000 as f64;
     }
     fun ::static() :bool {
         return true;
@@ -25,10 +25,13 @@ pub struct Person {
     }
 }
 fun main() {
+   let aa = name_call(20,"sdd");
    let person = Person({age:50,name:"pan",house:House({size:111.0,price:1_000_000.0})});
-   let bb = person.older_than(40);
+   let bb = person.house.size;
    print(bb);
-    let aa = name_call(20,"sdd");
+   let cc = person.house.idea();
+
+   //
    return;
 }
 

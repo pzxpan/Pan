@@ -19,6 +19,7 @@ use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
 use crate::util::get_pos_lambda_name;
+use crate::util::get_attribute_vec;
 
 pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -982,6 +983,7 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
+        println!("exxx:{:?}", expression);
         match &expression {
             Subscript(_, a, b) => {
                 self.scan_expression(a, context)?;
@@ -996,7 +998,9 @@ impl SymbolTableBuilder {
                 } else {
                     if name.is_some() && obj.expr_name().ne("self".clone()) {
                         let ty = self.get_register_type(obj.expr_name());
-                        self.verify_field_visible(ty.borrow(), obj.expr_name(), name.as_ref().unwrap().clone().name)?
+                        self.resolve_attribute(&expression.clone(), &ty)?;
+                        return Ok(());
+                        // self.verify_field_visible(ty.borrow(), obj.expr_name(), name.as_ref().unwrap().clone().name)?
                     } else if idx.is_some() {
                         let ty = self.get_register_type(obj.expr_name());
                         if let CType::Tuple(n) = ty {
@@ -1022,10 +1026,10 @@ impl SymbolTableBuilder {
                             location: loc.clone(),
                         });
                     }
-                    if let Attribute(_, name, Some(ident), _) = name.as_ref() {
-                        if name.expr_name().ne("self".clone()) {
+                    if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                        if n.expr_name().ne("self".clone()) {
                             if !self.is_enum_variant(&ty, ident.name.clone()) {
-                                self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
+                                self.resovle_method(name.as_ref(), &ty)?;
                             }
                         }
                         //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分,不雅观;
@@ -1415,7 +1419,7 @@ impl SymbolTableBuilder {
     }
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-       // println!("register name={:?}, ty: {:?}", name, ty);
+        // println!("register name={:?}, ty: {:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());
@@ -1488,4 +1492,48 @@ impl SymbolTableBuilder {
         table.symbols.remove(name);
         Ok(())
     }
+
+    fn resolve_attribute(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
+        let v = get_attribute_vec(expr);
+        let mut cty = ty;
+        let mut attri_type = 0;
+        let len = v.len();
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Struct(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.clone());
+                    self.verify_field_visible(cty, name.clone(), attri_name.clone())?;
+                    // attri_type = tmp.0;
+                    cty = tmp.1;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn resovle_method(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
+        let v = get_attribute_vec(expr);
+        let mut cty = ty;
+        let mut attri_type = 0;
+        let len = v.len();
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Struct(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.clone());
+                    attri_type = tmp.0;
+                    if attri_type > 1 {
+                        self.verify_fun_visible(cty, name.clone(), attri_name.clone())?;
+                    } else {
+                        self.verify_field_visible(cty, name.clone(), attri_name.clone())?;
+                    }
+                    cty = tmp.1;
+                }
+            }
+        }
+        Ok(())
+    }
 }
+
+

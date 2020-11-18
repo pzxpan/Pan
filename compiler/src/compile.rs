@@ -18,7 +18,8 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec};
+
 use pan_bytecode::bytecode::ComparisonOperator::In;
 
 
@@ -1198,7 +1199,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        trace!("Compiling {:?}", expression);
+        println!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;
@@ -1218,27 +1219,42 @@ impl<O: OutputStream> Compiler<O> {
                 if self.scope_for_name(&value.expr_name()) == NameScope::Const {
                     self.emit(Instruction::ConstStart);
                 }
-                self.compile_expression(value)?;
                 //按名字取，还是下标取
                 if name.is_some() {
                     //is_enum_item元组表示是静态构造方法，还是普通属性;
                     let is_enum_item = self.is_enum_variant_def(value, name);
                     if is_enum_item.0 {
+                        self.compile_expression(value)?;
                         self.emit(Instruction::LoadConst(
                             bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
                         self.emit(Instruction::LoadBuildEnum(2));
                     } else if is_enum_item.1 {
+                        self.compile_expression(value)?;
                         self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
                     } else {
-                        let (def_current, base_name) = self.is_struct_item_def(value, name);
-                        if def_current {
-                            self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-                        } else {
-                            self.emit(Instruction::LoadName(base_name, NameScope::Local));
-                            self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+                        let v = get_attribute_vec(expression);
+                        for (idx, name) in v.iter().enumerate() {
+                            if idx == 0 {
+                                self.emit(Instruction::LoadName(name.clone(), NameScope::Local));
+                            } else {
+                                self.emit(Instruction::LoadAttr(name.clone()));
+                            }
                         }
+                        // bound另外判断，放到这里没有symbol，无法进行
+                        // println!("cc::{:?}",v);
+                        // let attr_name = v.get(0).unwrap().clone();
+                        // let obj_name = v.get(1).unwrap().clone();
+                        //
+                        // let (def_current, base_name) = self.is_struct_item_def(obj_name, attr_name);
+                        // if def_current {
+                        //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+                        // } else {
+                        //     self.emit(Instruction::LoadName(base_name, NameScope::Local));
+                        //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+                        // }
                     }
                 } else {
+                    self.compile_expression(value)?;
                     self.emit(Instruction::LoadConst(
                         bytecode::Constant::Integer(idx.unwrap() as i32)));
                     self.emit(Instruction::Subscript);
@@ -1811,33 +1827,33 @@ impl<O: OutputStream> Compiler<O> {
         unreachable!()
     }
 
-    fn is_struct_item_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> (bool, String) {
-        let mut name_str = "";
-        let mut attri = "";
-        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
-            name_str = name;
-        }
-        if let Some(ident) = attribute {
-            attri = &ident.name;
-        }
+    fn is_struct_item_def(&self, name_str: String, attri: String) -> (bool, String) {
+        // let mut name_str = "";
+        // let mut attri = "";
+        // if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
+        //     name_str = name;
+        // }
+        // if let Some(ident) = attribute {
+        //     attri = &ident.name;
+        // }
 
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
-            let symbol = self.symbol_table_stack[i].lookup(name_str);
+            let symbol = self.symbol_table_stack[i].lookup(&name_str);
             if let Some(s) = symbol {
                 if let CType::Struct(StructType { fields, static_methods: static_fields, methods, bases, .. }) = &s.ty {
                     for (a_name, ..) in fields {
-                        if a_name.eq(attri) {
+                        if a_name.eq(&attri) {
                             return (true, "".to_string());
                         }
                     }
                     for (a_name, ..) in static_fields {
-                        if a_name.eq(attri) {
+                        if a_name.eq(&attri) {
                             return (true, "".to_string());
                         }
                     }
                     for (a_name, ..) in methods {
-                        if a_name.eq(attri) {
+                        if a_name.eq(&attri) {
                             return (true, "".to_string());
                         }
                     }
@@ -1847,7 +1863,7 @@ impl<O: OutputStream> Compiler<O> {
                         let base_ty = &symbol.ty;
                         if let CType::Bound(BoundType { methods, .. }) = base_ty {
                             for (a_name, ..) in methods {
-                                if a_name.eq(attri) {
+                                if a_name.eq(&attri) {
                                     return (false, base.clone());
                                 }
                             }
