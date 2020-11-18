@@ -30,6 +30,15 @@ pub fn get_pos_lambda_name(loc: Loc) -> String {
     return name;
 }
 
+pub fn get_pos_name(name: String, loc: Loc) -> String {
+    let mut name = name;
+    name.push_str("_");
+    name.push_str(&*loc.1.to_string());
+    name.push_str("_");
+    name.push_str(&*loc.2.to_string());
+    return name;
+}
+
 
 
 

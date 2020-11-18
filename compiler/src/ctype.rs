@@ -37,7 +37,16 @@ pub enum CType {
     Reference(String, Vec<CType>),
     Any,
     TSelf,
+    //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;
+    Assistant(AssistantType),
     Unknown,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum AssistantType {
+    AttributeRecursive(bool, Box<AssistantType>),
+    EnumMethod(i32),
+    StructFieldOrMethod(i32),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -188,12 +197,22 @@ impl CType {
         }
     }
 
-    pub fn attri_type(&self, index: usize, name: String) -> &CType {
+    pub fn attri_index(&self, index: usize, name: String) -> &CType {
         //struct的属性类型需要名称，而tuple需要索引值;
         match self {
             CType::Tuple(s) => s.as_ref().get(index).unwrap(),
             _ => self
         }
+    }
+    pub fn attri_name_type(&self, name: String) -> &CType {
+        if let CType::Struct(ty) = self {
+            for (method_name, cty, is_pub) in ty.fields.iter() {
+                if method_name.eq(&name) {
+                    return cty;
+                }
+            }
+        }
+        self
     }
 
     pub fn param_type(&self) -> Vec<(CType, bool, bool)> {
@@ -202,6 +221,56 @@ impl CType {
             _ => Vec::new()
         }
     }
+
+    // pub fn is_struct_ty(&self) -> bool {
+    //     return if let CType::Struct(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_enum_ty(&self) -> bool {
+    //     return if let CType::Enum(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_bound_ty(&self) -> bool {
+    //     return if let CType::Bound(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_lambda_ty(&self) -> bool {
+    //     return if let CType::Lambda(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_fn_ty(&self) -> bool {
+    //     return if let CType::Fn(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_generic_ty(&self) -> bool {
+    //     return if let CType::Generic(..) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_reference(&self) -> bool {
+    //     return if let CType::Reference(..) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
 }
 
 impl PartialOrd for FnType {
@@ -214,7 +283,6 @@ impl PartialOrd for FnType {
     }
 }
 
-
 impl PartialOrd for StructType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.name.eq(&other.name) {
@@ -222,6 +290,12 @@ impl PartialOrd for StructType {
         } else {
             None
         }
+    }
+}
+
+impl PartialOrd for AssistantType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        None
     }
 }
 
@@ -254,3 +328,4 @@ impl PartialOrd for BoundType {
         }
     }
 }
+

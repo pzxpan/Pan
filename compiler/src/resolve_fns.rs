@@ -173,6 +173,28 @@ pub fn resolve_builtin_fun<O: OutputStream>(compiler: &mut Compiler<O>) {
     }
 }
 
+pub fn resolve_recursive_attribute<O: OutputStream>(compiler: &mut Compiler<O>, expression: &Expression) -> Result<(), CompileError> {
+    if let Expression::Attribute(loc, ex, name, ..) = expression {
+        // if let Expression::Attribute(_, attri, attri_name, ..) = ex.as_ref() {
+        //     let cty = build.get_field_type(&ty, ex.expr_name(), attri_name.as_ref().unwrap().name.clone());
+        //     if cty != CType::Unknown {
+        //         return resovle_attribute(build, &cty, attri_name.as_ref().unwrap().name.clone(), obj_attri, ex);
+        //     } else {
+        //         return Err(CompileError {
+        //             statement: None,
+        //             error: CompileErrorType::ImportFileError,
+        //             location: Default::default(),
+        //             source_path: None,
+        //         });
+        //     }
+        // } else {
+        //     println!("obj_name:{:?}", obj_name);
+        //     return build.verify_fun_visible(&ty, obj_name, obj_attri);
+        // }
+    }
+    Ok(())
+}
+
 
 
 

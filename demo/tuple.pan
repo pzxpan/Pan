@@ -3,7 +3,6 @@ fun main() {
   let bb = aa.0;
   aa.0 = 100;
   let ccc = (aa,bb);
-  let bb = aa.0;
   print(ccc.1);
  // for dd in aa {
  //   print(dd);

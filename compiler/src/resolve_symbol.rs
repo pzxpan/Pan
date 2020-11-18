@@ -329,5 +329,40 @@ pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: 
     Ok(())
 }
 
+// pub fn resovle_attribute(build: &SymbolTableBuilder, ty: &CType, obj_name: String, obj_attri: String, attri: &Expression, obj_ty: &mut i32, field_ty: &i32) -> SymbolTableResult {
+//     println!("aaaaa:{:?}", attri);
+//     //Attribute(Loc(1, 29, 29),
+//     // Attribute(Loc(1, 29, 24), Variable(Identifier { loc: Loc(1, 29, 18), name: "person" }), Some(Identifier { loc: Loc(1, 29, 24), name: "house" }), None),
+//     // Some(Identifier { loc: Loc(1, 29, 29), name: "idea" }), None)
+//     if let Expression::Attribute(loc, ex, name, ..) = attri {
+//         if obj_ty == 0 {
+//             if ty.is_struct_ty() {
+//                 *obj_ty = 1;
+//             } else if ty.is_enum_ty() {
+//                 *obj_ty = 2;
+//             }
+//         }
+//         if let Expression::Attribute(_, attri, attri_name, ..) = ex.as_ref() {
+//             let cty = build.get_field_type(&ty, ex.expr_name(), attri_name.as_ref().unwrap().name.clone());
+//             if cty != CType::Unknown {
+//
+//                 return resovle_attribute(build, &cty, attri_name.as_ref().unwrap().name.clone(), obj_attri, ex, obj_ty, field_ty);
+//             } else {
+//                 return Err(SymbolTableError {
+//                     error: format!("{:?}中找不到属性{:?}", ex.expr_name(), attri_name.as_ref().unwrap().name.clone(), ),
+//                     location: attri.loc().clone(),
+//                 });
+//             }
+//         } else {
+//             println!("obj_name:{:?}", obj_name);
+//             return build.verify_fun_visible(&ty, obj_name, obj_attri);
+//         }
+//     }
+//     return Err(SymbolTableError {
+//         error: format!("{:?}不是属性调用", attri.expr_name()),
+//         location: attri.loc().clone(),
+//     });
+// }
+
 
 
