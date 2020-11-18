@@ -63,6 +63,7 @@ pub enum SymbolTableType {
     Enum,
     Bound,
     MatchItem,
+    Block,
 }
 
 impl fmt::Display for SymbolTableType {
@@ -73,7 +74,8 @@ impl fmt::Display for SymbolTableType {
             SymbolTableType::Function => write!(f, "function"),
             SymbolTableType::Enum => write!(f, "enum"),
             SymbolTableType::Bound => write!(f, "bound"),
-            SymbolTableType::MatchItem => write!(f, "matchItem")
+            SymbolTableType::MatchItem => write!(f, "matchItem"),
+            SymbolTableType::Block => write!(f, "block"),
         }
     }
 }
@@ -640,12 +642,13 @@ impl SymbolTableBuilder {
         // println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
-            Block(_, stmts) => {
+            Block(loc, stmts) => {
                 for stmt in stmts {
                     self.scan_statement(stmt)?;
                 }
             }
             For(loc, target, iter, body) => {
+                self.enter_scope(&target.expr_name(), SymbolTableType::Block, loc.1);
                 let mut ty = iter.get_type(&self.tables);
                 let mut symbol_name = String::new();
                 if let ast::Expression::Variable(Identifier { name, .. }) = target {
@@ -688,18 +691,23 @@ impl SymbolTableBuilder {
                 //     self.scan_expression(e, &ExpressionContext::Load)?;
                 // }
                 self.scan_statement(body.as_ref().unwrap())?;
+                self.leave_scope();
             }
-            While(_, test, body) => {
+            While(loc, test, body) => {
+                self.enter_scope(&test.expr_name(), SymbolTableType::Block, loc.1);
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 self.scan_statement(body)?;
+                self.leave_scope();
             }
             Break(_) | Continue(_) => {}
             Expression(_, expression) => {
                 self.scan_expression(expression, &ExpressionContext::Load)?;
             }
-            If(_, test, body, orelse) => {
+            If(loc, test, body, orelse) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
+                self.enter_scope(&test.expr_name(), SymbolTableType::Block, loc.1);
                 self.scan_statement(body)?;
+                self.leave_scope();
                 if let Some(code) = orelse {
                     self.scan_statement(code)?;
                 }
@@ -722,8 +730,7 @@ impl SymbolTableBuilder {
                         self.register_name(name, ty, SymbolUsage::Assigned, decl.loc)?;
                     }
                     return Ok(());
-                }
-                if decl.ty.is_some() {
+                } else if decl.ty.is_some() {
                     self.register_name(decl.name.borrow().name.borrow(),
                                        decl.ty.as_ref().unwrap().get_type(&self.tables),
                                        SymbolUsage::Assigned, decl.loc)?;
@@ -760,13 +767,16 @@ impl SymbolTableBuilder {
                             }
                         }
                     } else {
+                        let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables);
                         if let ast::Expression::Variable(Identifier { .. }) = e {
-                            //简单赋值，右侧如果是饮用语言直接拷贝类型；
-                            // TOTO 如果是值类型的话，拷贝类型，删除已注册的变量
-                            self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
+                            //函数和lambda特殊，直接删除原有定义，用右侧的覆盖;
+                            if let Fn(_) = left_ty {
+                                self.delete_name(decl.name.borrow().name.borrow());
+                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
+                            }
                             return Ok(());
                         }
-                        let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables);
+
                         let mut right_ty = ty.ret_type().clone();
                         if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
                             return Err(SymbolTableError {
@@ -802,8 +812,10 @@ impl SymbolTableBuilder {
                 if let CType::Enum(enum_type) = ty {
                     let mut hash_set = self.get_test_item(&enum_type);
                     for (expr, item) in items.iter() {
+                        self.enter_scope(&expr.expr_name(), SymbolTableType::MatchItem, expr.loc().1);
                         self.scan_match_item(expr, &ExpressionContext::Load, &mut hash_set)?;
                         self.scan_statement(item)?;
+                        self.leave_scope();
                     }
                     if !hash_set.is_empty() {
                         return Err(SymbolTableError {
@@ -814,11 +826,14 @@ impl SymbolTableBuilder {
                 } else if ty >= CType::I8 && ty < CType::Float {
                     let mut found_hole = false;
                     for (expr, item) in items.iter() {
-                        self.scan_match_item(expr, &ExpressionContext::Load, &mut HashSet::new())?;
+                        let mut name = expr.expr_name();
                         if let ast::Expression::Hole(_) = expr.as_ref() {
                             found_hole = true;
                         }
+                        self.enter_scope(&name, SymbolTableType::MatchItem, expr.loc().1);
+                        self.scan_match_item(expr, &ExpressionContext::Load, &mut HashSet::new())?;
                         self.scan_statement(item)?;
+                        self.leave_scope();
                     }
                     if !found_hole {
                         return Err(SymbolTableError {
@@ -854,8 +869,6 @@ impl SymbolTableBuilder {
                         if ident.name.eq(c) {
                             found = true;
                             items.remove(c);
-                            println!("fuck");
-                            self.enter_scope(c, SymbolTableType::MatchItem, name.loc().1);
                             if let CType::Reference(_, tys) = item_ty {
                                 if args.len() == tys.len() {
                                     for i in 0..args.len() {
@@ -863,7 +876,6 @@ impl SymbolTableBuilder {
                                     }
                                 }
                             }
-                            self.leave_scope();
                         }
                     }
                     if !found {
@@ -877,13 +889,11 @@ impl SymbolTableBuilder {
                 //TODO
                 if let CType::Reference(_, tys) = item_ty {
                     items.remove(&*v.name);
-                    self.enter_scope(&v.name, SymbolTableType::MatchItem, name.loc().1);
                     if args.len() == tys.len() {
                         for i in 0..args.len() {
                             self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Assigned, name.loc())?;
                         }
                     }
-                    self.leave_scope();
                 }
             }
         } else if let Expression::Attribute(_, name, Some(ident), _) = expression {
@@ -1405,7 +1415,12 @@ impl SymbolTableBuilder {
     }
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        //println!("register name={:?}, ty: {:?}", name, ty);
+       // println!("register name={:?}, ty: {:?}", name, ty);
+        //忽略_符号
+        if name.is_empty() {
+            return Ok(());
+        }
+
         if self.in_struct_func && self.in_struct_scope(name.clone()) {
             return if role == SymbolUsage::Used {
                 Ok(())
@@ -1465,6 +1480,12 @@ impl SymbolTableBuilder {
         table.symbols.insert(name.to_owned(), symbol.clone());
         // println!("after register name={:?}, ty: {:?}", name, symbol.clone());
 
+        Ok(())
+    }
+
+    fn delete_name(&mut self, name: &String) -> SymbolTableResult {
+        let table = self.tables.last_mut().unwrap();
+        table.symbols.remove(name);
         Ok(())
     }
 }

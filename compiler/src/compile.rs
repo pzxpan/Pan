@@ -366,15 +366,19 @@ impl<O: OutputStream> Compiler<O> {
                 match orelse {
                     None => {
                         // 只有if分支
+                        self.enter_scope();
                         self.compile_jump_if(test, false, end_label)?;
                         self.compile_statements(body)?;
+                        self.leave_scope();
                         self.set_label(end_label);
                     }
                     Some(statements) => {
                         // if - else
                         let else_label = self.new_label();
+                        self.enter_scope();
                         self.compile_jump_if(test, false, else_label)?;
                         self.compile_statements(body)?;
+                        self.leave_scope();
                         self.emit(Instruction::Jump(end_label));
 
                         // else
@@ -403,14 +407,18 @@ impl<O: OutputStream> Compiler<O> {
             }
 
             For(_, target, iter, body) => {
+                self.enter_scope();
                 self.compile_for(target, iter, body.as_ref().unwrap())?;
+                self.leave_scope();
             }
             MultiVariableDefinition(_, decl, expression) => {
                 self.compile_expression(expression)?;
                 self.compile_store_multi_value_def(decl)?;
             }
             While(_, expression, body) => {
+                self.enter_scope();
                 self.compile_while(expression, body)?;
+                self.leave_scope();
             }
             Match(_, test, bodies) => {
                 self.compile_expression(test)?;
@@ -423,6 +431,7 @@ impl<O: OutputStream> Compiler<O> {
                 for (index, expr) in bodies.iter().enumerate() {
                     self.set_label(labels[index]);
                     self.emit(Instruction::Duplicate);
+                    self.enter_scope();
                     if let ast::Expression::Hole(_) = expr.0.as_ref() {} else {
                         if expr.0.as_ref().is_compare_operation() {
                             self.emit(Instruction::Pop);
@@ -444,6 +453,7 @@ impl<O: OutputStream> Compiler<O> {
                     }
                     self.compile_statements(expr.1.as_ref())?;
                     self.emit(Instruction::Jump(end_label));
+                    self.leave_scope();
                 }
                 self.set_label(end_label);
                 //弹出被比较的数据
