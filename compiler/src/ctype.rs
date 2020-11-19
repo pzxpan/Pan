@@ -211,30 +211,31 @@ impl CType {
                     return (1, cty);
                 }
             }
-            for (method_name, cty) in ty.static_methods.iter() {
+            for (method_name, cty) in ty.methods.iter() {
                 if method_name.eq(&name) {
                     return (2, cty);
                 }
             }
-            for (method_name, cty) in ty.methods.iter() {
+            for (method_name, cty) in ty.static_methods.iter() {
                 if method_name.eq(&name) {
                     return (3, cty);
                 }
             }
         } else if let CType::Enum(ty) = self {
-            for (method_name, cty) in ty.static_methods.iter() {
+            for (method_name, cty) in ty.items.iter() {
+                if method_name.eq(&name) {
+                    return (1, cty);
+                }
+            }
+
+            for (method_name, cty) in ty.methods.iter() {
                 if method_name.eq(&name) {
                     return (2, cty);
                 }
             }
-            for (method_name, cty) in ty.methods.iter() {
+            for (method_name, cty) in ty.static_methods.iter() {
                 if method_name.eq(&name) {
                     return (3, cty);
-                }
-            }
-            for (method_name, cty) in ty.items.iter() {
-                if method_name.eq(&name) {
-                    return (4, cty);
                 }
             }
         }

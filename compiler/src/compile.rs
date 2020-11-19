@@ -1222,48 +1222,20 @@ impl<O: OutputStream> Compiler<O> {
                 if self.scope_for_name(&value.expr_name()) == NameScope::Const {
                     self.emit(Instruction::ConstStart);
                 }
-                //按名字取，还是下标取
-                if name.is_some() {
-                    //is_enum_item元组表示是静态构造方法，还是普通属性;
-                    let is_enum_item = self.is_enum_variant_def(value, name);
-                    if is_enum_item.0 {
-                        self.compile_expression(value)?;
-                        self.emit(Instruction::LoadConst(
-                            bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
-                        self.emit(Instruction::LoadBuildEnum(2));
-                    } else if is_enum_item.1 {
-                        self.compile_expression(value)?;
-                        self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-                    } else {
-                        let v = get_attribute_vec(expression);
-                        for (idx, name) in v.iter().enumerate() {
-                            if idx == 0 {
-                                self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                            } else {
-                                self.emit(Instruction::LoadAttr(name.0.clone()));
-                            }
-                        }
-                        // bound另外判断，放到这里没有symbol，无法进行
-                        // println!("cc::{:?}",v);
-                        // let attr_name = v.get(0).unwrap().clone();
-                        // let obj_name = v.get(1).unwrap().clone();
-                        //
-                        // let (def_current, base_name) = self.is_struct_item_def(obj_name, attr_name);
-                        // if def_current {
-                        //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-                        // } else {
-                        //     self.emit(Instruction::LoadName(base_name, NameScope::Local));
-                        //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-                        // }
-                    }
-                } else {
-                    self.compile_expression(value)?;
-                    self.emit(Instruction::LoadConst(
-                        bytecode::Constant::Integer(idx.unwrap() as i32)));
-                    self.emit(Instruction::Subscript);
-                    if self.scope_for_name(&value.expr_name()) == NameScope::Const {
-                        self.emit(Instruction::ConstEnd);
-                    }
+                self.resolve_compile_attribute(expression)?;
+                // //按名字取，还是下标取
+                // if name.is_some() {
+                //     //is_enum_item元组表示是静态构造方法，还是普通属性;
+                //
+                // } else {
+                //     self.compile_expression(value)?;
+                //     self.emit(Instruction::LoadConst(
+                //         bytecode::Constant::Integer(idx.unwrap() as i32)));
+                //     self.emit(Instruction::Subscript);
+                // }
+
+                if self.scope_for_name(&value.expr_name()) == NameScope::Const {
+                    self.emit(Instruction::ConstEnd);
                 }
             }
             FunctionCall(_, name, args) => {
@@ -2011,6 +1983,102 @@ impl<O: OutputStream> Compiler<O> {
             format!("{}{}", name, suffix)
         }
     }
+
+    fn resolve_compile_attribute(&mut self, expr: &Expression) -> Result<(), CompileError> {
+        let v = get_attribute_vec(expr);
+        let mut cty = &self.lookup_name(&expr.expr_name()).ty.clone();
+        let len = v.len();
+
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Struct(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    // attri_type = tmp.0;
+                    cty = tmp.1;
+                    if idx == 0 {
+                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                    } else {
+                        self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                    }
+                } else if let CType::Tuple(n) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let index = attri_name.0.parse::<i32>().unwrap();
+                    let tmp = cty.attri_index(index);
+                    cty = tmp;
+                    if idx == 0 {
+                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::Integer(index)));
+                        self.emit(Instruction::Subscript);
+                    } else {
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::Integer(index)));
+                        self.emit(Instruction::Subscript);
+                    }
+                } else if let CType::Enum(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    // attri_type = tmp.0;
+                    cty = tmp.1;
+                    if idx == 0 {
+                        if tmp.0 == 1 {
+                            self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                            self.emit(Instruction::LoadConst(
+                                bytecode::Constant::String(attri_name.0.clone())));
+                            self.emit(Instruction::LoadBuildEnum(2));
+                        } else if tmp.0 == 2 {
+                            self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                            self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                        }
+                    } else {
+                        if tmp.0 == 1 {
+                            self.emit(Instruction::LoadConst(
+                                bytecode::Constant::String(attri_name.0.clone())));
+                            self.emit(Instruction::LoadBuildEnum(2));
+                        } else if tmp.0 == 2 {
+                            self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                            self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // let is_enum_item = self.is_enum_variant_def(value, name);
+    // if is_enum_item.0 {
+    //     self.compile_expression(value)?;
+    //     self.emit(Instruction::LoadConst(
+    //         bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
+    //     self.emit(Instruction::LoadBuildEnum(2));
+    // } else if is_enum_item.1 {
+    //     self.compile_expression(value)?;
+    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+    // } else {
+    //     let v = get_attribute_vec(expression);
+    //     for (idx, name) in v.iter().enumerate() {
+    //         if idx == 0 {
+    //             self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+    //         } else {
+    //             self.emit(Instruction::LoadAttr(name.0.clone()));
+    //         }
+    //     }
+    // bound另外判断，放到这里没有symbol，无法进行
+    // println!("cc::{:?}",v);
+    // let attr_name = v.get(0).unwrap().clone();
+    // let obj_name = v.get(1).unwrap().clone();
+    //
+    // let (def_current, base_name) = self.is_struct_item_def(obj_name, attr_name);
+    // if def_current {
+    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+    // } else {
+    //     self.emit(Instruction::LoadName(base_name, NameScope::Local));
+    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+    // }
+
 
     fn mark_generator(&mut self) {
         self.current_output().mark_generator();

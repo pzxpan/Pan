@@ -20,6 +20,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
 use crate::util::get_pos_lambda_name;
 use crate::util::get_attribute_vec;
+use std::process::exit;
 
 pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -751,13 +752,8 @@ impl SymbolTableBuilder {
                             //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
                             // 那右侧表示符应该是变量，需要从表中查找到的类型进行推断
                             if let Some(ast::Expression::Attribute(_, _, name, idx)) = expression {
-                                if name.is_some() {
-                                    ty = ty.attri_name_type(name.as_ref().unwrap().borrow().name.clone()).1.clone();
-                                    self.register_name(decl.name.borrow().name.borrow(), ty, SymbolUsage::Assigned, decl.loc)?;
-                                } else if idx.is_some() {
-                                    ty = ty.attri_index(idx.as_ref().unwrap().clone()).clone();
-                                    self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned, decl.loc)?;
-                                }
+                                let tmp = self.resolve_attribute(expression.as_ref().unwrap(), &ty)?;
+                                self.register_name(decl.name.borrow().name.borrow(), tmp, SymbolUsage::Assigned, decl.loc)?;
                             } else {
                                 self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned, decl.loc)?;
                             }
@@ -994,15 +990,8 @@ impl SymbolTableBuilder {
             // Attribute(Loc(1, 3, 20), Variable(Identifier { loc: Loc(1, 3, 18), name: "varargs" }), None, Some(0))))
 
             Attribute(_, obj, name, idx) => {
-                if name.is_some() && obj.expr_name().ne("self".clone()) {
-                    let ty = self.get_register_type(obj.expr_name());
-                    self.resolve_attribute(&expression.clone(), &ty)?;
-                    // self.verify_field_visible(ty.borrow(), obj.expr_name(), name.as_ref().unwrap().clone().name)?
-                } else if idx.is_some() {
-                    let ty = self.get_register_type(obj.expr_name());
-
-                    self.scan_expression(obj, context)?;
-                }
+                let ty = self.get_register_type(obj.expr_name());
+                self.resolve_attribute(&expression.clone(), &ty)?;
             }
             FunctionCall(loc, name, args) => {
                 if name.expr_name().eq("print") || name.expr_name().eq("format") {
@@ -1016,7 +1005,7 @@ impl SymbolTableBuilder {
                         });
                     }
                     if let Attribute(_, n, Some(ident), _) = name.as_ref() {
-                        self.resovle_method(name.as_ref(), &ty)?;
+                        self.resovle_method(name, &ty)?;
                     } else {
                         self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                         self.scan_expressions(args, &ExpressionContext::Load)?;
@@ -1462,10 +1451,9 @@ impl SymbolTableBuilder {
         Ok(())
     }
 
-    fn resolve_attribute(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
+    fn resolve_attribute(&mut self, expr: &Expression, ty: &CType) -> Result<CType, SymbolTableError> {
         let v = get_attribute_vec(expr);
         let mut cty = ty;
-        let mut attri_type = 0;
         let len = v.len();
         for (idx, name) in v.iter().enumerate() {
             if idx < len - 1 {
@@ -1486,15 +1474,20 @@ impl SymbolTableBuilder {
                     }
                     let tmp = cty.attri_index(index);
                     cty = tmp;
+                } else if let CType::Enum(n) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
+                    return Ok(cty.clone());
                 } else {
                     return Err(SymbolTableError {
-                        error: format!("只有struct和tuple类型才有属性"),
+                        error: format!("只有struct和tuple,enum类型才有属性"),
                         location: expr.loc().clone(),
                     });
                 }
             }
         }
-        Ok(())
+        Ok(cty.clone())
     }
 
     fn resovle_method(&mut self, expr: &Expression, ty: &CType) -> Result<CType, SymbolTableError> {
@@ -1503,6 +1496,7 @@ impl SymbolTableBuilder {
         let mut attri_type = 0;
         let len = v.len();
         for (idx, name) in v.iter().enumerate() {
+            println!("tytt:{:?}", cty.clone());
             if name.0.clone().is_empty() {
                 continue;
             }
@@ -1523,6 +1517,8 @@ impl SymbolTableBuilder {
                     attri_type = tmp.0;
                     if attri_type > 1 {
                         self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    } else {
+                        self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
                     }
                     cty = tmp.1.clone();
                 } else if let CType::Fn(fntype) = cty.clone() {
