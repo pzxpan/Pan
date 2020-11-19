@@ -53,7 +53,7 @@ pub fn get_attribute_vec(expression: &Expression) -> Vec<String> {
     loop {
         println!("ddd:{:?},", expr);
         if let Expression::Attribute(loc, ex, name, ..) = expr.clone() {
-            println!("fuckxxx:{:?}",ex);
+            println!("fuckxxx:{:?}", ex);
             v.push(name.as_ref().unwrap().name.clone());
             if let Expression::Attribute(loc, ex2, name2, ..) = *ex.clone() {
                 expr = ex.as_ref().clone();
@@ -68,6 +68,13 @@ pub fn get_attribute_vec(expression: &Expression) -> Vec<String> {
     println!("vvv:{:?}", v);
     v.reverse();
     v
+}
+
+pub fn get_mod_name(path: String) -> String {
+    let file_name = path.split('/').last().unwrap().to_string();
+    let len = file_name.len();
+    let a = &file_name[..len - 4];
+    return String::from(a);
 }
 
 

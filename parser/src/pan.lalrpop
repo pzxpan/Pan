@@ -7,8 +7,8 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'input,'err>(input: &'input str, file_no: usize,errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, LexicalError>>);
 
-pub Module: Module = {
-    ModulePart+ => Module(<>)
+pub TopModule: Module = {
+   ModulePart+ => Module(<>)
 }
 
 ModulePart: ModulePart = {
@@ -19,8 +19,14 @@ ModulePart: ModulePart = {
     FunctionDefinition => ModulePart::FunctionDefinition(<>),
     BoundDefinition => ModulePart::BoundDefinition(<>),
     ConstVariableDefinition => ModulePart::ConstDefinition(<>),
-
+    ModuleDefinition => ModulePart::ModuleDefinition(Box::new(<>)),
     <err: !>  => { errors.push(err); ModulePart::Error},
+}
+
+pub ModuleDefinition: ModuleDefinition = {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:ModulePart+> "}" <R:@L> => {
+        ModuleDefinition{module_parts:parts,name,is_pub:is_pub.is_some()}
+    }
 }
 
 ImportDirective: Import = {
@@ -665,6 +671,7 @@ extern {
         "break" => Token::Break,
 
         "as" => Token::As,
+        "mod" => Token::Mod,
         "from" => Token::From,
         "impl" => Token::Impl,
         "let" => Token::Let,

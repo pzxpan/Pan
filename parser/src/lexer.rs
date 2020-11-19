@@ -96,6 +96,7 @@ pub enum Token<'input> {
     DivideAssign,
     ModuloAssign,
     Modulo,
+    Mod,
 
     Equal,
     Assign,
@@ -206,6 +207,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::ShiftLeftAssign => write!(f, "<<="),
             Token::More => write!(f, ">"),
             Token::MoreEqual => write!(f, ">="),
+            Token::Mod => write!(f, "mod"),
             Token::Member => write!(f, "."),
             Token::TwoColon => write!(f, "::"),
             Token::Colon => write!(f, ":"),
@@ -328,6 +330,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
 
     "as" => Token::As,
     "from" => Token::From,
+    "mod" => Token::Mod,
     "impl" => Token::Impl,
     "let" => Token::Let,
     "lambda" => Token::Lambda,

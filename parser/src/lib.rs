@@ -23,7 +23,7 @@ lalrpop_mod!(
 pub fn parse(src: &str, file_name: String) -> Result<ast::Module, Vec<Diagnostic>> {
     let mut lex = lexer::Lexer::new(src);
     let mut token_erros: Vec<ErrorRecovery<usize, Token, LexicalError>> = Vec::new();
-    let r = pan::ModuleParser::new().parse(src, 1, &mut token_erros, &mut lex);
+    let r = pan::TopModuleParser::new().parse(src, 1, &mut token_erros, &mut lex);
     let mut errors = Vec::new();
     if token_erros.is_empty() {
         return Ok(r.unwrap());

@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
 
@@ -89,9 +89,12 @@ pub fn compile(
     optimize: u8,
     is_import: bool,
 ) -> Result<CodeObject, CompileError> {
-    let ast = parse(source, source_path.to_string());
+    let mut ast = parse(source, source_path.to_string());
     if ast.is_ok() {
-        compile_program(ast.unwrap(), source_path.clone(), optimize, is_import)
+        let module_name = get_mod_name(source_path.clone());
+        let module = ast.unwrap();
+        let md = ast::ModuleDefinition { module_parts: module.0, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true };
+        compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
                 err
             })
@@ -123,7 +126,7 @@ fn with_compiler(
 }
 
 pub fn compile_program(
-    ast: ast::Module,
+    ast: ast::ModuleDefinition,
     source_path: String,
     optimize: u8,
     is_import: bool,
@@ -184,7 +187,7 @@ impl<O: OutputStream> Compiler<O> {
 
     pub fn compile_program(
         &mut self,
-        program: &ast::Module,
+        program: &ast::ModuleDefinition,
         symbol_table: SymbolTable,
         is_import: bool,
     ) -> Result<(), CompileError> {
@@ -194,7 +197,7 @@ impl<O: OutputStream> Compiler<O> {
         let size_before = self.output_stack.len();
         resolve_builtin_fun(self);
 
-        for part in &program.0 {
+        for part in &program.module_parts {
             match part {
                 ast::ModulePart::DataDefinition(_) => {}
                 ast::ModulePart::EnumDefinition(def) => {

@@ -26,6 +26,13 @@ pub struct DocComment {
 pub struct Module(pub Vec<ModulePart>);
 
 #[derive(Debug, PartialEq)]
+pub struct ModuleDefinition {
+    pub module_parts: Vec<ModulePart>,
+    pub name: Identifier,
+    pub is_pub: bool,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum ModulePart {
     StructDefinition(Box<StructDefinition>),
     BoundDefinition(Box<BoundDefinition>),
@@ -34,7 +41,7 @@ pub enum ModulePart {
     DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
-
+    ModuleDefinition(Box<ModuleDefinition>),
     Error,
 }
 

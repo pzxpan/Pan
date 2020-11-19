@@ -18,6 +18,7 @@ use crate::ctype::{CType, StructType, FnType};
 use itertools::Tuples;
 use dynformat::check;
 use std::borrow::Borrow;
+use crate::util;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
@@ -89,8 +90,11 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     let mut file = File::open(path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let ast = parse(&contents, path.clone().into_os_string().into_string().unwrap()).unwrap();
-    build.scan_top_symbol_types(&ast, true, *is_all, item_name, as_name)?;
+    let ast = parse(&contents, path.clone().into_os_string().into_string().unwrap());
+    let module_name = util::get_mod_name(String::from(path.to_str().unwrap()));
+    let module = ast.unwrap();
+    let md = ModuleDefinition { module_parts: module.0, name: Identifier { loc: Loc::default(), name: module_name }, is_pub: true };
+    build.scan_top_symbol_types(&md, true, *is_all, item_name, as_name)?;
     Ok(())
 }
 

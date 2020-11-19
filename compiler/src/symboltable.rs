@@ -21,9 +21,9 @@ use pan_bytecode::bytecode::Instruction::YieldFrom;
 use crate::util::get_pos_lambda_name;
 use crate::util::get_attribute_vec;
 
-pub fn make_symbol_table(program: &ast::Module) -> Result<SymbolTable, SymbolTableError> {
+pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
-    builder.prepare();
+    builder.prepare(program.name.name.clone());
     builder.insert_builtin_symbol();
     builder.scan_top_symbol_types(program, false, false, Option::None, Option::None)?;
     builder.scan_program(program)?;
@@ -230,8 +230,8 @@ enum ExpressionContext {
 }
 
 impl SymbolTableBuilder {
-    fn prepare(&mut self) {
-        self.enter_scope(&"top".to_string(), SymbolTableType::Module, 0);
+    fn prepare(&mut self, name: String) {
+        self.enter_scope(&name, SymbolTableType::Module, 0);
     }
     fn finish(&mut self) -> Result<SymbolTable, SymbolTableError> {
         assert_eq!(self.tables.len(), 1);
@@ -292,8 +292,8 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
-    pub fn scan_program(&mut self, program: &ast::Module) -> SymbolTableResult {
-        for part in &program.0 {
+    pub fn scan_program(&mut self, program: &ast::ModuleDefinition) -> SymbolTableResult {
+        for part in &program.module_parts {
             match part {
                 ModulePart::DataDefinition(_) => {}
                 ModulePart::EnumDefinition(def) => {
@@ -486,11 +486,11 @@ impl SymbolTableBuilder {
     }
 
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
-    pub fn scan_top_symbol_types(&mut self, program: &ast::Module, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
+    pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
         if in_import && is_all && as_name.clone().is_some() {
             self.register_name(&as_name.clone().unwrap(), CType::Module, SymbolUsage::Import, Loc::default());
         }
-        for part in &program.0 {
+        for part in &program.module_parts {
             match part {
                 ModulePart::DataDefinition(_) => {
                     //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
