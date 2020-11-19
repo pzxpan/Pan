@@ -23,10 +23,10 @@ pub struct DocComment {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct SourceUnit(pub Vec<SourceUnitPart>);
+pub struct Module(pub Vec<ModulePart>);
 
 #[derive(Debug, PartialEq)]
-pub enum SourceUnitPart {
+pub enum ModulePart {
     StructDefinition(Box<StructDefinition>),
     BoundDefinition(Box<BoundDefinition>),
     ImportDirective(Import),

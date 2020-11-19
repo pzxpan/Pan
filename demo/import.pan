@@ -3,7 +3,7 @@ import std.person {Person as PPP, House};
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import std.color.Color;
+import std.color.*;
 
 fun main() {
   let person = PPP({age:50,name:"pan"});
@@ -12,7 +12,7 @@ fun main() {
   let house = House({size:1000.0,price:1000000.0});
   let dd = house.idea();
   print(dd);
-  let color = Color::Red(10);
-  color.is_warm();
+  let c = Color::Red(10);
+  c.is_warm();
 }
 

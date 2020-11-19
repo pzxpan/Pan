@@ -7,20 +7,20 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'input,'err>(input: &'input str, file_no: usize,errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, LexicalError>>);
 
-pub SourceUnit: SourceUnit = {
-    SourceUnitPart+ => SourceUnit(<>)
+pub Module: Module = {
+    ModulePart+ => Module(<>)
 }
 
-SourceUnitPart: SourceUnitPart = {
-    StructDefinition => SourceUnitPart::StructDefinition(<>),
-    ImportDirective => SourceUnitPart::ImportDirective(<>),
-    EnumDefinition => SourceUnitPart::EnumDefinition(<>),
-    DataDefinition => SourceUnitPart::DataDefinition(<>),
-    FunctionDefinition => SourceUnitPart::FunctionDefinition(<>),
-    BoundDefinition => SourceUnitPart::BoundDefinition(<>),
-    ConstVariableDefinition => SourceUnitPart::ConstDefinition(<>),
+ModulePart: ModulePart = {
+    StructDefinition => ModulePart::StructDefinition(<>),
+    ImportDirective => ModulePart::ImportDirective(<>),
+    EnumDefinition => ModulePart::EnumDefinition(<>),
+    DataDefinition => ModulePart::DataDefinition(<>),
+    FunctionDefinition => ModulePart::FunctionDefinition(<>),
+    BoundDefinition => ModulePart::BoundDefinition(<>),
+    ConstVariableDefinition => ModulePart::ConstDefinition(<>),
 
-    <err: !>  => { errors.push(err); SourceUnitPart::Error},
+    <err: !>  => { errors.push(err); ModulePart::Error},
 }
 
 ImportDirective: Import = {

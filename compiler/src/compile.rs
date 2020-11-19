@@ -123,7 +123,7 @@ fn with_compiler(
 }
 
 pub fn compile_program(
-    ast: ast::SourceUnit,
+    ast: ast::Module,
     source_path: String,
     optimize: u8,
     is_import: bool,
@@ -184,7 +184,7 @@ impl<O: OutputStream> Compiler<O> {
 
     pub fn compile_program(
         &mut self,
-        program: &ast::SourceUnit,
+        program: &ast::Module,
         symbol_table: SymbolTable,
         is_import: bool,
     ) -> Result<(), CompileError> {
@@ -196,20 +196,20 @@ impl<O: OutputStream> Compiler<O> {
 
         for part in &program.0 {
             match part {
-                ast::SourceUnitPart::DataDefinition(_) => {}
-                ast::SourceUnitPart::EnumDefinition(def) => {
+                ast::ModulePart::DataDefinition(_) => {}
+                ast::ModulePart::EnumDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
                     self.compile_enum_def(name.as_str(), &body, &generics)?;
                 }
-                ast::SourceUnitPart::StructDefinition(def) => {
+                ast::ModulePart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
                     self.compile_class_def(name.as_str(), &body, &generics)?;
                 }
-                ast::SourceUnitPart::ImportDirective(def) => {
+                ast::ModulePart::ImportDirective(def) => {
                     if !is_import {
                         match def {
                             Import::Plain(mod_path, all) => {
@@ -233,10 +233,10 @@ impl<O: OutputStream> Compiler<O> {
                         }
                     }
                 }
-                ast::SourceUnitPart::ConstDefinition(def) => {
+                ast::ModulePart::ConstDefinition(def) => {
                     self.calculate_const(def);
                 }
-                ast::SourceUnitPart::FunctionDefinition(def) => {
+                ast::ModulePart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
                     if name.eq("main") {
                         if !is_import {
@@ -253,7 +253,7 @@ impl<O: OutputStream> Compiler<O> {
                     let is_async = false;
                     self.compile_function_def(name, args.as_slice(), body, returns, is_async, false)?;
                 }
-                ast::SourceUnitPart::BoundDefinition(def) => {
+                ast::ModulePart::BoundDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;

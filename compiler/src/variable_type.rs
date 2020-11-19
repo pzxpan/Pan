@@ -582,11 +582,11 @@ impl HasType for LambdaDefinition {
     }
 }
 
-impl HasType for SourceUnitPart {
+impl HasType for ModulePart {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match &self {
-            SourceUnitPart::FunctionDefinition(s) => { s.get_type(tables) }
-            SourceUnitPart::StructDefinition(s) => { s.get_type(tables) }
+            ModulePart::FunctionDefinition(s) => { s.get_type(tables) }
+            ModulePart::StructDefinition(s) => { s.get_type(tables) }
             _ => { CType::Unknown }
         }
     }
