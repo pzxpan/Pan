@@ -40,8 +40,8 @@ pub fn get_pos_name(name: String, loc: Loc) -> String {
     return name;
 }
 
-pub fn get_attribute_vec(expression: &Expression) -> Vec<String> {
-    let mut v = vec![];
+pub fn get_attribute_vec(expression: &Expression) -> Vec<(String, Expression)> {
+    let mut v: Vec<(String, Expression)> = vec![];
     // let mut attri_name = "".to_string();
     // if let Expression::Attribute(_, _, name, ..) = expr {
     //     attri_name = name.as_ref().unwrap().name.clone();
@@ -52,15 +52,27 @@ pub fn get_attribute_vec(expression: &Expression) -> Vec<String> {
     //  Some(Identifier { loc: Loc(1, 29, 29), name: "idea" }), None)
     loop {
         println!("ddd:{:?},", expr);
-        if let Expression::Attribute(loc, ex, name, ..) = expr.clone() {
+        if let Expression::Attribute(loc, ex, name, idx) = expr.clone() {
             println!("fuckxxx:{:?}", ex);
-            v.push(name.as_ref().unwrap().name.clone());
-            if let Expression::Attribute(loc, ex2, name2, ..) = *ex.clone() {
-                expr = ex.as_ref().clone();
+            if name.is_some() {
+                v.push((name.as_ref().unwrap().name.clone(), Expression::Error));
             } else {
-                v.push(ex.expr_name());
+                v.push((idx.unwrap().to_string(), Expression::Error));
+            }
+
+            if let Expression::Attribute(loc, ex2, name2, idx) = *ex.clone() {
+                expr = ex.as_ref().clone();
+            } else if let Expression::FunctionCall(_, name, ..) = *ex.clone() {
+                v.push((name.expr_name(), *ex.clone()));
+                //函数插入两边，因为需要取返回值类型，相当于停顿了一下再来
+                v.push(("".to_string(), Expression::Error));
+            } else {
+                v.push((ex.expr_name(), Expression::Error));
                 break;
             }
+        } else if let Expression::FunctionCall(_, name, ..) = expr.clone() {
+            v.push((name.expr_name(), expr.clone()));
+            v.push(("".to_string(), Expression::Error));
         } else {
             break;
         }

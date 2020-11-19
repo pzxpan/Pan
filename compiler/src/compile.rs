@@ -1238,9 +1238,9 @@ impl<O: OutputStream> Compiler<O> {
                         let v = get_attribute_vec(expression);
                         for (idx, name) in v.iter().enumerate() {
                             if idx == 0 {
-                                self.emit(Instruction::LoadName(name.clone(), NameScope::Local));
+                                self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                             } else {
-                                self.emit(Instruction::LoadAttr(name.clone()));
+                                self.emit(Instruction::LoadAttr(name.0.clone()));
                             }
                         }
                         // bound另外判断，放到这里没有symbol，无法进行

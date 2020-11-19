@@ -197,11 +197,11 @@ impl CType {
         }
     }
 
-    pub fn attri_index(&self, index: usize, name: String) -> &CType {
+    pub fn attri_index(&self, index: i32) -> &CType {
         //struct的属性类型需要名称，而tuple需要索引值;
         match self {
-            CType::Tuple(s) => s.as_ref().get(index).unwrap(),
-            _ => self
+            CType::Tuple(s) => s.as_ref().get(index as usize).unwrap(),
+            _ => &CType::Unknown
         }
     }
     pub fn attri_name_type(&self, name: String) -> (i32, &CType) {
@@ -221,8 +221,24 @@ impl CType {
                     return (3, cty);
                 }
             }
+        } else if let CType::Enum(ty) = self {
+            for (method_name, cty) in ty.static_methods.iter() {
+                if method_name.eq(&name) {
+                    return (2, cty);
+                }
+            }
+            for (method_name, cty) in ty.methods.iter() {
+                if method_name.eq(&name) {
+                    return (3, cty);
+                }
+            }
+            for (method_name, cty) in ty.items.iter() {
+                if method_name.eq(&name) {
+                    return (4, cty);
+                }
+            }
         }
-        (0, self)
+        (0, &CType::Unknown)
     }
 
     pub fn param_type(&self) -> Vec<(CType, bool, bool)> {
@@ -231,6 +247,7 @@ impl CType {
             _ => Vec::new()
         }
     }
+
 
     // pub fn is_struct_ty(&self) -> bool {
     //     return if let CType::Struct(n) = self {
