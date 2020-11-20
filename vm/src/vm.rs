@@ -314,7 +314,6 @@ impl VirtualMachine {
     }
 
     pub fn _gt(&self, a: Value, b: Value) -> Value {
-        println!("a:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a > b)

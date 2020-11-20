@@ -4,6 +4,7 @@ use crate::symboltable::*;
 use crate::ctype::*;
 use crate::ctype::CType::Bool;
 use std::ops::Deref;
+use crate::util::get_attribute_vec;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -451,12 +452,9 @@ impl HasType for Expression {
             Expression::Not(_, _) |
             Expression::BoolLiteral(_, _)
             => { CType::Bool }
-            Expression::FunctionCall(_, name, _) => { name.get_type(&tables) }
+            Expression::FunctionCall(_, name, _) => { return resovle_method(name, &name.get_type(&tables)); }
             Expression::Subscript(_, a, b) => {
                 let a_ty = a.get_type(&tables);
-                // Tuple(Box < Vec < CType >>),
-                // Array(Box < CType >),
-                // Dict(Box < CType >, Box < CType >),
                 if let CType::Tuple(tys) = a_ty {
                     if let Expression::NumberLiteral(_, n) = b.as_ref() {
                         let ty = tys.get(*n as usize);
@@ -512,25 +510,7 @@ impl HasType for Expression {
                 }
             }
             Expression::Attribute(loc, obj, name, idx) => {
-                if name.is_some() {
-                    let ty = obj.get_type(tables);
-                    if let CType::Struct(struct_ty) = ty {
-                        for attri in struct_ty.fields {
-                            if attri.0.eq(&name.as_ref().unwrap().name) {
-                                return attri.1;
-                            }
-                        }
-                    }
-                } else if idx.is_some() {
-                    let ty = obj.get_type(tables);
-                    if let CType::Tuple(tty) = ty {
-                        let t = tty.get(idx.unwrap() as usize);
-                        if t.is_some() {
-                            return t.unwrap().clone();
-                        }
-                    }
-                }
-                return CType::Unknown;
+                return resolve_attribute(self, &obj.get_type(tables));
             }
 
             _ => { return CType::Unknown; }
@@ -590,5 +570,63 @@ impl HasType for ModulePart {
             _ => { CType::Unknown }
         }
     }
+}
+
+fn resovle_method(expr: &Expression, ty: &CType) -> CType {
+    let v = get_attribute_vec(expr);
+    let mut cty = ty.clone();
+    let mut attri_type = 0;
+    let len = v.len();
+    for (idx, name) in v.iter().enumerate() {
+        if name.0.clone().is_empty() {
+            continue;
+        }
+        if idx < len - 1 {
+            if let CType::Struct(_) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                attri_type = tmp.0;
+                cty = tmp.1.clone();
+            } else if let CType::Enum(_) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                attri_type = tmp.0;
+                cty = tmp.1.clone();
+            } else if let CType::Fn(fntype) = cty.clone() {
+                cty = cty.ret_type().clone();
+            } else {
+                return CType::Unknown;
+            }
+        }
+    }
+    cty
+}
+
+fn resolve_attribute(expr: &Expression, ty: &CType) -> CType {
+    let v = get_attribute_vec(expr);
+    let mut cty = ty;
+    let len = v.len();
+    for (idx, name) in v.iter().enumerate() {
+        if idx < len - 1 {
+            if let CType::Struct(_) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                // attri_type = tmp.0;
+                cty = tmp.1;
+            } else if let CType::Tuple(n) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let index = attri_name.0.parse::<i32>().unwrap();
+                let tmp = cty.attri_index(index);
+                cty = tmp;
+            } else if let CType::Enum(n) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                return cty.clone();
+            } else {
+                return CType::Unknown;
+            }
+        }
+    }
+    cty.clone()
 }
 

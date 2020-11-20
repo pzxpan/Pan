@@ -18,14 +18,19 @@ pub struct Person {
    // pub address: string,
   //  money: i32,
     //pub house: House,
+    fun fff() : bool {
+        return true;
+    }
     pub fun is_older(): bool {
-        return age > 40;
+        let c =  self.fff();
+        return c;
     }
     pub fun older_than(a: i32): bool {
         //money = 100;
         return age > a;
     }
 }
+
 fun main() {
    let person = Person({age:50,name:"pan"});
    let bb = person.is_older();

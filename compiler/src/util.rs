@@ -42,18 +42,10 @@ pub fn get_pos_name(name: String, loc: Loc) -> String {
 
 pub fn get_attribute_vec(expression: &Expression) -> Vec<(String, Expression)> {
     let mut v: Vec<(String, Expression)> = vec![];
-    // let mut attri_name = "".to_string();
-    // if let Expression::Attribute(_, _, name, ..) = expr {
-    //     attri_name = name.as_ref().unwrap().name.clone();
-    // }
+
     let mut expr = expression.clone();
-    // Attribute(Loc(1, 29, 29),
-    //  Attribute(Loc(1, 29, 24), Variable(Identifier { loc: Loc(1, 29, 18), name: "person" }), Some(Identifier { loc: Loc(1, 29, 24), name: "house" }), None),
-    //  Some(Identifier { loc: Loc(1, 29, 29), name: "idea" }), None)
     loop {
-        println!("ddd:{:?},", expr);
         if let Expression::Attribute(loc, ex, name, idx) = expr.clone() {
-            println!("fuckxxx:{:?}", ex);
             if name.is_some() {
                 v.push((name.as_ref().unwrap().name.clone(), Expression::Error));
             } else {
@@ -77,7 +69,6 @@ pub fn get_attribute_vec(expression: &Expression) -> Vec<(String, Expression)> {
             break;
         }
     }
-    println!("vvv:{:?}", v);
     v.reverse();
     v
 }

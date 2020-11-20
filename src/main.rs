@@ -31,7 +31,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("thread.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();
@@ -68,7 +68,7 @@ fn test_one_file(home_path: &Path) {
 
         let handle = run_code_in_thread(code_object.unwrap(), scope);
         handle.join().unwrap();
-       // std::thread::sleep(Duration::from_secs(10));
+        std::thread::sleep(Duration::from_secs(10));
 
     } else {
         let error = code_object.err().unwrap();
