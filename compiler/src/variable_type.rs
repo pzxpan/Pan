@@ -588,10 +588,11 @@ fn resovle_method(expr: &Expression, ty: &CType) -> CType {
                 attri_type = tmp.0;
                 cty = tmp.1.clone();
             } else if let CType::Enum(_) = cty.clone() {
-                let attri_name = v.get(idx + 1).unwrap().clone();
-                let tmp = cty.attri_name_type(attri_name.0.clone());
-                attri_type = tmp.0;
-                cty = tmp.1.clone();
+                // let attri_name = v.get(idx + 1).unwrap().clone();
+                // let tmp = cty.attri_name_type(attri_name.0.clone());
+                // attri_type = tmp.0;
+                return cty;
+              //  cty = tmp.1.clone();
             } else if let CType::Fn(fntype) = cty.clone() {
                 cty = cty.ret_type().clone();
             } else {

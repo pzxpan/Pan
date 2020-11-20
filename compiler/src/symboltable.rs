@@ -1501,6 +1501,7 @@ impl SymbolTableBuilder {
         let mut attri_type = 0;
         let len = v.len();
         for (idx, name) in v.iter().enumerate() {
+            println!("expression:{:?},ttty:{:?},", expr, cty);
             if name.0.clone().is_empty() {
                 continue;
             }
@@ -1528,7 +1529,8 @@ impl SymbolTableBuilder {
                             self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
                         }
                     }
-                    cty = tmp.1.clone();
+                   // cty = tmp.1.clone();
+                    return Ok(cty);
                 } else if let CType::Fn(fntype) = cty.clone() {
                     self.resolve_fn(&name.1, &cty.clone())?;
                     cty = cty.ret_type().clone();
