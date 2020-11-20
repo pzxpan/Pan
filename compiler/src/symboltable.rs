@@ -1501,7 +1501,6 @@ impl SymbolTableBuilder {
         let mut attri_type = 0;
         let len = v.len();
         for (idx, name) in v.iter().enumerate() {
-            println!("expression:{:?},ttty:{:?},", expr, cty);
             if name.0.clone().is_empty() {
                 continue;
             }

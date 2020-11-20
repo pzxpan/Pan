@@ -96,6 +96,7 @@ pub fn compile(
         let md = ast::ModuleDefinition { module_parts: module.0, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true };
         compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
+                err.source_path = Some(source_path);
                 err
             })
     } else {
@@ -133,7 +134,7 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-       // println!("sybmol{:?}", symbol_table);
+        // println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
     })
 }
@@ -329,7 +330,7 @@ impl<O: OutputStream> Compiler<O> {
                         statement: None,
                         error: CompileErrorType::InvalidReturn,
                         location: statement.loc().clone(),
-                        source_path: None,
+                        source_path: self.source_path.clone(),
                     });
                 }
                 match value {
@@ -348,7 +349,7 @@ impl<O: OutputStream> Compiler<O> {
                         statement: None,
                         error: CompileErrorType::InvalidContinue,
                         location: statement.loc().clone(),
-                        source_path: None,
+                        source_path: self.source_path.clone(),
                     });
                 }
                 self.emit(Instruction::Continue);
@@ -359,7 +360,7 @@ impl<O: OutputStream> Compiler<O> {
                         statement: None,
                         error: CompileErrorType::InvalidBreak,
                         location: statement.loc().clone(),
-                        source_path: None,
+                        source_path: self.source_path.clone(),
                     });
                 }
                 self.emit(Instruction::Break);
@@ -1055,7 +1056,7 @@ impl<O: OutputStream> Compiler<O> {
                     statement: None,
                     error: CompileErrorType::Assign("迭代器出错"),
                     location: self.current_source_location.clone(),
-                    source_path: None,
+                    source_path: self.source_path.clone(),
                 });
             }
         }
@@ -1523,7 +1524,7 @@ impl<O: OutputStream> Compiler<O> {
                     statement: None,
                     error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
                     location: self.current_source_location.clone(),
-                    source_path: None,
+                    source_path: self.source_path.clone(),
                 });
             }
             self.gather_elements(args)?;
@@ -1535,7 +1536,7 @@ impl<O: OutputStream> Compiler<O> {
                     statement: None,
                     error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
                     location: self.current_source_location.clone(),
-                    source_path: None,
+                    source_path: self.source_path.clone(),
                 });
             }
             let arg = args.get(0).unwrap();
@@ -1545,7 +1546,7 @@ impl<O: OutputStream> Compiler<O> {
                     statement: None,
                     error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
                     location: self.current_source_location.clone(),
-                    source_path: None,
+                    source_path: self.source_path.clone(),
                 });
             }
             self.gather_elements(args)?;
