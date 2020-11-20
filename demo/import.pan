@@ -6,10 +6,10 @@ import std.person {Person as PPP, House};
 import std.color.*;
 
 fun main() {
-  let person = PPP({age:50,name:"pan"});
+  let person = PPP!{age:50,name:"pan"};
   let bb = person.is_older();
   print(bb);
-  let house = House({size:1000.0,price:1000000.0});
+  let house = House!{size:1000.0,price:1000000.0};
   let dd = house.idea();
   print(dd);
   let c = Color::Red(10);

@@ -17,7 +17,7 @@ pub struct Person {
     pub name: string,
    // pub address: string,
   //  money: i32,
-    //pub house: House,
+    pub house: House,
     fun fff() : bool {
         return true;
     }
@@ -32,14 +32,14 @@ pub struct Person {
 }
 
 fun main() {
-   let person = Person({age:50,name:"pan"});
+   let person = Person!{age:50,name:"pan",house: House!{size:111.0,price:1_000_000.0}};
    let bb = person.is_older();
-   let house = House({size:111.0,price:1_000_000.0});
+   let house = House!{size:111.0,price:1_000_000.0};
    //私有的
    //print(house.idea());
    let aaa = name_call(50,"addd");
    print(aaa);
-   let bbb = name_call({age:50,name:"addd"});
+   let bbb = name_call!{age:50,name:"addd"};
    print(bbb);
    let cc = person.older_than(40);
    person.name = "ddddd";

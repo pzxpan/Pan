@@ -14,7 +14,7 @@ fun main() {
     //a ^=b;
     //a |=b;
     //a &=b;
-
+    {a:3,b:4}
     let add = (aa:i32,bb:i32) => {
         return a  + aa + bb ;
     };
