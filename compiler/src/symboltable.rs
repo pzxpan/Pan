@@ -144,22 +144,22 @@ impl SymbolTable {
 
 impl std::fmt::Debug for SymbolTable {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // write!(
-        //     f,
-        //     "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
-        //     self.name,
-        //     self.symbols.len(),
-        //     self.sub_tables.len()
-        // );
-        // write!(f, "symbols:\n");
-        // for (key, value) in self.symbols.iter() {
-        //     write!(f, "key:{:?},value:{:?}\n", key, value);
-        // }
-        // write!(f, "subtable is:\n");
-        // write!(f, "symbols222:\n");
-        // for (idx, table) in self.sub_tables.iter().enumerate() {
-        //     write!(f, "table idx {:?} is {:?}\n", idx, table);
-        // }
+        write!(
+            f,
+            "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
+            self.name,
+            self.symbols.len(),
+            self.sub_tables.len()
+        );
+        write!(f, "symbols:\n");
+        for (key, value) in self.symbols.iter() {
+            write!(f, "key:{:?},value:{:?}\n", key, value);
+        }
+        write!(f, "subtable is:\n");
+        write!(f, "symbols222:\n");
+        for (idx, table) in self.sub_tables.iter().enumerate() {
+            write!(f, "table idx {:?} is {:?}\n", idx, table);
+        }
 
         write!(f, "table name:{:?}", self.name)
     }
@@ -1301,13 +1301,14 @@ impl SymbolTableBuilder {
         }
     }
 
-
     pub fn verify_field_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
         match ty {
             CType::Struct(ty) => {
                 for (method_name, _, is_pub) in ty.fields.iter() {
                     if method_name.eq(&method) {
                         return if *is_pub {
+                            Ok(())
+                        } else if name.eq("self") {
                             Ok(())
                         } else {
                             Err(SymbolTableError {

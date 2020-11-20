@@ -133,7 +133,7 @@ pub fn compile_program(
 ) -> Result<CodeObject, CompileError> {
     with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        // println!("sybmol{:?}", symbol_table);
+        println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
     })
 }
@@ -1507,12 +1507,61 @@ impl<O: OutputStream> Compiler<O> {
         }
         return Ok(());
     }
-
+    fn compile_builtin_fn(&mut self, function: &ast::Expression, args: &[ast::Expression]) -> Result<bool, CompileError> {
+        //内置函数处理
+        if function.expr_name().eq("print") {
+            self.compile_format(true, args);
+            return Ok(true);
+        } else if function.expr_name().eq("format") {
+            self.compile_format(false, args);
+            return Ok(true);
+        } else if function.expr_name().eq("typeof") {
+            //这些判断应该在语义分析阶段完成，那就要写两遍一样的逻辑，
+            // 分别在symboltable生成和compile阶段，因此放在这来完成对内置函数的特殊处理
+            if args.len() > 1 {
+                return Err(CompileError {
+                    statement: None,
+                    error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
+                    location: self.current_source_location.clone(),
+                    source_path: None,
+                });
+            }
+            self.gather_elements(args)?;
+            self.emit(Instruction::TypeOf);
+            return Ok(true);
+        } else if function.expr_name().eq("sleep") {
+            if args.len() > 1 {
+                return Err(CompileError {
+                    statement: None,
+                    error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
+                    location: self.current_source_location.clone(),
+                    source_path: None,
+                });
+            }
+            let arg = args.get(0).unwrap();
+            let ty = arg.get_type(&self.symbol_table_stack);
+            if ty <= CType::I8 || ty > CType::U64 {
+                return Err(CompileError {
+                    statement: None,
+                    error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
+                    location: self.current_source_location.clone(),
+                    source_path: None,
+                });
+            }
+            self.gather_elements(args)?;
+            self.emit(Instruction::Sleep);
+            return Ok(true);
+        }
+        return Ok(false);
+    }
     fn compile_call(
         &mut self,
         function: &ast::Expression,
         args: &[ast::Expression],
     ) -> Result<(), CompileError> {
+        let builtin = self.compile_builtin_fn(function, args)?;
+        if builtin { return Ok(()); }
+
         let mut is_enum_item = (false, false);
         let mut is_thread_start = false;
         if let ast::Expression::Attribute(_, variable, attribute, _) = function {
@@ -1533,51 +1582,6 @@ impl<O: OutputStream> Compiler<O> {
                     ));
                     self.emit(Instruction::LoadAttr(name.clone()));
                 }
-            } else {
-                self.compile_expression(function)?;
-            }
-        } else {
-            //内置函数处理
-            if function.expr_name().eq("print") {
-                return self.compile_format(true, args);
-            } else if function.expr_name().eq("format") {
-                return self.compile_format(false, args);
-            } else if function.expr_name().eq("typeof") {
-                //这些判断应该在语义分析阶段完成，那就要写两遍一样的逻辑，
-                // 分别在symboltable生成和compile阶段，因此放在这来完成对内置函数的特殊处理
-                if args.len() > 1 {
-                    return Err(CompileError {
-                        statement: None,
-                        error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
-                        location: self.current_source_location.clone(),
-                        source_path: None,
-                    });
-                }
-                self.gather_elements(args)?;
-                self.emit(Instruction::TypeOf);
-                return Ok(());
-            } else if function.expr_name().eq("sleep") {
-                if args.len() > 1 {
-                    return Err(CompileError {
-                        statement: None,
-                        error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
-                        location: self.current_source_location.clone(),
-                        source_path: None,
-                    });
-                }
-                let arg = args.get(0).unwrap();
-                let ty = arg.get_type(&self.symbol_table_stack);
-                if ty <= CType::I8 || ty > CType::U64 {
-                    return Err(CompileError {
-                        statement: None,
-                        error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
-                        location: self.current_source_location.clone(),
-                        source_path: None,
-                    });
-                }
-                self.gather_elements(args)?;
-                self.emit(Instruction::Sleep);
-                return Ok(());
             }
         }
         self.compile_expression(function)?;
@@ -1863,13 +1867,18 @@ impl<O: OutputStream> Compiler<O> {
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name_str);
             if let Some(s) = symbol {
-                if let CType::Enum(EnumType { items, methods, .. }) = &s.ty {
+                if let CType::Enum(EnumType { items, methods, static_methods, .. }) = &s.ty {
                     for (a_name, _) in items {
                         if a_name.eq(attri) {
                             return (true, false);
                         }
                     }
                     for (a_name, _) in methods {
+                        if a_name.eq(attri) {
+                            return (false, true);
+                        }
+                    }
+                    for (a_name, _) in static_methods {
                         if a_name.eq(attri) {
                             return (false, true);
                         }
@@ -2022,25 +2031,15 @@ impl<O: OutputStream> Compiler<O> {
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     // attri_type = tmp.0;
                     cty = tmp.1;
-                    if idx == 0 {
-                        if tmp.0 == 1 {
-                            self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                            self.emit(Instruction::LoadConst(
-                                bytecode::Constant::String(attri_name.0.clone())));
-                            self.emit(Instruction::LoadBuildEnum(2));
-                        } else if tmp.0 == 2 {
-                            self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                            self.emit(Instruction::LoadAttr(attri_name.0.clone()));
-                        }
-                    } else {
-                        if tmp.0 == 1 {
-                            self.emit(Instruction::LoadConst(
-                                bytecode::Constant::String(attri_name.0.clone())));
-                            self.emit(Instruction::LoadBuildEnum(2));
-                        } else if tmp.0 == 2 {
-                            self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                            self.emit(Instruction::LoadAttr(attri_name.0.clone()));
-                        }
+                    if tmp.0 == 1 {
+                        //如果为无参属性，则直接调用构造函数，如果为有参，则有FunctionCall处理;如果是其他属性，则LoadAttr处理
+                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::String(attri_name.0.clone())));
+                        self.emit(Instruction::LoadBuildEnum(2));
+                    } else if tmp.0 > 2 {
+                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     }
                 }
             }
