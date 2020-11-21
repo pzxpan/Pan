@@ -23,12 +23,16 @@ pub struct DocComment {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Module(pub Vec<ModulePart>);
+pub struct Module {
+    pub content: Vec<ModulePart>,
+    pub package: Vec<Identifier>,
+}
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleDefinition {
     pub module_parts: Vec<ModulePart>,
     pub name: Identifier,
+    pub package: String,
     pub is_pub: bool,
 }
 

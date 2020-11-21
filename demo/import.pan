@@ -1,3 +1,5 @@
+package default;
+
 import std.person {Person as PPP, House};
 //以下import都Ok
 //import std.person.Person;

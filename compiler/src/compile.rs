@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
 
@@ -93,7 +93,7 @@ pub fn compile(
     if ast.is_ok() {
         let module_name = get_mod_name(source_path.clone());
         let module = ast.unwrap();
-        let md = ast::ModuleDefinition { module_parts: module.0, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true };
+        let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(module.package) };
         compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
                 err.source_path = Some(source_path);

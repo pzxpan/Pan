@@ -32,6 +32,7 @@ pub enum Token<'input> {
     Bound,
     Function,
     Import,
+    Package,
 
     Data,
     Enum,
@@ -226,6 +227,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Bound => write!(f, "bound"),
             Token::Function => write!(f, "fun"),
             Token::Import => write!(f, "import"),
+            Token::Package => write!(f, "package"),
             Token::Data => write!(f, "data"),
             Token::Enum => write!(f, "enum"),
 
@@ -319,6 +321,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "fun" => Token::Function,
     "if" => Token::If,
     "import" => Token::Import,
+    "package" => Token::Package,
 
     "pure" => Token::Pure,
 

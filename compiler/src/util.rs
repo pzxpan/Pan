@@ -1,5 +1,5 @@
 use crate::ctype::CType;
-use pan_parser::ast::Loc;
+use pan_parser::ast::{Loc, Identifier};
 use pan_parser::ast::Expression;
 
 pub fn get_number_type(ty: CType) -> i32 {
@@ -78,6 +78,15 @@ pub fn get_mod_name(path: String) -> String {
     let len = file_name.len();
     let a = &file_name[..len - 4];
     return String::from(a);
+}
+
+
+pub fn get_package_name(idents: Vec<Identifier>) -> String {
+    return idents.iter().fold("".to_string(), |mut ss, s| {
+        ss.push_str("$");
+        ss.push_str(&s.name);
+        return ss;
+    });
 }
 
 

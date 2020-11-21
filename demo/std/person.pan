@@ -1,6 +1,10 @@
+package std.person;
+
 pub struct House {
     pub size: f64,
     pub price: f64,
+
+
     pub fun idea(): bool {
         return price / size > 10000.0;
     }
