@@ -1,11 +1,10 @@
 package default;
-
 import std.person {Person as PPP, House};
 //以下import都Ok
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import std.color.*;
+import std.color.Color;
 
 fun main() {
   let person = PPP!{age:50,name:"pan"};

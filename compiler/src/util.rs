@@ -82,12 +82,21 @@ pub fn get_mod_name(path: String) -> String {
 
 
 pub fn get_package_name(idents: Vec<Identifier>) -> String {
-    return idents.iter().fold("".to_string(), |mut ss, s| {
+    let mut s = idents.iter().fold("".to_string(), |mut ss, s| {
         ss.push_str("$");
         ss.push_str(&s.name);
         return ss;
     });
+    s.push_str("$");
+    return s;
 }
+
+pub fn get_full_name(package: &String, s: &str) -> String {
+    let mut tmp = package.clone();
+    tmp.push_str(s);
+    return tmp;
+}
+
 
 
 

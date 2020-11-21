@@ -88,7 +88,7 @@ pub fn compile(
     source_path: String,
     optimize: u8,
     is_import: bool,
-) -> Result<CodeObject, CompileError> {
+) -> Result<(String, CodeObject), CompileError> {
     let mut ast = parse(source, source_path.to_string());
     if ast.is_ok() {
         let module_name = get_mod_name(source_path.clone());
@@ -131,12 +131,17 @@ pub fn compile_program(
     source_path: String,
     optimize: u8,
     is_import: bool,
-) -> Result<CodeObject, CompileError> {
-    with_compiler(source_path, optimize, |compiler| {
+) -> Result<(String, CodeObject), CompileError> {
+    let r = with_compiler(source_path, optimize, |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        // println!("sybmol{:?}", symbol_table);
+        println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
-    })
+    });
+    if r.is_ok() {
+        return Ok((ast.package, r.unwrap()));
+    } else {
+        return Err(r.err().unwrap());
+    }
 }
 
 impl<O> Default for Compiler<O>
@@ -186,6 +191,11 @@ impl<O: OutputStream> Compiler<O> {
         self.output_stack.pop().unwrap().into()
     }
 
+    fn get_full_name(&self, package: &String, s: &str) -> String {
+        let mut tmp = package.clone();
+        tmp.push_str(s);
+        return tmp;
+    }
     pub fn compile_program(
         &mut self,
         program: &ast::ModuleDefinition,
@@ -205,13 +215,14 @@ impl<O: OutputStream> Compiler<O> {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_enum_def(name.as_str(), &body, &generics)?;
+                    self.compile_enum_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
                 }
                 ast::ModulePart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_class_def(name.as_str(), &body, &generics)?;
+
+                    self.compile_class_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
                 }
                 ast::ModulePart::ImportDirective(def) => {
                     if !is_import {
@@ -255,13 +266,13 @@ impl<O: OutputStream> Compiler<O> {
                     let body = &def.body.as_ref().unwrap();
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false)?;
+                    self.compile_function_def(&self.get_full_name(&program.package, name), args.as_slice(), body, returns, is_async, false)?;
                 }
                 ast::ModulePart::BoundDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_bound_def(name.as_str(), &body, &generics)?;
+                    self.compile_bound_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
                 }
                 _ => (),
             }
@@ -272,7 +283,7 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(i.clone());
         }
         if found_main {
-            self.emit(Instruction::LoadName("main".to_string(), NameScope::Local));
+            self.emit(Instruction::LoadName(self.get_full_name(&program.package, "main"), NameScope::Local));
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
         }
@@ -1796,7 +1807,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-        // println!("Looking up {:?}", name);
+        println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);

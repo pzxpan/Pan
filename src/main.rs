@@ -66,10 +66,9 @@ fn test_one_file(home_path: &Path) {
         let scope = Scope::with_builtins(v, global_value, &vm);
         //vm.run_code_obj(code_object.unwrap(),scope);
 
-        let handle = run_code_in_thread(code_object.unwrap(), scope);
+        let handle = run_code_in_thread(code_object.unwrap().1, scope);
         handle.join().unwrap();
-     //   std::thread::sleep(Duration::from_secs(10));
-
+        //   std::thread::sleep(Duration::from_secs(10));
     } else {
         let error = code_object.err().unwrap();
         match error.error {
