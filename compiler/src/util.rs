@@ -97,6 +97,10 @@ pub fn get_full_name(package: &String, s: &str) -> String {
     return tmp;
 }
 
+pub fn get_last_name(package: &String) -> String {
+    return package.split("$").last().unwrap().to_string();
+}
+
 
 
 

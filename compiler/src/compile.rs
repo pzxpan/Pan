@@ -206,8 +206,9 @@ impl<O: OutputStream> Compiler<O> {
         let mut found_main = false;
         self.symbol_table_stack.push(symbol_table);
         let size_before = self.output_stack.len();
-        resolve_builtin_fun(self);
-
+        if !is_import {
+            resolve_builtin_fun(self);
+        }
         for part in &program.module_parts {
             match part {
                 ast::ModulePart::DataDefinition(_) => {}

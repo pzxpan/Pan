@@ -504,15 +504,15 @@ impl SymbolTableBuilder {
                     //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ModulePart::EnumDefinition(def) => {
-                    if in_import && !is_all {
-                        println!("item_name:{:?}", item_name);
-                        if def.name.name.eq(&item_name.clone().unwrap()) {
+                    if in_import {
+                        if is_all {
+                            self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Import, def.loc)?;
+                        } else if def.name.name.eq(&item_name.clone().unwrap()) {
                             if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                                self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Import, def.loc)?;
                             } else {
-                                self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                                self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Import, def.loc)?;
                             }
-                            return Ok(());
                         }
                     } else {
                         self.register_name(&self.get_full_name(&def.name.name), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
