@@ -4,7 +4,7 @@ import std.person {Person as PPP, House};
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import std.color.*;
+import std.color;
 
 pub fun add_pub(a:i32) : i32 {
     return a - 100;
@@ -16,7 +16,7 @@ fun main() {
   let house = House!{size:1000.0,price:1000000.0};
   let dd = house.idea();
   print(dd);
-  let c = Color::Red(10);
+  let c = color.Color::Red(10);
   c.is_warm();
   let ss = add_pub(10);
   print(ss);

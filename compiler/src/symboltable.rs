@@ -22,6 +22,8 @@ use crate::util::get_pos_lambda_name;
 use crate::util::get_attribute_vec;
 use std::process::exit;
 use crate::util::get_full_name;
+use crate::util::get_last_name;
+use crate::error::CompileErrorType::SyntaxError;
 
 pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
@@ -196,12 +198,12 @@ impl<'a> SymbolTableAnalyzer<'a> {
 
     fn analyze_symbol(&mut self, symbol: &mut Symbol) -> SymbolTableResult {
         match symbol.ty {
-            // CType::Unknown => {
-            //     return Err(SymbolTableError {
-            //         error: format!("{:?}类型不能推断", symbol.name),
-            //         location: Loc(0, 0, 0),
-            //     });
-            // }
+            CType::Unknown => {
+                return Err(SymbolTableError {
+                    error: format!("{:?}类型不能推断", symbol.name),
+                    location: Loc(0, 0, 0),
+                });
+            }
             _ => {}
         }
         Ok(())
@@ -491,6 +493,10 @@ impl SymbolTableBuilder {
     }
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
     pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
+        if in_import && !is_all && item_name.is_none() {
+            println!("package_name:{:?},", program.package);
+            self.register_name(&get_last_name(&program.package), CType::Module, SymbolUsage::Import, Loc::default());
+        }
         for part in &program.module_parts {
             match part {
                 ModulePart::DataDefinition(_) => {
@@ -500,7 +506,7 @@ impl SymbolTableBuilder {
                     let ty = def.get_type(&self.tables);
                     //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     if !in_import {
-                        //       self.register_name(&def.name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                       // self.register_name(&def.name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         continue;
                     }
@@ -508,12 +514,16 @@ impl SymbolTableBuilder {
                     if is_all {
                         self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     } else {
-                        if def.name.name.eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Import, def.loc)?;
-                            } else {
-                                self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        if item_name.is_some() {
+                            if def.name.name.eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.name.name), ty.clone(), SymbolUsage::Import, def.loc)?;
                         }
                     }
                 }
@@ -535,14 +545,18 @@ impl SymbolTableBuilder {
 
                     //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     if !is_all {
-                        if def.name.name.eq(&item_name.clone().unwrap()) {
-                            if as_name.is_some() {
-                                // println!("1111:{:?},def.name.name:{:?}", item_name, def.name.name);
-                                self.register_name(&as_name.clone().unwrap(), ty.clone(), SymbolUsage::Import, def.loc)?;
-                            } else {
-                                // println!("4444:{:?},def.name.name:{:?}", item_name, def.name.name);
-                                self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        if item_name.is_some() {
+                            if def.name.name.eq(&item_name.clone().unwrap()) {
+                                if as_name.is_some() {
+                                    // println!("1111:{:?},def.name.name:{:?}", item_name, def.name.name);
+                                    self.register_name(&as_name.clone().unwrap(), ty.clone(), SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    // println!("4444:{:?},def.name.name:{:?}", item_name, def.name.name);
+                                    self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.name.name), ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         }
                     } else {
                         self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
@@ -583,12 +597,16 @@ impl SymbolTableBuilder {
                         continue;
                     }
                     if !is_all {
-                        if def.as_ref().name.clone().name.eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
-                            } else {
-                                self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        if item_name.is_some() {
+                            if def.as_ref().name.clone().name.eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
                         }
                     } else {
                         self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Import, def.loc)?;
@@ -604,12 +622,16 @@ impl SymbolTableBuilder {
                         continue;
                     }
                     if !is_all {
-                        if def.as_ref().name.as_ref().unwrap().name.clone().eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
-                            } else {
-                                self.register_name(&name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        if item_name.is_some() {
+                            if def.as_ref().name.as_ref().unwrap().name.clone().eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), name), ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         }
                     } else {
                         self.register_name(name, ty.clone(), SymbolUsage::Import, def.loc)?;
@@ -624,12 +646,16 @@ impl SymbolTableBuilder {
                         continue;
                     }
                     if !is_all {
-                        if def.as_ref().name.name.eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
-                            } else {
-                                self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        if item_name.is_some() {
+                            if def.as_ref().name.name.eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.as_ref().name.name), ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         }
                     } else {
                         self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
@@ -1041,6 +1067,7 @@ impl SymbolTableBuilder {
                             }
                         } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
                             ty = self.get_register_type(n.expr_name());
+
                             // if self.in_current_scope(n.expr_name()) {
                             //     ty = self.get_register_type(n.expr_name());
                             // } else {
@@ -1056,7 +1083,9 @@ impl SymbolTableBuilder {
                                 ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
                             }
                         } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                            println!("expression:{:?},", name.as_ref());
                             ty = self.get_register_type(n.expr_name());
+                            println!("ttty:{:?}", ty);
                             // if self.in_current_scope(n.expr_name()) {
                             //     ty = self.get_register_type(n.expr_name());
                             // } else {
@@ -1611,6 +1640,9 @@ impl SymbolTableBuilder {
                 } else if let CType::Fn(fntype) = cty.clone() {
                     self.resolve_fn(&name.1, &cty.clone())?;
                     cty = cty.ret_type().clone();
+                } else if CType::Module == cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    cty = self.get_register_type(get_full_name(&name.0, &attri_name.0));
                 } else {
                     return Err(SymbolTableError {
                         error: format!("只有是struct、函数、和enum时才有函数类型"),

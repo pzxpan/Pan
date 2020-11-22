@@ -87,18 +87,19 @@ pub fn get_package_name(idents: Vec<Identifier>) -> String {
         ss.push_str(&s.name);
         return ss;
     });
-    s.push_str("$");
+
     return s;
 }
 
 pub fn get_full_name(package: &String, s: &str) -> String {
     let mut tmp = package.clone();
+    tmp.push_str("$");
     tmp.push_str(s);
     return tmp;
 }
 
 pub fn get_last_name(package: &String) -> String {
-    return package.split("$").last().unwrap().to_string();
+    return package.split_terminator("$").last().unwrap().to_string();
 }
 
 

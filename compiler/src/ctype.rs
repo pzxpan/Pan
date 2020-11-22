@@ -38,16 +38,10 @@ pub enum CType {
     Any,
     TSelf,
     //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;
-    Assistant(AssistantType),
+    NeedPackageName,
     Unknown,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum AssistantType {
-    AttributeRecursive(bool, Box<AssistantType>),
-    EnumMethod(i32),
-    StructFieldOrMethod(i32),
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FnType {
@@ -326,12 +320,6 @@ impl PartialOrd for StructType {
         } else {
             None
         }
-    }
-}
-
-impl PartialOrd for AssistantType {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        None
     }
 }
 
