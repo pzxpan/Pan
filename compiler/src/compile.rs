@@ -1590,7 +1590,7 @@ impl<O: OutputStream> Compiler<O> {
 
         if self.ctx.func == FunctionContext::StructFunction {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                if !self.is_out_symbol(name.as_str()) {
+                if self.is_current_scope(name.as_str()) {
                     self.emit(Instruction::LoadName(
                         "self".to_string(),
                         bytecode::NameScope::Local,
@@ -1974,6 +1974,15 @@ impl<O: OutputStream> Compiler<O> {
             if symbol.is_some() {
                 return true;
             }
+        }
+        return false;
+    }
+
+    fn is_current_scope(&self, name: &str) -> bool {
+        let len: usize = self.symbol_table_stack.len();
+        let symbol = self.symbol_table_stack[len - 1].lookup(name);
+        if symbol.is_some() {
+            return true;
         }
         return false;
     }

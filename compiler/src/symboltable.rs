@@ -1029,22 +1029,42 @@ impl SymbolTableBuilder {
                     let mut ty = CType::Unknown;
                     if self.in_struct_func {
                         if let Variable(ident) = name.as_ref() {
-                            ty = self.get_register_type(name.expr_name());
-                        } else {
-                            ty = self.get_register_type(name.expr_name());
+                            if self.in_current_scope(ident.clone().name) {
+                                ty = self.get_register_type(name.expr_name());
+                            } else if self.in_struct_scope(ident.clone().name) {
+                                ty = self.get_register_type(name.expr_name());
+                            } else {
+                                ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
+                            }
+                        } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                            ty = self.get_register_type(n.expr_name());
+                            // if self.in_current_scope(n.expr_name()) {
+                            //     ty = self.get_register_type(n.expr_name());
+                            // } else {
+                            //     ty = self.get_register_type(get_full_name(&self.package, &n.expr_name()));
+                            // }
                         }
                     } else {
                         if let Variable(ident) = name.as_ref() {
                             println!("package_name:{:?},", get_full_name(&self.package, &name.expr_name()));
-                            ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
-                        } else {
-                            ty = self.get_register_type(name.expr_name());
+                            if self.in_current_scope(ident.clone().name) {
+                                ty = self.get_register_type(name.expr_name());
+                            } else {
+                                ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
+                            }
+                        } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                            ty = self.get_register_type(n.expr_name());
+                            // if self.in_current_scope(n.expr_name()) {
+                            //     ty = self.get_register_type(n.expr_name());
+                            // } else {
+                            //     ty = self.get_register_type(get_full_name(&self.package, &n.expr_name()));
+                            // }
                         }
                     }
 
                     if ty == CType::Unknown {
                         return Err(SymbolTableError {
-                            error: format!("未定义{:?}的类型，", name.expr_name()),
+                            error: format!("2222未定义{:?}的类型，", name.expr_name()),
                             location: loc.clone(),
                         });
                     }

@@ -28,11 +28,9 @@ pub struct Person {
             //money = 100;
         return self.age > a;
     }
-    pub fun add_pub(a:i32):i32 {
-            return a - 10000;
-    }
+
     pub fun is_older(): bool {
-      let c = add_pub(age);
+      let c = add_pub(self.age);
       print(c);
       return age > 20;
     }
