@@ -504,7 +504,10 @@ impl SymbolTableBuilder {
                         self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         continue;
                     }
-                    if in_import && !is_all {
+
+                    if is_all {
+                        self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                    } else {
                         if def.name.name.eq(&item_name.clone().unwrap()) {
                             if as_name.clone().is_some() {
                                 self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Import, def.loc)?;
@@ -512,8 +515,6 @@ impl SymbolTableBuilder {
                                 self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                             }
                         }
-                    } else {
-                        self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
 
@@ -533,7 +534,7 @@ impl SymbolTableBuilder {
                     }
 
                     //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
-                    if in_import && !is_all {
+                    if !is_all {
                         if def.name.name.eq(&item_name.clone().unwrap()) {
                             if as_name.is_some() {
                                 // println!("1111:{:?},def.name.name:{:?}", item_name, def.name.name);
@@ -542,11 +543,9 @@ impl SymbolTableBuilder {
                                 // println!("4444:{:?},def.name.name:{:?}", item_name, def.name.name);
                                 self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                             }
-                        } else {
-                            //   println!("3333:{:?},def.name.name:{:?}", item_name, def.name.name);
                         }
                     } else {
-                        self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                        self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
                 //处理文件各项内容时，不需要处理import和从const, const、import在扫描文件顶层symbol的时候已处理;
@@ -583,7 +582,7 @@ impl SymbolTableBuilder {
                         self.register_name(&get_full_name(&program.package, &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
                         continue;
                     }
-                    if in_import && !is_all {
+                    if !is_all {
                         if def.as_ref().name.clone().name.eq(&item_name.clone().unwrap()) {
                             if as_name.clone().is_some() {
                                 self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
@@ -592,7 +591,7 @@ impl SymbolTableBuilder {
                             }
                         }
                     } else {
-                        self.register_name(&get_full_name(&program.package, &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
                 ModulePart::FunctionDefinition(def) => {
@@ -604,7 +603,7 @@ impl SymbolTableBuilder {
                         self.register_name(&get_full_name(&program.package, name), ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         continue;
                     }
-                    if in_import && !is_all {
+                    if !is_all {
                         if def.as_ref().name.as_ref().unwrap().name.clone().eq(&item_name.clone().unwrap()) {
                             if as_name.clone().is_some() {
                                 self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
@@ -613,7 +612,7 @@ impl SymbolTableBuilder {
                             }
                         }
                     } else {
-                        self.register_name(&get_full_name(&program.package, name), ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
                 ModulePart::BoundDefinition(def) => {
@@ -624,7 +623,7 @@ impl SymbolTableBuilder {
                         //  self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
                         continue;
                     }
-                    if in_import && !is_all {
+                    if !is_all {
                         if def.as_ref().name.name.eq(&item_name.clone().unwrap()) {
                             if as_name.clone().is_some() {
                                 self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
@@ -633,7 +632,7 @@ impl SymbolTableBuilder {
                             }
                         }
                     } else {
-                        self.register_name(&get_full_name(&program.package, &def.as_ref().name.name), ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
                 _ => {}
@@ -670,6 +669,7 @@ impl SymbolTableBuilder {
         }
         return false;
     }
+
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
         // println!("statement is {:?}", statement);
         use ast::Statement::*;
@@ -878,6 +878,7 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
+
     fn get_test_item(&self, enum_type: &EnumType) -> HashSet<String> {
         let mut hash_set: HashSet<String> = HashSet::new();
         for item in &enum_type.items {
@@ -885,6 +886,7 @@ impl SymbolTableBuilder {
         }
         return hash_set;
     }
+
     //剩下问题，tuple匹配，Variable匹配查找问题
     fn scan_match_item(&mut self, expression: &Expression, context: &ExpressionContext, items: &mut HashSet<String>) -> SymbolTableResult {
         if let Expression::FunctionCall(_, name, args) = expression {
@@ -992,6 +994,7 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
+
     fn scan_expressions(
         &mut self,
         expressions: &[Expression],
@@ -1285,6 +1288,7 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
+
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
         match ty {
             CType::Struct(ty) => {
@@ -1434,6 +1438,7 @@ impl SymbolTableBuilder {
         }
         return false;
     }
+
     pub fn lookup_name_ty(&self, name: &String) -> &CType {
         // println!("Looking up {:?}", name);
         let len: usize = self.tables.len();
@@ -1445,6 +1450,7 @@ impl SymbolTableBuilder {
         }
         unreachable!()
     }
+
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
         println!("register name={:?}, ty: {:?}", name, ty);
@@ -1615,6 +1621,7 @@ impl SymbolTableBuilder {
         }
         Ok(cty)
     }
+
     fn resolve_fn(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
         if let Expression::FunctionCall(_, name, args) = expr {
             let args_type = ty.param_type();

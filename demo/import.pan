@@ -4,7 +4,7 @@ import std.person {Person as PPP, House};
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import std.color.Color;
+import std.color.*;
 
 pub fun add_pub(a:i32) : i32 {
     return a - 100;

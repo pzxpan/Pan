@@ -112,10 +112,10 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
         if *is_all {
             for i in code_object.instructions.iter() {
                 if let Instruction::StoreName(name, ns) = i {
-                    //  let n = util::get_last_name(name);
-                    //  compiler.import_instructions.push(Instruction::Duplicate);
+                    let n = util::get_last_name(name);
+                    compiler.import_instructions.push(Instruction::Duplicate);
                     compiler.import_instructions.push(i.clone());
-                    //  compiler.import_instructions.push(Instruction::StoreName(n, NameScope::Global));
+                    compiler.import_instructions.push(Instruction::StoreName(n, ns.clone()));
                 } else {
                     compiler.import_instructions.push(i.clone());
                 }
