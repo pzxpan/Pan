@@ -1,3 +1,4 @@
+package default;
 fun main() {
   let set = {"Alice","Adasd"};
   let sum = "";

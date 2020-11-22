@@ -1,3 +1,4 @@
+package default;
 pub struct Person {
     pub name: string,
     pub age: i32,

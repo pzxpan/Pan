@@ -31,7 +31,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("match.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();

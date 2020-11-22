@@ -1,3 +1,4 @@
+package default;
 fun main() {
   let arr = [1,2,3,4];
   for a in arr {

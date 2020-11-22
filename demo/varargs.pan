@@ -1,3 +1,4 @@
+package default;
 pub fun add(a:i32,b:i32,..varargs) : i32 {
     let sum = a + b;
     for i in varargs {

@@ -1,3 +1,4 @@
+package default;
 fun main() {
   let a = 'c';
   let b = 2128333344444212833334444421283333_i128;

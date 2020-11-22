@@ -1,3 +1,4 @@
+package default;
 pub struct House {
     pub size: f64,
     pub price: f64,

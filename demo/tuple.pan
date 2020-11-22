@@ -1,3 +1,4 @@
+package default;
 fun main() {
   let aa = (20,30);
   let bb = aa.0;

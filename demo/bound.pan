@@ -1,3 +1,4 @@
+package default;
 pub bound Add<T:Self> {
     pub fun swap(rhs: T) : T {
         return rhs;

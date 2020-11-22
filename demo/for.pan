@@ -1,3 +1,4 @@
+package default;
 fun main() {
   let sum = 0;
   for i in 100..0  {

@@ -1,3 +1,4 @@
+package default;
 pub struct Thread {
     pub f: FunType,
     state: i32,

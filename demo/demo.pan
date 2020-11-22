@@ -1,3 +1,4 @@
+package default;
 fun main() {
    let cc = 30;
    let a = 40;

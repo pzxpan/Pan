@@ -1,3 +1,4 @@
+package default;
 pub enum Color {
    Red(i32),
    Single(i128),

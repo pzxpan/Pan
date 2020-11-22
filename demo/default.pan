@@ -1,3 +1,4 @@
+package default;
 pub fun add(b:i32,a:i32 = 10):i32 {
     return a + b;
 }

@@ -1,3 +1,4 @@
+package default;
 pub fun ddd(a:int) : int {
 /*
 *dddd

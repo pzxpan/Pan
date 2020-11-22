@@ -1,6 +1,6 @@
 use log::*;
 use std::borrow::Borrow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, Constant};
@@ -26,6 +26,7 @@ use pan_bytecode::bytecode::Instruction::LoadName;
 
 lazy_static! {
     static ref CONST_MAP: Mutex<HashMap<String,Constant>> = Mutex::new(HashMap::new());
+    static ref BUILTIN_NAME: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
 
 pub fn insert(name: String, value: Constant) {
@@ -33,6 +34,15 @@ pub fn insert(name: String, value: Constant) {
     map.insert(name, value);
 }
 
+pub fn insert_builtin_name(name: String) {
+    let ref mut map = BUILTIN_NAME.lock().unwrap();
+    map.insert(name);
+}
+
+pub fn is_builtin_name(name: &str) -> bool {
+    let ref map = BUILTIN_NAME.lock().unwrap();
+    return map.contains(name);
+}
 
 pub fn get(name: String) -> Option<Constant> {
     let ref map = CONST_MAP.lock().unwrap();
@@ -1380,7 +1390,13 @@ impl<O: OutputStream> Compiler<O> {
             }
             List(_, _) => {}
 
-            Variable(ast::Identifier { name, .. }) => { self.load_name(name); }
+            Variable(ast::Identifier { name, .. }) => {
+                if self.variable_in_scope(name.as_str()) > 0 || is_builtin_name(name.as_str()) {
+                    self.load_name(name);
+                } else {
+                    self.load_name(get_full_name(&self.package, name.as_str()).as_str());
+                }
+            }
             Yield(_, _) => {}
             Slice(_, _) => {}
             Await(_, _) => {}
@@ -1658,6 +1674,7 @@ impl<O: OutputStream> Compiler<O> {
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
             is_constructor = self.is_constructor(name);
         }
+        println!("nameCall:{:?},", function);
         self.compile_expression(function)?;
 
         for keyword in args {
@@ -1826,6 +1843,19 @@ impl<O: OutputStream> Compiler<O> {
         unreachable!()
     }
 
+    fn variable_in_scope(&self, name: &str) -> usize {
+        println!("Looking up {:?}", name);
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if symbol.is_some() {
+                println!("len - i :{:?}", len - i);
+                return len  - i;
+            }
+        }
+        unreachable!()
+    }
+
     fn is_struct_item_def(&self, name_str: String, attri: String) -> (bool, String) {
         // let mut name_str = "";
         // let mut attri = "";
@@ -1969,14 +1999,16 @@ impl<O: OutputStream> Compiler<O> {
         return false;
     }
 
-    fn is_current_scope(&self, name: &str) -> bool {
-        let len: usize = self.symbol_table_stack.len();
-        let symbol = self.symbol_table_stack[len - 1].lookup(name);
+
+    fn is_current_scope(&mut self, name: &str) -> bool {
+        let table = self.symbol_table_stack.last_mut().unwrap();
+        let symbol = table.lookup(name);
         if symbol.is_some() {
             return true;
         }
         return false;
     }
+
 
     //弹出指令
     pub fn emit(&mut self, instruction: Instruction) {

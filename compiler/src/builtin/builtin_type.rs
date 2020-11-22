@@ -1,6 +1,7 @@
 use crate::ctype::CType;
 use crate::ctype::FnType;
 use crate::symboltable::SymbolUsage;
+use crate::compile::insert_builtin_name;
 
 pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     let mut vec = Vec::new();
@@ -83,5 +84,8 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
 
     vec.push(("sleep".to_owned(), ty, SymbolUsage::Builtin));
 
+    for n in &vec {
+        insert_builtin_name(n.0.clone());
+    }
     vec
 }

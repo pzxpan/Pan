@@ -1,3 +1,4 @@
+package default;
 fun main() {
  let dd = 0x11;
  let ff = 189.9;
