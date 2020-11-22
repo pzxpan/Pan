@@ -18,9 +18,10 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
+use pan_bytecode::bytecode::Instruction::LoadName;
 
 
 lazy_static! {
@@ -57,6 +58,7 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
     ctx: CompileContext,
     optimize: u8,
     lambda_name: String,
+    package: String,
 }
 
 #[derive(Clone, Copy)]
@@ -115,9 +117,10 @@ pub fn compile(
 fn with_compiler(
     source_path: String,
     optimize: u8,
+    package: String,
     f: impl FnOnce(&mut Compiler) -> Result<(), CompileError>,
 ) -> Result<CodeObject, CompileError> {
-    let mut compiler = Compiler::new(optimize);
+    let mut compiler = Compiler::new(optimize, package);
     compiler.source_path = Some(source_path);
     compiler.push_new_code_object("<module>".to_owned());
     f(&mut compiler)?;
@@ -132,7 +135,7 @@ pub fn compile_program(
     optimize: u8,
     is_import: bool,
 ) -> Result<(String, CodeObject), CompileError> {
-    let r = with_compiler(source_path, optimize, |compiler| {
+    let r = with_compiler(source_path, optimize, ast.package.clone(), |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
         println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
@@ -149,12 +152,12 @@ impl<O> Default for Compiler<O>
         O: OutputStream,
 {
     fn default() -> Self {
-        Compiler::new(0)
+        Compiler::new(0, "".to_string())
     }
 }
 
 impl<O: OutputStream> Compiler<O> {
-    fn new(optimize: u8) -> Self {
+    fn new(optimize: u8, package: String) -> Self {
         Compiler {
             import_instructions: Vec::new(),
             output_stack: Vec::new(),
@@ -168,6 +171,7 @@ impl<O: OutputStream> Compiler<O> {
                 in_loop: false,
                 func: FunctionContext::NoFunction,
             },
+            package,
             optimize,
             lambda_name: "".to_string(),
         }
@@ -1586,18 +1590,24 @@ impl<O: OutputStream> Compiler<O> {
 
         if self.ctx.func == FunctionContext::StructFunction {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                if self.is_out_symbol(name.as_str()) {
-                    self.compile_expression(function)?;
-                } else {
+                if !self.is_out_symbol(name.as_str()) {
                     self.emit(Instruction::LoadName(
                         "self".to_string(),
                         bytecode::NameScope::Local,
                     ));
                     self.emit(Instruction::LoadAttr(name.clone()));
+                } else {
+                    self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
                 }
             }
+        } else {
+            if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
+                self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+            } else {
+                self.compile_expression(function)?;
+            }
         }
-        self.compile_expression(function)?;
+
         if is_enum_item.0 {
             if let ast::Expression::Attribute(_, variable, attribute, _) = function {
                 self.emit(Instruction::LoadName(

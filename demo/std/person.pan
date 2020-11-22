@@ -12,7 +12,9 @@ pub struct House {
         return true;
     }
 }
-
+pub fun add_pub(a:i32) :i32 {
+    return a + 100111;
+}
 pub fun name_call(age:i32, name:string) : bool {
    return age > 30;
 }
@@ -22,14 +24,25 @@ pub struct Person {
    // pub address: string,
   //  money: i32,
     //pub house: House,
-    pub fun is_older(): bool {
-        return age > 40;
-    }
     pub fun older_than(a: i32): bool {
-        //money = 100;
-        return age > a;
+            //money = 100;
+        return self.age > a;
+    }
+    pub fun add_pub(a:i32):i32 {
+            return a - 10000;
+    }
+    pub fun is_older(): bool {
+      let c = add_pub(age);
+      print(c);
+      return age > 20;
     }
 }
+
+fun add(a:i32,b:32) : i32 {
+    return a + b;
+}
+
+
 
 
 

@@ -13,6 +13,7 @@ use crate::builtin::builtin_fun::get_builtin_fun;
 use crate::compile::*;
 use crate::util;
 use pan_bytecode::bytecode::NameScope::Global;
+use crate::util::get_last_name;
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> Result<(), CompileError> {
     //顺序为系统目录，工作目录，当前子目录;
@@ -105,13 +106,16 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
         let result = r.unwrap();
         let package_name = result.0;
         let code_object = result.1;
+        for i in code_object.instructions.clone().iter() {
+            println!("fuck...{:?}", i);
+        }
         if *is_all {
             for i in code_object.instructions.iter() {
                 if let Instruction::StoreName(name, ns) = i {
-                    let n = util::get_last_name(name);
-                    compiler.import_instructions.push(Instruction::Duplicate);
+                    //  let n = util::get_last_name(name);
+                    //  compiler.import_instructions.push(Instruction::Duplicate);
                     compiler.import_instructions.push(i.clone());
-                    compiler.import_instructions.push(Instruction::StoreName(n, NameScope::Global));
+                    //  compiler.import_instructions.push(Instruction::StoreName(n, NameScope::Global));
                 } else {
                     compiler.import_instructions.push(i.clone());
                 }
@@ -142,7 +146,6 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
                             rev_instruction.push(Instruction::StoreName(item_name.clone().unwrap(), NameScope::Global));
                             rev_instruction.push(i.clone());
                             rev_instruction.push(Instruction::Duplicate);
-
                         } else {
                             rev_instruction.push(i.clone());
                         }

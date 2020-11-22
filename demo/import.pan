@@ -4,8 +4,11 @@ import std.person {Person as PPP, House};
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import std.color.*;
+import std.color.Color;
 
+pub fun add_pub(a:i32) : i32 {
+    return a - 100;
+}
 fun main() {
   let person = PPP!{age:50,name:"pan"};
   let bb = person.is_older();
@@ -15,6 +18,8 @@ fun main() {
   print(dd);
   let c = Color::Red(10);
   c.is_warm();
+  let ss = add_pub(10);
+  print(ss);
 }
 
 
