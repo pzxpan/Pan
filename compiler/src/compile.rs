@@ -197,6 +197,7 @@ impl<O: OutputStream> Compiler<O> {
 
     fn get_full_name(&self, package: &String, s: &str) -> String {
         let mut tmp = package.clone();
+        tmp.push_str("$");
         tmp.push_str(s);
         return tmp;
     }
@@ -1579,11 +1580,11 @@ impl<O: OutputStream> Compiler<O> {
         let builtin = self.compile_builtin_fn(function, args)?;
         if builtin { return Ok(()); }
 
-        let mut is_enum_item = (false, false);
+        let mut is_enum_item = false;
         let mut is_thread_start = false;
         if let ast::Expression::Attribute(_, variable, attribute, _) = function {
-            is_enum_item = self.is_enum_variant_def(variable, attribute);
-            if !is_enum_item.0 {
+            is_enum_item = self.is_enum_variant_def(&function);
+            if !is_enum_item {
                 is_thread_start = self.is_thread_run(variable, attribute);
             }
         }
@@ -1604,20 +1605,16 @@ impl<O: OutputStream> Compiler<O> {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
                 self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
             } else {
+                println!("functionis {:?},", function);
                 self.compile_expression(function)?;
             }
         }
 
-        if is_enum_item.0 {
-            if let ast::Expression::Attribute(_, variable, attribute, _) = function {
-                self.emit(Instruction::LoadName(
-                    variable.expr_name().to_string(),
-                    bytecode::NameScope::Local,
-                ));
-                self.emit(Instruction::LoadConst(bytecode::Constant::String(
-                    attribute.as_ref().unwrap().name.clone())));
-            }
-        }
+        // if is_enum_item {
+        //     if let ast::Expression::Attribute(_, variable, attribute, _) = function {
+        //
+        //     }
+        // }
 
         let ty = function.get_type(&self.symbol_table_stack);
         let mut need_count = 0;
@@ -1642,7 +1639,7 @@ impl<O: OutputStream> Compiler<O> {
             count = args.len();
         }
 
-        if is_enum_item.0 {
+        if is_enum_item {
             self.emit(Instruction::LoadBuildEnum(count + 2));
         } else if is_thread_start {
             self.emit(Instruction::StartThread);
@@ -1876,40 +1873,34 @@ impl<O: OutputStream> Compiler<O> {
         }
         unreachable!()
     }
-    fn is_enum_variant_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> (bool, bool) {
-        let mut name_str = "";
-        let mut attri = "";
-        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
-            name_str = name;
-        }
-        if let Some(ident) = attribute {
-            attri = &ident.name;
-        }
+    fn is_enum_variant_def(&self, expr: &Expression) -> bool {
+        let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
 
-        let len: usize = self.symbol_table_stack.len();
-        for i in (0..len).rev() {
-            let symbol = self.symbol_table_stack[i].lookup(name_str);
-            if let Some(s) = symbol {
-                if let CType::Enum(EnumType { items, methods, static_methods, .. }) = &s.ty {
-                    for (a_name, _) in items {
-                        if a_name.eq(attri) {
-                            return (true, false);
-                        }
+        let mut v = get_attribute_vec(expr);
+        if cty == CType::Module && v.len() > 1 {
+            let s = v.get(0).unwrap();
+            let mut s2 = v.get(1).unwrap();
+            let s3 = (get_full_name(&s.0, &s2.0), s2.1.clone());
+            cty = self.lookup_name(&get_full_name(&s.0, &s2.0)).ty.clone();
+            v.remove(0);
+            v.insert(0, s3);
+        }
+        let len = v.len();
+
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Enum(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    // attri_type = tmp.0;
+                    if tmp.0 == 2 {
+                        return true;
                     }
-                    for (a_name, _) in methods {
-                        if a_name.eq(attri) {
-                            return (false, true);
-                        }
-                    }
-                    for (a_name, _) in static_methods {
-                        if a_name.eq(attri) {
-                            return (false, true);
-                        }
-                    }
+                    // cty = tmp.1.clone();
                 }
             }
         }
-        return (false, false);
+        return false;
     }
 
     fn is_thread_run(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
@@ -2026,8 +2017,18 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn resolve_compile_attribute(&mut self, expr: &Expression) -> Result<(), CompileError> {
-        let v = get_attribute_vec(expr);
-        let mut cty = &self.lookup_name(&expr.expr_name()).ty.clone();
+        let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
+
+        let mut v = get_attribute_vec(expr);
+        if cty == CType::Module && v.len() > 1 {
+            let s = v.get(0).unwrap();
+            let mut s2 = v.get(1).unwrap();
+            let s3 = (get_full_name(&s.0, &s2.0), s2.1.clone());
+            cty = self.lookup_name(&get_full_name(&s.0, &s2.0)).ty.clone();
+            v.remove(0);
+            v.remove(0);
+            v.insert(0, s3);
+        }
         let len = v.len();
 
         for (idx, name) in v.iter().enumerate() {
@@ -2036,7 +2037,7 @@ impl<O: OutputStream> Compiler<O> {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     // attri_type = tmp.0;
-                    cty = tmp.1;
+                    cty = tmp.1.clone();
                     if idx == 0 {
                         self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         self.emit(Instruction::LoadAttr(attri_name.0.clone()));
@@ -2047,7 +2048,7 @@ impl<O: OutputStream> Compiler<O> {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let index = attri_name.0.parse::<i32>().unwrap();
                     let tmp = cty.attri_index(index);
-                    cty = tmp;
+                    cty = tmp.clone();
                     if idx == 0 {
                         self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         self.emit(Instruction::LoadConst(
@@ -2060,19 +2061,25 @@ impl<O: OutputStream> Compiler<O> {
                     }
                 } else if let CType::Enum(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
+                    println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     // attri_type = tmp.0;
-                    cty = tmp.1;
+
                     if tmp.0 == 1 {
                         //如果为无参属性，则直接调用构造函数，如果为有参，则有FunctionCall处理;如果是其他属性，则LoadAttr处理
                         self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         self.emit(Instruction::LoadConst(
                             bytecode::Constant::String(attri_name.0.clone())));
                         self.emit(Instruction::LoadBuildEnum(2));
-                    } else if tmp.0 > 2 {
+                    } else if tmp.0 == 2 {
+                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
+                    }
+                    if tmp.0 > 2 {
                         self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     }
+                    cty = tmp.1.clone();
                 }
             }
         }

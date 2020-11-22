@@ -13,7 +13,7 @@ use crate::builtin::builtin_fun::get_builtin_fun;
 use crate::compile::*;
 use crate::util;
 use pan_bytecode::bytecode::NameScope::Global;
-use crate::util::get_last_name;
+use crate::util::{get_last_name, get_full_name};
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> Result<(), CompileError> {
     //顺序为系统目录，工作目录，当前子目录;
@@ -142,12 +142,20 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
                 let mut rev_instruction = Vec::new();
                 for i in code_object.instructions.iter().rev() {
                     if let Instruction::StoreName(name, ns) = i {
-                        if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
-                            rev_instruction.push(Instruction::StoreName(item_name.clone().unwrap(), NameScope::Global));
+                        if item_name.clone().is_some() {
+                            if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
+                                rev_instruction.push(Instruction::StoreName(item_name.clone().unwrap(), NameScope::Global));
+                                rev_instruction.push(i.clone());
+                                rev_instruction.push(Instruction::Duplicate);
+                            } else {
+                                rev_instruction.push(i.clone());
+                            }
+                        } else {
+                            let s: Vec<&str> = name.split_terminator("$").collect();
+                            let tmp = get_full_name(&String::from(s[s.len() - 2]), s[s.len() - 1]);
+                            rev_instruction.push(Instruction::StoreName(tmp, NameScope::Global));
                             rev_instruction.push(i.clone());
                             rev_instruction.push(Instruction::Duplicate);
-                        } else {
-                            rev_instruction.push(i.clone());
                         }
                     } else {
                         rev_instruction.push(i.clone());
