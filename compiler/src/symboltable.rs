@@ -2,7 +2,7 @@
 */
 use std::fmt;
 use std::borrow::Borrow;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 use indexmap::map::IndexMap;
 use num_traits::cast::ToPrimitive;
@@ -1037,7 +1037,7 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
-
+        println!("expression:{:?}", expression);
         match &expression {
             Subscript(_, a, b) => {
                 self.scan_expression(a, context)?;
@@ -1267,10 +1267,15 @@ impl SymbolTableBuilder {
                                 });
                             }
                         }
-                        //验证参数是否足够
-                        let hash_set: HashSet<String> = args.iter().map(|s| s.name.name.clone()).collect();
-                        self.verify_param_enough(ty.borrow(), hash_set)?;
+
+                        self.scan_expression(&arg.expr, &ExpressionContext::Load)?;
                     }
+                    //验证参数是否足够
+                    let hash_set: HashMap<String,CType> = args.iter().map(|s| {
+                        let ty = s.expr.get_type(&self.tables);
+                        (s.name.name.clone(),ty)
+                    }).collect();
+                    self.verify_param_ty_enough(ty.borrow(), hash_set)?;
                 }
             }
             IfExpression(_, test, body, orelse) => {
@@ -1437,11 +1442,18 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub fn verify_param_enough(&self, ty: &CType, methods: HashSet<String>) -> SymbolTableResult {
+    pub fn verify_param_ty_enough(&self, ty: &CType, methods: HashMap<String, CType>) -> SymbolTableResult {
         match ty {
             CType::Struct(ty) => {
-                for (field_name, ..) in ty.fields.iter() {
-                    if !methods.contains(field_name) {
+                for (field_name, ty, ..) in ty.fields.iter() {
+                    if methods.contains_key(field_name) {
+                        if methods.get(field_name).unwrap() != ty {
+                            return Err(SymbolTableError {
+                                error: format!("参数类型不匹配，期望是{:?},实际为{:?}", ty, &methods.get(field_name)),
+                                location: Loc(0, 0, 0),
+                            });
+                        }
+                    } else {
                         return Err(SymbolTableError {
                             error: format!("命名参数缺少{}", field_name),
                             location: Loc(0, 0, 0),
@@ -1479,7 +1491,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-       // println!("register name={:?}, ty: {:?}", name, ty);
+        // println!("register name={:?}, ty: {:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());
@@ -1569,6 +1581,7 @@ impl SymbolTableBuilder {
                 if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
+                    println!("tmp:{:?}", tmp);
                     if !self.in_struct_scope(attri_name.0.clone()) {
                         self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
                     }
@@ -1588,6 +1601,7 @@ impl SymbolTableBuilder {
                 } else if let CType::Enum(n) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
+                    println!("tmp:{:?}", tmp);
                     if !self.in_struct_scope(attri_name.0.clone()) {
                         self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
                     }
@@ -1617,25 +1631,35 @@ impl SymbolTableBuilder {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     attri_type = tmp.0;
-                    if !self.in_struct_scope(attri_name.0.clone()) {
-                        if attri_type > 1 {
-                            self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
-                        } else {
-                            self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
-                        }
+                    println!("tmp:{:?}", tmp);
+                    if attri_type < 1 {
+                        return Err(SymbolTableError {
+                            error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),
+                            location: expr.loc().clone(),
+                        });
+                    } else if attri_type > 1 {
+                        self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    } else {
+                        self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
                     }
                     cty = tmp.1.clone();
                 } else if let CType::Enum(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     attri_type = tmp.0;
-                    if !self.in_struct_scope(attri_name.0.clone()) {
-                        if attri_type > 1 {
-                            self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
-                        } else {
-                            self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
-                        }
+                    println!("tmp:{:?}", tmp);
+                    if attri_type < 1 {
+                        return Err(SymbolTableError {
+                            error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),
+                            location: expr.loc().clone(),
+                        });
                     }
+                    if attri_type > 1 {
+                        self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    } else {
+                        self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    }
+
                     // cty = tmp.1.clone();
                     return Ok(cty);
                 } else if let CType::Fn(fntype) = cty.clone() {

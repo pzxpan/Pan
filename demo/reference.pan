@@ -30,11 +30,12 @@ pub struct Person {
     }
 }
 fun main() {
-   let a = 30;
+   let const a = 30;
    let aa = name_call(a,"pan");
    print(a);
    let house = House!{size:111.0,price:1_000_000.0};
-   let const person = Person!{age:50,name:"pan",house:house.clone()};
+   let const person = Person!{age:50,name:"pan",house:house};
+ //  let c = house.add.clone();
    let bb = person.house.size;
    person.age = 60;
    print(bb);
