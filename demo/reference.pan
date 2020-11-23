@@ -30,7 +30,8 @@ pub struct Person {
     }
 }
 fun main() {
-   let const a = 30;
+   let a = 30;
+   a = a + 10;
    let aa = name_call(a,"pan");
    print(a);
    let house = House!{size:111.0,price:1_000_000.0};
