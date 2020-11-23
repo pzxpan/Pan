@@ -78,6 +78,7 @@ pub struct VariableDeclaration {
     pub loc: Loc,
     pub ty: Option<Expression>,
     pub name: Identifier,
+    pub is_mut: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -177,6 +178,7 @@ pub struct StructVariableDefinition {
     pub loc: Loc,
     pub ty: Expression,
     pub is_pub: bool,
+    pub is_own: bool,
     pub name: Identifier,
     pub initializer: Option<Expression>,
 }
@@ -526,6 +528,7 @@ pub struct FunctionDefinition {
     pub generics: Vec<Generic>,
     pub is_pub: bool,
     pub is_static: bool,
+    pub is_mut: bool,
     pub returns: Option<Expression>,
     pub body: Option<Statement>,
 }

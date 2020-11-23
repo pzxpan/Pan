@@ -61,11 +61,8 @@ Identifier: Identifier = {
 }
 
 VariableDeclaration: VariableDeclaration = {
-    <l:@L> <ty:Precedence0> <name:Identifier> <r:@R> => VariableDeclaration {
-        loc: Loc(file_no, l, r), ty:Some(ty), name
-    },
-    <l:@L> "let" <name:Identifier>  <ty: (":" Precedence0)?> <r:@R> => VariableDeclaration {
-            loc: Loc(file_no, l, r), ty:ty.map(|x|x.1), name
+    <l:@L> "let" <is_mut: "const"?> <name:Identifier>  <ty: (":" Precedence0)?> <r:@R> => VariableDeclaration {
+        loc: Loc(file_no, l, r), ty:ty.map(|x|x.1), name,is_mut: is_mut.is_none()
     },
 
 }
@@ -154,10 +151,9 @@ EnumDefinition: Box<EnumDefinition> = {
 }
 
 StructVariableDefinition: Box<StructVariableDefinition> = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?>  <name:Identifier> ":" <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
-        let is_pub = is_pub.is_some();
+    <doc:DocComments> <l:@L> <is_pub:"pub"?>  <name:Identifier> ":" <o:"own"?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
         Box::new(StructVariableDefinition {
-            doc, loc: Loc(file_no, l, r), ty, is_pub, name, initializer: e,
+            doc, loc: Loc(file_no, l, r), ty, is_pub:is_pub.is_some(), name, initializer: e,is_own:o.is_some()
         })
     },
 }
@@ -171,9 +167,9 @@ EnumVariableDefinition: Box<EnumVariableDefinition> = {
 }
 
 DataVariableDefinition: Box<StructVariableDefinition> = {
-    <doc:DocComments> <l:@L>  <name:Identifier> ":" <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
+    <doc:DocComments> <l:@L>  <name:Identifier> ":" <o:"own"?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
         Box::new(StructVariableDefinition {
-            doc, loc: Loc(file_no, l, r), ty, is_pub:true, name, initializer: e,
+            doc, loc: Loc(file_no, l, r), ty, is_pub:true, name, initializer: e,is_own:o.is_some()
         })
     },
 }
@@ -394,14 +390,9 @@ StringLiteral: StringLiteral = {
 }
 
 Parameter: Parameter = {
-    <l:@L><name:Identifier?> ":"  "ref"  <ty:Expression>   <r:@R> => {
+    <l:@L><name:Identifier?> ":" <m:"mut"?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty, is_ref:true, is_mut: false, name,default:None,is_varargs:false}
-    },
-
-    <l:@L><name:Identifier?> ":" <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> => {
-        let loc = Loc(file_no, l, r);
-        Parameter{loc, ty, is_ref:false, is_mut: false, name,default:e,is_varargs:false}
+        Parameter{ loc, ty, is_ref:false, is_mut: m.is_some(), name,default:e,is_varargs:false }
     },
     <l:@L>".." <name:Identifier?> <r:@R> => {
         let loc = Loc(file_no, l, r);
@@ -426,7 +417,7 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 
 FunctionDefinition: Box<FunctionDefinition> = {
-    <doc:DocComments> <is_pub:"pub"?> <l:@L> "fun"  <nl:@L> <is_static: "::"?> <name:Identifier?> <nr:@R> <generics:Generics> <params:ParameterList>
+    <doc:DocComments> <is_pub:"pub"?> <c:"const"?> <l:@L> "fun"  <nl:@L> <is_static: "::"?> <name:Identifier?> <nr:@R> <generics:Generics> <params:ParameterList>
     <returns:(":" Expression)?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let is_pub = is_pub.is_some();
         let is_static = is_static.is_some();
@@ -439,6 +430,7 @@ FunctionDefinition: Box<FunctionDefinition> = {
             is_pub,
             generics,
             is_static,
+            is_mut:c.is_none(),
             returns:returns.map(|x|x.1),
             body,
         })
@@ -504,9 +496,9 @@ SimpleStatement: Statement = {
         Statement::VariableDefinition(Loc(file_no, l, r), v, e)
     },
     //Set放在这里就没法嵌套定义，只能在"="的右边推导出一个Set;放在Expression的话，与NamedArgument有规约冲突
-    <l:@L>  <v:VariableDeclaration> "="  <ll:@L> "{" <vv:CommaOne<Expression>> "}" <rr:@R> <r:@R> => {
-         Statement::VariableDefinition(Loc(file_no, l, r), v, Some(Expression::Set(Loc(file_no, ll, rr), vv)))
-     },
+  //  <l:@L>  <v:VariableDeclaration> "="  <ll:@L> "{" <vv:CommaOne<Expression>> "}" <rr:@R> <r:@R> => {
+    //     Statement::VariableDefinition(Loc(file_no, l, r), v, Some(Expression::Set(Loc(file_no, ll, rr), vv)))
+ //    },
      <l:@L> "let" <v:MultiVariableDeclaration> "=" <e:Expression> <r:@R> => {
             Statement::MultiVariableDefinition(Loc(file_no, l, r), v, e)
         },
@@ -657,6 +649,8 @@ extern {
         "enum" => Token::Enum,
 
         "const" => Token::Constant,
+        "mut" => Token::Mut,
+        "own" => Token::Own,
         "true" => Token::True,
         "false" => Token::False,
         "pure" => Token::Pure,

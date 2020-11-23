@@ -38,6 +38,8 @@ pub enum Token<'input> {
     Enum,
 
     Constant,
+    Mut,
+    Own,
 
     Pure,
 
@@ -232,6 +234,8 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Enum => write!(f, "enum"),
 
             Token::Constant => write!(f, "const"),
+            Token::Mut => write!(f, "mut"),
+            Token::Own => write!(f, "own"),
             Token::Pure => write!(f, "pure"),
 
             Token::Continue => write!(f, "continue"),
@@ -308,6 +312,8 @@ impl LexicalError {
 static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "break" => Token::Break,
     "const" => Token::Constant,
+    "own" => Token::Own,
+    "mut" => Token::Mut,
     "continue" => Token::Continue,
     "struct" => Token::Struct,
     "bound" => Token::Bound,
