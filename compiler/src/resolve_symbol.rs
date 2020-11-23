@@ -67,7 +67,6 @@ fn scan_import_symbol_inner(whole_name: String, build: &mut SymbolTableBuilder, 
         slice.push_str(".pan");
         let mut path = env::current_dir().unwrap();
         path.push(slice);
-        println!("path{:?}", path);
         if path.is_file() {
             scan_import_file(build, &path, Some(item_name), as_name, is_all)?;
         } else {

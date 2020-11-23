@@ -147,7 +147,7 @@ pub fn compile_program(
 ) -> Result<(String, CodeObject), CompileError> {
     let r = with_compiler(source_path, optimize, ast.package.clone(), |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        println!("sybmol{:?}", symbol_table);
+        //println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
     });
     if r.is_ok() {
@@ -1249,7 +1249,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        println!("Compiling {:?}", expression);
+        //println!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;
@@ -1638,7 +1638,6 @@ impl<O: OutputStream> Compiler<O> {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
                 self.emit(LoadName(name.clone(), NameScope::Local));
             } else {
-                println!("functionis {:?},", function);
                 self.compile_expression(function)?;
             }
         }
@@ -1698,9 +1697,6 @@ impl<O: OutputStream> Compiler<O> {
         } else {
             self.compile_expression(function)?;
         }
-
-        println!("nameCall:{:?},", function);
-
 
         for keyword in args {
             self.emit(Instruction::LoadConst(bytecode::Constant::String(keyword.name.name.clone())));
@@ -1857,7 +1853,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-        println!("Looking up {:?}", name);
+       // println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
@@ -2078,9 +2074,6 @@ impl<O: OutputStream> Compiler<O> {
         let len = v.len();
 
         for (idx, name) in v.iter().enumerate() {
-            if name.0.eq("is_older") && name.0.eq("is_older") {
-                println!("fff");
-            }
             if idx < len - 1 {
                 if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
@@ -2112,7 +2105,7 @@ impl<O: OutputStream> Compiler<O> {
                     }
                 } else if let CType::Enum(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
-                    println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
+                    //println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     // attri_type = tmp.0;
 

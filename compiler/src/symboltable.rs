@@ -495,7 +495,6 @@ impl SymbolTableBuilder {
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
     pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
         if in_import && !is_all && item_name.is_none() {
-            println!("package_name:{:?},", program.package);
             self.register_name(&get_last_name(&program.package), CType::Module, SymbolUsage::Import, Loc::default());
         }
         for part in &program.module_parts {
@@ -1038,7 +1037,7 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
-        println!("exxx:{:?}", expression);
+
         match &expression {
             Subscript(_, a, b) => {
                 self.scan_expression(a, context)?;
@@ -1076,16 +1075,13 @@ impl SymbolTableBuilder {
                         }
                     } else {
                         if let Variable(ident) = name.as_ref() {
-                            println!("package_name:{:?},", get_full_name(&self.package, &name.expr_name()));
                             if self.in_current_scope(ident.clone().name) {
                                 ty = self.get_register_type(name.expr_name());
                             } else {
                                 ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
                             }
                         } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
-                            println!("expression:{:?},", name.as_ref());
                             ty = self.get_register_type(n.expr_name());
-                            println!("ttty:{:?}", ty);
                             // if self.in_current_scope(n.expr_name()) {
                             //     ty = self.get_register_type(n.expr_name());
                             // } else {
@@ -1483,7 +1479,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        println!("register name={:?}, ty: {:?}", name, ty);
+       // println!("register name={:?}, ty: {:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());

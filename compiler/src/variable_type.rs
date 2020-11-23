@@ -454,7 +454,7 @@ impl HasType for Expression {
             Expression::BoolLiteral(_, _)
             => { CType::Bool }
             Expression::FunctionCall(_, name, _) => {
-                println!("&name.get_type(&table):{:?},", &name);
+              //  println!("&name.get_type(&table):{:?},", &name);
                 if let Expression::Variable(n) = name.as_ref() {
                     return name.get_type(tables);
                 } else {

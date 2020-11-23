@@ -106,9 +106,6 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
         let result = r.unwrap();
         let package_name = result.0;
         let code_object = result.1;
-        for i in code_object.instructions.clone().iter() {
-            println!("fuck...{:?}", i);
-        }
         if *is_all {
             for i in code_object.instructions.iter() {
                 if let Instruction::StoreName(name, ns) = i {
