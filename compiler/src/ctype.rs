@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use crate::symboltable::SymbolMutability;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
@@ -46,7 +47,7 @@ pub enum CType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FnType {
     pub name: String,
-    pub arg_types: Vec<(String, CType, bool, bool)>,
+    pub arg_types: Vec<(String, CType, bool, bool, SymbolMutability)>,
     pub type_args: Vec<String>,
     pub ret_type: Box<CType>,
     pub is_varargs: bool,
@@ -119,7 +120,7 @@ pub struct LambdaType {
     pub name: String,
     pub ret_type: Box<CType>,
     pub captures: Vec<String>,
-    pub arg_types: Vec<(String, CType, bool, bool)>,
+    pub arg_types: Vec<(String, CType, bool, bool, SymbolMutability)>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

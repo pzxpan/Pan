@@ -388,15 +388,18 @@ StringLiteral: StringLiteral = {
         StringLiteral{ loc: Loc(file_no, l, r), string: s.to_string() }
     }
 }
-
+MutOrOwn: MutOrOwn = {
+    "own" => MutOrOwn::Own,
+    "mut" => MutOrOwn::Mut,
+}
 Parameter: Parameter = {
-    <l:@L><name:Identifier?> ":" <m:"mut"?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> => {
+    <l:@L><name:Identifier?> ":" <mut_own:MutOrOwn?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{ loc, ty, is_ref:false, is_mut: m.is_some(), name,default:e,is_varargs:false }
+        Parameter{ loc, ty, mut_own, name,default:e,is_varargs:false }
     },
     <l:@L>".." <name:Identifier?> <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty:Expression::List(Loc(file_no, l, r), vec![]), is_ref:false, is_mut: false, name,default:None,is_varargs:true}
+        Parameter{loc, ty:Expression::List(Loc(file_no, l, r), vec![]), mut_own: None, name,default:None,is_varargs:true}
     }
 }
 

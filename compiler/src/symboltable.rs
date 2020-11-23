@@ -96,7 +96,7 @@ pub enum SymbolScope {
     Const,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum SymbolMutability {
     Immutable,
     Mut,
@@ -1122,7 +1122,7 @@ impl SymbolTableBuilder {
 
                     if ty == CType::Unknown {
                         return Err(SymbolTableError {
-                            error: format!("2222未定义{:?}的类型，", name.expr_name()),
+                            error: format!("未定义{:?}的类型，", name.expr_name()),
                             location: loc.clone(),
                         });
                     }
@@ -1136,11 +1136,11 @@ impl SymbolTableBuilder {
             }
             Not(loc, name) => {
                 let ty = name.get_type(&self.tables);
-                if ty > CType::I8 && ty <= CType::U128 {
+                if ty == CType::Bool {
                     self.scan_expression(name, &ExpressionContext::Load)?;
                 } else {
                     return Err(SymbolTableError {
-                        error: format!("取反操作只能针对整型"),
+                        error: format!("取反操作只能针对Bool型"),
                         location: loc.clone(),
                     });
                 }
@@ -1259,9 +1259,14 @@ impl SymbolTableBuilder {
                             self.register_name(name, ty, SymbolUsage::Mut, loc.clone())?;
                         }
                         let m = self.get_variable_mutbility(name.to_string());
-                        if m == SymbolMutability::ImmRef || m == SymbolMutability::Immutable || m == SymbolMutability::Moved {
+                        if m == SymbolMutability::ImmRef || m == SymbolMutability::Immutable {
                             return Err(SymbolTableError {
                                 error: format!("不能修改不可变变量{:?}的值,", name),
+                                location: loc.clone(),
+                            });
+                        } else if m == SymbolMutability::Moved {
+                            return Err(SymbolTableError {
+                                error: format!("{:?}变量已经moved,", name),
                                 location: loc.clone(),
                             });
                         }
@@ -1357,9 +1362,17 @@ impl SymbolTableBuilder {
     }
 
     pub fn update_mutability(&mut self, name: String, mutability: SymbolMutability) -> SymbolTableResult {
+        if name.is_empty() {
+            return Ok(());
+        }
+        let table = self.tables.last_mut().unwrap();
+        let mut symbol = table.symbols.get(&name).unwrap().clone();
+        symbol.mutability = mutability;
+        table.symbols.insert(name.to_owned(), symbol.clone());
         Ok(())
     }
-    pub fn verify_update_mutability(&mut self, name: String, mutability: SymbolMutability, loc: Loc) -> SymbolTableResult {
+
+    pub fn verify_mutability(&mut self, name: String, mutability: SymbolMutability, loc: Loc) -> SymbolTableResult {
         let t = self.get_variable_mutbility(name.clone());
         match t {
             SymbolMutability::ImmRef => {
@@ -1386,13 +1399,13 @@ impl SymbolTableBuilder {
                     });
                 } else if mutability == SymbolMutability::Moved {
                     return Err(SymbolTableError {
-                        error: format!("变量{:?}为不可变变量引用，不能被moved", name),
+                        error: format!("变量{:?}已存在可变引用，不能被moved", name),
                         location: loc,
                     });
                 }
             }
             SymbolMutability::Mut => {
-                self.update_mutability(name, mutability);
+                // self.update_mutability(name, mutability);
             }
             SymbolMutability::Moved => {
                 return Err(SymbolTableError {
@@ -1411,7 +1424,7 @@ impl SymbolTableBuilder {
         line_number: usize,
     ) -> SymbolTableResult {
         self.enter_scope(name, SymbolTableType::Function, line_number);
-        let arg_types: Vec<(String, CType, bool, bool)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter, Loc::default());
         }
@@ -1675,8 +1688,6 @@ impl SymbolTableBuilder {
             _ => {}
         }
         table.symbols.insert(name.to_owned(), symbol.clone());
-        // println!("after register name={:?}, ty: {:?}", name, symbol.clone());
-
         Ok(())
     }
 

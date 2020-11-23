@@ -17,16 +17,31 @@ impl HasType for Parameter {
     }
 }
 
-pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool) {
+pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool, SymbolMutability) {
     let ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
     let is_optional = s.1.as_ref().unwrap().default.is_some();
-    (arg_name, ty, is_optional, s.1.as_ref().unwrap().is_varargs)
+    let mut_or_own = s.1.as_ref().unwrap().mut_own.clone();
+    let mut is_mut = false;
+    let mut is_own = false;
+    if mut_or_own.is_some() {
+        is_mut = mut_or_own.unwrap() == MutOrOwn::Mut;
+        is_own = !is_mut;
+    }
+    let mut is_ref = false;
+    if ty >= CType::Str {
+        is_ref = true;
+    }
+    let mutability = if is_ref {
+        if is_mut { SymbolMutability::MutRef } else { SymbolMutability::ImmRef }
+    } else if is_own { SymbolMutability::Moved } else { if is_mut { SymbolMutability::Mut } else { SymbolMutability::Immutable } };
+
+    (arg_name, ty, is_optional, s.1.as_ref().unwrap().is_varargs, mutability)
 }
 
 impl HasType for FunctionDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
-        let arg_types: Vec<(String, CType, bool, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let type_args = Vec::new();
         let mut ret_type = Box::new(CType::Any);
         if let Some(ty) = self.returns.as_ref() {
@@ -454,7 +469,7 @@ impl HasType for Expression {
             Expression::BoolLiteral(_, _)
             => { CType::Bool }
             Expression::FunctionCall(_, name, _) => {
-              //  println!("&name.get_type(&table):{:?},", &name);
+                //  println!("&name.get_type(&table):{:?},", &name);
                 if let Expression::Variable(n) = name.as_ref() {
                     return name.get_type(tables);
                 } else {
@@ -551,7 +566,7 @@ impl HasType for Expression {
 
 impl HasType for LambdaDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
-        let arg_types: Vec<(String, CType, bool, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let name = "lambda".to_string();
         let ret_type = Box::from(match *self.body.clone() {
             Statement::Block(_, statements) => {

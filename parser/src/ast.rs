@@ -451,11 +451,16 @@ impl Expression {
 pub struct Parameter {
     pub loc: Loc,
     pub ty: Expression,
-    pub is_ref: bool,
-    pub is_mut: bool,
+    pub mut_own: Option<MutOrOwn>,
     pub is_varargs: bool,
     pub name: Option<Identifier>,
     pub default: Option<Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MutOrOwn {
+    Own,
+    Mut,
 }
 
 #[derive(Debug, PartialEq, Clone)]
