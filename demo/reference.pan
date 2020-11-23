@@ -31,8 +31,10 @@ pub struct Person {
 }
 fun main() {
    let a = 30;
+   let const b = "aaa";
+   let aa = name_call(a, b);
+
    a = a + 10;
-   let aa = name_call(a,"pan");
    print(a);
    let house = House!{size:111.0,price:1_000_000.0};
    let const person = Person!{age:50,name:"pan",house:house};

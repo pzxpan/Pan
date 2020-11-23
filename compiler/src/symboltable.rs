@@ -801,6 +801,7 @@ impl SymbolTableBuilder {
             Args(_, _) => {}
             VariableDefinition(location, decl, expression) => {
                 let muttable = if decl.is_mut { SymbolUsage::Mut } else { SymbolUsage::Immutable };
+                println!("ssssexpression:{:?},mutt:{:?}", decl, muttable);
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
@@ -1131,7 +1132,8 @@ impl SymbolTableBuilder {
                     } else {
                         self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                     }
-                    self.scan_expressions(args, &ExpressionContext::Load)?;
+                    self.resolve_fn(expression, &ty)?;
+                    //self.scan_expressions(args, &ExpressionContext::Load)?;
                 }
             }
             Not(loc, name) => {
@@ -1373,6 +1375,7 @@ impl SymbolTableBuilder {
     }
 
     pub fn verify_mutability(&mut self, name: String, mutability: SymbolMutability, loc: Loc) -> SymbolTableResult {
+        println!("ssssname:{:?},loc:{:?},mut::{:?}", name, loc, mutability);
         let t = self.get_variable_mutbility(name.clone());
         match t {
             SymbolMutability::ImmRef => {
@@ -1392,7 +1395,7 @@ impl SymbolTableBuilder {
                 }
             }
             SymbolMutability::MutRef => {
-                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut {
+                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut || mutability == SymbolMutability::ImmRef {
                     return Err(SymbolTableError {
                         error: format!("变量{:?}已存在可变引用，不能再被修改", name),
                         location: loc,
@@ -1405,7 +1408,9 @@ impl SymbolTableBuilder {
                 }
             }
             SymbolMutability::Mut => {
-                // self.update_mutability(name, mutability);
+                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Moved {
+                    self.update_mutability(name.clone(), mutability.clone())?;
+                }
             }
             SymbolMutability::Moved => {
                 return Err(SymbolTableError {
@@ -1807,7 +1812,7 @@ impl SymbolTableBuilder {
     fn resolve_fn(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
         if let Expression::FunctionCall(_, name, args) = expr {
             let args_type = ty.param_type();
-            for (i, (ety, is_default, is_varargs)) in args_type.iter().enumerate() {
+            for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
                 if let Some(e) = args.get(i) {
                     let cty = e.get_type(&self.tables);
                     let ret_ty = cty.ret_type();
@@ -1832,8 +1837,14 @@ impl SymbolTableBuilder {
                         });
                     }
                 }
+
+                if let Some(Expression::Variable(Identifier { name, loc })) = args.get(i) {
+                    self.verify_mutability(name.clone(), ref_mut.clone(), loc.clone())?;
+                } else if let Some(Expression::FunctionCall(..)) = args.get(i) {
+                    //TODO
+                } else if let Some(Expression::Attribute(..)) = args.get(i) {}
             }
-            self.scan_expressions(args, &ExpressionContext::Load)?;
+            // self.scan_expressions(args, &ExpressionContext::Load)?;
         }
         Ok(())
     }

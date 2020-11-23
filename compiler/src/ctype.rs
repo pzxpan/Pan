@@ -245,9 +245,9 @@ impl CType {
         (0, &CType::Unknown)
     }
 
-    pub fn param_type(&self) -> Vec<(CType, bool, bool)> {
+    pub fn param_type(&self) -> Vec<(CType, bool, bool, SymbolMutability)> {
         match self {
-            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2.clone(), s.3.clone())).collect(),
+            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2.clone(), s.3.clone(), s.4.clone())).collect(),
             _ => Vec::new()
         }
     }

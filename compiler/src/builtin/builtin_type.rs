@@ -32,7 +32,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("FunType".to_owned(), CType::Fn(FnType::new()), SymbolUsage::Builtin));
 
     let mut arg_types = Vec::new();
-    arg_types.push((String::from("value"), CType::Any, false, false, SymbolMutability::Immutable));
+    arg_types.push((String::from("value"), CType::Any, false, false, SymbolMutability::ImmRef));
     let tt = CType::Fn(FnType {
         name: "print".to_string(),
         arg_types: arg_types.clone(),
