@@ -27,7 +27,7 @@ pub struct Person {
 }
 fun main() {
    let aa = name_call(20,"sdd");
-   let person = Person({age:50,name:"pan",house:House({size:111.0,price:1_000_000.0})});
+   let person = Person!{age:50,name:"pan",house:House!{size:111.0,price:1_000_000.0}};
    let bb = person.house.size;
    print(bb);
    let cc = person.house.idea();

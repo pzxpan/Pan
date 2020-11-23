@@ -23,6 +23,7 @@ use crate::util::get_attribute_vec;
 use std::process::exit;
 use crate::util::get_full_name;
 use crate::util::get_last_name;
+use crate::compile::is_builtin_name;
 use crate::error::CompileErrorType::SyntaxError;
 
 pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable, SymbolTableError> {
@@ -86,7 +87,7 @@ impl fmt::Display for SymbolTableType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SymbolScope {
     Global,
     Local,
@@ -1051,7 +1052,7 @@ impl SymbolTableBuilder {
                 self.resolve_attribute(&expression.clone(), &ty)?;
             }
             FunctionCall(loc, name, args) => {
-                if name.expr_name().eq("print") || name.expr_name().eq("format") {
+                if is_builtin_name(&name.expr_name()) {
                     resovle_varargs_fun(self, &name.loc(), &args)?;
                 } else {
                     let mut ty = CType::Unknown;
@@ -1203,11 +1204,12 @@ impl SymbolTableBuilder {
                     ExpressionContext::Load => {}
                     ExpressionContext::Store => {
                         let mut ty = Unknown;
-                        if self.in_struct_func {
-                            ty = self.get_register_type(name.to_string()).clone();
-                        } else {
-                            ty = self.get_register_type(get_full_name(&self.package, &name.to_string())).clone();
-                        }
+                        ty = self.get_register_type(name.to_string()).clone();
+                        // if self.in_struct_func {
+                        //     ty = self.get_register_type(name.to_string()).clone();
+                        // } else {
+                        //     ty = self.get_register_type(get_full_name(&self.package, &name.to_string())).clone();
+                        // }
                         if ty == Unknown {
                             return Err(SymbolTableError {
                                 error: format!("找不到{}的定义", name),
@@ -1544,6 +1546,10 @@ impl SymbolTableBuilder {
             SymbolUsage::Const => {
                 symbol.scope = SymbolScope::Const;
             }
+            SymbolUsage::Import => {
+                symbol.scope = SymbolScope::Global;
+            }
+
             _ => {}
         }
         table.symbols.insert(name.to_owned(), symbol.clone());

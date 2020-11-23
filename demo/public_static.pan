@@ -11,7 +11,7 @@ pub struct Person {
 fun main() {
    let age = 10;
    let namemmm = "addd";
-   let person = Person({age,name: namemmm});
+   let person = Person!{age,name: namemmm};
 
    let a = person.ddd();
    print(person.age);

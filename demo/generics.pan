@@ -15,7 +15,7 @@ pub struct Pair<T:Add> {
 }
 
 fun main() {
-   let a = Pair({x:10000,y:20});
+   let a = Pair!{x:10000,y:20};
    let b = a.x_add_number(10);
    print(b);
    return;
