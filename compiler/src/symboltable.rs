@@ -1271,6 +1271,11 @@ impl SymbolTableBuilder {
                                 error: format!("{:?}变量已经moved,", name),
                                 location: loc.clone(),
                             });
+                        } else if m == SymbolMutability::MutRef {
+                                return Err(SymbolTableError {
+                                    error: format!("{:?}变量已有可变引用,无法赋值", name),
+                                    location: loc.clone(),
+                                });
                         }
                     }
                 }
@@ -1314,6 +1319,7 @@ impl SymbolTableBuilder {
                     let struct_ty = resovle_generic(sty, args.clone(), &self.tables);
                     ty = CType::Struct(struct_ty);
                     for arg in args {
+
                         //不在struct当前作用域，则需要检查Named参数的可见性
                         if !self.in_struct_scope(arg.name.name.clone()) {
                             let result = self.verify_field_visible(ty.borrow(), exp.as_ref().expr_name(), arg.name.name.clone());
@@ -1324,8 +1330,12 @@ impl SymbolTableBuilder {
                                 });
                             }
                         }
-
-                        self.scan_expression(&arg.expr, &ExpressionContext::Load)?;
+                        if let Expression::Variable(Identifier { name, loc }) = arg.expr.clone() {
+                            let mutability = self.get_field_mutabiltiy(&ty, arg.name.name.clone());
+                            self.verify_mutability(name.clone(), mutability, loc.clone())?;
+                        } else if let Expression::FunctionCall(..) = arg.expr.clone() {
+                            //TODO
+                        } else if let Expression::Attribute(..) = arg.expr.clone() {}
                     }
                     //验证参数是否足够
                     let hash_set: HashMap<String, CType> = args.iter().map(|s| {
@@ -1367,6 +1377,7 @@ impl SymbolTableBuilder {
         if name.is_empty() {
             return Ok(());
         }
+        println!("namessss {:?} change to {:?}", name, mutability);
         let table = self.tables.last_mut().unwrap();
         let mut symbol = table.symbols.get(&name).unwrap().clone();
         symbol.mutability = mutability;
@@ -1520,11 +1531,20 @@ impl SymbolTableBuilder {
             _ => unreachable!()
         }
     }
-
+    pub fn get_field_mutabiltiy(&self, ty: &CType, name: String) -> SymbolMutability {
+        if let Struct(n) = ty {
+            for (field_name, _, _, mutability) in &n.fields {
+                if name.eq(field_name) {
+                    return mutability.clone();
+                }
+            }
+        }
+        unreachable!()
+    }
     pub fn verify_field_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
         match ty {
             CType::Struct(ty) => {
-                for (method_name, _, is_pub) in ty.fields.iter() {
+                for (method_name, _, is_pub, ..) in ty.fields.iter() {
                     if method_name.eq(&method) {
                         return if *is_pub {
                             Ok(())

@@ -178,7 +178,7 @@ pub struct StructVariableDefinition {
     pub loc: Loc,
     pub ty: Expression,
     pub is_pub: bool,
-    pub is_own: bool,
+    pub mut_own: Option<MutOrOwn>,
     pub name: Identifier,
     pub initializer: Option<Expression>,
 }

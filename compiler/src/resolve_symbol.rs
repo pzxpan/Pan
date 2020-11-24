@@ -119,7 +119,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                     if let CType::Generic(n, cty) = content.1.clone() {
                         if expected_ty < cty.as_ref().clone() {
                             fields.swap_remove(idx);
-                            fields.insert(idx, (content.0.clone(), expected_ty.clone(), content.2));
+                            fields.insert(idx, (content.0.clone(), expected_ty.clone(), content.2, content.3.clone()));
                             generic_type_name = n.clone();
                         }
                     }
@@ -164,6 +164,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                     }
                     methods.insert(i, (fty.0.clone(), CType::Fn(FnType {
                         name: fnty.name.clone(),
+                        is_mut: fnty.is_mut,
                         arg_types: fn_arg_tys,
                         type_args: fnty.type_args.clone(),
                         ret_type: fn_ret_ty,
@@ -205,6 +206,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                     }
                     static_fields.insert(1, (fty.0.clone(), CType::Fn(FnType {
                         name: fnty.name.clone(),
+                        is_mut: fnty.is_mut,
                         arg_types: fn_arg_tys,
                         type_args: fnty.type_args.clone(),
                         ret_type: fn_ret_ty,

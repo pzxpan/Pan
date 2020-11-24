@@ -18,7 +18,7 @@ pub fun name_call(age: mut i32, name: mut string): bool {
 
 pub struct Person {
     pub age: i32,
-    pub name: own string,
+    pub name: mut string,
     pub house: own House,
     pub const fun is_older(): bool {
         age = 1000 + age;
@@ -31,13 +31,14 @@ pub struct Person {
 }
 fun main() {
    let a = 30;
-   let const b = "aaa";
+   let b = "aaa";
    let aa = name_call(a, b);
 
    a = a + 10;
    print(a);
    let house = House!{size:111.0,price:1_000_000.0};
-   let const person = Person!{age:50,name:"pan",house:house};
+   let name = "pan";
+   let const person = Person!{age:50,name:name,house:house};
  //  let c = house.add.clone();
    let bb = person.house.size;
    person.age = 60;

@@ -6,6 +6,7 @@ use crate::ctype::CType::Bool;
 use std::ops::Deref;
 use crate::util::get_attribute_vec;
 use crate::util::get_full_name;
+use crate::util::get_mutability;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -21,21 +22,7 @@ pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* 
     let ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
     let is_optional = s.1.as_ref().unwrap().default.is_some();
-    let mut_or_own = s.1.as_ref().unwrap().mut_own.clone();
-    let mut is_mut = false;
-    let mut is_own = false;
-    if mut_or_own.is_some() {
-        is_mut = mut_or_own.unwrap() == MutOrOwn::Mut;
-        is_own = !is_mut;
-    }
-    let mut is_ref = false;
-    if ty >= CType::Str {
-        is_ref = true;
-    }
-    let mutability = if is_ref {
-        if is_mut { SymbolMutability::MutRef } else { SymbolMutability::ImmRef }
-    } else if is_own { SymbolMutability::Moved } else { if is_mut { SymbolMutability::Mut } else { SymbolMutability::Immutable } };
-
+    let mutability = get_mutability(s.1.as_ref().unwrap().mut_own.clone(), &ty);
     (arg_name, ty, is_optional, s.1.as_ref().unwrap().is_varargs, mutability)
 }
 
@@ -52,7 +39,7 @@ impl HasType for FunctionDefinition {
         if arg_types.len() > 0 {
             is_varargs = arg_types.last().unwrap().3;
         }
-        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some(), is_varargs })
+        CType::Fn(FnType { name, is_mut: self.is_mut, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some(), is_varargs })
     }
 }
 
@@ -102,7 +89,7 @@ impl HasType for StructDefinition {
             table.symbols.insert(ty.name.name.clone(), symbol);
         }
 
-        let mut fields: Vec<(String, CType, bool)> = Vec::new();
+        let mut fields: Vec<(String, CType, bool, SymbolMutability)> = Vec::new();
         let mut methods: Vec<(String, CType)> = Vec::new();
         let mut static_methods: Vec<(String, CType)> = Vec::new();
 
@@ -117,7 +104,8 @@ impl HasType for StructDefinition {
                 }
                 StructPart::StructVariableDefinition(v) => {
                     let ty = v.ty.get_type(&local_tables);
-                    fields.push((v.name.name.clone(), ty, v.is_pub))
+                    let mutability = get_mutability(v.mut_own.clone(), &ty);
+                    fields.push((v.name.name.clone(), ty, v.is_pub, mutability))
                 }
                 _ => {}
             }

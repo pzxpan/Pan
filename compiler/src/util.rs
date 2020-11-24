@@ -1,6 +1,7 @@
 use crate::ctype::CType;
-use pan_parser::ast::{Loc, Identifier};
+use pan_parser::ast::{Loc, Identifier, MutOrOwn};
 use pan_parser::ast::Expression;
+use crate::symboltable::SymbolMutability;
 
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {
@@ -100,6 +101,22 @@ pub fn get_full_name(package: &String, s: &str) -> String {
 
 pub fn get_last_name(package: &String) -> String {
     return package.split_terminator("$").last().unwrap().to_string();
+}
+
+pub fn get_mutability(mut_or_own: Option<MutOrOwn>, ty: &CType) -> SymbolMutability {
+    let mut is_mut = false;
+    let mut is_own = false;
+    if mut_or_own.is_some() {
+        is_mut = mut_or_own.unwrap() == MutOrOwn::Mut;
+        is_own = !is_mut;
+    }
+    let mut is_ref = false;
+    if ty >= &CType::Str {
+        is_ref = true;
+    }
+    return if is_ref {
+        if is_mut { SymbolMutability::MutRef } else { SymbolMutability::ImmRef }
+    } else if is_own { SymbolMutability::Moved } else { if is_mut { SymbolMutability::Mut } else { SymbolMutability::Immutable } };
 }
 
 

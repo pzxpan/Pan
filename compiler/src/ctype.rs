@@ -52,6 +52,7 @@ pub struct FnType {
     pub ret_type: Box<CType>,
     pub is_varargs: bool,
     pub is_pub: bool,
+    pub is_mut: bool,
     pub is_static: bool,
     pub has_body: bool,
 }
@@ -66,6 +67,7 @@ impl FnType {
             ret_type: Box::new(CType::Any),
             is_varargs: false,
             is_pub: false,
+            is_mut: false,
             is_static: false,
             has_body: false,
         }
@@ -127,7 +129,7 @@ pub struct LambdaType {
 pub struct StructType {
     pub name: String,
     pub generics: Option<Vec<CType>>,
-    pub fields: Vec<(String, CType, bool)>,
+    pub fields: Vec<(String, CType, bool, SymbolMutability)>,
     pub static_methods: Vec<(String, CType)>,
     pub methods: Vec<(String, CType)>,
     pub bases: Vec<String>,
@@ -202,7 +204,7 @@ impl CType {
     pub fn attri_name_type(&self, name: String) -> (i32, &CType) {
         if let CType::Struct(ty) = self {
             //1为字段，2为普通函数，3为静态函数
-            for (method_name, cty, is_pub) in ty.fields.iter() {
+            for (method_name, cty, is_pub, ..) in ty.fields.iter() {
                 if method_name.eq(&name) {
                     return (1, cty);
                 }
