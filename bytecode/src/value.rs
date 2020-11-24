@@ -14,7 +14,7 @@ pub struct FnValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd,Serialize, Deserialize)]
 pub struct ThreadValue {
     pub typ: Box<Value>,
     pub field_map: Value,
@@ -24,10 +24,11 @@ pub struct ThreadValue {
 pub struct ClosureValue {
     pub name: String,
     pub code: CodeObject,
+    pub capture_values: Box<Vec<Value>>,
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd,Serialize, Deserialize)]
 pub enum Value {
     Bool(bool),
     Char(char),
@@ -302,20 +303,20 @@ impl Display for Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq,Serialize, Deserialize)]
 pub struct InstanceObj {
     pub typ: Box<Value>,
     pub field_map: Value,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq,Serialize, Deserialize)]
 pub struct EnumObj {
     pub typ: Box<Value>,
     pub field_map: Option<Vec<Value>>,
     pub item_name: Value,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq,Serialize, Deserialize)]
 pub enum Obj {
     StringObj(String),
     ArrayObj(Vec<Value>),
