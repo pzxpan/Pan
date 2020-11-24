@@ -139,6 +139,7 @@ impl VirtualMachine {
 
     pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
         let mut update_value = Value::Nil;
+        println!("attr:{:?},value:{:?}",attr,value);
         match obj {
             Value::Obj(ref mut e) => {
                 match e.as_mut() {

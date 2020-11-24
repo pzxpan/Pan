@@ -21,7 +21,8 @@ use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
 use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
-use pan_bytecode::bytecode::Instruction::LoadName;
+use pan_bytecode::bytecode::Instruction::{LoadName, LoadAttr};
+use crate::compile::FunctionContext::Function;
 
 
 lazy_static! {
@@ -82,7 +83,7 @@ struct CompileContext {
 enum FunctionContext {
     NoFunction,
     Function,
-    AsyncFunction,
+    // AsyncFunction,
     StructFunction,
 }
 
@@ -645,15 +646,20 @@ impl<O: OutputStream> Compiler<O> {
         in_lambda: bool,
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
-        self.ctx = CompileContext {
-            in_lambda,
-            in_loop: false,
-            func: if is_async {
-                FunctionContext::AsyncFunction
-            } else {
-                FunctionContext::Function
-            },
-        };
+        if in_lambda {
+            self.ctx = CompileContext {
+                in_lambda,
+                in_loop: false,
+                func: prev_ctx.func,
+            };
+        } else {
+            self.ctx = CompileContext {
+                in_lambda,
+                in_loop: false,
+                func: FunctionContext::Function,
+            };
+        }
+
 
         let qualified_name = self.create_qualified_name(name, "");
         let old_qualified_path = self.current_qualified_path.take();
@@ -1064,10 +1070,15 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_store(&mut self, target: &ast::Expression) -> Result<(), CompileError> {
         match &target {
             ast::Expression::Variable(ast::Identifier { name, .. }) => {
-                let s = self.lookup_name(name);
-                if s.is_attribute {
-                    self.load_name("self");
-                    self.emit(Instruction::StoreAttr(name.clone()));
+                // let s = self.lookup_name(name);
+                if self.ctx.func == FunctionContext::StructFunction {
+                    if self.is_current_scope(name.as_str()) {
+                        self.store_name(name);
+                    } else {
+                        self.load_name("self");
+                        self.emit(Instruction::StoreAttr(name.clone()));
+                        self.store_name("self");
+                    }
                 } else {
                     self.store_name(name);
                 }
@@ -1076,6 +1087,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(a)?;
                 self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
+                //TODO这里需要修改，struct中的subscript数据怎么办;
                 self.store_name(&a.expr_name());
             }
             ast::Expression::Attribute(_, obj, attr, idx) => {
@@ -1410,7 +1422,19 @@ impl<O: OutputStream> Compiler<O> {
             List(_, _) => {}
 
             Variable(ast::Identifier { name, .. }) => {
-                self.load_name(name);
+                if self.ctx.func == FunctionContext::StructFunction {
+                    //顺序不要变，后期可能会允许let绑定覆盖
+                    if self.is_current_scope(name.as_str()) {
+                        self.load_name(name);
+                    } else if self.is_struct_item_def("self".to_string(), name.clone()) {
+                        self.load_name("self");
+                        self.emit(LoadAttr(name.clone()));
+                    } else {
+                        self.load_name(name);
+                    }
+                } else {
+                    self.load_name(name);
+                }
             }
             Yield(_, _) => {}
             Slice(_, _) => {}
@@ -1622,7 +1646,9 @@ impl<O: OutputStream> Compiler<O> {
 
         if self.ctx.func == FunctionContext::StructFunction {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                if self.is_struct_item_def("self".to_string(), name.clone()) {
+                if self.is_current_scope(name.as_str()) {
+                    self.emit(LoadName(name.clone(), NameScope::Local));
+                } else if self.is_struct_item_def("self".to_string(), name.clone()) {
                     self.emit(Instruction::LoadName(
                         "self".to_string(),
                         bytecode::NameScope::Local,

@@ -93,10 +93,15 @@ impl Frame {
         ins2
     }
 
+    // thread_id:ThreadId(2),instruction is:LoadConst(Code(<code object aabb at ??? file "/Users/panzhenxing/Desktop/PanPan/Pan/demo/structs.pan", line 31>)),
+    // thread_id:ThreadId(2),instruction is:LoadConst(String("older_than.<locals>.aabb")),
+    // thread_id:ThreadId(2),instruction is:MakeFunction,
+    // thread_id:ThreadId(2),instruction is:StoreName("aabb", Local),
+    // thread_id:ThreadId(2),instruction is:LoadName("$default$aabb", Local),
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        //println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
+        println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -684,9 +689,11 @@ impl Frame {
     }
 
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
+
         let mut parent = self.pop_value();
         let value = self.pop_value();
         let update_value = vm.set_attribute(&mut parent, attr_name.to_owned(), value);
+        println!("update_value:{:?}", update_value);
         self.push_value(update_value);
         None
     }

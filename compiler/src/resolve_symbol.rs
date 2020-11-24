@@ -113,8 +113,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
             let expected_ty = arg.expr.get_type(tables);
             let arg_name = &arg.name.name;
             let mut generic_type_name = "".to_string();
-            for (idx, content) in st.fields.iter().enumerate()
-            {
+            for (idx, content) in st.fields.iter().enumerate() {
                 if content.0.eq(arg_name) {
                     if let CType::Generic(n, cty) = content.1.clone() {
                         if expected_ty < cty.as_ref().clone() {

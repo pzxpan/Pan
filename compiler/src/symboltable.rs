@@ -810,7 +810,7 @@ impl SymbolTableBuilder {
             Args(_, _) => {}
             VariableDefinition(location, decl, expression) => {
                 let muttable = if decl.is_mut { SymbolUsage::Mut } else { SymbolUsage::Immutable };
-                println!("ssssexpression:{:?},mutt:{:?}", decl, muttable);
+                println!("ssssexpression:{:?},mutt:{:?},lambda:{:?}", decl, muttable, expression.as_ref().unwrap());
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
@@ -1302,6 +1302,7 @@ impl SymbolTableBuilder {
                             if self.in_current_scope(name.clone()) {
                                 self.register_name(name, ty, SymbolUsage::Mut, loc.clone())?;
                             } else if self.is_const_fun {
+                                //包括自身的属性和其他的变量;
                                 return Err(SymbolTableError {
                                     error: format!("不可变函数中不能修改外部的值"),
                                     location: loc.clone(),
