@@ -293,7 +293,7 @@ impl Display for Value {
             }
             Value::Thread(n) => write!(f, "<func {}>", n.field_map.to_string()),
             Value::Fn(FnValue { name, .. }) |
-            Value::Closure(ClosureValue { name, .. }) => write!(f, "<func {}>", name),
+            Value::Closure(ClosureValue { name, .. }) => write!(f, "<closure {}>", name),
 // Value::NativeFn(NativeFn { name, .. }) => write!(f, "<func {}>", name),
             Value::Type(TypeValue { name, .. }) => write!(f, "<type {}>", name),
             Value::Nil => write!(f, "None"),
