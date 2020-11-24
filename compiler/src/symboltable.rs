@@ -1133,7 +1133,7 @@ impl SymbolTableBuilder {
                         self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                     }
                     self.resolve_fn(expression, &ty)?;
-                    //self.scan_expressions(args, &ExpressionContext::Load)?;
+                    self.scan_expressions(args, &ExpressionContext::Load)?;
                 }
             }
             Not(loc, name) => {
@@ -1272,10 +1272,10 @@ impl SymbolTableBuilder {
                                 location: loc.clone(),
                             });
                         } else if m == SymbolMutability::MutRef {
-                                return Err(SymbolTableError {
-                                    error: format!("{:?}变量已有可变引用,无法赋值", name),
-                                    location: loc.clone(),
-                                });
+                            return Err(SymbolTableError {
+                                error: format!("{:?}变量已有可变引用,无法赋值", name),
+                                location: loc.clone(),
+                            });
                         }
                     }
                 }
@@ -1314,6 +1314,7 @@ impl SymbolTableBuilder {
             }
             Number(_, _) => {}
             NamedFunctionCall(_, exp, args) => {
+                println!("named_call:{:?},", expression);
                 let mut ty = self.get_register_type(exp.as_ref().expr_name());
                 if let CType::Struct(sty) = ty.clone() {
                     let struct_ty = resovle_generic(sty, args.clone(), &self.tables);
@@ -1335,7 +1336,10 @@ impl SymbolTableBuilder {
                             self.verify_mutability(name.clone(), mutability, loc.clone())?;
                         } else if let Expression::FunctionCall(..) = arg.expr.clone() {
                             //TODO
-                        } else if let Expression::Attribute(..) = arg.expr.clone() {}
+                        } else if let Expression::Attribute(..) = arg.expr.clone() {} else {
+                            self.scan_expression(&arg.expr, &ExpressionContext::Load)?;
+                            //self.scan_expression(&arg.name, &ExpressionContext::)?;
+                        }
                     }
                     //验证参数是否足够
                     let hash_set: HashMap<String, CType> = args.iter().map(|s| {
@@ -1448,6 +1452,9 @@ impl SymbolTableBuilder {
     }
 
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+        if self.in_struct_func {
+            return Ok(());
+        }
         match ty {
             CType::Struct(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {
@@ -1542,6 +1549,9 @@ impl SymbolTableBuilder {
         unreachable!()
     }
     pub fn verify_field_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+        if self.in_struct_func {
+            return Ok(());
+        }
         match ty {
             CType::Struct(ty) => {
                 for (method_name, _, is_pub, ..) in ty.fields.iter() {
