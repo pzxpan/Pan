@@ -57,11 +57,13 @@ fun main() {
    let name = "pan";
    let const person = Person!{age:50,name:name,ddd:house.size,house:House!{size:111.0,price:1_000_000.0}};
  //  let c = house.add.clone();
+  // person.age = 40;
+  // person.older_than3(40);
    person.is_older();
    let bb = person.house.size;
-   person.age = 60;
+  // person.age = 60;
    print(bb);
-   let cc = person.house.idea();
+   // let cc = person.house.idea();
 }
 
 

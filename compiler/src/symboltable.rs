@@ -1140,11 +1140,19 @@ impl SymbolTableBuilder {
                             }
                         } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
                             ty = self.get_register_type(n.expr_name());
+                            ty = self.resovle_method(name, &ty)?;
                             // if self.in_current_scope(n.expr_name()) {
                             //     ty = self.get_register_type(n.expr_name());
                             // } else {
                             //     ty = self.get_register_type(get_full_name(&self.package, &n.expr_name()));
                             // }
+                            if let CType::Fn(fnty) = ty.clone() {
+                                if fnty.is_mut {
+                                    self.verify_mutability(expression.expr_name(), SymbolMutability::MutRef, expression.loc())?;
+                                } else {
+                                    self.check_readable(expression.expr_name(), expression.loc())?;
+                                }
+                            }
                         }
                     }
 
@@ -1224,6 +1232,9 @@ impl SymbolTableBuilder {
                     });
                 }
                 self.scan_expression(b, &ExpressionContext::Load)?;
+                if let Attribute(loc, a, b, c) = a.as_ref() {
+                    self.check_storeable(a.expr_name(), loc.clone())?;
+                }
                 self.scan_expression(a, &ExpressionContext::Store)?;
             }
             AssignOr(loc, a, b) |
@@ -1246,6 +1257,9 @@ impl SymbolTableBuilder {
                 }
                 self.scan_expression(b, &ExpressionContext::Load)?;
                 self.scan_expression(a, &ExpressionContext::Load)?;
+                if let Attribute(loc, a, b, c) = a.as_ref() {
+                    self.check_storeable(a.expr_name(), loc.clone())?;
+                }
                 self.scan_expression(a, &ExpressionContext::Store)?;
             }
             BoolLiteral(_, _) => {}
@@ -1294,23 +1308,8 @@ impl SymbolTableBuilder {
                                 });
                             }
                         }
-                        let m = self.get_variable_mutbility(name.to_string());
-                        if m == SymbolMutability::ImmRef || m == SymbolMutability::Immutable {
-                            return Err(SymbolTableError {
-                                error: format!("不能修改不可变变量{:?}的值,", name),
-                                location: loc.clone(),
-                            });
-                        } else if m == SymbolMutability::Moved {
-                            return Err(SymbolTableError {
-                                error: format!("{:?}变量已经moved,", name),
-                                location: loc.clone(),
-                            });
-                        } else if m == SymbolMutability::MutRef {
-                            return Err(SymbolTableError {
-                                error: format!("{:?}变量已有可变引用,无法赋值", name),
-                                location: loc.clone(),
-                            });
-                        }
+                        self.check_storeable(name.to_string(), loc.clone())?;
+                        // let m = self.get_variable_mutbility(name.to_string());
                     }
                 }
             }
@@ -1488,6 +1487,47 @@ impl SymbolTableBuilder {
                     location: loc,
                 });
             }
+        }
+        Ok(())
+    }
+
+    pub fn check_readable(&mut self, name: String, loc: Loc) -> SymbolTableResult {
+        let t = self.get_variable_mutbility(name.clone());
+        match t {
+            SymbolMutability::MutRef => {
+                return Err(SymbolTableError {
+                    error: format!("变量{:?}已存在可变引用，不能再被读取", name),
+                    location: loc,
+                });
+            }
+            SymbolMutability::Moved => {
+                return Err(SymbolTableError {
+                    error: format!("变量{:?}已被move，不能在访问", name),
+                    location: loc,
+                });
+            }
+            _ => { return Ok(()); }
+        }
+        Ok(())
+    }
+
+    pub fn check_storeable(&mut self, name: String, loc: Loc) -> SymbolTableResult {
+        let m = self.get_variable_mutbility(name.clone());
+        if m == SymbolMutability::ImmRef || m == SymbolMutability::Immutable {
+            return Err(SymbolTableError {
+                error: format!("不能修改不可变变量{:?}的值,", name),
+                location: loc.clone(),
+            });
+        } else if m == SymbolMutability::Moved {
+            return Err(SymbolTableError {
+                error: format!("{:?}变量已经moved,", name),
+                location: loc.clone(),
+            });
+        } else if m == SymbolMutability::MutRef {
+            return Err(SymbolTableError {
+                error: format!("{:?}变量已有可变引用,无法赋值", name),
+                location: loc.clone(),
+            });
         }
         Ok(())
     }
