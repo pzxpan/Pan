@@ -271,7 +271,7 @@ pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: 
     Ok(())
 }
 
-pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &Vec<Expression>) -> SymbolTableResult {
+pub fn resovle_build_funs(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &Vec<Expression>) -> SymbolTableResult {
     if var_args.is_empty() {
         return Err(SymbolTableError {
             error: format!("参数为空"),
@@ -290,6 +290,14 @@ pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: 
             error: format!("格式化参数需要静态字符串"),
             location: fmt_expr.loc().clone(),
         });
+    } else {
+        let c = fmt_expr.get_type(&build.tables);
+        if c == CType::Unknown {
+            return Err(SymbolTableError {
+                error: format!("变量{:?}为定义", fmt_expr.expr_name()),
+                location: fmt_expr.loc().clone(),
+            });
+        }
     }
 
     let a = check(&s);

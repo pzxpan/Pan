@@ -14,7 +14,7 @@ use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds, resovle_varargs_fun};
+use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds, resovle_build_funs};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
@@ -247,6 +247,7 @@ pub struct SymbolTableBuilder {
     pub package: String,
     fun_call: bool,
     in_struct_func: bool,
+    is_const_fun: bool,
 }
 
 enum ExpressionContext {
@@ -406,12 +407,16 @@ impl SymbolTableBuilder {
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                                     self.in_struct_func = true;
+                                    self.is_const_fun = !def.is_mut;
                                     if def.body.is_some() {
                                         self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                                         if def.generics.is_empty() {
                                             self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
                                         }
                                     }
+                                    self.is_const_fun = false;
+                                    //更新self为可变状态;
+                                    self.update_self_mutability("self".to_string(), SymbolMutability::Mut);
                                     self.in_struct_func = false;
                                     self.leave_scope();
                                 }
@@ -479,12 +484,15 @@ impl SymbolTableBuilder {
                         }
                         self.enter_function(&func_name, &part.as_ref().params, part.loc.1)?;
                         self.in_struct_func = true;
+                        self.is_const_fun = !part.is_mut;
                         if part.body.is_some() {
                             self.scan_statement(&part.body.as_ref().unwrap())?;
                             if part.generics.is_empty() {
                                 self.get_body_return_ty(&part.body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
                             }
                         }
+                        self.is_const_fun = false;
+                        self.update_self_mutability("self".to_string(), SymbolMutability::Mut);
                         self.in_struct_func = false;
                         self.leave_scope();
                     }
@@ -708,6 +716,7 @@ impl SymbolTableBuilder {
 
     fn in_struct_scope(&self, name: String) -> bool {
         let len = self.tables.len();
+        //多层咋整,len - 2 有点不对啊
         let a = self.tables.get(len - 2).unwrap().lookup(name.as_str());
         if a.is_some() {
             return true;
@@ -1082,27 +1091,45 @@ impl SymbolTableBuilder {
                 self.resolve_attribute(&expression.clone(), &ty)?;
             }
             FunctionCall(loc, name, args) => {
-                if is_builtin_name(&name.expr_name()) {
-                    resovle_varargs_fun(self, &name.loc(), &args)?;
+                if is_builtin_name(&name.expr_name()) && name.is_a_variable() {
+                    if name.expr_name().eq("print") || name.expr_name().eq("format") {
+                        resovle_build_funs(self, &name.loc(), &args)?;
+                    } else {
+                        self.resolve_fn(expression, &self.get_register_type(name.expr_name()))?;
+                    }
                 } else {
                     let mut ty = CType::Unknown;
                     if self.in_struct_func {
                         if let Variable(ident) = name.as_ref() {
-                            if self.in_current_scope(ident.clone().name) {
-                                ty = self.get_register_type(name.expr_name());
-                            } else if self.in_struct_scope(ident.clone().name) {
+                            if self.in_current_scope(ident.clone().name) || self.in_struct_scope(ident.clone().name) {
                                 ty = self.get_register_type(name.expr_name());
                             } else {
                                 ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
                             }
                         } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
                             ty = self.get_register_type(n.expr_name());
+                            ty = self.resovle_method(name, &ty)?;
 
                             // if self.in_current_scope(n.expr_name()) {
                             //     ty = self.get_register_type(n.expr_name());
                             // } else {
                             //     ty = self.get_register_type(get_full_name(&self.package, &n.expr_name()));
                             // }
+                        }
+                        if let CType::Fn(fnty) = ty.clone() {
+                            if self.is_const_fun {
+                                if fnty.is_mut {
+                                    if !self.in_current_scope(name.expr_name()) && self.in_struct_scope(name.expr_name()) {
+                                        return Err(SymbolTableError {
+                                            error: format!("struct中的不可变函数中不能调用struct可变的函数{:?}", name.expr_name()),
+                                            location: loc.clone(),
+                                        });
+                                    }
+                                }
+                            } else {
+                                //验证struct自身在函数中的可变引用次数
+                                self.verify_mutability("self".to_string(), SymbolMutability::MutRef, expression.loc())?;
+                            }
                         }
                     } else {
                         if let Variable(ident) = name.as_ref() {
@@ -1133,7 +1160,7 @@ impl SymbolTableBuilder {
                         self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                     }
                     self.resolve_fn(expression, &ty)?;
-                    self.scan_expressions(args, &ExpressionContext::Load)?;
+                    if !name.is_a_variable() { self.scan_expressions(args, &ExpressionContext::Load)?; }
                 }
             }
             Not(loc, name) => {
@@ -1257,8 +1284,15 @@ impl SymbolTableBuilder {
                                 location: loc.clone(),
                             });
                         }
-                        if self.in_struct_func && !self.in_struct_scope(name.clone()) {
-                            self.register_name(name, ty, SymbolUsage::Mut, loc.clone())?;
+                        if self.in_struct_func {
+                            if self.in_current_scope(name.clone()) {
+                                self.register_name(name, ty, SymbolUsage::Mut, loc.clone())?;
+                            } else if self.is_const_fun {
+                                return Err(SymbolTableError {
+                                    error: format!("不可变函数中不能修改外部的值"),
+                                    location: loc.clone(),
+                                });
+                            }
                         }
                         let m = self.get_variable_mutbility(name.to_string());
                         if m == SymbolMutability::ImmRef || m == SymbolMutability::Immutable {
@@ -1388,6 +1422,23 @@ impl SymbolTableBuilder {
         table.symbols.insert(name.to_owned(), symbol.clone());
         Ok(())
     }
+    // 循环取最近一个self进行修改
+    pub fn update_self_mutability(&mut self, name: String, mutability: SymbolMutability) -> SymbolTableResult {
+        if name.is_empty() {
+            return Ok(());
+        }
+        let len = self.tables.len();
+        for i in (0..len).rev() {
+            let table = self.tables.get_mut(i).unwrap();
+            let a = table.lookup(name.as_str());
+            if a.is_some() {
+                let mut symbol = a.unwrap().clone();
+                symbol.mutability = mutability.clone();
+                table.symbols.insert(name.to_owned(), symbol.clone());
+            }
+        }
+        Ok(())
+    }
 
     pub fn verify_mutability(&mut self, name: String, mutability: SymbolMutability, loc: Loc) -> SymbolTableResult {
         println!("ssssname:{:?},loc:{:?},mut::{:?}", name, loc, mutability);
@@ -1396,7 +1447,7 @@ impl SymbolTableBuilder {
             SymbolMutability::ImmRef => {
                 if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut {
                     return Err(SymbolTableError {
-                        error: format!("变量{:?}为不可变变量，不能被可变借用", name),
+                        error: format!("变量{:?}为不可变变量引用，不能被可变借用", name),
                         location: loc,
                     });
                 }
@@ -1424,7 +1475,11 @@ impl SymbolTableBuilder {
             }
             SymbolMutability::Mut => {
                 if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Moved {
-                    self.update_mutability(name.clone(), mutability.clone())?;
+                    if "self".eq(name.as_str()) {
+                        self.update_self_mutability("self".to_string(), mutability.clone())?;
+                    } else {
+                        self.update_mutability(name.clone(), mutability.clone())?;
+                    }
                 }
             }
             SymbolMutability::Moved => {
@@ -1695,6 +1750,7 @@ impl SymbolTableBuilder {
         match role {
             SymbolUsage::Attribute => {
                 symbol.is_attribute = true;
+                symbol.mutability = SymbolMutability::Mut;
             }
             SymbolUsage::Parameter => {
                 symbol.scope = SymbolScope::Parameter;

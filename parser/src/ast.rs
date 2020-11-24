@@ -341,6 +341,12 @@ impl Expression {
             _ => "".to_string()
         }
     }
+    pub fn is_a_variable(&self) -> bool {
+        match self {
+            Expression::Variable(id) => true,
+            _ => false
+        }
+    }
     pub fn is_compare_operation(&self) -> bool {
         match self {
             Expression::More(_, _, _) |
