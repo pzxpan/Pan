@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::collections::HashMap;
 
@@ -15,6 +15,7 @@ use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::Duration;
+use std::borrow::Borrow;
 
 fn main() {
     // let num = 1000;
@@ -66,9 +67,13 @@ fn test_one_file(home_path: &Path) {
         let scope = Scope::with_builtins(v, global_value, &vm);
         //vm.run_code_obj(code_object.unwrap(),scope);
 
-        let handle = run_code_in_thread(code_object.unwrap().1, scope);
+        let code = code_object.unwrap().1;
+
+        let handle = run_code_in_thread(code.clone(), scope);
         handle.join().unwrap();
-        //   std::thread::sleep(Duration::from_secs(10));
+        let byte_file = env::current_dir().unwrap().join("demo").join("dst.txt");
+        let mut f = File::create(byte_file).unwrap();
+        f.write(&code.clone().to_bytes()).unwrap();
     } else {
         let error = code_object.err().unwrap();
         match error.error {
