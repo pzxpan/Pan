@@ -16,9 +16,11 @@ use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
 use std::cell::RefCell;
+use crate::scope::NameProtocol;
 
 pub struct VirtualMachine {
-    pub frames: Vec<FrameRef>,
+    pub scope: Scope,
+    pub frame_count: usize,
     pub initialized: bool,
 }
 
@@ -32,10 +34,11 @@ pub enum InitParameter {
 }
 
 impl VirtualMachine {
-    pub fn new() -> VirtualMachine {
+    pub fn new(scope: Scope) -> VirtualMachine {
         let initialize_parameter = InitParameter::NoInitialize;
         let mut vm = VirtualMachine {
-            frames: vec![],
+            scope,
+            frame_count: 0,
             initialized: false,
         };
         vm.initialize(initialize_parameter);
@@ -54,8 +57,8 @@ impl VirtualMachine {
         }
     }
 
-    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> FrameResult {
-        let frame = Frame::new(code, hash_map, global);
+    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
+        let frame = Frame::new(code, hash_map);
         self.run_frame(frame)
     }
 
@@ -72,6 +75,46 @@ impl VirtualMachine {
         let result = frame.run(self);
         //self.frames.pop();
         result
+    }
+
+    #[cfg_attr(feature = "flame-it", flame("Frame"))]
+    pub fn load_name(
+        &self,
+        name: &str,
+        name_scope: &bytecode::NameScope,
+    ) -> Value {
+        let optional_value = match name_scope {
+            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
+            bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
+            bytecode::NameScope::Const => self.scope.load_global(name.to_string()),
+        };
+
+        match optional_value {
+            Some(value) => value,
+            None => {
+                Value::Nil
+            }
+        }
+    }
+
+    pub fn store_name(
+        &self,
+        name: &str,
+        obj: Value,
+        name_scope: &bytecode::NameScope,
+    ) -> FrameResult {
+        match name_scope {
+            bytecode::NameScope::Global => {
+                self.scope.store_global(name.to_string(), obj);
+            }
+            bytecode::NameScope::Local => {
+                self.scope.store_name(name.to_string(), obj);
+            }
+            bytecode::NameScope::Const => {
+                self.scope.store_global(name.to_string(), obj);
+            }
+        }
+        None
     }
 
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
@@ -837,26 +880,23 @@ impl VirtualMachine {
     }
 }
 
-impl Default for VirtualMachine {
-    fn default() -> Self {
-        VirtualMachine::new()
-    }
-}
 
-pub fn run_code_in_thread(code: CodeObject, scope: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> JoinHandle<()> {
+pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> JoinHandle<()> {
     return thread::spawn(|| {
+        let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new();
-        vm.run_code_obj(code, scope, global);
+        let mut vm = VirtualMachine::new(scope);
+        vm.run_code_obj(code, vm.scope.get_locals().clone());
         let handle = thread::current();
     });
 }
 
-pub fn run_code_in_sub_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) {
+pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) {
     thread::spawn(|| {
+        let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new();
-        vm.run_code_obj(code, hash_map, global);
+        let mut vm = VirtualMachine::new(scope);
+        vm.run_code_obj(code, vm.scope.get_locals().clone());
         let handle = thread::current();
     });
 

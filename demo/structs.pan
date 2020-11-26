@@ -30,7 +30,7 @@ pub struct Person {
     pub fun older_than(a: i32): bool {
         //money = 100;
         let aabb = () => {
-            return 2000 + 1000;
+            return age + 1000;
         };
         let aa = aabb();
         age += aa;

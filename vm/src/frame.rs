@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::CodeObject;
-use pan_bytecode::value::{Value, FnValue, Obj};
+use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
 use crate::vm::VirtualMachine;
 use crate::scope::{Scope, NameProtocol};
@@ -49,7 +49,7 @@ pub struct Frame {
     /// 循环块等
     blocks: RefCell<Vec<Block>>,
     /// 变量
-    pub scope: Scope,
+    pub value_hash_map: HashMap<String, Value>,
     /// PC计数
     pub lasti: Cell<usize>,
 }
@@ -64,12 +64,12 @@ pub enum ExecutionResult {
 pub type FrameResult = Option<ExecutionResult>;
 
 impl Frame {
-    pub fn new(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> Frame {
+    pub fn new(code: CodeObject, value_hash_map: HashMap<String, Value>) -> Frame {
         Frame {
             code,
             stack: RefCell::new(vec![]),
             blocks: RefCell::new(vec![]),
-            scope: Scope::new(vec![hash_map], global),
+            value_hash_map,
             lasti: Cell::new(0),
         }
     }
@@ -116,11 +116,15 @@ impl Frame {
             bytecode::Instruction::LoadName(
                 ref name,
                 ref scope,
-            ) => self.load_name(vm, name, scope),
+            ) => {
+                let v = vm.load_name(name, scope);
+                self.push_value(v);
+                None
+            }
             bytecode::Instruction::StoreName(
                 ref name,
                 ref scope,
-            ) => self.store_name(vm, name, scope),
+            ) => vm.store_name(name, self.pop_value(), scope),
             bytecode::Instruction::Subscript => self.execute_subscript(vm),
             bytecode::Instruction::StoreSubscript => self.execute_store_subscript(vm),
             bytecode::Instruction::DeleteSubscript => self.execute_delete_subscript(vm),
@@ -215,8 +219,9 @@ impl Frame {
                 None
             }
             bytecode::Instruction::MakeFunction => self.execute_make_function(vm),
+            bytecode::Instruction::MakeLambda(size) => self.execute_make_lambda(vm, *size),
             bytecode::Instruction::CallFunction(typ) => self.execute_call_function(vm, typ),
-            bytecode::Instruction::StartThread => self.start_thread(),
+            bytecode::Instruction::StartThread => self.start_thread(vm),
             bytecode::Instruction::Jump(target) => {
                 self.jump(*target);
                 None
@@ -342,27 +347,27 @@ impl Frame {
         Value::new_array_obj(elements)
     }
 
-    fn store_name(
-        &self,
-        vm: &VirtualMachine,
-        name: &str,
-        name_scope: &bytecode::NameScope,
-    ) -> FrameResult {
-        let obj = self.pop_value();
-
-        match name_scope {
-            bytecode::NameScope::Global => {
-                self.scope.store_global(name.to_string(), obj);
-            }
-            bytecode::NameScope::Local => {
-                self.scope.store_name(name.to_string(), obj);
-            }
-            bytecode::NameScope::Const => {
-                self.scope.store_global(name.to_string(), obj);
-            }
-        }
-        None
-    }
+    // fn store_name(
+    //     &self,
+    //     vm: &VirtualMachine,
+    //     name: &str,
+    //     name_scope: &bytecode::NameScope,
+    // ) -> FrameResult {
+    //     let obj = self.pop_value();
+    //
+    //     match name_scope {
+    //         bytecode::NameScope::Global => {
+    //             self.v.store_global(name.to_string(), obj);
+    //         }
+    //         bytecode::NameScope::Local => {
+    //             self.scope.store_name(name.to_string(), obj);
+    //         }
+    //         bytecode::NameScope::Const => {
+    //             self.scope.store_global(name.to_string(), obj);
+    //         }
+    //     }
+    //     None
+    // }
     fn execute_format_string(&self, size: &usize) -> FrameResult {
         let v = self.pop_multiple(*size);
         let format_str = self.pop_value();
@@ -371,29 +376,6 @@ impl Frame {
         None
     }
 
-    #[cfg_attr(feature = "flame-it", flame("Frame"))]
-    fn load_name(
-        &self,
-        vm: &VirtualMachine,
-        name: &str,
-        name_scope: &bytecode::NameScope,
-    ) -> FrameResult {
-        let optional_value = match name_scope {
-            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
-            bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
-            bytecode::NameScope::Const => self.scope.load_global(name.to_string()),
-        };
-
-        let value = match optional_value {
-            Some(value) => value,
-            None => {
-                Value::Nil
-            }
-        };
-        println!("load_name value: {:?},栈名:{:p}", value, self);
-        self.push_value(value.clone());
-        None
-    }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let subscript = self.pop_value();
@@ -433,7 +415,7 @@ impl Frame {
         self.push_value(map_obj);
         None
     }
-    fn start_thread(&self) -> FrameResult {
+    fn start_thread(&self, vm: &VirtualMachine) -> FrameResult {
         let func_ref = self.pop_value();
         let code = func_ref.code();
         let mut hash_map = HashMap::new();
@@ -451,7 +433,7 @@ impl Frame {
         // global.extend(self.scope.globals.borrow().iter().to_owned());
         // let s = self.scope.new_child_scope_with_locals();
         // self.scope.add_local_value(hash_map);
-        Frame::create_new_thread(code, hash_map, self.scope.globals.clone());
+        Frame::create_new_thread(code, hash_map, vm.scope.globals.clone());
         None
     }
     fn create_new_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> FrameResult {
@@ -513,7 +495,7 @@ impl Frame {
             }
         }
 
-        let value = vm.run_code_obj(func_ref.code().to_owned(), hash_map, self.scope.globals.clone());
+        let value = vm.run_code_obj(func_ref.code().to_owned(), hash_map);
         match value {
             Some(ExecutionResult::Return(v)) => {
                 self.push_value(v);
@@ -549,6 +531,15 @@ impl Frame {
         let code_obj = self.pop_value();
         let func = FnValue { name: qualified_name.name(), code: code_obj.code(), has_return: true };
         self.push_value(Value::Fn(func));
+        None
+    }
+
+    fn execute_make_lambda(&self, vm: &VirtualMachine, count: usize) -> FrameResult {
+        let qualified_name = self.pop_value();
+        let capture_value = self.pop_multiple(count);
+        let code_obj = self.pop_value();
+        let func = ClosureValue { name: qualified_name.name(), code: code_obj.code(), capture_values: Box::new(capture_value), has_return: true };
+        self.push_value(Value::Closure(func));
         None
     }
 
@@ -776,15 +767,15 @@ impl fmt::Debug for Frame {
             .iter()
             .map(|elem| format!("\n  > {:?}", elem))
             .collect::<String>();
-        let dict = self.scope.get_locals();
-        let local_str = dict
-            .into_iter()
-            .map(|elem| format!("\n  {:?} = {:?}", elem.0, elem.1))
-            .collect::<String>();
+        // let dict = self.scope.get_locals();
+        // let local_str = dict
+        //     .into_iter()
+        //     .map(|elem| format!("\n  {:?} = {:?}", elem.0, elem.1))
+        //     .collect::<String>();
         write!(
             f,
-            "栈中有 {{ \n 数据栈:{}\n 块:{}\n 局部变量:{}\n}}",
-            stack_str, block_str, local_str
+            "栈中有 {{ \n 数据栈:{}\n 块:{}\n\n}}",
+            stack_str, block_str,
         )
     }
 }

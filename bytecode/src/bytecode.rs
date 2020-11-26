@@ -105,6 +105,7 @@ pub enum Instruction {
     /// 假跳真弹
     JumpIfFalseOrPop(Label),
     MakeFunction,
+    MakeLambda(usize),
     CallFunction(CallType),
     ForIter(Label),
     Ignore,
@@ -399,6 +400,7 @@ impl Instruction {
             JumpIfTrueOrPop(target) => w!(JumpIfTrueOrPop, label_map[target]),
             JumpIfFalseOrPop(target) => w!(JumpIfFalseOrPop, label_map[target]),
             MakeFunction => w!(MakeFunction),
+            MakeLambda(usize) => w!(MakeLambda,usize),
             CallFunction(typ) => w!(CallFunction, format!("{:?}", typ)),
             ForIter(target) => w!(ForIter, label_map[target]),
             ReturnValue => w!(ReturnValue),
