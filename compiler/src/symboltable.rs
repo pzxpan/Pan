@@ -1412,7 +1412,7 @@ impl SymbolTableBuilder {
     }
 
     pub fn update_mutability(&mut self, name: String, mutability: SymbolMutability) -> SymbolTableResult {
-        if name.is_empty() {
+        if name.is_empty() || name.eq("Thread") {
             return Ok(());
         }
         println!("namessss {:?} change to {:?}", name, mutability);

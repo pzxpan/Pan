@@ -15,6 +15,7 @@ use crate::scope::Scope;
 use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
+use std::cell::RefCell;
 
 pub struct VirtualMachine {
     pub frames: Vec<FrameRef>,
@@ -53,8 +54,8 @@ impl VirtualMachine {
         }
     }
 
-    pub fn run_code_obj(&mut self, code: CodeObject, scope: Scope) -> FrameResult {
-        let frame = Frame::new(code, scope);
+    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> FrameResult {
+        let frame = Frame::new(code, hash_map, global);
         self.run_frame(frame)
     }
 
@@ -67,9 +68,9 @@ impl VirtualMachine {
     }
 
     pub fn run_frame(&mut self, frame: Frame) -> FrameResult {
-        self.frames.push(Rc::from(frame.clone()));
+        //self.frames.push(Rc::from(frame.clone()));
         let result = frame.run(self);
-        self.frames.pop();
+        //self.frames.pop();
         result
     }
 
@@ -139,7 +140,7 @@ impl VirtualMachine {
 
     pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
         let mut update_value = Value::Nil;
-        println!("attr:{:?},value:{:?}",attr,value);
+        println!("attr:{:?},value:{:?}", attr, value);
         match obj {
             Value::Obj(ref mut e) => {
                 match e.as_mut() {
@@ -436,6 +437,7 @@ impl VirtualMachine {
         }
     }
     pub fn add(&self, a: Value, b: Value) -> Value {
+        println!("add:{:?},b:{:?},", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)
@@ -841,20 +843,20 @@ impl Default for VirtualMachine {
     }
 }
 
-pub fn run_code_in_thread(code: CodeObject, scope: Scope) -> JoinHandle<()> {
+pub fn run_code_in_thread(code: CodeObject, scope: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> JoinHandle<()> {
     return thread::spawn(|| {
         println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new();
-        vm.run_code_obj(code, scope);
+        vm.run_code_obj(code, scope, global);
         let handle = thread::current();
     });
 }
 
-pub fn run_code_in_sub_thread(code: CodeObject, scope: Scope) {
+pub fn run_code_in_sub_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) {
     thread::spawn(|| {
         println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new();
-        vm.run_code_obj(code, scope);
+        vm.run_code_obj(code, hash_map, global);
         let handle = thread::current();
     });
 

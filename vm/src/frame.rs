@@ -64,12 +64,12 @@ pub enum ExecutionResult {
 pub type FrameResult = Option<ExecutionResult>;
 
 impl Frame {
-    pub fn new(code: CodeObject, scope: Scope) -> Frame {
+    pub fn new(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> Frame {
         Frame {
             code,
             stack: RefCell::new(vec![]),
             blocks: RefCell::new(vec![]),
-            scope,
+            scope: Scope::new(vec![hash_map], global),
             lasti: Cell::new(0),
         }
     }
@@ -291,8 +291,8 @@ impl Frame {
             }
 
             bytecode::Instruction::LoadBuildModule => {
-                let value = self.pop_value();
-                vm.run_code_obj(value.code(), self.scope.clone());
+                // let value = self.pop_value();
+                // vm.run_code_obj(value.code(), self.scope.clone());
                 None
             }
             bytecode::Instruction::Print => {
@@ -390,7 +390,7 @@ impl Frame {
                 Value::Nil
             }
         };
-        // println!("load_name value: {:?},栈名:{:p}", value, self);
+        println!("load_name value: {:?},栈名:{:p}", value, self);
         self.push_value(value.clone());
         None
     }
@@ -436,23 +436,26 @@ impl Frame {
     fn start_thread(&self) -> FrameResult {
         let func_ref = self.pop_value();
         let code = func_ref.code();
-        self.scope.new_child_scope_with_locals();
-        if self.stack.borrow_mut().len() > 0 {
+        let mut hash_map = HashMap::new();
+        if self.stack.borrow_mut().len() > 0
+        {
             let last_value = self.last_value();
             let map = last_value.hash_map_value();
             for (k, v) in map {
-                self.scope.store_name(k, v);
+                hash_map.insert(k, v);
             }
-            self.scope.store_name("self".to_string(), last_value);
+            hash_map.insert("self".to_string(), last_value);
             self.pop_value();
         }
-        let s = self.scope.new_child_scope_with_locals();
-
-        Frame::create_new_thread(code, s);
+        // let mut global = HashMap::new();
+        // global.extend(self.scope.globals.borrow().iter().to_owned());
+        // let s = self.scope.new_child_scope_with_locals();
+        // self.scope.add_local_value(hash_map);
+        Frame::create_new_thread(code, hash_map, self.scope.globals.clone());
         None
     }
-    fn create_new_thread(code: CodeObject, scope: Scope) -> FrameResult {
-        run_code_in_sub_thread(code, scope);
+    fn create_new_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> FrameResult {
+        run_code_in_sub_thread(code, hash_map, global);
         return None;
     }
 
@@ -475,40 +478,42 @@ impl Frame {
         let func_ref = self.pop_value();
         let code = func_ref.code();
 
-        self.scope.new_child_scope_with_locals();
+        // self.scope.new_child_scope_with_locals();
+        let mut hash_map = HashMap::new();
+        println!("len:{:?},stack is :{:?}", self.stack.borrow().len(), self.stack.borrow());
         if self.stack.borrow_mut().len() > 0 {
             let last_value = self.last_value();
             match last_value.is_obj_instant() {
                 1 => {
                     let map = last_value.hash_map_value();
                     for (k, v) in map {
-                        self.scope.store_name(k, v);
+                        hash_map.insert(k, v);
                     }
-                    self.scope.store_name("self".to_string(), last_value);
+                    hash_map.insert("self".to_string(), last_value);
                     self.pop_value();
                 }
                 2 => {
-                    self.scope.store_name("self".to_string(), last_value);
+                    hash_map.insert("self".to_string(), last_value);
                     self.pop_value();
                 }
                 _ => {}
             }
         }
 
-        let s = self.scope.new_child_scope_with_locals();
+        // let s = self.scope.new_child_scope_with_locals();
         if named_call {
             for (name, value) in args[0].hash_map_value().iter() {
-                s.store_name(name.to_string(), value.clone());
+                hash_map.insert(name.to_string(), value.clone());
             }
         } else {
             for (i, name) in code.arg_names.iter().enumerate() {
                 if i < args.len() {
-                    s.store_name(name.to_string(), args.get(i).unwrap().to_owned());
+                    hash_map.insert(name.to_string(), args.get(i).unwrap().to_owned());
                 }
             }
         }
 
-        let value = vm.run_code_obj(func_ref.code().to_owned(), s);
+        let value = vm.run_code_obj(func_ref.code().to_owned(), hash_map, self.scope.globals.clone());
         match value {
             Some(ExecutionResult::Return(v)) => {
                 self.push_value(v);
@@ -689,7 +694,6 @@ impl Frame {
     }
 
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
-
         let mut parent = self.pop_value();
         let value = self.pop_value();
         let update_value = vm.set_attribute(&mut parent, attr_name.to_owned(), value);
@@ -729,6 +733,7 @@ impl Frame {
     }
 
     pub fn push_value(&self, obj: Value) {
+        println!("push_value:{:?}", obj);
         self.stack.borrow_mut().push(obj);
     }
 

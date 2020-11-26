@@ -16,6 +16,7 @@ use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::Duration;
 use std::borrow::Borrow;
+use std::cell::{Ref, RefCell};
 
 fn main() {
     // let num = 1000;
@@ -32,13 +33,13 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
+   // test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();
     // b = &mut c;
     // println!("{}",b);
-    // test_all_demo_file();
+     test_all_demo_file();
 }
 
 fn test_all_demo_file() {
@@ -59,19 +60,19 @@ fn test_one_file(home_path: &Path) {
     let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0, false);
     if code_object.is_ok() {
         let mut vm = VirtualMachine::new();
-        let global_value = HashMap::new();
+        let global_value = RefCell::new(HashMap::new());
         let local_value: HashMap<String, Value> = HashMap::new();
-        let mut v = Vec::new();
+        // let mut v = Vec::new();
 
-        v.push(local_value);
-        let scope = Scope::with_builtins(v, global_value, &vm);
+        //   v.push(local_value);
+        // let scope = Scope::with_builtins(v, global_value);
         //vm.run_code_obj(code_object.unwrap(),scope);
 
         let code = code_object.unwrap().1;
 
-        let handle = run_code_in_thread(code.clone(), scope);
+        let handle = run_code_in_thread(code.clone(), local_value, global_value);
         handle.join().unwrap();
-        let byte_file = env::current_dir().unwrap().join("demo").join("dst.txt");
+        let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
         let mut f = File::create(byte_file).unwrap();
         f.write(&code.clone().to_bytes()).unwrap();
     } else {
