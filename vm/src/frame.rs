@@ -297,6 +297,22 @@ impl Frame {
                 // vm.run_code_obj(value.code(), self.scope.clone());
                 None
             }
+
+            bytecode::Instruction::LoadReference(idx, name, ref_name) => {
+                let v = vm.load_capture_reference(*idx, name.clone());
+                println!("load_value:{:?}", v);
+                self.push_value(v);
+                None
+            }
+
+            bytecode::Instruction::StoreReference => {
+                let name = self.pop_value();
+                let idx = self.pop_value();
+                let value = self.pop_value();
+                println!("bbbbname:{:?}", name);
+                vm.store_capture_reference(idx.usize(), name.name(), value);
+                None
+            }
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());
                 None
@@ -467,6 +483,11 @@ impl Frame {
                     let map = last_value.hash_map_value();
                     for (k, v) in map {
                         hash_map.insert(k, v);
+                    }
+                    if code.is_mut {
+                        hash_map.insert("capture$$idx".to_string(), Value::USize(vm.frame_count - 2));
+                        println!("self.nth_value(1):{:?}", self.nth_value(1));
+                        hash_map.insert("capture$$name".to_string(), self.nth_value(1));
                     }
                     hash_map.insert("self".to_string(), last_value);
                     self.pop_value();

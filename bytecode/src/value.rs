@@ -14,7 +14,7 @@ pub struct FnValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd,Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ThreadValue {
     pub typ: Box<Value>,
     pub field_map: Value,
@@ -28,7 +28,7 @@ pub struct ClosureValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd,Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Value {
     Bool(bool),
     Char(char),
@@ -82,6 +82,13 @@ impl Value {
         match self {
             Value::String(v) => { v.to_string() }
             _ => { "".to_string() }
+        }
+    }
+
+    pub fn usize(&self) -> usize {
+        match self {
+            Value::USize(v) => { *v }
+            _ => { 0 }
         }
     }
     pub fn bool_value(&self) -> bool {
@@ -302,20 +309,20 @@ impl Display for Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq,Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstanceObj {
     pub typ: Box<Value>,
     pub field_map: Value,
 }
 
-#[derive(Debug, Clone, PartialEq,Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnumObj {
     pub typ: Box<Value>,
     pub field_map: Option<Vec<Value>>,
     pub item_name: Value,
 }
 
-#[derive(Debug, Clone, PartialEq,Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Obj {
     StringObj(String),
     ArrayObj(Vec<Value>),

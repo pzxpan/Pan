@@ -30,12 +30,14 @@ pub struct Person {
     pub fun older_than(a: i32): bool {
         //money = 100;
         let aabb = () => {
-            return age + 1000;
+            age += 10;
+        //    let aa = 10000;
+            return age + 20;
         };
         let aa = aabb();
         age += aa;
         let a = self.age;
-        self.age = 1000000;
+        age = 1000000;
 
         print("age:{:d}", age);
         return age > a;

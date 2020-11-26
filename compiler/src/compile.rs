@@ -70,6 +70,7 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
     optimize: u8,
     lambda_name: String,
     package: String,
+    capture_value: Vec<(usize, String)>,
 }
 
 #[derive(Clone, Copy)]
@@ -84,7 +85,7 @@ enum FunctionContext {
     NoFunction,
     Function,
     // AsyncFunction,
-    StructFunction,
+    StructFunction(bool),
 }
 
 impl CompileContext {
@@ -185,6 +186,8 @@ impl<O: OutputStream> Compiler<O> {
             package,
             optimize,
             lambda_name: "".to_string(),
+            capture_value: vec![],
+
         }
     }
 
@@ -199,6 +202,7 @@ impl<O: OutputStream> Compiler<O> {
             self.source_path.clone().unwrap(),
             1,
             obj_name,
+            false,
         ));
     }
 
@@ -581,7 +585,7 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
-    fn enter_function(&mut self, name: &str, args: &[ast::Parameter]) -> Result<(), CompileError> {
+    fn enter_function(&mut self, name: &str, args: &[ast::Parameter], is_mut: bool) -> Result<(), CompileError> {
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             args.iter().map(|a| a.name.as_ref().unwrap().name.clone()).collect(),
@@ -589,6 +593,7 @@ impl<O: OutputStream> Compiler<O> {
             self.source_path.clone().unwrap(),
             line_number,
             name.to_owned(),
+            is_mut,
         ));
         self.enter_scope();
         for arg in args.iter() {
@@ -621,7 +626,7 @@ impl<O: OutputStream> Compiler<O> {
         let qualified_name = self.create_qualified_name(name, "");
 
         let a: Vec<Parameter> = Vec::new();
-        self.enter_function(name, &a)?;
+        self.enter_function(name, &a, false)?;
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
         let code = self.pop_code_object();
@@ -642,7 +647,7 @@ impl<O: OutputStream> Compiler<O> {
         args: &[ast::Parameter],
         body: &ast::Statement,
         returns: &Option<ast::Expression>,
-        is_async: bool,
+        is_mut: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
@@ -665,7 +670,7 @@ impl<O: OutputStream> Compiler<O> {
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
 
-        self.enter_function(name, args)?;
+        self.enter_function(name, args, is_mut)?;
         self.compile_statements(body)?;
         match body {
             ast::Statement::Block(_, statements) => {
@@ -710,20 +715,20 @@ impl<O: OutputStream> Compiler<O> {
         args: &[ast::Parameter],
         body: &ast::Statement,
         returns: &Option<ast::Expression>,
-        is_async: bool,
+        is_mut: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
             in_lambda,
             in_loop: false,
-            func: FunctionContext::StructFunction,
+            func: FunctionContext::StructFunction(is_mut),
         };
         let qualified_name = self.create_qualified_name(name, "");
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
 
-        self.enter_function(name, args)?;
+        self.enter_function(name, args, is_mut)?;
         self.compile_statements(body)?;
         match body {
             ast::Statement::Block(_, statements) => {
@@ -802,9 +807,9 @@ impl<O: OutputStream> Compiler<O> {
             "pan".to_string(),
             line_number,
             name.to_owned(),
+            false,
         ));
         self.enter_scope();
-
 
         self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
@@ -824,13 +829,13 @@ impl<O: OutputStream> Compiler<O> {
                         args.push(p.clone());
                     }
                     let returns = &def.returns;
-                    let is_async = false;
+                    let is_mut = def.is_mut;
                     if def.body.is_some() {
                         let body = &def.body.as_ref().unwrap();
                         if *&def.is_static {
-                            self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                            self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_mut, false);
                         } else {
-                            self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
+                            self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_mut, false)?;
                         }
                     }
                 }
@@ -877,6 +882,7 @@ impl<O: OutputStream> Compiler<O> {
             self.source_path.as_ref().unwrap().to_string(),
             line_number,
             name.to_owned(),
+            false,
         ));
         self.enter_scope();
 
@@ -896,13 +902,13 @@ impl<O: OutputStream> Compiler<O> {
                 args.push(p.clone());
             }
             let returns = &def.returns;
-            let is_async = false;
+            let is_mut = def.is_mut;
             if def.body.is_some() {
                 let body = &def.body.as_ref().unwrap();
                 if *&def.is_static {
-                    self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false)?;
+                    self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_mut, false)?;
                 } else {
-                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
+                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_mut, false)?;
                 }
             }
         }
@@ -945,6 +951,7 @@ impl<O: OutputStream> Compiler<O> {
             "".to_string(),
             line_number,
             name.to_owned(),
+            false,
         ));
         self.enter_scope();
 
@@ -1071,13 +1078,17 @@ impl<O: OutputStream> Compiler<O> {
         match &target {
             ast::Expression::Variable(ast::Identifier { name, .. }) => {
                 // let s = self.lookup_name(name);
-                if self.ctx.func == FunctionContext::StructFunction {
+                if let FunctionContext::StructFunction(..) = self.ctx.func {
                     if self.is_current_scope(name.as_str()) {
                         self.store_name(name);
                     } else {
                         self.load_name("self");
                         self.emit(Instruction::StoreAttr(name.clone()));
+                        self.emit(Instruction::Duplicate);
                         self.store_name("self");
+                        self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                        self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                        self.emit(Instruction::StoreReference);
                     }
                 } else {
                     self.store_name(name);
@@ -1422,7 +1433,7 @@ impl<O: OutputStream> Compiler<O> {
             List(_, _) => {}
 
             Variable(ast::Identifier { name, .. }) => {
-                if self.ctx.func == FunctionContext::StructFunction {
+                if let FunctionContext::StructFunction(_) = self.ctx.func {
                     //顺序不要变，后期可能会允许let绑定覆盖
                     if self.is_current_scope(name.as_str()) {
                         self.load_name(name);
@@ -1644,7 +1655,7 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
 
-        if self.ctx.func == FunctionContext::StructFunction {
+        if let FunctionContext::StructFunction(_) = self.ctx.func {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
                 if self.is_current_scope(name.as_str()) {
                     self.emit(LoadName(name.clone(), NameScope::Local));
@@ -1775,6 +1786,7 @@ impl<O: OutputStream> Compiler<O> {
             "pan".to_string(),
             line_number,
             self.source_path.clone().unwrap(),
+            false,
         ));
         self.enter_scope();
 
@@ -2106,9 +2118,17 @@ impl<O: OutputStream> Compiler<O> {
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     // attri_type = tmp.0;
                     cty = tmp.1.clone();
-
-
                     if idx == 0 {
+                        //在这里收集可变调用的返回的信息;
+                        // println!("panpan::{:?},attri_name:{:?}", name.0, attri_name.0);
+                        //  if let FunctionContext::StructFunction(true) = self.ctx.func {
+                        //      println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
+                        //      self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                        //  }
+                        if attri_name.0.eq("older_than") {
+                            println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
+                            self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                        }
                         self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     } else {
@@ -2120,6 +2140,7 @@ impl<O: OutputStream> Compiler<O> {
                     let tmp = cty.attri_index(index);
                     cty = tmp.clone();
                     if idx == 0 {
+                        //  capture_name = name.0.clone();
                         self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         self.emit(Instruction::LoadConst(
                             bytecode::Constant::Integer(index)));
