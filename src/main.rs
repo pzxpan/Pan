@@ -81,9 +81,9 @@ fn test_one_file(home_path: &Path) {
         // let mut vm = VirtualMachine::new(v);
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
         handle.join().unwrap();
-        let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
-        let mut f = File::create(byte_file).unwrap();
-        f.write(&code.clone().to_bytes()).unwrap();
+        // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
+        // let mut f = File::create(byte_file).unwrap();
+        // f.write(&code.clone().to_bytes()).unwrap();
     } else {
         let error = code_object.err().unwrap();
         match error.error {

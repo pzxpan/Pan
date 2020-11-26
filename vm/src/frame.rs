@@ -48,8 +48,6 @@ pub struct Frame {
     stack: RefCell<Vec<Value>>,
     /// 循环块等
     blocks: RefCell<Vec<Block>>,
-    /// 变量
-    pub value_hash_map: HashMap<String, Value>,
     /// PC计数
     pub lasti: Cell<usize>,
 }
@@ -64,12 +62,11 @@ pub enum ExecutionResult {
 pub type FrameResult = Option<ExecutionResult>;
 
 impl Frame {
-    pub fn new(code: CodeObject, value_hash_map: HashMap<String, Value>) -> Frame {
+    pub fn new(code: CodeObject) -> Frame {
         Frame {
             code,
             stack: RefCell::new(vec![]),
             blocks: RefCell::new(vec![]),
-            value_hash_map,
             lasti: Cell::new(0),
         }
     }

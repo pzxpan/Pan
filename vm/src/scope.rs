@@ -1,7 +1,7 @@
 use std::fmt;
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::borrow::BorrowMut;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 
 use pan_bytecode::value::Value;
@@ -52,6 +52,20 @@ impl Scope {
 
     pub fn add_local_value(&self, values: HashMap<String, Value>) {
         self.locals.borrow_mut().push(RefCell::new(values));
+    }
+
+    pub fn load_capture_reference(&self, idx: usize, name: String) -> Value {
+        let v = self.locals.borrow();
+        let vv = v.get(idx);
+        let vvv = vv.unwrap().borrow();
+        let vvvv = vvv.get(&name).unwrap();
+        vvvv.clone()
+    }
+
+    pub fn store_capture_reference(&self, idx: usize, name: String, value: Value) {
+        let v = self.locals.borrow_mut();
+        let vv = v.get(idx).unwrap();
+        vv.borrow_mut().insert(name, value);
     }
 }
 

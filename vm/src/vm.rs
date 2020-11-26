@@ -58,11 +58,16 @@ impl VirtualMachine {
     }
 
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
-        let frame = Frame::new(code, hash_map);
-        self.run_frame(frame)
+        let frame = Frame::new(code);
+        self.frame_count += 1;
+        self.scope.add_local_value(hash_map);
+        let r = self.run_frame(frame);
+        self.frame_count -= 1;
+        r
     }
 
-    pub fn run_frame_full(&mut self, frame: Frame) -> FrameResult {
+    pub fn run_frame_full(&mut self, frame:
+    Frame) -> FrameResult {
         match self.run_frame(frame)? {
             ExecutionResult::Return(value) => Some(ExecutionResult::Return(value)),
             ExecutionResult::Ignore => Some(ExecutionResult::Ignore),
@@ -95,6 +100,23 @@ impl VirtualMachine {
                 Value::Nil
             }
         }
+    }
+
+    pub fn load_capture_reference(
+        &self,
+        idx: usize,
+        name: String,
+    ) -> Value {
+        return self.scope.load_capture_reference(idx, name);
+    }
+
+    pub fn store_capture_reference(
+        &self,
+        idx: usize,
+        name: String,
+        value: Value,
+    ) {
+        self.scope.store_capture_reference(idx, name, value);
     }
 
     pub fn store_name(
@@ -886,7 +908,10 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
         let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new(scope);
-        vm.run_code_obj(code, vm.scope.get_locals().clone());
+        let frame = Frame::new(code);
+        vm.frame_count += 1;
+        vm.run_frame(frame);
+        vm.frame_count -= 1;
         let handle = thread::current();
     });
 }
@@ -896,7 +921,10 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, 
         let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new(scope);
-        vm.run_code_obj(code, vm.scope.get_locals().clone());
+        let frame = Frame::new(code);
+        vm.frame_count += 1;
+        vm.run_frame(frame);
+        vm.frame_count -= 1;
         let handle = thread::current();
     });
 
