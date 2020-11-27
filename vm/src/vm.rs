@@ -918,6 +918,8 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
 
 pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) {
     thread::spawn(|| {
+        println!("local_hash_map:{:?},", locals);
+        println!("global_:{:?},", global);
         let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new(scope);

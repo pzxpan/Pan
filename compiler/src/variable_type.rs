@@ -21,7 +21,10 @@ impl HasType for Parameter {
 }
 
 pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool, SymbolMutability) {
-    let ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
+    let mut ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
+    if ty == CType::Unknown {
+        ty = CType::Args(s.1.as_ref().unwrap().ty.expr_name());
+    }
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
     let is_optional = s.1.as_ref().unwrap().default.is_some();
     let mutability = get_mutability(s.1.as_ref().unwrap().mut_own.clone(), &ty);
@@ -268,9 +271,9 @@ impl HasType for Expression {
             Expression::NamedFunctionCall(_, name, args) => {
                 let ty = name.get_type(&tables).clone();
                 if let CType::Struct(tty) = ty {
-                    return CType::Struct(resolve_generic(tty,args.clone(),tables));
+                    return CType::Struct(resolve_generic(tty, args.clone(), tables));
                 }
-               // TODO 解决函数范型,FunctionCall也需要;
+                // TODO 解决函数范型,FunctionCall也需要;
                 return ty.ret_type().clone();
             }
 

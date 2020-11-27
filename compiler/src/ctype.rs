@@ -36,6 +36,7 @@ pub enum CType {
     Bound(BoundType),
     Generic(String, Box<CType>),
     Reference(String, Vec<CType>),
+    Args(String),
     Any,
     TSelf,
     //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;

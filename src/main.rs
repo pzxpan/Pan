@@ -42,7 +42,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("bound.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("thread.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();
@@ -81,6 +81,7 @@ fn test_one_file(home_path: &Path) {
         // let mut vm = VirtualMachine::new(v);
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
         handle.join().unwrap();
+        std::thread::sleep(Duration::from_millis(100000));
         // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
         // let mut f = File::create(byte_file).unwrap();
         // f.write(&code.clone().to_bytes()).unwrap();

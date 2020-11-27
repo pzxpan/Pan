@@ -1348,13 +1348,13 @@ impl SymbolTableBuilder {
             }
             Number(_, _) => {}
             NamedFunctionCall(_, exp, args) => {
-              //  println!("named_call:{:?},", expression);
+                //  println!("named_call:{:?},", expression);
                 let mut ty = self.get_register_type(exp.as_ref().expr_name());
-                println!("named_call:{:?},ty:{:?}", expression,ty);
+                println!("named_call:{:?},ty:{:?}", expression, ty);
                 if let CType::Struct(sty) = ty.clone() {
                     let struct_ty = resolve_generic(sty, args.clone(), &self.tables);
                     ty = CType::Struct(struct_ty);
-                    println!("11111named_call:{:?},ty:{:?}", expression,ty);
+                    println!("11111named_call:{:?},ty:{:?}", expression, ty);
                     for arg in args {
 
 
@@ -1945,6 +1945,15 @@ impl SymbolTableBuilder {
             for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
                 if let Some(e) = args.get(i) {
                     let cty = e.get_type(&self.tables);
+                    println!("cty::{:?},", cty);
+                    if let CType::Fn(fnty) = ety {
+                        if let Lambda(n) = cty {
+                            continue;
+                        }
+                        if let Fn(fnty) = cty {
+                            continue;
+                        }
+                    }
                     let ret_ty = cty.ret_type();
                     if ety != ret_ty {
                         if ety != &CType::Any {
@@ -1953,6 +1962,15 @@ impl SymbolTableBuilder {
                                     continue;
                                 }
                             }
+                            //TODO 引用自身的类型，还不能处理package.Point这样的Expression;
+                            if let CType::Args(s) = ety {
+                                if ret_ty == &self.get_register_type(s.clone()) {
+                                    continue;
+                                }
+                            }
+                            //Todo ety如果是无参函数类型，让其过，没搞明白，这里要咋样处理,是否允许定义函数类型时带参数呢，还是只能推导;以函数为参数的函数，其函数参数如何确定，需要处理;
+
+
                             return Err(SymbolTableError {
                                 error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
                                 location: expr.loc().clone(),
