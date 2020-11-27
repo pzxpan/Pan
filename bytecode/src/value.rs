@@ -59,6 +59,7 @@ pub enum Value {
     Type(TypeValue),
     Enum(EnumValue),
     Code(CodeObject),
+    Reference(usize, String),
     Nil,
 }
 
@@ -146,6 +147,7 @@ impl Value {
             Value::Thread(_) => { "Thread".to_string() }
             Value::Closure(_) => { "Closure".to_string() }
             Value::Bool(_) => { "bool".to_string() }
+            Value::Reference(_, _) => { "Ref".to_string() }
         }
     }
 
@@ -234,6 +236,7 @@ impl Value {
             Value::Nil => format!("None"),
             Value::Code(code) => format!("<code {}>", code),
             Value::Enum(EnumValue { name, .. }) => format!("<enum {}>", name),
+            Value::Reference(idx, name) => format!("<ref {} {}>", idx, name)
         }
     }
 
@@ -305,6 +308,7 @@ impl Display for Value {
             Value::Nil => write!(f, "None"),
             Value::Code(code) => write!(f, "<code {}>", code),
             Value::Enum(EnumValue { name, .. }) => write!(f, "<enum {}>", name),
+            Value::Reference(idx, name) => write!(f, "<ref {} {}>", idx, name)
         }
     }
 }

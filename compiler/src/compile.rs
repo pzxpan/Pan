@@ -2110,7 +2110,8 @@ impl<O: OutputStream> Compiler<O> {
             v.insert(0, s3);
         }
         let len = v.len();
-
+        let mut capture_name = "".to_string();
+        let mut instructions: Vec<Instruction> = Vec::new();
         for (idx, name) in v.iter().enumerate() {
             if idx < len - 1 {
                 if let CType::Struct(_) = cty.clone() {
@@ -2125,14 +2126,18 @@ impl<O: OutputStream> Compiler<O> {
                         //      println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
                         //      self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
                         //  }
-                        if attri_name.0.eq("older_than") {
-                            println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
-                            self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
-                        }
-                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                        self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                        // if attri_name.0.eq("older_than") {
+                        //     println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
+                        //     self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                        // }
+                        capture_name = name.0.clone();
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     } else {
-                        self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                        instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     }
                 } else if let CType::Tuple(n) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
@@ -2141,14 +2146,21 @@ impl<O: OutputStream> Compiler<O> {
                     cty = tmp.clone();
                     if idx == 0 {
                         //  capture_name = name.0.clone();
-                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                        self.emit(Instruction::LoadConst(
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadConst(
                             bytecode::Constant::Integer(index)));
-                        self.emit(Instruction::Subscript);
+                        instructions.push(Instruction::Subscript);
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadConst(
+                        //     bytecode::Constant::Integer(index)));
+                        // self.emit(Instruction::Subscript);
                     } else {
-                        self.emit(Instruction::LoadConst(
+                        instructions.push(Instruction::LoadConst(
                             bytecode::Constant::Integer(index)));
-                        self.emit(Instruction::Subscript);
+                        instructions.push(Instruction::Subscript);
+                        // self.emit(Instruction::LoadConst(
+                        //     bytecode::Constant::Integer(index)));
+                        // self.emit(Instruction::Subscript);
                     }
                 } else if let CType::Enum(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
@@ -2157,22 +2169,37 @@ impl<O: OutputStream> Compiler<O> {
                     // attri_type = tmp.0;
 
                     if tmp.0 == 1 {
-                        //如果为无参属性，则直接调用构造函数，如果为有参，则有FunctionCall处理;如果是其他属性，则LoadAttr处理
-                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                        self.emit(Instruction::LoadConst(
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(attri_name.0.clone())));
-                        self.emit(Instruction::LoadBuildEnum(2));
+                        instructions.push(Instruction::LoadBuildEnum(2));
+                        //如果为无参属性，则直接调用构造函数，如果为有参，则有FunctionCall处理;如果是其他属性，则LoadAttr处理
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadConst(
+                        //     bytecode::Constant::String(attri_name.0.clone())));
+                        // self.emit(Instruction::LoadBuildEnum(2));
                     } else if tmp.0 == 2 {
-                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                        self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::String(attri_name.0.clone())));
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
                     }
                     if tmp.0 > 2 {
-                        self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-                        self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     }
                     cty = tmp.1.clone();
                 }
             }
+        }
+        if !capture_name.is_empty() && cty.is_mut_fun() {
+            self.emit(Instruction::LoadConst(Constant::String(capture_name)));
+        }
+        for i in instructions {
+            self.emit(i);
         }
         Ok(())
     }

@@ -271,6 +271,10 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
             Value::Code(_) => {
                 fmt.str(&vv.to_string())
             }
+
+            Value::Reference(idx,name) => {
+                fmt.str(&name)
+            }
             Value::Nil => { fmt.str(&"None".to_string()) }
         }
     };

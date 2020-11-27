@@ -254,7 +254,13 @@ impl CType {
         }
     }
 
-
+    pub fn is_mut_fun(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_mut
+        } else {
+            false
+        };
+    }
     // pub fn is_struct_ty(&self) -> bool {
     //     return if let CType::Struct(n) = self {
     //         true
