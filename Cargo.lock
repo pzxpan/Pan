@@ -856,6 +856,7 @@ dependencies = [
  "indexmap",
  "is-macro",
  "itertools 0.8.2",
+ "lazy_static",
  "lexical",
  "libc",
  "log",

@@ -7,8 +7,6 @@ use std::collections::HashMap;
 use walkdir::WalkDir;
 use pan_bytecode::value::Value;
 
-#[macro_use]
-extern crate lazy_static;
 
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
@@ -24,9 +22,7 @@ use pan_bytecode::value;
 use std::sync::Mutex;
 use std::sync::Arc;
 
-lazy_static! {
-    static ref SCOPE: Mutex<Arc<Scope>> = Mutex::new(Arc::new(Scope::with_builtins(Vec::new(),HashMap::new())));
-}
+
 
 fn main() {
     // let num = 1000;
@@ -43,13 +39,13 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-   // test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("default.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();
     // b = &mut c;
     // println!("{}",b);
-     test_all_demo_file();
+    // test_all_demo_file();
 }
 
 fn test_all_demo_file() {

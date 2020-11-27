@@ -36,6 +36,7 @@ impl Scope {
         locals: Vec<PanDictRef>,
         globals: HashMap<String, Value>,
     ) -> Scope {
+
         Scope::new(locals, globals)
     }
 

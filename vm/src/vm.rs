@@ -17,14 +17,69 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::cell::RefCell;
 use crate::scope::NameProtocol;
+use std::sync::Mutex;
+use std::sync::Arc;
 
 pub struct VirtualMachine {
-    pub scope: Scope,
     pub frame_count: usize,
     pub initialized: bool,
 }
 
 pub const NSIG: usize = 64;
+
+lazy_static! {
+    static ref SCOPE: Arc<Mutex<Scope>> = Arc::new(Mutex::new(Scope::with_builtins(vec![HashMap::new()],HashMap::new())));
+}
+
+pub fn add_local_value(hash_map: HashMap<String, Value>) {
+    let ref mut map = SCOPE.lock().unwrap();
+    map.locals.push(hash_map);
+}
+
+pub fn load_capture_reference(idx: usize, name: String) -> Value {
+    let ref mut scope = SCOPE.lock().unwrap();
+    let vv = scope.locals.get(idx);
+    let vvvv = vv.unwrap().get(&name).unwrap();
+    vvvv.clone()
+}
+
+pub fn store_capture_reference(idx: usize, name: String, value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.locals.get_mut(idx).unwrap().insert(name, value);
+}
+
+fn load_global(name: String) -> Option<Value> {
+    let ref mut scope = SCOPE.lock().unwrap();
+    if let Some(v) = scope.globals.get(&name) {
+        return Some(v.clone());
+    }
+    None
+}
+
+fn store_global(name: String, value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.globals.insert(name, value);
+}
+
+fn load_name(name: String) -> Option<Value> {
+    let ref mut scope = SCOPE.lock().unwrap();
+    for dict in scope.locals.iter() {
+        let v = dict.get(&name);
+        if let Some(value) = v {
+            return Some(value.clone());
+        }
+    }
+    if let Some(v) = scope.load_global(name.clone()) {
+        return Some(v.clone());
+    }
+    None
+}
+
+fn store_name(key: String, value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.locals.first_mut().unwrap().insert(key.to_string(), value);
+}
+
 
 #[derive(Copy, Clone)]
 pub enum InitParameter {
@@ -34,10 +89,9 @@ pub enum InitParameter {
 }
 
 impl VirtualMachine {
-    pub fn new(scope: Scope) -> VirtualMachine {
+    pub fn new() -> VirtualMachine {
         let initialize_parameter = InitParameter::NoInitialize;
         let mut vm = VirtualMachine {
-            scope,
             frame_count: 0,
             initialized: false,
         };
@@ -60,7 +114,7 @@ impl VirtualMachine {
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
         let frame = Frame::new(code);
         self.frame_count += 1;
-        self.scope.add_local_value(hash_map);
+        add_local_value(hash_map);
         let r = self.run_frame(frame);
         self.frame_count -= 1;
         r
@@ -89,9 +143,9 @@ impl VirtualMachine {
         name_scope: &bytecode::NameScope,
     ) -> Value {
         let optional_value = match name_scope {
-            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
-            bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
-            bytecode::NameScope::Const => self.scope.load_global(name.to_string()),
+            bytecode::NameScope::Global => load_global(name.to_string()),
+            bytecode::NameScope::Local => load_name(name.to_string()),
+            bytecode::NameScope::Const => load_global(name.to_string()),
         };
 
         match optional_value {
@@ -107,7 +161,7 @@ impl VirtualMachine {
         idx: usize,
         name: String,
     ) -> Value {
-        return self.scope.load_capture_reference(idx, name);
+        return load_capture_reference(idx, name);
     }
 
     pub fn store_capture_reference(
@@ -116,7 +170,7 @@ impl VirtualMachine {
         name: String,
         value: Value,
     ) {
-        self.scope.store_capture_reference(idx, name, value);
+        store_capture_reference(idx, name, value);
     }
 
     pub fn store_name(
@@ -127,13 +181,13 @@ impl VirtualMachine {
     ) -> FrameResult {
         match name_scope {
             bytecode::NameScope::Global => {
-                self.scope.store_global(name.to_string(), obj);
+                store_global(name.to_string(), obj);
             }
             bytecode::NameScope::Local => {
-                self.scope.store_name(name.to_string(), obj);
+                store_name(name.to_string(), obj);
             }
             bytecode::NameScope::Const => {
-                self.scope.store_global(name.to_string(), obj);
+                store_global(name.to_string(), obj);
             }
         }
         None
@@ -907,7 +961,7 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new(scope);
+        let mut vm = VirtualMachine::new();
         let frame = Frame::new(code);
         vm.frame_count += 1;
         vm.run_frame(frame);
@@ -918,11 +972,11 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
 
 pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) {
     thread::spawn(|| {
-        println!("local_hash_map:{:?},", locals);
-        println!("global_:{:?},", global);
-        let scope = Scope::new(vec![locals], global);
+        // println!("local_hash_map:{:?},", locals);
+        // println!("global_:{:?},", global);
+        //  let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new(scope);
+        let mut vm = VirtualMachine::new();
         let frame = Frame::new(code);
         vm.frame_count += 1;
         vm.run_frame(frame);

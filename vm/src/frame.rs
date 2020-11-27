@@ -446,7 +446,7 @@ impl Frame {
         // global.extend(self.scope.globals.borrow().iter().to_owned());
         // let s = self.scope.new_child_scope_with_locals();
         // self.scope.add_local_value(hash_map);
-        Frame::create_new_thread(code, hash_map, vm.scope.globals.clone());
+        Frame::create_new_thread(code, hash_map, HashMap::new());
         None
     }
     fn create_new_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: HashMap<String, Value>) -> FrameResult {

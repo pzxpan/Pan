@@ -10,6 +10,7 @@ vm-tracing-logging = []
 freeze-stdlib = []
 
 [dependencies]
+lazy_static = "1.4"
 digest = "0.8.1"
 md-5 = "0.8"
 sha-1 = "0.8"
