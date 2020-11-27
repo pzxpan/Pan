@@ -32,11 +32,14 @@ pub enum Token<'input> {
     Bound,
     Function,
     Import,
+    Package,
 
     Data,
     Enum,
 
     Constant,
+    Mut,
+    Own,
 
     Pure,
 
@@ -96,6 +99,7 @@ pub enum Token<'input> {
     DivideAssign,
     ModuloAssign,
     Modulo,
+    Mod,
 
     Equal,
     Assign,
@@ -206,6 +210,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::ShiftLeftAssign => write!(f, "<<="),
             Token::More => write!(f, ">"),
             Token::MoreEqual => write!(f, ">="),
+            Token::Mod => write!(f, "mod"),
             Token::Member => write!(f, "."),
             Token::TwoColon => write!(f, "::"),
             Token::Colon => write!(f, ":"),
@@ -224,10 +229,13 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Bound => write!(f, "bound"),
             Token::Function => write!(f, "fun"),
             Token::Import => write!(f, "import"),
+            Token::Package => write!(f, "package"),
             Token::Data => write!(f, "data"),
             Token::Enum => write!(f, "enum"),
 
             Token::Constant => write!(f, "const"),
+            Token::Mut => write!(f, "mut"),
+            Token::Own => write!(f, "own"),
             Token::Pure => write!(f, "pure"),
 
             Token::Continue => write!(f, "continue"),
@@ -304,6 +312,8 @@ impl LexicalError {
 static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "break" => Token::Break,
     "const" => Token::Constant,
+    "own" => Token::Own,
+    "mut" => Token::Mut,
     "continue" => Token::Continue,
     "struct" => Token::Struct,
     "bound" => Token::Bound,
@@ -317,6 +327,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "fun" => Token::Function,
     "if" => Token::If,
     "import" => Token::Import,
+    "package" => Token::Package,
 
     "pure" => Token::Pure,
 
@@ -328,6 +339,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
 
     "as" => Token::As,
     "from" => Token::From,
+    "mod" => Token::Mod,
     "impl" => Token::Impl,
     "let" => Token::Let,
     "lambda" => Token::Lambda,

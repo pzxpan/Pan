@@ -1,3 +1,4 @@
+package default;
 fun main() {
   let dict = {"Alice": 2341, "Beth": 9102, "Cecil": 3258};
 

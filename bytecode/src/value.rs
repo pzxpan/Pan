@@ -14,7 +14,7 @@ pub struct FnValue {
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ThreadValue {
     pub typ: Box<Value>,
     pub field_map: Value,
@@ -24,10 +24,11 @@ pub struct ThreadValue {
 pub struct ClosureValue {
     pub name: String,
     pub code: CodeObject,
+    pub capture_values: Box<Vec<Value>>,
     pub has_return: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Value {
     Bool(bool),
     Char(char),
@@ -58,6 +59,7 @@ pub enum Value {
     Type(TypeValue),
     Enum(EnumValue),
     Code(CodeObject),
+    Reference(usize, String),
     Nil,
 }
 
@@ -81,6 +83,13 @@ impl Value {
         match self {
             Value::String(v) => { v.to_string() }
             _ => { "".to_string() }
+        }
+    }
+
+    pub fn usize(&self) -> usize {
+        match self {
+            Value::USize(v) => { *v }
+            _ => { 0 }
         }
     }
     pub fn bool_value(&self) -> bool {
@@ -138,6 +147,7 @@ impl Value {
             Value::Thread(_) => { "Thread".to_string() }
             Value::Closure(_) => { "Closure".to_string() }
             Value::Bool(_) => { "bool".to_string() }
+            Value::Reference(_, _) => { "Ref".to_string() }
         }
     }
 
@@ -226,6 +236,7 @@ impl Value {
             Value::Nil => format!("None"),
             Value::Code(code) => format!("<code {}>", code),
             Value::Enum(EnumValue { name, .. }) => format!("<enum {}>", name),
+            Value::Reference(idx, name) => format!("<ref {} {}>", idx, name)
         }
     }
 
@@ -290,32 +301,32 @@ impl Display for Value {
                 Obj::StringObj(value) => write!(f, "\"{}\"", value),
                 o @ _ => write!(f, "{}", o.to_string()),
             }
-            Value::Thread(n) => write!(f, "<func {}>", n.field_map.to_string()),
-            Value::Fn(FnValue { name, .. }) |
-            Value::Closure(ClosureValue { name, .. }) => write!(f, "<func {}>", name),
-// Value::NativeFn(NativeFn { name, .. }) => write!(f, "<func {}>", name),
+            Value::Thread(n) => write!(f, "<thread {}>", n.field_map.to_string()),
+            Value::Fn(FnValue { name, .. }) => write!(f, "<func {}>", name),
+            Value::Closure(ClosureValue { name, .. }) => write!(f, "<closure {}>", name),
             Value::Type(TypeValue { name, .. }) => write!(f, "<type {}>", name),
             Value::Nil => write!(f, "None"),
             Value::Code(code) => write!(f, "<code {}>", code),
             Value::Enum(EnumValue { name, .. }) => write!(f, "<enum {}>", name),
+            Value::Reference(idx, name) => write!(f, "<ref {} {}>", idx, name)
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstanceObj {
     pub typ: Box<Value>,
     pub field_map: Value,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnumObj {
     pub typ: Box<Value>,
     pub field_map: Option<Vec<Value>>,
     pub item_name: Value,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Obj {
     StringObj(String),
     ArrayObj(Vec<Value>),

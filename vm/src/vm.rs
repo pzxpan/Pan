@@ -15,9 +15,12 @@ use crate::scope::Scope;
 use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
+use std::cell::RefCell;
+use crate::scope::NameProtocol;
 
 pub struct VirtualMachine {
-    pub frames: Vec<FrameRef>,
+    pub scope: Scope,
+    pub frame_count: usize,
     pub initialized: bool,
 }
 
@@ -31,10 +34,11 @@ pub enum InitParameter {
 }
 
 impl VirtualMachine {
-    pub fn new() -> VirtualMachine {
+    pub fn new(scope: Scope) -> VirtualMachine {
         let initialize_parameter = InitParameter::NoInitialize;
         let mut vm = VirtualMachine {
-            frames: vec![],
+            scope,
+            frame_count: 0,
             initialized: false,
         };
         vm.initialize(initialize_parameter);
@@ -53,12 +57,17 @@ impl VirtualMachine {
         }
     }
 
-    pub fn run_code_obj(&mut self, code: CodeObject, scope: Scope) -> FrameResult {
-        let frame = Frame::new(code, scope);
-        self.run_frame(frame)
+    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
+        let frame = Frame::new(code);
+        self.frame_count += 1;
+        self.scope.add_local_value(hash_map);
+        let r = self.run_frame(frame);
+        self.frame_count -= 1;
+        r
     }
 
-    pub fn run_frame_full(&mut self, frame: Frame) -> FrameResult {
+    pub fn run_frame_full(&mut self, frame:
+    Frame) -> FrameResult {
         match self.run_frame(frame)? {
             ExecutionResult::Return(value) => Some(ExecutionResult::Return(value)),
             ExecutionResult::Ignore => Some(ExecutionResult::Ignore),
@@ -67,16 +76,74 @@ impl VirtualMachine {
     }
 
     pub fn run_frame(&mut self, frame: Frame) -> FrameResult {
-        self.frames.push(Rc::from(frame.clone()));
+        //self.frames.push(Rc::from(frame.clone()));
         let result = frame.run(self);
-        self.frames.pop();
+        //self.frames.pop();
         result
+    }
+
+    #[cfg_attr(feature = "flame-it", flame("Frame"))]
+    pub fn load_name(
+        &self,
+        name: &str,
+        name_scope: &bytecode::NameScope,
+    ) -> Value {
+        let optional_value = match name_scope {
+            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
+            bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
+            bytecode::NameScope::Const => self.scope.load_global(name.to_string()),
+        };
+
+        match optional_value {
+            Some(value) => value,
+            None => {
+                Value::Nil
+            }
+        }
+    }
+
+    pub fn load_capture_reference(
+        &self,
+        idx: usize,
+        name: String,
+    ) -> Value {
+        return self.scope.load_capture_reference(idx, name);
+    }
+
+    pub fn store_capture_reference(
+        &self,
+        idx: usize,
+        name: String,
+        value: Value,
+    ) {
+        self.scope.store_capture_reference(idx, name, value);
+    }
+
+    pub fn store_name(
+        &self,
+        name: &str,
+        obj: Value,
+        name_scope: &bytecode::NameScope,
+    ) -> FrameResult {
+        match name_scope {
+            bytecode::NameScope::Global => {
+                self.scope.store_global(name.to_string(), obj);
+            }
+            bytecode::NameScope::Local => {
+                self.scope.store_name(name.to_string(), obj);
+            }
+            bytecode::NameScope::Const => {
+                self.scope.store_global(name.to_string(), obj);
+            }
+        }
+        None
     }
 
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
         None
     }
     pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
+        //println!("obj:{:?},attri:{:?}", obj, attr);
         match obj {
             Value::Obj(mut e) => {
                 match e.as_mut() {
@@ -138,6 +205,7 @@ impl VirtualMachine {
 
     pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
         let mut update_value = Value::Nil;
+        println!("attr:{:?},value:{:?}", attr, value);
         match obj {
             Value::Obj(ref mut e) => {
                 match e.as_mut() {
@@ -434,6 +502,7 @@ impl VirtualMachine {
         }
     }
     pub fn add(&self, a: Value, b: Value) -> Value {
+        println!("add:{:?},b:{:?},", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)
@@ -833,26 +902,31 @@ impl VirtualMachine {
     }
 }
 
-impl Default for VirtualMachine {
-    fn default() -> Self {
-        VirtualMachine::new()
-    }
-}
 
-pub fn run_code_in_thread(code: CodeObject, scope: Scope) -> JoinHandle<()> {
+pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> JoinHandle<()> {
     return thread::spawn(|| {
+        let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new();
-        vm.run_code_obj(code, scope);
+        let mut vm = VirtualMachine::new(scope);
+        let frame = Frame::new(code);
+        vm.frame_count += 1;
+        vm.run_frame(frame);
+        vm.frame_count -= 1;
         let handle = thread::current();
     });
 }
 
-pub fn run_code_in_sub_thread(code: CodeObject, scope: Scope) {
+pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) {
     thread::spawn(|| {
+        println!("local_hash_map:{:?},", locals);
+        println!("global_:{:?},", global);
+        let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new();
-        vm.run_code_obj(code, scope);
+        let mut vm = VirtualMachine::new(scope);
+        let frame = Frame::new(code);
+        vm.frame_count += 1;
+        vm.run_frame(frame);
+        vm.frame_count -= 1;
         let handle = thread::current();
     });
 

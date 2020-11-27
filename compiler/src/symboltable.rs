@@ -2,7 +2,7 @@
 */
 use std::fmt;
 use std::borrow::Borrow;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 use indexmap::map::IndexMap;
 use num_traits::cast::ToPrimitive;
@@ -14,15 +14,22 @@ use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds, resovle_varargs_fun};
+use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds, resovle_build_funs};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
 use crate::util::get_pos_lambda_name;
+use crate::util::get_attribute_vec;
+use std::process::exit;
+use crate::util::get_full_name;
+use crate::util::get_last_name;
+use crate::compile::is_builtin_name;
+use crate::error::CompileErrorType::SyntaxError;
 
-pub fn make_symbol_table(program: &SourceUnit) -> Result<SymbolTable, SymbolTableError> {
+pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = Default::default();
-    builder.prepare();
+    builder.package = program.package.clone();
+    builder.prepare(program.package.clone());
     builder.insert_builtin_symbol();
     builder.scan_top_symbol_types(program, false, false, Option::None, Option::None)?;
     builder.scan_program(program)?;
@@ -62,6 +69,8 @@ pub enum SymbolTableType {
     Function,
     Enum,
     Bound,
+    MatchItem,
+    Block,
 }
 
 impl fmt::Display for SymbolTableType {
@@ -71,12 +80,14 @@ impl fmt::Display for SymbolTableType {
             SymbolTableType::Struct => write!(f, "struct"),
             SymbolTableType::Function => write!(f, "function"),
             SymbolTableType::Enum => write!(f, "enum"),
-            SymbolTableType::Bound => write!(f, "bound")
+            SymbolTableType::Bound => write!(f, "bound"),
+            SymbolTableType::MatchItem => write!(f, "matchItem"),
+            SymbolTableType::Block => write!(f, "block"),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SymbolScope {
     Global,
     Local,
@@ -85,11 +96,21 @@ pub enum SymbolScope {
     Const,
 }
 
-/// 符号表中的符号，有作用域等属性，由于可以重新绑定，作用域在重新绑定之后会被修改，
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum SymbolMutability {
+    Immutable,
+    Mut,
+    ImmRef,
+    MutRef,
+    Moved,
+}
+
+/// 符号表中的符号，有作用域等属性，
 #[derive(Debug, Clone)]
 pub struct Symbol {
     pub name: String,
     pub scope: SymbolScope,
+    pub mutability: SymbolMutability,
     pub is_referenced: bool,
     pub is_attribute: bool,
     pub is_parameter: bool,
@@ -102,6 +123,7 @@ impl Symbol {
         Symbol {
             name: name.to_owned(),
             scope: SymbolScope::Local,
+            mutability: SymbolMutability::Mut,
             is_referenced: false,
             is_attribute: false,
             is_parameter: false,
@@ -138,22 +160,22 @@ impl SymbolTable {
 
 impl std::fmt::Debug for SymbolTable {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // write!(
-        //     f,
-        //     "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
-        //     self.name,
-        //     self.symbols.len(),
-        //     self.sub_tables.len()
-        // );
-        // write!(f, "symbols:\n");
-        // for (key, value) in self.symbols.iter() {
-        //     write!(f, "key:{:?},value:{:?}\n", key, value);
-        // }
-        // write!(f, "subtable is:\n");
-        // write!(f, "symbols222:\n");
-        // for (idx, table) in self.sub_tables.iter().enumerate() {
-        //     write!(f, "table idx {:?} is {:?}\n", idx, table);
-        // }
+        write!(
+            f,
+            "name:{:?}, SymbolTable({:?} symbols, {:?} sub scopes)",
+            self.name,
+            self.symbols.len(),
+            self.sub_tables.len()
+        );
+        write!(f, "symbols:\n");
+        for (key, value) in self.symbols.iter() {
+            write!(f, "key:{:?},value:{:?}\n", key, value);
+        }
+        write!(f, "subtable is:\n");
+        write!(f, "symbols222:\n");
+        for (idx, table) in self.sub_tables.iter().enumerate() {
+            write!(f, "table idx {:?} is {:?}\n", idx, table);
+        }
 
         write!(f, "table name:{:?}", self.name)
     }
@@ -200,23 +222,32 @@ impl<'a> SymbolTableAnalyzer<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum SymbolUsage {
     Builtin,
     Attribute,
     Parameter,
-    Assigned,
-    Const,
+
     Used,
     Import,
+    Const,
+
+    Mut,
+    MutRef,
+    ImmRef,
+    Immutable,
+    Own,
+
 }
 
 #[derive(Default)]
 pub struct SymbolTableBuilder {
     pub tables: Vec<SymbolTable>,
     lambda_name: String,
+    pub package: String,
     fun_call: bool,
     in_struct_func: bool,
+    is_const_fun: bool,
 }
 
 enum ExpressionContext {
@@ -225,8 +256,8 @@ enum ExpressionContext {
 }
 
 impl SymbolTableBuilder {
-    fn prepare(&mut self) {
-        self.enter_scope(&"top".to_string(), SymbolTableType::Module, 0);
+    fn prepare(&mut self, name: String) {
+        self.enter_scope(&name, SymbolTableType::Module, 0);
     }
     fn finish(&mut self) -> Result<SymbolTable, SymbolTableError> {
         assert_eq!(self.tables.len(), 1);
@@ -247,6 +278,7 @@ impl SymbolTableBuilder {
     }
     fn get_body_return_ty(&self, body: &Statement, ty: &CType, self_ty: bool) -> SymbolTableResult {
         let mut r_ty = CType::Any;
+
         if let ast::Statement::Block(_, statements) = body {
             let s = statements.last();
             if let Some(ast::Statement::Return(_, expression)) = s {
@@ -287,13 +319,13 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
-    pub fn scan_program(&mut self, program: &SourceUnit) -> SymbolTableResult {
-        for part in &program.0 {
+    pub fn scan_program(&mut self, program: &ast::ModuleDefinition) -> SymbolTableResult {
+        for part in &program.module_parts {
             match part {
-                SourceUnitPart::DataDefinition(_) => {}
-                SourceUnitPart::EnumDefinition(def) => {
-                    let enum_ty = self.get_register_type(def.name.name.clone());
-                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Enum, def.loc.1);
+                ModulePart::DataDefinition(_) => {}
+                ModulePart::EnumDefinition(def) => {
+                    let enum_ty = self.get_register_type(get_full_name(&program.package, &def.name.name.clone()));
+                    self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Enum, def.loc.1);
                     self.register_name(&"self".to_string(), enum_ty, SymbolUsage::Used, Loc::default())?;
 
                     let self_name = &def.name.name.clone();
@@ -304,7 +336,7 @@ impl SymbolTableBuilder {
                                     let tt = def.get_type(&self.tables);
                                     let ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
-                                    self.register_name(&name.name, tt, SymbolUsage::Assigned, def.loc)?;
+                                    self.register_name(&name.name, tt, SymbolUsage::Mut, def.loc)?;
                                     if let Some(expression) = &def.as_ref().returns {
                                         self.scan_expression(expression, &ExpressionContext::Load)?;
                                         return_name = expression.expr_name();
@@ -330,12 +362,12 @@ impl SymbolTableBuilder {
                         }
                     }
                     self.leave_scope();
-                    self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                    //  self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
                 }
 
-                SourceUnitPart::StructDefinition(def) => {
-                    let struct_ty = self.get_register_type(def.name.name.clone());
-                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Struct, def.loc.1);
+                ModulePart::StructDefinition(def) => {
+                    let struct_ty = self.get_register_type(get_full_name(&program.package, &def.name.name.clone()));
+                    self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
                     self.register_name(&"self".to_string(), struct_ty, SymbolUsage::Attribute, def.loc)?;
                     let self_name = def.name.name.clone();
                     for generic in &def.generics {
@@ -375,12 +407,16 @@ impl SymbolTableBuilder {
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                                     self.in_struct_func = true;
+                                    self.is_const_fun = !def.is_mut;
                                     if def.body.is_some() {
                                         self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                                         if def.generics.is_empty() {
                                             self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
                                         }
                                     }
+                                    self.is_const_fun = false;
+                                    //更新self为可变状态;
+                                    self.update_self_mutability("self".to_string(), SymbolMutability::Mut);
                                     self.in_struct_func = false;
                                     self.leave_scope();
                                 }
@@ -393,20 +429,20 @@ impl SymbolTableBuilder {
                     if def.impls.is_some() {
                         if let Struct(mut ty) = cty.clone() {
                             resolve_bounds(self, &mut ty, &def.impls.as_ref().unwrap())?;
-                            self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned, def.loc)?;
+                            //   self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned, def.loc)?;
                         }
                     } else {
-                        self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned, def.loc)?;
+                        //   self.register_name(&def.name.name.clone(), cty.clone(), SymbolUsage::Assigned, def.loc)?;
                     }
                 }
 
-                SourceUnitPart::FunctionDefinition(def) => {
+                ModulePart::FunctionDefinition(def) => {
                     let tt = def.get_type(&self.tables);
                     if let Some(name) = &def.name {
                         if let Some(expression) = &def.as_ref().returns {
                             self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
-                        self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+                        self.enter_function(&get_full_name(&program.package, &name.name), &def.as_ref().params, def.loc.1)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                             if def.generics.is_empty() {
@@ -416,9 +452,9 @@ impl SymbolTableBuilder {
                         self.leave_scope();
                     }
                 }
-                SourceUnitPart::BoundDefinition(def) => {
-                    self.enter_scope(&def.name.name.clone(), SymbolTableType::Struct, def.loc.1);
-                    self.register_name(&"self".to_string(), CType::Str, SymbolUsage::Attribute, Loc::default())?;
+                ModulePart::BoundDefinition(def) => {
+                    self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
+                    self.register_name(&"self".to_string(), CType::TSelf, SymbolUsage::Attribute, Loc::default())?;
                     let self_name = def.name.name.clone();
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
@@ -448,17 +484,20 @@ impl SymbolTableBuilder {
                         }
                         self.enter_function(&func_name, &part.as_ref().params, part.loc.1)?;
                         self.in_struct_func = true;
+                        self.is_const_fun = !part.is_mut;
                         if part.body.is_some() {
                             self.scan_statement(&part.body.as_ref().unwrap())?;
                             if part.generics.is_empty() {
                                 self.get_body_return_ty(&part.body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
                             }
                         }
+                        self.is_const_fun = false;
+                        self.update_self_mutability("self".to_string(), SymbolMutability::Mut);
                         self.in_struct_func = false;
                         self.leave_scope();
                     }
                     self.leave_scope();
-                    self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                    // self.register_name(&def.name.name.clone(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
                 }
                 _ => (),
             }
@@ -479,59 +518,78 @@ impl SymbolTableBuilder {
             self.register_name(&t.0, t.1.clone(), t.2.clone(), Loc::default());
         }
     }
-
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
-    pub fn scan_top_symbol_types(&mut self, program: &SourceUnit, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
-        if in_import && is_all && as_name.clone().is_some() {
-            self.register_name(&as_name.clone().unwrap(), CType::Module, SymbolUsage::Import, Loc::default());
+    pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
+        if in_import && !is_all && item_name.is_none() {
+            self.register_name(&get_last_name(&program.package), CType::Module, SymbolUsage::Import, Loc::default());
         }
-        for part in &program.0 {
+        for part in &program.module_parts {
             match part {
-                SourceUnitPart::DataDefinition(_) => {
+                ModulePart::DataDefinition(_) => {
                     //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
-                SourceUnitPart::EnumDefinition(def) => {
-                    if in_import && !is_all {
-                        if def.name.name.eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
-                            } else {
-                                self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
-                            }
-                            return Ok(());
-                        }
-                    } else {
-                        self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
+                ModulePart::EnumDefinition(def) => {
+                    let ty = def.get_type(&self.tables);
+                    //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                    if !in_import {
+                        self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                        continue;
                     }
-                }
-                SourceUnitPart::StructDefinition(def) => {
-                    if in_import && !is_all {
-                        if def.name.name.eq(&item_name.clone().unwrap()) {
-                            if as_name.is_some() {
-                                self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
-                            } else {
-                                self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
-                            }
-                            for part in &def.parts {
-                                if let StructPart::ConstDefinition(const_def) = part {
-                                    let ty = const_def.initializer.get_type(&self.tables);
-                                    self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+
+                    if is_all {
+                        self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                    } else {
+                        if item_name.is_some() {
+                            if def.name.name.eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), def.get_type(&self.tables), SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                                 }
                             }
-                            return Ok(());
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.name.name), ty.clone(), SymbolUsage::Import, def.loc)?;
+                        }
+                    }
+                }
+
+                ModulePart::StructDefinition(def) => {
+                    let ty = def.get_type(&self.tables);
+                    //   self.register_name(&def.name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                    for part in &def.parts {
+                        if let StructPart::ConstDefinition(const_def) = part {
+                            let ty = const_def.initializer.get_type(&self.tables);
+                            self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                        }
+                    }
+                    if !in_import {
+                        self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                        continue;
+                    }
+
+                    //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                    if !is_all {
+                        if item_name.is_some() {
+                            if def.name.name.eq(&item_name.clone().unwrap()) {
+                                if as_name.is_some() {
+                                    // println!("1111:{:?},def.name.name:{:?}", item_name, def.name.name);
+                                    self.register_name(&as_name.clone().unwrap(), ty.clone(), SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    // println!("4444:{:?},def.name.name:{:?}", item_name, def.name.name);
+                                    self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
+                            }
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
                         }
                     } else {
-                        self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned, def.loc)?;
-                        for part in &def.parts {
-                            if let StructPart::ConstDefinition(const_def) = part {
-                                let ty = const_def.initializer.get_type(&self.tables);
-                                self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
-                            }
-                        }
+                        self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
                 //处理文件各项内容时，不需要处理import和从const, const、import在扫描文件顶层symbol的时候已处理;
-                SourceUnitPart::ImportDirective(def) => {
+                ModulePart::ImportDirective(def) => {
                     if !in_import {
                         match def {
                             Import::Plain(mod_path, all) => {
@@ -555,49 +613,77 @@ impl SymbolTableBuilder {
                         }
                     }
                 }
-                SourceUnitPart::ConstDefinition(def) => {
+                ModulePart::ConstDefinition(def) => {
                     let ty = def.initializer.get_type(&self.tables);
-                    if in_import && !is_all {
-                        if def.as_ref().name.clone().name.eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Const, def.loc)?;
-                            } else {
-                                self.register_name(&def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                    //  self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Const, def.loc)?;
+                    if !in_import {
+                        self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&get_full_name(&program.package, &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
+                        continue;
+                    }
+                    if !is_all {
+                        if item_name.is_some() {
+                            if def.as_ref().name.clone().name.eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
-                            return Ok(());
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
                         }
                     } else {
-                        self.register_name(&def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                        self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
-                SourceUnitPart::FunctionDefinition(def) => {
+                ModulePart::FunctionDefinition(def) => {
                     let ty = def.get_type(&self.tables);
-                    if in_import && !is_all {
-                        if def.as_ref().name.as_ref().unwrap().name.clone().eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Assigned, def.loc)?;
-                            } else {
-                                self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty, SymbolUsage::Assigned, def.loc)?;
+                    let name = &def.as_ref().name.as_ref().unwrap().name;
+                    // self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                    if !in_import {
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&get_full_name(&program.package, name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                        continue;
+                    }
+                    if !is_all {
+                        if item_name.is_some() {
+                            if def.as_ref().name.as_ref().unwrap().name.clone().eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
-                            return Ok(());
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), name), ty.clone(), SymbolUsage::Mut, def.loc)?;
                         }
                     } else {
-                        self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty, SymbolUsage::Assigned, def.loc)?;
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
-                SourceUnitPart::BoundDefinition(def) => {
+                ModulePart::BoundDefinition(def) => {
                     let ty = def.get_type(&self.tables);
-                    if in_import && !is_all {
-                        if def.as_ref().name.name.eq(&item_name.clone().unwrap()) {
-                            if as_name.clone().is_some() {
-                                self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Assigned, def.loc)?;
-                            } else {
-                                self.register_name(&def.as_ref().name.name, ty, SymbolUsage::Assigned, def.loc)?;
+                    //self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                    if !in_import {
+                        self.register_name(&get_full_name(&program.package, &def.as_ref().name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                        self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        continue;
+                    }
+                    if !is_all {
+                        if item_name.is_some() {
+                            if def.as_ref().name.name.eq(&item_name.clone().unwrap()) {
+                                if as_name.clone().is_some() {
+                                    self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                                } else {
+                                    self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                                }
                             }
-                            return Ok(());
+                        } else {
+                            self.register_name(&get_full_name(&get_last_name(&program.package), &def.as_ref().name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
                         }
                     } else {
-                        self.register_name(&def.as_ref().name.name, ty, SymbolUsage::Assigned, def.loc)?;
+                        self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     }
                 }
                 _ => {}
@@ -606,7 +692,7 @@ impl SymbolTableBuilder {
         Ok(())
     }
 
-    fn get_register_type(&mut self, name: String) -> CType {
+    fn get_register_type(&self, name: String) -> CType {
         let len = self.tables.len();
         for i in (0..len).rev() {
             let a = self.tables.get(i).unwrap().lookup(name.as_str());
@@ -617,8 +703,20 @@ impl SymbolTableBuilder {
         CType::Unknown
     }
 
+    fn get_variable_mutbility(&self, name: String) -> SymbolMutability {
+        let len = self.tables.len();
+        for i in (0..len).rev() {
+            let a = self.tables.get(i).unwrap().lookup(name.as_str());
+            if a.is_some() {
+                return a.unwrap().mutability.clone();
+            }
+        }
+        SymbolMutability::Immutable
+    }
+
     fn in_struct_scope(&self, name: String) -> bool {
         let len = self.tables.len();
+        //多层咋整,len - 2 有点不对啊
         let a = self.tables.get(len - 2).unwrap().lookup(name.as_str());
         if a.is_some() {
             return true;
@@ -634,16 +732,18 @@ impl SymbolTableBuilder {
         }
         return false;
     }
+
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
-       // println!("statement is {:?}", statement);
+        // println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
-            Block(_, stmts) => {
+            Block(loc, stmts) => {
                 for stmt in stmts {
                     self.scan_statement(stmt)?;
                 }
             }
             For(loc, target, iter, body) => {
+                self.enter_scope(&target.expr_name(), SymbolTableType::Block, loc.1);
                 let mut ty = iter.get_type(&self.tables);
                 let mut symbol_name = String::new();
                 if let ast::Expression::Variable(Identifier { name, .. }) = target {
@@ -656,7 +756,7 @@ impl SymbolTableBuilder {
                 // println!("ty:{:?},iter.expr_name:{:?}", ty, iter.expr_name());
                 if let CType::Tuple(n) = ty {
                     if n.is_empty() {
-                        self.register_name(symbol_name.borrow(), CType::Any, SymbolUsage::Assigned, iter.loc())?;
+                        self.register_name(symbol_name.borrow(), CType::Any, SymbolUsage::Mut, iter.loc())?;
                     } else {
                         let cty = n.get(0).unwrap();
                         for nty in n.iter() {
@@ -668,12 +768,12 @@ impl SymbolTableBuilder {
                             }
                         }
                         //如果类型相同的Tuple,就退化为Array,允许对其中的元素进行迭代;
-                        self.register_name(symbol_name.borrow(), cty.clone(), SymbolUsage::Assigned, iter.loc())?;
+                        self.register_name(symbol_name.borrow(), cty.clone(), SymbolUsage::Mut, iter.loc())?;
                     }
                 } else if let CType::Array(cty) = ty {
-                    self.register_name(symbol_name.borrow(), cty.as_ref().clone(), SymbolUsage::Assigned, iter.loc())?;
+                    self.register_name(symbol_name.borrow(), cty.as_ref().clone(), SymbolUsage::Mut, iter.loc())?;
                 } else if let CType::Dict(key, value) = ty {
-                    self.register_name(symbol_name.borrow(), CType::Tuple(Box::new(vec![key.as_ref().clone(), value.as_ref().clone()])), SymbolUsage::Assigned, iter.loc())?;
+                    self.register_name(symbol_name.borrow(), CType::Tuple(Box::new(vec![key.as_ref().clone(), value.as_ref().clone()])), SymbolUsage::Mut, iter.loc())?;
                 } else {
                     return Err(SymbolTableError {
                         error: format!("{:?}类型不正确,只有数组类型才能生成迭代器", iter.expr_name()),
@@ -686,24 +786,31 @@ impl SymbolTableBuilder {
                 //     self.scan_expression(e, &ExpressionContext::Load)?;
                 // }
                 self.scan_statement(body.as_ref().unwrap())?;
+                self.leave_scope();
             }
-            While(_, test, body) => {
+            While(loc, test, body) => {
+                self.enter_scope(&test.expr_name(), SymbolTableType::Block, loc.1);
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 self.scan_statement(body)?;
+                self.leave_scope();
             }
             Break(_) | Continue(_) => {}
             Expression(_, expression) => {
                 self.scan_expression(expression, &ExpressionContext::Load)?;
             }
-            If(_, test, body, orelse) => {
+            If(loc, test, body, orelse) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
+                self.enter_scope(&test.expr_name(), SymbolTableType::Block, loc.1);
                 self.scan_statement(body)?;
+                self.leave_scope();
                 if let Some(code) = orelse {
                     self.scan_statement(code)?;
                 }
             }
             Args(_, _) => {}
             VariableDefinition(location, decl, expression) => {
+                let muttable = if decl.is_mut { SymbolUsage::Mut } else { SymbolUsage::Immutable };
+                println!("ssssexpression:{:?},mutt:{:?},lambda:{:?}", decl, muttable, expression.as_ref().unwrap());
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
@@ -717,14 +824,13 @@ impl SymbolTableBuilder {
 
                         self.leave_scope();
                         self.lambda_name = name.clone();
-                        self.register_name(name, ty, SymbolUsage::Assigned, decl.loc)?;
+                        self.register_name(name, ty, muttable.clone(), decl.loc)?;
                     }
                     return Ok(());
-                }
-                if decl.ty.is_some() {
+                } else if decl.ty.is_some() {
                     self.register_name(decl.name.borrow().name.borrow(),
                                        decl.ty.as_ref().unwrap().get_type(&self.tables),
-                                       SymbolUsage::Assigned, decl.loc)?;
+                                       muttable.clone(), decl.loc)?;
                 }
 
                 if let Some(e) = expression {
@@ -740,31 +846,29 @@ impl SymbolTableBuilder {
                             //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
                             // 那右侧表示符应该是变量，需要从表中查找到的类型进行推断
                             if let Some(ast::Expression::Attribute(_, _, name, idx)) = expression {
-                                if name.is_some() {
-                                    ty = ty.attri_type(0, name.as_ref().unwrap().borrow().name.clone()).clone();
-                                    self.register_name(decl.name.borrow().name.borrow(), ty, SymbolUsage::Assigned, decl.loc)?;
-                                } else if idx.is_some() {
-                                    ty = ty.attri_type(idx.as_ref().unwrap().to_usize().unwrap(), "".to_string()).clone();
-                                    self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned, decl.loc)?;
-                                }
+                                let tmp = self.resolve_attribute(expression.as_ref().unwrap(), &ty)?;
+                                self.register_name(decl.name.borrow().name.borrow(), tmp, muttable.clone(), decl.loc)?;
                             } else {
-                                self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned, decl.loc)?;
+                                self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                             }
                         } else {
-                            if let Some(ast::Expression::FunctionCall(..)) = expression {
-                                self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), SymbolUsage::Assigned, decl.loc)?;
+                            if let ast::Expression::FunctionCall(..) = e {
+                                self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                             } else {
-                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
+                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
                             }
                         }
                     } else {
+                        let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables);
                         if let ast::Expression::Variable(Identifier { .. }) = e {
-                            //简单赋值，右侧如果是饮用语言直接拷贝类型；
-                            // TOTO 如果是值类型的话，拷贝类型，删除已注册的变量
-                            self.register_name(decl.name.borrow().name.borrow(), ty.clone(), SymbolUsage::Assigned, decl.loc)?;
+                            //函数和lambda特殊，直接删除原有定义，用右侧的覆盖;
+                            if let Fn(_) = left_ty {
+                                self.delete_name(decl.name.borrow().name.borrow());
+                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
+                            }
                             return Ok(());
                         }
-                        let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables);
+
                         let mut right_ty = ty.ret_type().clone();
                         if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
                             return Err(SymbolTableError {
@@ -800,8 +904,10 @@ impl SymbolTableBuilder {
                 if let CType::Enum(enum_type) = ty {
                     let mut hash_set = self.get_test_item(&enum_type);
                     for (expr, item) in items.iter() {
+                        self.enter_scope(&expr.expr_name(), SymbolTableType::MatchItem, expr.loc().1);
                         self.scan_match_item(expr, &ExpressionContext::Load, &mut hash_set)?;
                         self.scan_statement(item)?;
+                        self.leave_scope();
                     }
                     if !hash_set.is_empty() {
                         return Err(SymbolTableError {
@@ -812,11 +918,14 @@ impl SymbolTableBuilder {
                 } else if ty >= CType::I8 && ty < CType::Float {
                     let mut found_hole = false;
                     for (expr, item) in items.iter() {
-                        self.scan_match_item(expr, &ExpressionContext::Load, &mut HashSet::new())?;
+                        let mut name = expr.expr_name();
                         if let ast::Expression::Hole(_) = expr.as_ref() {
                             found_hole = true;
                         }
+                        self.enter_scope(&name, SymbolTableType::MatchItem, expr.loc().1);
+                        self.scan_match_item(expr, &ExpressionContext::Load, &mut HashSet::new())?;
                         self.scan_statement(item)?;
+                        self.leave_scope();
                     }
                     if !found_hole {
                         return Err(SymbolTableError {
@@ -834,6 +943,7 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
+
     fn get_test_item(&self, enum_type: &EnumType) -> HashSet<String> {
         let mut hash_set: HashSet<String> = HashSet::new();
         for item in &enum_type.items {
@@ -841,6 +951,7 @@ impl SymbolTableBuilder {
         }
         return hash_set;
     }
+
     //剩下问题，tuple匹配，Variable匹配查找问题
     fn scan_match_item(&mut self, expression: &Expression, context: &ExpressionContext, items: &mut HashSet<String>) -> SymbolTableResult {
         if let Expression::FunctionCall(_, name, args) = expression {
@@ -855,7 +966,7 @@ impl SymbolTableBuilder {
                             if let CType::Reference(_, tys) = item_ty {
                                 if args.len() == tys.len() {
                                     for i in 0..args.len() {
-                                        self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Assigned, name.loc())?;
+                                        self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Mut, name.loc())?;
                                     }
                                 }
                             }
@@ -874,7 +985,7 @@ impl SymbolTableBuilder {
                     items.remove(&*v.name);
                     if args.len() == tys.len() {
                         for i in 0..args.len() {
-                            self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Assigned, name.loc())?;
+                            self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Mut, name.loc())?;
                         }
                     }
                 }
@@ -938,7 +1049,7 @@ impl SymbolTableBuilder {
     fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> SymbolTableResult {
         match part {
             MultiDeclarationPart::Single(ident) => {
-                self.register_name(ident.name.borrow(), ty.clone(), SymbolUsage::Assigned, ident.loc)?;
+                self.register_name(ident.name.borrow(), ty.clone(), SymbolUsage::Mut, ident.loc)?;
             }
             MultiDeclarationPart::TupleOrArray(decl) => {
                 self.scan_multi_value_def(decl, ty);
@@ -948,6 +1059,7 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
+
     fn scan_expressions(
         &mut self,
         expressions: &[Expression],
@@ -965,6 +1077,7 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
+        println!("expression:{:?}", expression);
         match &expression {
             Subscript(_, a, b) => {
                 self.scan_expression(a, context)?;
@@ -974,85 +1087,97 @@ impl SymbolTableBuilder {
             // Attribute(Loc(1, 3, 20), Variable(Identifier { loc: Loc(1, 3, 18), name: "varargs" }), None, Some(0))))
 
             Attribute(_, obj, name, idx) => {
-                if self.fun_call {
-                    self.fun_call = false;
+                let ty = self.get_register_type(obj.expr_name());
+                self.resolve_attribute(&expression.clone(), &ty)?;
+            }
+            FunctionCall(loc, name, args) => {
+                if is_builtin_name(&name.expr_name()) && name.is_a_variable() {
+                    if name.expr_name().eq("print") || name.expr_name().eq("format") {
+                        resovle_build_funs(self, &name.loc(), &args)?;
+                    } else {
+                        self.resolve_fn(expression, &self.get_register_type(name.expr_name()))?;
+                    }
                 } else {
-                    if name.is_some() && obj.expr_name().ne("self".clone()) {
-                        let ty = self.get_register_type(obj.expr_name());
-                        self.verify_field_visible(ty.borrow(), obj.expr_name(), name.as_ref().unwrap().clone().name)?
-                    } else if idx.is_some() {
-                        let ty = self.get_register_type(obj.expr_name());
-                        if let CType::Tuple(n) = ty {
-                            if idx.unwrap() >= n.len() as i32 {
-                                return Err(SymbolTableError {
-                                    error: format!("Tuple的长度是{:?}，访问的下标为:{:?}", n.len(), idx.unwrap()),
-                                    location: obj.loc().clone(),
-                                });
+                    let mut ty = CType::Unknown;
+                    if self.in_struct_func {
+                        if let Variable(ident) = name.as_ref() {
+                            if self.in_current_scope(ident.clone().name) || self.in_struct_scope(ident.clone().name) {
+                                ty = self.get_register_type(name.expr_name());
+                            } else {
+                                ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
+                            }
+                        } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                            ty = self.get_register_type(n.expr_name());
+                            ty = self.resovle_method(name, &ty)?;
+
+                            // if self.in_current_scope(n.expr_name()) {
+                            //     ty = self.get_register_type(n.expr_name());
+                            // } else {
+                            //     ty = self.get_register_type(get_full_name(&self.package, &n.expr_name()));
+                            // }
+                        }
+                        if let CType::Fn(fnty) = ty.clone() {
+                            if self.is_const_fun {
+                                if fnty.is_mut {
+                                    if !self.in_current_scope(name.expr_name()) && self.in_struct_scope(name.expr_name()) {
+                                        return Err(SymbolTableError {
+                                            error: format!("struct中的不可变函数中不能调用struct可变的函数{:?}", name.expr_name()),
+                                            location: loc.clone(),
+                                        });
+                                    }
+                                }
+                            } else {
+                                //验证struct自身在函数中的可变引用次数
+                                self.verify_mutability("self".to_string(), SymbolMutability::MutRef, expression.loc())?;
+                            }
+                        }
+                    } else {
+                        if let Variable(ident) = name.as_ref() {
+                            if self.in_current_scope(ident.clone().name) {
+                                ty = self.get_register_type(name.expr_name());
+                            } else {
+                                ty = self.get_register_type(get_full_name(&self.package, &name.expr_name()));
+                            }
+                        } else if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                            ty = self.get_register_type(n.expr_name());
+                            ty = self.resovle_method(name, &ty)?;
+                            // if self.in_current_scope(n.expr_name()) {
+                            //     ty = self.get_register_type(n.expr_name());
+                            // } else {
+                            //     ty = self.get_register_type(get_full_name(&self.package, &n.expr_name()));
+                            // }
+                            if let CType::Fn(fnty) = ty.clone() {
+                                if fnty.is_mut {
+                                    self.verify_mutability(expression.expr_name(), SymbolMutability::MutRef, expression.loc())?;
+                                } else {
+                                    self.check_readable(expression.expr_name(), expression.loc())?;
+                                }
                             }
                         }
                     }
-                }
-                self.scan_expression(obj, context)?;
-            }
-            FunctionCall(loc, name, args) => {
-                if name.expr_name().eq("print") || name.expr_name().eq("format") {
-                    resovle_varargs_fun(self, &name.loc(), &args)?;
-                } else {
-                    let ty = self.get_register_type(name.expr_name());
+
                     if ty == CType::Unknown {
                         return Err(SymbolTableError {
                             error: format!("未定义{:?}的类型，", name.expr_name()),
                             location: loc.clone(),
                         });
                     }
-                    if let Attribute(_, name, Some(ident), _) = name.as_ref() {
-                        if name.expr_name().ne("self".clone()) {
-                            if !self.is_enum_variant(&ty, ident.name.clone()) {
-                                self.verify_fun_visible(&ty, name.expr_name(), ident.name.clone())?;
-                            }
-                        }
-                        //形如print(obj.private)的字段，需要验证private的可见性，用fun_call变量进行区分,不雅观;
-                        self.fun_call = true;
+                    if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                        self.resovle_method(name, &ty)?;
+                    } else {
+                        self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
                     }
-
-                    self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
-                    let args_type = ty.param_type();
-                    for (i, (ety, is_default, is_varargs)) in args_type.iter().enumerate() {
-                        if let Some(e) = args.get(i) {
-                            let cty = e.get_type(&self.tables);
-                            let ret_ty = cty.ret_type();
-                            if ety != ret_ty {
-                                if ety != &CType::Any {
-                                    if *is_varargs {
-                                        if let CType::Array(_) = ety {
-                                            continue;
-                                        }
-                                    }
-                                    return Err(SymbolTableError {
-                                        error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
-                                        location: loc.clone(),
-                                    });
-                                }
-                            }
-                        } else {
-                            if !*is_default {
-                                return Err(SymbolTableError {
-                                    error: format!("缺少第{:?}个参数，参数类型为{:?}", i + 1, ety),
-                                    location: loc.clone(),
-                                });
-                            }
-                        }
-                    }
+                    self.resolve_fn(expression, &ty)?;
+                    if !name.is_a_variable() { self.scan_expressions(args, &ExpressionContext::Load)?; }
                 }
-                self.scan_expressions(args, &ExpressionContext::Load)?;
             }
             Not(loc, name) => {
                 let ty = name.get_type(&self.tables);
-                if ty > CType::I8 && ty <= CType::U128 {
+                if ty == CType::Bool {
                     self.scan_expression(name, &ExpressionContext::Load)?;
                 } else {
                     return Err(SymbolTableError {
-                        error: format!("取反操作只能针对整型"),
+                        error: format!("取反操作只能针对Bool型"),
                         location: loc.clone(),
                     });
                 }
@@ -1107,6 +1232,9 @@ impl SymbolTableBuilder {
                     });
                 }
                 self.scan_expression(b, &ExpressionContext::Load)?;
+                if let Attribute(loc, a, b, c) = a.as_ref() {
+                    self.check_storeable(a.expr_name(), loc.clone())?;
+                }
                 self.scan_expression(a, &ExpressionContext::Store)?;
             }
             AssignOr(loc, a, b) |
@@ -1129,6 +1257,9 @@ impl SymbolTableBuilder {
                 }
                 self.scan_expression(b, &ExpressionContext::Load)?;
                 self.scan_expression(a, &ExpressionContext::Load)?;
+                if let Attribute(loc, a, b, c) = a.as_ref() {
+                    self.check_storeable(a.expr_name(), loc.clone())?;
+                }
                 self.scan_expression(a, &ExpressionContext::Store)?;
             }
             BoolLiteral(_, _) => {}
@@ -1138,19 +1269,48 @@ impl SymbolTableBuilder {
             }
             List(_, _) => {}
             Variable(Identifier { loc, name }) => {
-                let ty = self.get_register_type(name.to_string()).clone();
-                if ty == Unknown {
-                    return Err(SymbolTableError {
-                        error: format!("找不到{}的定义", name),
-                        location: loc.clone(),
-                    });
-                }
                 match context {
-                    ExpressionContext::Load => {}
-                    ExpressionContext::Store => {
-                        if self.in_struct_func && !self.in_struct_scope(name.clone()) {
-                            self.register_name(name, ty, SymbolUsage::Assigned, loc.clone())?;
+                    ExpressionContext::Load => {
+                        let m = self.get_variable_mutbility(name.to_string());
+                        if m == SymbolMutability::Moved {
+                            return Err(SymbolTableError {
+                                error: format!("{:?}的所有权已经moved，不能再被加载", name),
+                                location: loc.clone(),
+                            });
+                        } else if m == SymbolMutability::MutRef {
+                            return Err(SymbolTableError {
+                                error: format!("{:?}的已有可变引用，不能再被加载", name),
+                                location: loc.clone(),
+                            });
                         }
+                    }
+                    ExpressionContext::Store => {
+                        let mut ty = Unknown;
+                        ty = self.get_register_type(name.to_string()).clone();
+                        // if self.in_struct_func {
+                        //     ty = self.get_register_type(name.to_string()).clone();
+                        // } else {
+                        //     ty = self.get_register_type(get_full_name(&self.package, &name.to_string())).clone();
+                        // }
+                        if ty == Unknown {
+                            return Err(SymbolTableError {
+                                error: format!("找不到{}的定义", name),
+                                location: loc.clone(),
+                            });
+                        }
+                        if self.in_struct_func {
+                            if self.in_current_scope(name.clone()) {
+                                self.register_name(name, ty, SymbolUsage::Mut, loc.clone())?;
+                            } else if self.is_const_fun {
+                                //包括自身的属性和其他的变量;
+                                return Err(SymbolTableError {
+                                    error: format!("不可变函数中不能修改外部的值"),
+                                    location: loc.clone(),
+                                });
+                            }
+                        }
+                        self.check_storeable(name.to_string(), loc.clone())?;
+                        // let m = self.get_variable_mutbility(name.to_string());
                     }
                 }
             }
@@ -1180,19 +1340,24 @@ impl SymbolTableBuilder {
                 if self.lambda_name.is_empty() {
                     let mut name = get_pos_lambda_name(lambda.loc);
                     self.scan_lambda(name.clone(), *lambda.clone());
-                    self.register_name(&name, ty, SymbolUsage::Assigned, lambda.loc.clone());
+                    self.register_name(&name, ty, SymbolUsage::Mut, lambda.loc.clone());
                 } else {
                     self.scan_lambda(self.lambda_name.clone(), *lambda.clone());
-                    self.register_name(&self.lambda_name.clone(), ty, SymbolUsage::Assigned, lambda.loc.clone());
+                    self.register_name(&self.lambda_name.clone(), ty, SymbolUsage::Mut, lambda.loc.clone());
                 }
             }
             Number(_, _) => {}
             NamedFunctionCall(_, exp, args) => {
+                //  println!("named_call:{:?},", expression);
                 let mut ty = self.get_register_type(exp.as_ref().expr_name());
+                println!("named_call:{:?},ty:{:?}", expression, ty);
                 if let CType::Struct(sty) = ty.clone() {
-                    let struct_ty = resovle_generic(sty, args.clone(), &self.tables);
+                    let struct_ty = resolve_generic(sty, args.clone(), &self.tables);
                     ty = CType::Struct(struct_ty);
+                    println!("11111named_call:{:?},ty:{:?}", expression, ty);
                     for arg in args {
+
+
                         //不在struct当前作用域，则需要检查Named参数的可见性
                         if !self.in_struct_scope(arg.name.name.clone()) {
                             let result = self.verify_field_visible(ty.borrow(), exp.as_ref().expr_name(), arg.name.name.clone());
@@ -1203,10 +1368,22 @@ impl SymbolTableBuilder {
                                 });
                             }
                         }
-                        //验证参数是否足够
-                        let hash_set: HashSet<String> = args.iter().map(|s| s.name.name.clone()).collect();
-                        self.verify_param_enough(ty.borrow(), hash_set)?;
+                        if let Expression::Variable(Identifier { name, loc }) = arg.expr.clone() {
+                            let mutability = self.get_field_mutabiltiy(&ty, arg.name.name.clone());
+                            self.verify_mutability(name.clone(), mutability, loc.clone())?;
+                        } else if let Expression::FunctionCall(..) = arg.expr.clone() {
+                            //TODO
+                        } else if let Expression::Attribute(..) = arg.expr.clone() {} else {
+                            self.scan_expression(&arg.expr, &ExpressionContext::Load)?;
+                            //self.scan_expression(&arg.name, &ExpressionContext::)?;
+                        }
                     }
+                    //验证参数是否足够
+                    let hash_set: HashMap<String, CType> = args.iter().map(|s| {
+                        let ty = s.expr.get_type(&self.tables);
+                        (s.name.name.clone(), ty)
+                    }).collect();
+                    self.verify_param_ty_enough(ty.borrow(), hash_set)?;
                 }
             }
             IfExpression(_, test, body, orelse) => {
@@ -1237,6 +1414,128 @@ impl SymbolTableBuilder {
         Ok(())
     }
 
+    pub fn update_mutability(&mut self, name: String, mutability: SymbolMutability) -> SymbolTableResult {
+        if name.is_empty() || name.eq("Thread") {
+            return Ok(());
+        }
+        println!("namessss {:?} change to {:?}", name, mutability);
+        let table = self.tables.last_mut().unwrap();
+        let mut symbol = table.symbols.get(&name).unwrap().clone();
+        symbol.mutability = mutability;
+        table.symbols.insert(name.to_owned(), symbol.clone());
+        Ok(())
+    }
+    // 循环取最近一个self进行修改
+    pub fn update_self_mutability(&mut self, name: String, mutability: SymbolMutability) -> SymbolTableResult {
+        if name.is_empty() {
+            return Ok(());
+        }
+        let len = self.tables.len();
+        for i in (0..len).rev() {
+            let table = self.tables.get_mut(i).unwrap();
+            let a = table.lookup(name.as_str());
+            if a.is_some() {
+                let mut symbol = a.unwrap().clone();
+                symbol.mutability = mutability.clone();
+                table.symbols.insert(name.to_owned(), symbol.clone());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn verify_mutability(&mut self, name: String, mutability: SymbolMutability, loc: Loc) -> SymbolTableResult {
+        println!("ssssname:{:?},loc:{:?},mut::{:?}", name, loc, mutability);
+        let t = self.get_variable_mutbility(name.clone());
+        match t {
+            SymbolMutability::ImmRef => {
+                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut {
+                    return Err(SymbolTableError {
+                        error: format!("变量{:?}为不可变变量引用，不能被可变借用", name),
+                        location: loc,
+                    });
+                }
+            }
+            SymbolMutability::Immutable => {
+                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut {
+                    return Err(SymbolTableError {
+                        error: format!("变量{:?}为不可变变量，不能被可变借用", name),
+                        location: loc,
+                    });
+                }
+            }
+            SymbolMutability::MutRef => {
+                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut || mutability == SymbolMutability::ImmRef {
+                    return Err(SymbolTableError {
+                        error: format!("变量{:?}已存在可变引用，不能再被修改", name),
+                        location: loc,
+                    });
+                } else if mutability == SymbolMutability::Moved {
+                    return Err(SymbolTableError {
+                        error: format!("变量{:?}已存在可变引用，不能被moved", name),
+                        location: loc,
+                    });
+                }
+            }
+            SymbolMutability::Mut => {
+                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Moved {
+                    if "self".eq(name.as_str()) {
+                        self.update_self_mutability("self".to_string(), mutability.clone())?;
+                    } else {
+                        self.update_mutability(name.clone(), mutability.clone())?;
+                    }
+                }
+            }
+            SymbolMutability::Moved => {
+                return Err(SymbolTableError {
+                    error: format!("变量{:?}已被move，不能在访问", name),
+                    location: loc,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    pub fn check_readable(&mut self, name: String, loc: Loc) -> SymbolTableResult {
+        let t = self.get_variable_mutbility(name.clone());
+        match t {
+            SymbolMutability::MutRef => {
+                return Err(SymbolTableError {
+                    error: format!("变量{:?}已存在可变引用，不能再被读取", name),
+                    location: loc,
+                });
+            }
+            SymbolMutability::Moved => {
+                return Err(SymbolTableError {
+                    error: format!("变量{:?}已被move，不能在访问", name),
+                    location: loc,
+                });
+            }
+            _ => { return Ok(()); }
+        }
+        Ok(())
+    }
+
+    pub fn check_storeable(&mut self, name: String, loc: Loc) -> SymbolTableResult {
+        let m = self.get_variable_mutbility(name.clone());
+        if m == SymbolMutability::ImmRef || m == SymbolMutability::Immutable {
+            return Err(SymbolTableError {
+                error: format!("不能修改不可变变量{:?}的值,", name),
+                location: loc.clone(),
+            });
+        } else if m == SymbolMutability::Moved {
+            return Err(SymbolTableError {
+                error: format!("{:?}变量已经moved,", name),
+                location: loc.clone(),
+            });
+        } else if m == SymbolMutability::MutRef {
+            return Err(SymbolTableError {
+                error: format!("{:?}变量已有可变引用,无法赋值", name),
+                location: loc.clone(),
+            });
+        }
+        Ok(())
+    }
+
     fn enter_function(
         &mut self,
         name: &String,
@@ -1244,13 +1543,17 @@ impl SymbolTableBuilder {
         line_number: usize,
     ) -> SymbolTableResult {
         self.enter_scope(name, SymbolTableType::Function, line_number);
-        let arg_types: Vec<(String, CType, bool, bool)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter, Loc::default());
         }
         Ok(())
     }
+
     pub fn verify_fun_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+        if self.in_struct_func {
+            return Ok(());
+        }
         match ty {
             CType::Struct(ty) => {
                 for (method_name, ftype) in ty.methods.iter() {
@@ -1312,6 +1615,19 @@ impl SymbolTableBuilder {
                         }
                     }
                 }
+                for (method_name, ftype) in ty.static_methods.iter() {
+                    if method_name.eq(&method) {
+                        if let CType::Fn(fntype) = ftype {
+                            return Ok(());
+                        }
+                    }
+                }
+
+                for (method_name, ftype) in ty.items.iter() {
+                    if method_name.eq(&method) {
+                        return Ok(());
+                    }
+                }
                 return Err(SymbolTableError {
                     error: format!("{} 中找不到{}函数", name, method),
                     location: Loc(0, 0, 0),
@@ -1321,14 +1637,27 @@ impl SymbolTableBuilder {
             _ => unreachable!()
         }
     }
-
-
+    pub fn get_field_mutabiltiy(&self, ty: &CType, name: String) -> SymbolMutability {
+        if let Struct(n) = ty {
+            for (field_name, _, _, mutability) in &n.fields {
+                if name.eq(field_name) {
+                    return mutability.clone();
+                }
+            }
+        }
+        unreachable!()
+    }
     pub fn verify_field_visible(&self, ty: &CType, name: String, method: String) -> SymbolTableResult {
+        if self.in_struct_func {
+            return Ok(());
+        }
         match ty {
             CType::Struct(ty) => {
-                for (method_name, _, is_pub) in ty.fields.iter() {
+                for (method_name, _, is_pub, ..) in ty.fields.iter() {
                     if method_name.eq(&method) {
                         return if *is_pub {
+                            Ok(())
+                        } else if name.eq("self") {
                             Ok(())
                         } else {
                             Err(SymbolTableError {
@@ -1358,11 +1687,18 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub fn verify_param_enough(&self, ty: &CType, methods: HashSet<String>) -> SymbolTableResult {
+    pub fn verify_param_ty_enough(&self, ty: &CType, methods: HashMap<String, CType>) -> SymbolTableResult {
         match ty {
             CType::Struct(ty) => {
-                for (field_name, ..) in ty.fields.iter() {
-                    if !methods.contains(field_name) {
+                for (field_name, ty, ..) in ty.fields.iter() {
+                    if methods.contains_key(field_name) {
+                        if methods.get(field_name).unwrap() != ty {
+                            return Err(SymbolTableError {
+                                error: format!("参数类型不匹配，期望是{:?},实际为{:?}", ty, &methods.get(field_name)),
+                                location: Loc(0, 0, 0),
+                            });
+                        }
+                    } else {
                         return Err(SymbolTableError {
                             error: format!("命名参数缺少{}", field_name),
                             location: Loc(0, 0, 0),
@@ -1385,6 +1721,7 @@ impl SymbolTableBuilder {
         }
         return false;
     }
+
     pub fn lookup_name_ty(&self, name: &String) -> &CType {
         // println!("Looking up {:?}", name);
         let len: usize = self.tables.len();
@@ -1396,9 +1733,15 @@ impl SymbolTableBuilder {
         }
         unreachable!()
     }
+
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        //println!("register name={:?}, ty: {:?}", name, ty);
+        // println!("register name={:?}, ty: {:?}", name, ty);
+        //忽略_符号
+        if name.is_empty() {
+            return Ok(());
+        }
+
         if self.in_struct_func && self.in_struct_scope(name.clone()) {
             return if role == SymbolUsage::Used {
                 Ok(())
@@ -1415,32 +1758,43 @@ impl SymbolTableBuilder {
         // }
         let containing = table.symbols.contains_key(name);
         if containing {
-            match role {
-                SymbolUsage::Attribute => {
-                    return Err(SymbolTableError {
-                        error: format!("'{}'是属性,不能重新绑定 ", name),
-                        location,
-                    });
+            if role <= SymbolUsage::Const {
+                match role {
+                    SymbolUsage::Attribute => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'是属性,不能重新绑定 ", name),
+                            location,
+                        });
+                    }
+                    SymbolUsage::Builtin => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'内建类型,不能重新绑定 ", name),
+                            location,
+                        });
+                    }
+                    SymbolUsage::Const => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'是常量,不能重新赋值和定义", name),
+                            location,
+                        });
+                    }
+                    SymbolUsage::Import => {
+                        //import 允许重复导入，后面一次覆盖前一次
+                    }
+                    _ => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'重复定义", name),
+                            location,
+                        });
+                    }
                 }
-                SymbolUsage::Builtin => {
-                    return Err(SymbolTableError {
-                        error: format!("'{}'内建类型,不能重新绑定 ", name),
-                        location,
-                    });
-                }
-                SymbolUsage::Const => {
-                    return Err(SymbolTableError {
-                        error: format!("'{}'是常量,不能重新赋值和定义", name),
-                        location,
-                    });
-                }
-                _ => {}
             }
         }
         let mut symbol = Symbol::new(name, ty.clone());
         match role {
             SymbolUsage::Attribute => {
                 symbol.is_attribute = true;
+                symbol.mutability = SymbolMutability::Mut;
             }
             SymbolUsage::Parameter => {
                 symbol.scope = SymbolScope::Parameter;
@@ -1448,11 +1802,200 @@ impl SymbolTableBuilder {
             SymbolUsage::Const => {
                 symbol.scope = SymbolScope::Const;
             }
+            SymbolUsage::Import => {
+                symbol.scope = SymbolScope::Global;
+            }
+            SymbolUsage::Mut => {
+                symbol.mutability = SymbolMutability::Mut;
+            }
+            SymbolUsage::Immutable => {
+                symbol.mutability = SymbolMutability::Immutable;
+            }
+            SymbolUsage::ImmRef => {
+                symbol.mutability = SymbolMutability::ImmRef;
+            }
+            SymbolUsage::MutRef => {
+                symbol.mutability = SymbolMutability::MutRef;
+            }
+            SymbolUsage::Own => {
+                symbol.mutability = SymbolMutability::Moved;
+            }
             _ => {}
         }
         table.symbols.insert(name.to_owned(), symbol.clone());
-        // println!("after register name={:?}, ty: {:?}", name, symbol.clone());
+        Ok(())
+    }
 
+    fn delete_name(&mut self, name: &String) -> SymbolTableResult {
+        let table = self.tables.last_mut().unwrap();
+        table.symbols.remove(name);
+        Ok(())
+    }
+
+    fn resolve_attribute(&mut self, expr: &Expression, ty: &CType) -> Result<CType, SymbolTableError> {
+        let v = get_attribute_vec(expr);
+        let mut cty = ty;
+        let len = v.len();
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Struct(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    println!("tmp:{:?}", tmp);
+                    if !self.in_struct_scope(attri_name.0.clone()) {
+                        self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
+                    }
+                    // attri_type = tmp.0;
+                    cty = tmp.1;
+                } else if let CType::Tuple(n) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let index = attri_name.0.parse::<i32>().unwrap();
+                    if index >= n.len() as i32 {
+                        return Err(SymbolTableError {
+                            error: format!("Tuple的长度是{:?}，访问的下标为:{:?}", n.len(), index),
+                            location: expr.loc().clone(),
+                        });
+                    }
+                    let tmp = cty.attri_index(index);
+                    cty = tmp;
+                } else if let CType::Enum(n) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    println!("tmp:{:?}", tmp);
+                    if !self.in_struct_scope(attri_name.0.clone()) {
+                        self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
+                    }
+                    return Ok(cty.clone());
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("只有struct和tuple,enum类型才有属性"),
+                        location: expr.loc().clone(),
+                    });
+                }
+            }
+        }
+        Ok(cty.clone())
+    }
+
+    fn resovle_method(&mut self, expr: &Expression, ty: &CType) -> Result<CType, SymbolTableError> {
+        let v = get_attribute_vec(expr);
+        let mut cty = ty.clone();
+        let mut attri_type = 0;
+        let len = v.len();
+        for (idx, name) in v.iter().enumerate() {
+            if name.0.clone().is_empty() {
+                continue;
+            }
+            if idx < len - 1 {
+                if let CType::Struct(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    attri_type = tmp.0;
+                    println!("tmp:{:?}", tmp);
+                    if attri_type < 1 {
+                        return Err(SymbolTableError {
+                            error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),
+                            location: expr.loc().clone(),
+                        });
+                    } else if attri_type > 1 {
+                        self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    } else {
+                        self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    }
+                    cty = tmp.1.clone();
+                } else if let CType::Enum(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    attri_type = tmp.0;
+                    println!("tmp:{:?}", tmp);
+                    if attri_type < 1 {
+                        return Err(SymbolTableError {
+                            error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),
+                            location: expr.loc().clone(),
+                        });
+                    }
+                    if attri_type > 1 {
+                        self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    } else {
+                        self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                    }
+
+                    // cty = tmp.1.clone();
+                    return Ok(cty);
+                } else if let CType::Fn(fntype) = cty.clone() {
+                    self.resolve_fn(&name.1, &cty.clone())?;
+                    cty = cty.ret_type().clone();
+                } else if CType::Module == cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    cty = self.get_register_type(get_full_name(&name.0, &attri_name.0));
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("只有是struct、函数、和enum时才有函数类型"),
+                        location: expr.loc().clone(),
+                    });
+                }
+            }
+        }
+        Ok(cty)
+    }
+
+    fn resolve_fn(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
+        if let Expression::FunctionCall(_, name, args) = expr {
+            let args_type = ty.param_type();
+            for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
+                if let Some(e) = args.get(i) {
+                    let cty = e.get_type(&self.tables);
+                    println!("cty::{:?},", cty);
+                    if let CType::Fn(fnty) = ety {
+                        if let Lambda(n) = cty {
+                            continue;
+                        }
+                        if let Fn(fnty) = cty {
+                            continue;
+                        }
+                    }
+                    let ret_ty = cty.ret_type();
+                    if ety != ret_ty {
+                        if ety != &CType::Any {
+                            if *is_varargs {
+                                if let CType::Array(_) = ety {
+                                    continue;
+                                }
+                            }
+                            //TODO 引用自身的类型，还不能处理package.Point这样的Expression;
+                            if let CType::Args(s) = ety {
+                                if ret_ty == &self.get_register_type(s.clone()) {
+                                    continue;
+                                }
+                            }
+                            //Todo ety如果是无参函数类型，让其过，没搞明白，这里要咋样处理,是否允许定义函数类型时带参数呢，还是只能推导;以函数为参数的函数，其函数参数如何确定，需要处理;
+
+
+                            return Err(SymbolTableError {
+                                error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
+                                location: expr.loc().clone(),
+                            });
+                        }
+                    }
+                } else {
+                    if !*is_default {
+                        return Err(SymbolTableError {
+                            error: format!("缺少第{:?}个参数，参数类型为{:?}", i + 1, ety),
+                            location: expr.loc().clone(),
+                        });
+                    }
+                }
+
+                if let Some(Expression::Variable(Identifier { name, loc })) = args.get(i) {
+                    self.verify_mutability(name.clone(), ref_mut.clone(), loc.clone())?;
+                } else if let Some(Expression::FunctionCall(..)) = args.get(i) {
+                    //TODO
+                } else if let Some(Expression::Attribute(..)) = args.get(i) {}
+            }
+            // self.scan_expressions(args, &ExpressionContext::Load)?;
+        }
         Ok(())
     }
 }
+
+

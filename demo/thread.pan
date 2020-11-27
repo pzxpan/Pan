@@ -1,8 +1,9 @@
+package default;
 pub struct Thread {
     pub f: FunType,
     state: i32,
-    pub fun ::new(f:FunType): Thread {
-        return Thread ({f,state:0});
+    pub fun ::new(f: FunType): Thread {
+        return Thread! {f,state:0};
     }
     pub fun run() :Any {
         self.state = 1;
@@ -29,16 +30,7 @@ fun main() {
     });
     t.run();
 
-    let t2 = Thread::new(() => {
-        let cc = add(1000,bb);
-        print("第二个子线程");
-        print("第二个子线程..暂停2秒");
-        sleep(2000);
-        print("第二个子线程..暂停2秒结束");
-        print("1000+{}结果为:{}",bb,cc);
-    });
 
-    t2.run();
 }
 
 

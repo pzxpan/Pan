@@ -1,16 +1,19 @@
 //根据import，生成各种Value,最好是有个中间的代码形式，直接读取就好，不要重新编译;跟java的class中间字节码一样;
 use std::fs::File;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::io::Read;
 use std::env;
 
 use pan_parser::ast::*;
-use pan_bytecode::bytecode::{Instruction, Constant};
+use pan_bytecode::bytecode::{Instruction, Constant, NameScope};
 use walkdir::WalkDir;
 use crate::error::*;
 use crate::output_stream::OutputStream;
 use crate::builtin::builtin_fun::get_builtin_fun;
 use crate::compile::*;
+use crate::util;
+use pan_bytecode::bytecode::NameScope::Global;
+use crate::util::{get_last_name, get_full_name};
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> Result<(), CompileError> {
     //顺序为系统目录，工作目录，当前子目录;
@@ -98,37 +101,35 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
     let mut file = File::open(path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let code_object = compile(&contents, String::from(path.clone().to_str().unwrap()), 0, true);
-    if code_object.is_ok() {
+    let r = compile(&contents, String::from(path.clone().to_str().unwrap()), 0, true);
+    if r.is_ok() {
+        let result = r.unwrap();
+        let package_name = result.0;
+        let code_object = result.1;
         if *is_all {
-            if as_name.clone().is_some() {
-                //删除ReturnValue和LoadConst(None)指令
-                for i in code_object.unwrap().instructions.iter() {
-                    if let Instruction::StoreName(name, ns) = i {
-                        let mut n = as_name.clone().unwrap().clone();
-                        n.push('.');
-                        n.push_str(&name);
-                        compiler.import_instructions.push(Instruction::StoreName(n, ns.clone()));
-                    } else {
-                        compiler.import_instructions.push(i.clone());
-                    }
+            for i in code_object.instructions.iter() {
+                if let Instruction::StoreName(name, ns) = i {
+                    let n = util::get_last_name(name);
+                    compiler.import_instructions.push(Instruction::Duplicate);
+                    compiler.import_instructions.push(i.clone());
+                    compiler.import_instructions.push(Instruction::StoreName(n, ns.clone()));
+                } else {
+                    compiler.import_instructions.push(i.clone());
                 }
-            } else {
-                compiler.import_instructions.extend(code_object.unwrap().instructions);
             }
         } else {
             if as_name.clone().is_some() {
                 let mut rev_instruction = Vec::new();
-                let mut found = false;
-                for i in code_object.unwrap().instructions.iter().rev() {
+                for i in code_object.instructions.iter().rev() {
                     if let Instruction::StoreName(name, ns) = i {
-                        if item_name.clone().unwrap().eq(name) {
-                            found = true;
-                            rev_instruction.push(Instruction::StoreName(as_name.clone().unwrap(), ns.clone()));
+                        if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
+                            rev_instruction.push(Instruction::StoreName(as_name.clone().unwrap(), Global));
+                            rev_instruction.push(i.clone());
+                            rev_instruction.push(Instruction::Duplicate);
                         } else {
-                            found = false;
+                            rev_instruction.push(i.clone());
                         }
-                    } else if found {
+                    } else {
                         rev_instruction.push(i.clone());
                     }
                 }
@@ -136,17 +137,24 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
                 compiler.import_instructions.extend(rev_instruction);
             } else {
                 let mut rev_instruction = Vec::new();
-                let mut found = false;
-                for i in code_object.unwrap().instructions.iter().rev() {
+                for i in code_object.instructions.iter().rev() {
                     if let Instruction::StoreName(name, ns) = i {
-                        if item_name.clone().unwrap().eq(name) {
-                            found = true;
-                            rev_instruction.push(i.clone());
-                            //compiler.import_instructions.push(i.clone());
+                        if item_name.clone().is_some() {
+                            if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
+                                rev_instruction.push(Instruction::StoreName(item_name.clone().unwrap(), NameScope::Global));
+                                rev_instruction.push(i.clone());
+                                rev_instruction.push(Instruction::Duplicate);
+                            } else {
+                                rev_instruction.push(i.clone());
+                            }
                         } else {
-                            found = false;
+                            let s: Vec<&str> = name.split_terminator("$").collect();
+                            let tmp = get_full_name(&String::from(s[s.len() - 2]), s[s.len() - 1]);
+                            rev_instruction.push(Instruction::StoreName(tmp, NameScope::Global));
+                            rev_instruction.push(i.clone());
+                            rev_instruction.push(Instruction::Duplicate);
                         }
-                    } else if found {
+                    } else {
                         rev_instruction.push(i.clone());
                         // compiler.import_instructions.push(i.clone());
                     }
@@ -157,7 +165,7 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
         }
         Ok(())
     } else {
-        let mut err = code_object.err().unwrap();
+        let mut err = r.err().unwrap();
         err.update_source_path(path.to_str().unwrap());
         Err(err)
     }

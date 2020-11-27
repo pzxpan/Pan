@@ -23,10 +23,21 @@ pub struct DocComment {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct SourceUnit(pub Vec<SourceUnitPart>);
+pub struct Module {
+    pub content: Vec<ModulePart>,
+    pub package: Vec<Identifier>,
+}
 
 #[derive(Debug, PartialEq)]
-pub enum SourceUnitPart {
+pub struct ModuleDefinition {
+    pub module_parts: Vec<ModulePart>,
+    pub name: Identifier,
+    pub package: String,
+    pub is_pub: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ModulePart {
     StructDefinition(Box<StructDefinition>),
     BoundDefinition(Box<BoundDefinition>),
     ImportDirective(Import),
@@ -34,7 +45,7 @@ pub enum SourceUnitPart {
     DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
-
+    ModuleDefinition(Box<ModuleDefinition>),
     Error,
 }
 
@@ -67,6 +78,7 @@ pub struct VariableDeclaration {
     pub loc: Loc,
     pub ty: Option<Expression>,
     pub name: Identifier,
+    pub is_mut: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -166,6 +178,7 @@ pub struct StructVariableDefinition {
     pub loc: Loc,
     pub ty: Expression,
     pub is_pub: bool,
+    pub mut_own: Option<MutOrOwn>,
     pub name: Identifier,
     pub initializer: Option<Expression>,
 }
@@ -328,6 +341,12 @@ impl Expression {
             _ => "".to_string()
         }
     }
+    pub fn is_a_variable(&self) -> bool {
+        match self {
+            Expression::Variable(id) => true,
+            _ => false
+        }
+    }
     pub fn is_compare_operation(&self) -> bool {
         match self {
             Expression::More(_, _, _) |
@@ -438,11 +457,16 @@ impl Expression {
 pub struct Parameter {
     pub loc: Loc,
     pub ty: Expression,
-    pub is_ref: bool,
-    pub is_mut: bool,
+    pub mut_own: Option<MutOrOwn>,
     pub is_varargs: bool,
     pub name: Option<Identifier>,
     pub default: Option<Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MutOrOwn {
+    Own,
+    Mut,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -515,6 +539,7 @@ pub struct FunctionDefinition {
     pub generics: Vec<Generic>,
     pub is_pub: bool,
     pub is_static: bool,
+    pub is_mut: bool,
     pub returns: Option<Expression>,
     pub body: Option<Statement>,
 }

@@ -1,6 +1,6 @@
 use log::*;
 use std::borrow::Borrow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, Constant};
@@ -18,12 +18,16 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name};
+
 use pan_bytecode::bytecode::ComparisonOperator::In;
+use pan_bytecode::bytecode::Instruction::{LoadName, LoadAttr};
+use crate::compile::FunctionContext::Function;
 
 
 lazy_static! {
     static ref CONST_MAP: Mutex<HashMap<String,Constant>> = Mutex::new(HashMap::new());
+    static ref BUILTIN_NAME: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
 
 pub fn insert(name: String, value: Constant) {
@@ -31,6 +35,15 @@ pub fn insert(name: String, value: Constant) {
     map.insert(name, value);
 }
 
+pub fn insert_builtin_name(name: String) {
+    let ref mut map = BUILTIN_NAME.lock().unwrap();
+    map.insert(name);
+}
+
+pub fn is_builtin_name(name: &str) -> bool {
+    let ref map = BUILTIN_NAME.lock().unwrap();
+    return map.contains(name);
+}
 
 pub fn get(name: String) -> Option<Constant> {
     let ref map = CONST_MAP.lock().unwrap();
@@ -56,6 +69,8 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
     ctx: CompileContext,
     optimize: u8,
     lambda_name: String,
+    package: String,
+    capture_value: Vec<(usize, String)>,
 }
 
 #[derive(Clone, Copy)]
@@ -69,8 +84,8 @@ struct CompileContext {
 enum FunctionContext {
     NoFunction,
     Function,
-    AsyncFunction,
-    StructFunction,
+    // AsyncFunction,
+    StructFunction(bool),
 }
 
 impl CompileContext {
@@ -87,11 +102,15 @@ pub fn compile(
     source_path: String,
     optimize: u8,
     is_import: bool,
-) -> Result<CodeObject, CompileError> {
-    let ast = parse(source, source_path.to_string());
+) -> Result<(String, CodeObject), CompileError> {
+    let mut ast = parse(source, source_path.to_string());
     if ast.is_ok() {
-        compile_program(ast.unwrap(), source_path.clone(), optimize, is_import)
+        let module_name = get_mod_name(source_path.clone());
+        let module = ast.unwrap();
+        let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(module.package) };
+        compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
+                err.source_path = Some(source_path);
                 err
             })
     } else {
@@ -110,9 +129,10 @@ pub fn compile(
 fn with_compiler(
     source_path: String,
     optimize: u8,
+    package: String,
     f: impl FnOnce(&mut Compiler) -> Result<(), CompileError>,
 ) -> Result<CodeObject, CompileError> {
-    let mut compiler = Compiler::new(optimize);
+    let mut compiler = Compiler::new(optimize, package);
     compiler.source_path = Some(source_path);
     compiler.push_new_code_object("<module>".to_owned());
     f(&mut compiler)?;
@@ -122,16 +142,21 @@ fn with_compiler(
 }
 
 pub fn compile_program(
-    ast: ast::SourceUnit,
+    ast: ast::ModuleDefinition,
     source_path: String,
     optimize: u8,
     is_import: bool,
-) -> Result<CodeObject, CompileError> {
-    with_compiler(source_path, optimize, |compiler| {
+) -> Result<(String, CodeObject), CompileError> {
+    let r = with_compiler(source_path, optimize, ast.package.clone(), |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        // println!("sybmol{:?}", symbol_table);
+        //println!("sybmol{:?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
-    })
+    });
+    if r.is_ok() {
+        return Ok((ast.package, r.unwrap()));
+    } else {
+        return Err(r.err().unwrap());
+    }
 }
 
 impl<O> Default for Compiler<O>
@@ -139,12 +164,12 @@ impl<O> Default for Compiler<O>
         O: OutputStream,
 {
     fn default() -> Self {
-        Compiler::new(0)
+        Compiler::new(0, "".to_string())
     }
 }
 
 impl<O: OutputStream> Compiler<O> {
-    fn new(optimize: u8) -> Self {
+    fn new(optimize: u8, package: String) -> Self {
         Compiler {
             import_instructions: Vec::new(),
             output_stack: Vec::new(),
@@ -158,8 +183,11 @@ impl<O: OutputStream> Compiler<O> {
                 in_loop: false,
                 func: FunctionContext::NoFunction,
             },
+            package,
             optimize,
             lambda_name: "".to_string(),
+            capture_value: vec![],
+
         }
     }
 
@@ -174,6 +202,7 @@ impl<O: OutputStream> Compiler<O> {
             self.source_path.clone().unwrap(),
             1,
             obj_name,
+            false,
         ));
     }
 
@@ -181,35 +210,50 @@ impl<O: OutputStream> Compiler<O> {
         self.output_stack.pop().unwrap().into()
     }
 
+    fn get_full_name(&self, package: &String, s: &str) -> String {
+        let mut tmp = package.clone();
+        tmp.push_str("$");
+        tmp.push_str(s);
+        return tmp;
+    }
     pub fn compile_program(
         &mut self,
-        program: &ast::SourceUnit,
+        program: &ast::ModuleDefinition,
         symbol_table: SymbolTable,
-        is_import: bool,
+        in_import: bool,
     ) -> Result<(), CompileError> {
         trace!("compile symboltable{:?}", symbol_table);
         let mut found_main = false;
         self.symbol_table_stack.push(symbol_table);
         let size_before = self.output_stack.len();
-        resolve_builtin_fun(self);
-
-        for part in &program.0 {
+        if !in_import {
+            resolve_builtin_fun(self);
+        }
+        for part in &program.module_parts {
             match part {
-                ast::SourceUnitPart::DataDefinition(_) => {}
-                ast::SourceUnitPart::EnumDefinition(def) => {
+                ast::ModulePart::DataDefinition(_) => {}
+                ast::ModulePart::EnumDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_enum_def(name.as_str(), &body, &generics)?;
+                    if in_import {
+                        self.compile_enum_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
+                    } else {
+                        self.compile_enum_def(name.as_str(), &body, &generics)?;
+                    }
                 }
-                ast::SourceUnitPart::StructDefinition(def) => {
+                ast::ModulePart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_class_def(name.as_str(), &body, &generics)?;
+                    if in_import {
+                        self.compile_class_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
+                    } else {
+                        self.compile_class_def(name.as_str(), &body, &generics)?;
+                    }
                 }
-                ast::SourceUnitPart::ImportDirective(def) => {
-                    if !is_import {
+                ast::ModulePart::ImportDirective(def) => {
+                    if !in_import {
                         match def {
                             Import::Plain(mod_path, all) => {
                                 resolve_import_compile(self, mod_path, Option::None, all)?;
@@ -232,13 +276,13 @@ impl<O: OutputStream> Compiler<O> {
                         }
                     }
                 }
-                ast::SourceUnitPart::ConstDefinition(def) => {
-                    self.calculate_const(def);
+                ast::ModulePart::ConstDefinition(def) => {
+                    self.calculate_const(def, in_import);
                 }
-                ast::SourceUnitPart::FunctionDefinition(def) => {
+                ast::ModulePart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
                     if name.eq("main") {
-                        if !is_import {
+                        if !in_import {
                             found_main = true;
                         }
                     }
@@ -250,13 +294,21 @@ impl<O: OutputStream> Compiler<O> {
                     let body = &def.body.as_ref().unwrap();
                     let returns = &def.returns;
                     let is_async = false;
-                    self.compile_function_def(name, args.as_slice(), body, returns, is_async, false)?;
+                    if in_import {
+                        self.compile_function_def(&self.get_full_name(&program.package, name), args.as_slice(), body, returns, is_async, false)?;
+                    } else {
+                        self.compile_function_def(name, args.as_slice(), body, returns, is_async, false)?;
+                    }
                 }
-                ast::SourceUnitPart::BoundDefinition(def) => {
+                ast::ModulePart::BoundDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    self.compile_bound_def(name.as_str(), &body, &generics)?;
+                    if in_import {
+                        self.compile_bound_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
+                    } else {
+                        self.compile_bound_def(name.as_str(), &body, &generics)?;
+                    }
                 }
                 _ => (),
             }
@@ -271,16 +323,20 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
         }
-        if !is_import {
+        if !in_import {
             self.emit(Instruction::LoadConst(bytecode::Constant::None));
             self.emit(Instruction::ReturnValue);
         }
         Ok(())
     }
-    fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition) -> Result<(), CompileError> {
+    fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition, in_import: bool) -> Result<(), CompileError> {
         self.emit(Instruction::DefineConstStart);
         self.compile_expression(&const_def.initializer)?;
-        self.store_name(&const_def.name.name);
+        if in_import {
+            self.store_name(&get_full_name(&self.package, &const_def.name.name));
+        } else {
+            self.store_name(&const_def.name.name);
+        }
         self.emit(Instruction::DefineConstEnd);
         Ok(())
     }
@@ -325,7 +381,7 @@ impl<O: OutputStream> Compiler<O> {
                         statement: None,
                         error: CompileErrorType::InvalidReturn,
                         location: statement.loc().clone(),
-                        source_path: None,
+                        source_path: self.source_path.clone(),
                     });
                 }
                 match value {
@@ -344,7 +400,7 @@ impl<O: OutputStream> Compiler<O> {
                         statement: None,
                         error: CompileErrorType::InvalidContinue,
                         location: statement.loc().clone(),
-                        source_path: None,
+                        source_path: self.source_path.clone(),
                     });
                 }
                 self.emit(Instruction::Continue);
@@ -355,7 +411,7 @@ impl<O: OutputStream> Compiler<O> {
                         statement: None,
                         error: CompileErrorType::InvalidBreak,
                         location: statement.loc().clone(),
-                        source_path: None,
+                        source_path: self.source_path.clone(),
                     });
                 }
                 self.emit(Instruction::Break);
@@ -366,15 +422,19 @@ impl<O: OutputStream> Compiler<O> {
                 match orelse {
                     None => {
                         // 只有if分支
+                        self.enter_scope();
                         self.compile_jump_if(test, false, end_label)?;
                         self.compile_statements(body)?;
+                        self.leave_scope();
                         self.set_label(end_label);
                     }
                     Some(statements) => {
                         // if - else
                         let else_label = self.new_label();
+                        self.enter_scope();
                         self.compile_jump_if(test, false, else_label)?;
                         self.compile_statements(body)?;
+                        self.leave_scope();
                         self.emit(Instruction::Jump(end_label));
 
                         // else
@@ -403,14 +463,18 @@ impl<O: OutputStream> Compiler<O> {
             }
 
             For(_, target, iter, body) => {
+                self.enter_scope();
                 self.compile_for(target, iter, body.as_ref().unwrap())?;
+                self.leave_scope();
             }
             MultiVariableDefinition(_, decl, expression) => {
                 self.compile_expression(expression)?;
                 self.compile_store_multi_value_def(decl)?;
             }
             While(_, expression, body) => {
+                self.enter_scope();
                 self.compile_while(expression, body)?;
+                self.leave_scope();
             }
             Match(_, test, bodies) => {
                 self.compile_expression(test)?;
@@ -423,6 +487,7 @@ impl<O: OutputStream> Compiler<O> {
                 for (index, expr) in bodies.iter().enumerate() {
                     self.set_label(labels[index]);
                     self.emit(Instruction::Duplicate);
+                    self.enter_scope();
                     if let ast::Expression::Hole(_) = expr.0.as_ref() {} else {
                         if expr.0.as_ref().is_compare_operation() {
                             self.emit(Instruction::Pop);
@@ -444,6 +509,7 @@ impl<O: OutputStream> Compiler<O> {
                     }
                     self.compile_statements(expr.1.as_ref())?;
                     self.emit(Instruction::Jump(end_label));
+                    self.leave_scope();
                 }
                 self.set_label(end_label);
                 //弹出被比较的数据
@@ -519,7 +585,7 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
-    fn enter_function(&mut self, name: &str, args: &[ast::Parameter]) -> Result<(), CompileError> {
+    fn enter_function(&mut self, name: &str, args: &[ast::Parameter], is_mut: bool) -> Result<(), CompileError> {
         let line_number = self.get_source_line_number();
         self.push_output(CodeObject::new(
             args.iter().map(|a| a.name.as_ref().unwrap().name.clone()).collect(),
@@ -527,6 +593,7 @@ impl<O: OutputStream> Compiler<O> {
             self.source_path.clone().unwrap(),
             line_number,
             name.to_owned(),
+            is_mut,
         ));
         self.enter_scope();
         for arg in args.iter() {
@@ -559,7 +626,7 @@ impl<O: OutputStream> Compiler<O> {
         let qualified_name = self.create_qualified_name(name, "");
 
         let a: Vec<Parameter> = Vec::new();
-        self.enter_function(name, &a)?;
+        self.enter_function(name, &a, false)?;
         self.emit(Instruction::LoadConst(bytecode::Constant::None));
         self.emit(Instruction::ReturnValue);
         let code = self.pop_code_object();
@@ -580,25 +647,30 @@ impl<O: OutputStream> Compiler<O> {
         args: &[ast::Parameter],
         body: &ast::Statement,
         returns: &Option<ast::Expression>,
-        is_async: bool,
+        is_mut: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
-        self.ctx = CompileContext {
-            in_lambda,
-            in_loop: false,
-            func: if is_async {
-                FunctionContext::AsyncFunction
-            } else {
-                FunctionContext::Function
-            },
-        };
+        if in_lambda {
+            self.ctx = CompileContext {
+                in_lambda,
+                in_loop: false,
+                func: prev_ctx.func,
+            };
+        } else {
+            self.ctx = CompileContext {
+                in_lambda,
+                in_loop: false,
+                func: FunctionContext::Function,
+            };
+        }
+
 
         let qualified_name = self.create_qualified_name(name, "");
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
 
-        self.enter_function(name, args)?;
+        self.enter_function(name, args, is_mut)?;
         self.compile_statements(body)?;
         match body {
             ast::Statement::Block(_, statements) => {
@@ -643,20 +715,20 @@ impl<O: OutputStream> Compiler<O> {
         args: &[ast::Parameter],
         body: &ast::Statement,
         returns: &Option<ast::Expression>,
-        is_async: bool,
+        is_mut: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
             in_lambda,
             in_loop: false,
-            func: FunctionContext::StructFunction,
+            func: FunctionContext::StructFunction(is_mut),
         };
         let qualified_name = self.create_qualified_name(name, "");
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
 
-        self.enter_function(name, args)?;
+        self.enter_function(name, args, is_mut)?;
         self.compile_statements(body)?;
         match body {
             ast::Statement::Block(_, statements) => {
@@ -735,9 +807,9 @@ impl<O: OutputStream> Compiler<O> {
             "pan".to_string(),
             line_number,
             name.to_owned(),
+            false,
         ));
         self.enter_scope();
-
 
         self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
@@ -757,18 +829,18 @@ impl<O: OutputStream> Compiler<O> {
                         args.push(p.clone());
                     }
                     let returns = &def.returns;
-                    let is_async = false;
+                    let is_mut = def.is_mut;
                     if def.body.is_some() {
                         let body = &def.body.as_ref().unwrap();
                         if *&def.is_static {
-                            self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false);
+                            self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_mut, false);
                         } else {
-                            self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
+                            self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_mut, false)?;
                         }
                     }
                 }
                 ast::StructPart::ConstDefinition(def) => {
-                    self.calculate_const(def)?;
+                    self.calculate_const(def, false)?;
                 }
                 _ => {}
             }
@@ -810,6 +882,7 @@ impl<O: OutputStream> Compiler<O> {
             self.source_path.as_ref().unwrap().to_string(),
             line_number,
             name.to_owned(),
+            false,
         ));
         self.enter_scope();
 
@@ -829,13 +902,13 @@ impl<O: OutputStream> Compiler<O> {
                 args.push(p.clone());
             }
             let returns = &def.returns;
-            let is_async = false;
+            let is_mut = def.is_mut;
             if def.body.is_some() {
                 let body = &def.body.as_ref().unwrap();
                 if *&def.is_static {
-                    self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_async, false)?;
+                    self.compile_struct_function_def(&mut static_fields, name, args.as_slice(), body, returns, is_mut, false)?;
                 } else {
-                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_async, false)?;
+                    self.compile_struct_function_def(&mut methods, name, args.as_slice(), body, returns, is_mut, false)?;
                 }
             }
         }
@@ -878,6 +951,7 @@ impl<O: OutputStream> Compiler<O> {
             "".to_string(),
             line_number,
             name.to_owned(),
+            false,
         ));
         self.enter_scope();
 
@@ -1003,10 +1077,19 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_store(&mut self, target: &ast::Expression) -> Result<(), CompileError> {
         match &target {
             ast::Expression::Variable(ast::Identifier { name, .. }) => {
-                let s = self.lookup_name(name);
-                if s.is_attribute {
-                    self.load_name("self");
-                    self.emit(Instruction::StoreAttr(name.clone()));
+                // let s = self.lookup_name(name);
+                if let FunctionContext::StructFunction(..) = self.ctx.func {
+                    if self.is_current_scope(name.as_str()) {
+                        self.store_name(name);
+                    } else {
+                        self.load_name("self");
+                        self.emit(Instruction::StoreAttr(name.clone()));
+                        self.emit(Instruction::Duplicate);
+                        self.store_name("self");
+                        self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                        self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                        self.emit(Instruction::StoreReference);
+                    }
                 } else {
                     self.store_name(name);
                 }
@@ -1015,6 +1098,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(a)?;
                 self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
+                //TODO这里需要修改，struct中的subscript数据怎么办;
                 self.store_name(&a.expr_name());
             }
             ast::Expression::Attribute(_, obj, attr, idx) => {
@@ -1041,7 +1125,7 @@ impl<O: OutputStream> Compiler<O> {
                     statement: None,
                     error: CompileErrorType::Assign("迭代器出错"),
                     location: self.current_source_location.clone(),
-                    source_path: None,
+                    source_path: self.source_path.clone(),
                 });
             }
         }
@@ -1188,7 +1272,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        trace!("Compiling {:?}", expression);
+        //println!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
 
         use ast::Expression::*;
@@ -1208,33 +1292,20 @@ impl<O: OutputStream> Compiler<O> {
                 if self.scope_for_name(&value.expr_name()) == NameScope::Const {
                     self.emit(Instruction::ConstStart);
                 }
-                self.compile_expression(value)?;
-                //按名字取，还是下标取
-                if name.is_some() {
-                    //is_enum_item元组表示是静态构造方法，还是普通属性;
-                    let is_enum_item = self.is_enum_variant_def(value, name);
-                    if is_enum_item.0 {
-                        self.emit(Instruction::LoadConst(
-                            bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
-                        self.emit(Instruction::LoadBuildEnum(2));
-                    } else if is_enum_item.1 {
-                        self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-                    } else {
-                        let (def_current, base_name) = self.is_struct_item_def(value, name);
-                        if def_current {
-                            self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-                        } else {
-                            self.emit(Instruction::LoadName(base_name, NameScope::Local));
-                            self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-                        }
-                    }
-                } else {
-                    self.emit(Instruction::LoadConst(
-                        bytecode::Constant::Integer(idx.unwrap() as i32)));
-                    self.emit(Instruction::Subscript);
-                    if self.scope_for_name(&value.expr_name()) == NameScope::Const {
-                        self.emit(Instruction::ConstEnd);
-                    }
+                self.resolve_compile_attribute(expression)?;
+                // //按名字取，还是下标取
+                // if name.is_some() {
+                //     //is_enum_item元组表示是静态构造方法，还是普通属性;
+                //
+                // } else {
+                //     self.compile_expression(value)?;
+                //     self.emit(Instruction::LoadConst(
+                //         bytecode::Constant::Integer(idx.unwrap() as i32)));
+                //     self.emit(Instruction::Subscript);
+                // }
+
+                if self.scope_for_name(&value.expr_name()) == NameScope::Const {
+                    self.emit(Instruction::ConstEnd);
                 }
             }
             FunctionCall(_, name, args) => {
@@ -1361,7 +1432,21 @@ impl<O: OutputStream> Compiler<O> {
             }
             List(_, _) => {}
 
-            Variable(ast::Identifier { name, .. }) => { self.load_name(name); }
+            Variable(ast::Identifier { name, .. }) => {
+                if let FunctionContext::StructFunction(_) = self.ctx.func {
+                    //顺序不要变，后期可能会允许let绑定覆盖
+                    if self.is_current_scope(name.as_str()) {
+                        self.load_name(name);
+                    } else if self.is_struct_item_def("self".to_string(), name.clone()) {
+                        self.load_name("self");
+                        self.emit(LoadAttr(name.clone()));
+                    } else {
+                        self.load_name(name);
+                    }
+                } else {
+                    self.load_name(name);
+                }
+            }
             Yield(_, _) => {}
             Slice(_, _) => {}
             Await(_, _) => {}
@@ -1506,90 +1591,99 @@ impl<O: OutputStream> Compiler<O> {
         }
         return Ok(());
     }
-
+    fn compile_builtin_fn(&mut self, function: &ast::Expression, args: &[ast::Expression]) -> Result<bool, CompileError> {
+        //内置函数处理
+        if function.expr_name().eq("print") {
+            self.compile_format(true, args);
+            return Ok(true);
+        } else if function.expr_name().eq("format") {
+            self.compile_format(false, args);
+            return Ok(true);
+        } else if function.expr_name().eq("typeof") {
+            //这些判断应该在语义分析阶段完成，那就要写两遍一样的逻辑，
+            // 分别在symboltable生成和compile阶段，因此放在这来完成对内置函数的特殊处理
+            if args.len() > 1 {
+                return Err(CompileError {
+                    statement: None,
+                    error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
+                    location: self.current_source_location.clone(),
+                    source_path: self.source_path.clone(),
+                });
+            }
+            self.gather_elements(args)?;
+            self.emit(Instruction::TypeOf);
+            return Ok(true);
+        } else if function.expr_name().eq("sleep") {
+            if args.len() > 1 {
+                return Err(CompileError {
+                    statement: None,
+                    error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
+                    location: self.current_source_location.clone(),
+                    source_path: self.source_path.clone(),
+                });
+            }
+            let arg = args.get(0).unwrap();
+            let ty = arg.get_type(&self.symbol_table_stack);
+            if ty <= CType::I8 || ty > CType::U64 {
+                return Err(CompileError {
+                    statement: None,
+                    error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
+                    location: self.current_source_location.clone(),
+                    source_path: self.source_path.clone(),
+                });
+            }
+            self.gather_elements(args)?;
+            self.emit(Instruction::Sleep);
+            return Ok(true);
+        }
+        return Ok(false);
+    }
     fn compile_call(
         &mut self,
         function: &ast::Expression,
         args: &[ast::Expression],
     ) -> Result<(), CompileError> {
-        let mut is_enum_item = (false, false);
+        let builtin = self.compile_builtin_fn(function, args)?;
+        if builtin { return Ok(()); }
+
+        let mut is_enum_item = false;
         let mut is_thread_start = false;
         if let ast::Expression::Attribute(_, variable, attribute, _) = function {
-            is_enum_item = self.is_enum_variant_def(variable, attribute);
-            if !is_enum_item.0 {
+            is_enum_item = self.is_enum_variant_def(&function);
+            if !is_enum_item {
                 is_thread_start = self.is_thread_run(variable, attribute);
             }
         }
 
-        if self.ctx.func == FunctionContext::StructFunction {
+        if let FunctionContext::StructFunction(_) = self.ctx.func {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                if self.is_out_symbol(name.as_str()) {
-                    self.compile_expression(function)?;
-                } else {
+                if self.is_current_scope(name.as_str()) {
+                    self.emit(LoadName(name.clone(), NameScope::Local));
+                } else if self.is_struct_item_def("self".to_string(), name.clone()) {
                     self.emit(Instruction::LoadName(
                         "self".to_string(),
                         bytecode::NameScope::Local,
                     ));
                     self.emit(Instruction::LoadAttr(name.clone()));
+                } else {
+                    self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
                 }
+            } else if let ast::Expression::Attribute(_, expr, name, _) = function {
+                self.resolve_compile_attribute(function)?;
+            }
+        } else {
+            if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
+                self.emit(LoadName(name.clone(), NameScope::Local));
             } else {
                 self.compile_expression(function)?;
             }
-        } else {
-            //内置函数处理
-            if function.expr_name().eq("print") {
-                return self.compile_format(true, args);
-            } else if function.expr_name().eq("format") {
-                return self.compile_format(false, args);
-            } else if function.expr_name().eq("typeof") {
-                //这些判断应该在语义分析阶段完成，那就要写两遍一样的逻辑，
-                // 分别在symboltable生成和compile阶段，因此放在这来完成对内置函数的特殊处理
-                if args.len() > 1 {
-                    return Err(CompileError {
-                        statement: None,
-                        error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
-                        location: self.current_source_location.clone(),
-                        source_path: None,
-                    });
-                }
-                self.gather_elements(args)?;
-                self.emit(Instruction::TypeOf);
-                return Ok(());
-            } else if function.expr_name().eq("sleep") {
-                if args.len() > 1 {
-                    return Err(CompileError {
-                        statement: None,
-                        error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
-                        location: self.current_source_location.clone(),
-                        source_path: None,
-                    });
-                }
-                let arg = args.get(0).unwrap();
-                let ty = arg.get_type(&self.symbol_table_stack);
-                if ty <= CType::I8 || ty > CType::U64 {
-                    return Err(CompileError {
-                        statement: None,
-                        error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
-                        location: self.current_source_location.clone(),
-                        source_path: None,
-                    });
-                }
-                self.gather_elements(args)?;
-                self.emit(Instruction::Sleep);
-                return Ok(());
-            }
         }
-        self.compile_expression(function)?;
-        if is_enum_item.0 {
-            if let ast::Expression::Attribute(_, variable, attribute, _) = function {
-                self.emit(Instruction::LoadName(
-                    variable.expr_name().to_string(),
-                    bytecode::NameScope::Local,
-                ));
-                self.emit(Instruction::LoadConst(bytecode::Constant::String(
-                    attribute.as_ref().unwrap().name.clone())));
-            }
-        }
+
+        // if is_enum_item {
+        //     if let ast::Expression::Attribute(_, variable, attribute, _) = function {
+        //
+        //     }
+        // }
 
         let ty = function.get_type(&self.symbol_table_stack);
         let mut need_count = 0;
@@ -1614,7 +1708,7 @@ impl<O: OutputStream> Compiler<O> {
             count = args.len();
         }
 
-        if is_enum_item.0 {
+        if is_enum_item {
             self.emit(Instruction::LoadBuildEnum(count + 2));
         } else if is_thread_start {
             self.emit(Instruction::StartThread);
@@ -1632,8 +1726,14 @@ impl<O: OutputStream> Compiler<O> {
         let mut is_constructor = false;
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
             is_constructor = self.is_constructor(name);
+            if self.variable_local_scope(name.as_str()) {
+                self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+            } else {
+                self.emit(LoadName(name.clone(), NameScope::Global));
+            }
+        } else {
+            self.compile_expression(function)?;
         }
-        self.compile_expression(function)?;
 
         for keyword in args {
             self.emit(Instruction::LoadConst(bytecode::Constant::String(keyword.name.name.clone())));
@@ -1686,6 +1786,7 @@ impl<O: OutputStream> Compiler<O> {
             "pan".to_string(),
             line_number,
             self.source_path.clone().unwrap(),
+            false,
         ));
         self.enter_scope();
 
@@ -1790,7 +1891,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-        // println!("Looking up {:?}", name);
+        println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
@@ -1801,34 +1902,36 @@ impl<O: OutputStream> Compiler<O> {
         unreachable!()
     }
 
-    fn is_struct_item_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> (bool, String) {
-        let mut name_str = "";
-        let mut attri = "";
-        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
-            name_str = name;
-        }
-        if let Some(ident) = attribute {
-            attri = &ident.name;
-        }
-
+    fn variable_local_scope(&self, name: &str) -> bool {
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
-            let symbol = self.symbol_table_stack[i].lookup(name_str);
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if symbol.is_some() {
+                return symbol.unwrap().scope != SymbolScope::Global;
+            }
+        }
+        return false;
+    }
+
+    fn is_struct_item_def(&self, name_str: String, attri: String) -> bool {
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(&name_str);
             if let Some(s) = symbol {
                 if let CType::Struct(StructType { fields, static_methods: static_fields, methods, bases, .. }) = &s.ty {
                     for (a_name, ..) in fields {
-                        if a_name.eq(attri) {
-                            return (true, "".to_string());
+                        if a_name.eq(&attri) {
+                            return true;
                         }
                     }
                     for (a_name, ..) in static_fields {
-                        if a_name.eq(attri) {
-                            return (true, "".to_string());
+                        if a_name.eq(&attri) {
+                            return true;
                         }
                     }
                     for (a_name, ..) in methods {
-                        if a_name.eq(attri) {
-                            return (true, "".to_string());
+                        if a_name.eq(&attri) {
+                            return true;
                         }
                     }
                     //如果在父bound中,则返回
@@ -1837,8 +1940,8 @@ impl<O: OutputStream> Compiler<O> {
                         let base_ty = &symbol.ty;
                         if let CType::Bound(BoundType { methods, .. }) = base_ty {
                             for (a_name, ..) in methods {
-                                if a_name.eq(attri) {
-                                    return (false, base.clone());
+                                if a_name.eq(&attri) {
+                                    return true;
                                 }
                             }
                         }
@@ -1846,37 +1949,36 @@ impl<O: OutputStream> Compiler<O> {
                 }
             }
         }
-        unreachable!()
+        return false;
     }
-    fn is_enum_variant_def(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> (bool, bool) {
-        let mut name_str = "";
-        let mut attri = "";
-        if let ast::Expression::Variable(ast::Identifier { name, .. }) = variable.as_ref() {
-            name_str = name;
-        }
-        if let Some(ident) = attribute {
-            attri = &ident.name;
-        }
+    fn is_enum_variant_def(&self, expr: &Expression) -> bool {
+        let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
 
-        let len: usize = self.symbol_table_stack.len();
-        for i in (0..len).rev() {
-            let symbol = self.symbol_table_stack[i].lookup(name_str);
-            if let Some(s) = symbol {
-                if let CType::Enum(EnumType { items, methods, .. }) = &s.ty {
-                    for (a_name, _) in items {
-                        if a_name.eq(attri) {
-                            return (true, false);
-                        }
+        let mut v = get_attribute_vec(expr);
+        if cty == CType::Module && v.len() > 1 {
+            let s = v.get(0).unwrap();
+            let mut s2 = v.get(1).unwrap();
+            let s3 = (get_full_name(&s.0, &s2.0), s2.1.clone());
+            cty = self.lookup_name(&get_full_name(&s.0, &s2.0)).ty.clone();
+            v.remove(0);
+            v.insert(0, s3);
+        }
+        let len = v.len();
+
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Enum(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    // attri_type = tmp.0;
+                    if tmp.0 == 2 {
+                        return true;
                     }
-                    for (a_name, _) in methods {
-                        if a_name.eq(attri) {
-                            return (false, true);
-                        }
-                    }
+                    // cty = tmp.1.clone();
                 }
             }
         }
-        return (false, false);
+        return false;
     }
 
     fn is_thread_run(&self, variable: &Box<Expression>, attribute: &Option<ast::Identifier>) -> bool {
@@ -1945,6 +2047,17 @@ impl<O: OutputStream> Compiler<O> {
         return false;
     }
 
+
+    fn is_current_scope(&mut self, name: &str) -> bool {
+        let table = self.symbol_table_stack.last_mut().unwrap();
+        let symbol = table.lookup(name);
+        if symbol.is_some() {
+            return true;
+        }
+        return false;
+    }
+
+
     //弹出指令
     pub fn emit(&mut self, instruction: Instruction) {
         let location = compile_location(&self.current_source_location);
@@ -1982,6 +2095,146 @@ impl<O: OutputStream> Compiler<O> {
             format!("{}{}", name, suffix)
         }
     }
+
+    fn resolve_compile_attribute(&mut self, expr: &Expression) -> Result<(), CompileError> {
+        let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
+
+        let mut v = get_attribute_vec(expr);
+        if cty == CType::Module && v.len() > 1 {
+            let s = v.get(0).unwrap();
+            let mut s2 = v.get(1).unwrap();
+            let s3 = (get_full_name(&s.0, &s2.0), s2.1.clone());
+            cty = self.lookup_name(&get_full_name(&s.0, &s2.0)).ty.clone();
+            v.remove(0);
+            v.remove(0);
+            v.insert(0, s3);
+        }
+        let len = v.len();
+        let mut capture_name = "".to_string();
+        let mut instructions: Vec<Instruction> = Vec::new();
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Struct(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    // attri_type = tmp.0;
+                    cty = tmp.1.clone();
+                    if idx == 0 {
+                        //在这里收集可变调用的返回的信息;
+                        // println!("panpan::{:?},attri_name:{:?}", name.0, attri_name.0);
+                        //  if let FunctionContext::StructFunction(true) = self.ctx.func {
+                        //      println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
+                        //      self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                        //  }
+                        // if attri_name.0.eq("older_than") {
+                        //     println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
+                        //     self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                        // }
+                        capture_name = name.0.clone();
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                    } else {
+                        instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                    }
+                } else if let CType::Tuple(n) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let index = attri_name.0.parse::<i32>().unwrap();
+                    let tmp = cty.attri_index(index);
+                    cty = tmp.clone();
+                    if idx == 0 {
+                        //  capture_name = name.0.clone();
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::Integer(index)));
+                        instructions.push(Instruction::Subscript);
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadConst(
+                        //     bytecode::Constant::Integer(index)));
+                        // self.emit(Instruction::Subscript);
+                    } else {
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::Integer(index)));
+                        instructions.push(Instruction::Subscript);
+                        // self.emit(Instruction::LoadConst(
+                        //     bytecode::Constant::Integer(index)));
+                        // self.emit(Instruction::Subscript);
+                    }
+                } else if let CType::Enum(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    //println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    // attri_type = tmp.0;
+
+                    if tmp.0 == 1 {
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::String(attri_name.0.clone())));
+                        instructions.push(Instruction::LoadBuildEnum(2));
+                        //如果为无参属性，则直接调用构造函数，如果为有参，则有FunctionCall处理;如果是其他属性，则LoadAttr处理
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadConst(
+                        //     bytecode::Constant::String(attri_name.0.clone())));
+                        // self.emit(Instruction::LoadBuildEnum(2));
+                    } else if tmp.0 == 2 {
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::String(attri_name.0.clone())));
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
+                    }
+                    if tmp.0 > 2 {
+                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                    }
+                    cty = tmp.1.clone();
+                }
+            }
+        }
+        if !capture_name.is_empty() && cty.is_mut_fun() {
+            self.emit(Instruction::LoadConst(Constant::String(capture_name)));
+        }
+        for i in instructions {
+            self.emit(i);
+        }
+        Ok(())
+    }
+
+    // let is_enum_item = self.is_enum_variant_def(value, name);
+    // if is_enum_item.0 {
+    //     self.compile_expression(value)?;
+    //     self.emit(Instruction::LoadConst(
+    //         bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
+    //     self.emit(Instruction::LoadBuildEnum(2));
+    // } else if is_enum_item.1 {
+    //     self.compile_expression(value)?;
+    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+    // } else {
+    //     let v = get_attribute_vec(expression);
+    //     for (idx, name) in v.iter().enumerate() {
+    //         if idx == 0 {
+    //             self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+    //         } else {
+    //             self.emit(Instruction::LoadAttr(name.0.clone()));
+    //         }
+    //     }
+    // bound另外判断，放到这里没有symbol，无法进行
+    // println!("cc::{:?}",v);
+    // let attr_name = v.get(0).unwrap().clone();
+    // let obj_name = v.get(1).unwrap().clone();
+    //
+    // let (def_current, base_name) = self.is_struct_item_def(obj_name, attr_name);
+    // if def_current {
+    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+    // } else {
+    //     self.emit(Instruction::LoadName(base_name, NameScope::Local));
+    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
+    // }
+
 
     fn mark_generator(&mut self) {
         self.current_output().mark_generator();

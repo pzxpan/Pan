@@ -4,6 +4,11 @@ use crate::symboltable::*;
 use crate::ctype::*;
 use crate::ctype::CType::Bool;
 use std::ops::Deref;
+use crate::util::get_attribute_vec;
+use crate::resolve_symbol::resolve_generic;
+use crate::util::get_full_name;
+use crate::util::get_mutability;
+use crate::symboltable::SymbolTableType::Struct;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -15,16 +20,20 @@ impl HasType for Parameter {
     }
 }
 
-pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool) {
-    let ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
+pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool, SymbolMutability) {
+    let mut ty = s.1.as_ref().unwrap().get_type(tables).to_owned();
+    if ty == CType::Unknown {
+        ty = CType::Args(s.1.as_ref().unwrap().ty.expr_name());
+    }
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
     let is_optional = s.1.as_ref().unwrap().default.is_some();
-    (arg_name, ty, is_optional, s.1.as_ref().unwrap().is_varargs)
+    let mutability = get_mutability(s.1.as_ref().unwrap().mut_own.clone(), &ty);
+    (arg_name, ty, is_optional, s.1.as_ref().unwrap().is_varargs, mutability)
 }
 
 impl HasType for FunctionDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
-        let arg_types: Vec<(String, CType, bool, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let type_args = Vec::new();
         let mut ret_type = Box::new(CType::Any);
         if let Some(ty) = self.returns.as_ref() {
@@ -35,7 +44,7 @@ impl HasType for FunctionDefinition {
         if arg_types.len() > 0 {
             is_varargs = arg_types.last().unwrap().3;
         }
-        CType::Fn(FnType { name, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some(), is_varargs })
+        CType::Fn(FnType { name, is_mut: self.is_mut, arg_types, type_args, ret_type, is_pub: self.is_pub, is_static: self.is_static, has_body: self.body.is_some(), is_varargs })
     }
 }
 
@@ -85,7 +94,7 @@ impl HasType for StructDefinition {
             table.symbols.insert(ty.name.name.clone(), symbol);
         }
 
-        let mut fields: Vec<(String, CType, bool)> = Vec::new();
+        let mut fields: Vec<(String, CType, bool, SymbolMutability)> = Vec::new();
         let mut methods: Vec<(String, CType)> = Vec::new();
         let mut static_methods: Vec<(String, CType)> = Vec::new();
 
@@ -100,7 +109,8 @@ impl HasType for StructDefinition {
                 }
                 StructPart::StructVariableDefinition(v) => {
                     let ty = v.ty.get_type(&local_tables);
-                    fields.push((v.name.name.clone(), ty, v.is_pub))
+                    let mutability = get_mutability(v.mut_own.clone(), &ty);
+                    fields.push((v.name.name.clone(), ty, v.is_pub, mutability))
                 }
                 _ => {}
             }
@@ -258,8 +268,12 @@ impl HasType for Expression {
                 };
             }
 
-            Expression::NamedFunctionCall(_, name, _) => {
+            Expression::NamedFunctionCall(_, name, args) => {
                 let ty = name.get_type(&tables).clone();
+                if let CType::Struct(tty) = ty {
+                    return CType::Struct(resolve_generic(tty, args.clone(), tables));
+                }
+                // TODO 解决函数范型,FunctionCall也需要;
                 return ty.ret_type().clone();
             }
 
@@ -451,12 +465,16 @@ impl HasType for Expression {
             Expression::Not(_, _) |
             Expression::BoolLiteral(_, _)
             => { CType::Bool }
-            Expression::FunctionCall(_, name, _) => { name.get_type(&tables) }
+            Expression::FunctionCall(_, name, _) => {
+                //  println!("&name.get_type(&table):{:?},", &name);
+                if let Expression::Variable(n) = name.as_ref() {
+                    return name.get_type(tables);
+                } else {
+                    return resovle_method(name, &name.get_type(&tables), tables);
+                }
+            }
             Expression::Subscript(_, a, b) => {
                 let a_ty = a.get_type(&tables);
-                // Tuple(Box < Vec < CType >>),
-                // Array(Box < CType >),
-                // Dict(Box < CType >, Box < CType >),
                 if let CType::Tuple(tys) = a_ty {
                     if let Expression::NumberLiteral(_, n) = b.as_ref() {
                         let ty = tys.get(*n as usize);
@@ -512,25 +530,7 @@ impl HasType for Expression {
                 }
             }
             Expression::Attribute(loc, obj, name, idx) => {
-                if name.is_some() {
-                    let ty = obj.get_type(tables);
-                    if let CType::Struct(struct_ty) = ty {
-                        for attri in struct_ty.fields {
-                            if attri.0.eq(&name.as_ref().unwrap().name) {
-                                return attri.1;
-                            }
-                        }
-                    }
-                } else if idx.is_some() {
-                    let ty = obj.get_type(tables);
-                    if let CType::Tuple(tty) = ty {
-                        let t = tty.get(idx.unwrap() as usize);
-                        if t.is_some() {
-                            return t.unwrap().clone();
-                        }
-                    }
-                }
-                return CType::Unknown;
+                return resolve_attribute(self, &obj.get_type(tables), tables);
             }
 
             _ => { return CType::Unknown; }
@@ -563,7 +563,7 @@ impl HasType for Expression {
 
 impl HasType for LambdaDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
-        let arg_types: Vec<(String, CType, bool, bool)> = self.params.iter().map(|s| transfer(s, tables)).collect();
+        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = self.params.iter().map(|s| transfer(s, tables)).collect();
         let name = "lambda".to_string();
         let ret_type = Box::from(match *self.body.clone() {
             Statement::Block(_, statements) => {
@@ -582,13 +582,87 @@ impl HasType for LambdaDefinition {
     }
 }
 
-impl HasType for SourceUnitPart {
+fn in_current_scope(tables: &Vec<SymbolTable>, name: String) -> bool {
+    let len = tables.len();
+    let a = tables.get(len - 1).unwrap().lookup(name.as_str());
+    if a.is_some() {
+        return true;
+    }
+    return false;
+}
+
+impl HasType for ModulePart {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         match &self {
-            SourceUnitPart::FunctionDefinition(s) => { s.get_type(tables) }
-            SourceUnitPart::StructDefinition(s) => { s.get_type(tables) }
+            ModulePart::FunctionDefinition(s) => { s.get_type(tables) }
+            ModulePart::StructDefinition(s) => { s.get_type(tables) }
             _ => { CType::Unknown }
         }
     }
+}
+
+fn resovle_method(expr: &Expression, ty: &CType, tables: &Vec<SymbolTable>) -> CType {
+    let v = get_attribute_vec(expr);
+    let mut cty = ty.clone();
+    let mut attri_type = 0;
+    let len = v.len();
+    for (idx, name) in v.iter().enumerate() {
+        if name.0.clone().is_empty() {
+            continue;
+        }
+        if idx < len - 1 {
+            if let CType::Struct(_) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                attri_type = tmp.0;
+                cty = tmp.1.clone();
+            } else if let CType::Enum(_) = cty.clone() {
+                // let attri_name = v.get(idx + 1).unwrap().clone();
+                // let tmp = cty.attri_name_type(attri_name.0.clone());
+                // attri_type = tmp.0;
+                return cty;
+                //  cty = tmp.1.clone();
+            } else if let CType::Fn(fntype) = cty.clone() {
+                cty = cty.ret_type().clone();
+            } else if CType::Module == cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                cty = get_register_type(tables, get_full_name(&name.0, &attri_name.0));
+            } else {
+                return CType::Unknown;
+            }
+        }
+    }
+    cty
+}
+
+fn resolve_attribute(expr: &Expression, ty: &CType, tables: &Vec<SymbolTable>) -> CType {
+    let v = get_attribute_vec(expr);
+    let mut cty = ty.clone();
+    let len = v.len();
+    for (idx, name) in v.iter().enumerate() {
+        if idx < len - 1 {
+            if let CType::Struct(_) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                // attri_type = tmp.0;
+                cty = tmp.1.clone();
+            } else if let CType::Tuple(n) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let index = attri_name.0.parse::<i32>().unwrap();
+                let tmp = cty.attri_index(index).clone();
+                cty = tmp;
+            } else if let CType::Enum(n) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                return cty.clone();
+            } else if CType::Module == cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                cty = get_register_type(tables, get_full_name(&name.0, &attri_name.0));
+            } else {
+                return CType::Unknown;
+            }
+        }
+    }
+    cty.clone()
 }
 

@@ -1,18 +1,25 @@
-import std.person {Person as PPP , House};
+package default;
+import std.person {Person as PPP, House};
 //以下import都Ok
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import std.color.Color;
+import std.color;
 
+pub fun add_pub(a:i32) : i32 {
+    return a - 100;
+}
 fun main() {
-  let person = PPP({age:50,name:"pan"});
+  let person = PPP!{age:50,name:"pan"};
   let bb = person.is_older();
   print(bb);
-  let house = House({size:1000.0,price:1000000.0});
+  let house = House!{size:1000.0,price:1000000.0};
   let dd = house.idea();
   print(dd);
-  let color = Color::Red(10);
-  color.is_warm();
+  let c = color.Color::Red(10);
+  c.is_warm();
+  let ss = add_pub(10);
+  print(ss);
 }
+
 

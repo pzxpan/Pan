@@ -40,6 +40,7 @@ pub struct CodeObject {
     pub locations: Vec<Location>,
     pub arg_names: Vec<String>,
     pub varargs: bool,
+    pub is_mut: bool,
     pub source_path: String,
     pub first_line_number: usize,
     pub obj_name: String, // Name of the object that created this code object
@@ -105,6 +106,7 @@ pub enum Instruction {
     /// 假跳真弹
     JumpIfFalseOrPop(Label),
     MakeFunction,
+    MakeLambda(usize),
     CallFunction(CallType),
     ForIter(Label),
     Ignore,
@@ -133,6 +135,8 @@ pub enum Instruction {
     LoadBuildModule,
     BuildThread,
     StartThread,
+    LoadReference(usize, String, String),
+    StoreReference,
     UnpackSequence(usize),
     UnpackEx(usize, usize),
     Reverse(usize),
@@ -240,11 +244,13 @@ impl CodeObject {
         source_path: String,
         first_line_number: usize,
         obj_name: String,
+        is_mut: bool,
     ) -> CodeObject {
         CodeObject {
             instructions: Vec::new(),
             label_map: HashMap::new(),
             locations: Vec::new(),
+            is_mut,
             arg_names,
             varargs,
             source_path,
@@ -266,6 +272,7 @@ impl CodeObject {
             varargs,
             source_path: "".to_string(),
             first_line_number: 0,
+            is_mut: false,
             obj_name,
         }
     }
@@ -399,6 +406,7 @@ impl Instruction {
             JumpIfTrueOrPop(target) => w!(JumpIfTrueOrPop, label_map[target]),
             JumpIfFalseOrPop(target) => w!(JumpIfFalseOrPop, label_map[target]),
             MakeFunction => w!(MakeFunction),
+            MakeLambda(usize) => w!(MakeLambda,usize),
             CallFunction(typ) => w!(CallFunction, format!("{:?}", typ)),
             ForIter(target) => w!(ForIter, label_map[target]),
             ReturnValue => w!(ReturnValue),
@@ -424,6 +432,8 @@ impl Instruction {
                 for_call,
             ) => w!(BuildMap, size, unpack, for_call),
             BuildSlice(size) => w!(BuildSlice, size),
+            LoadReference(size, name, ref_name) => w!(LoadReference, size,name,ref_name),
+            StoreReference => w!(StoreReference),
             ListAppend(i) => w!(ListAppend, i),
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),

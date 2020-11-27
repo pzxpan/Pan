@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use crate::symboltable::SymbolMutability;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
@@ -35,19 +36,24 @@ pub enum CType {
     Bound(BoundType),
     Generic(String, Box<CType>),
     Reference(String, Vec<CType>),
+    Args(String),
     Any,
     TSelf,
+    //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;
+    NeedPackageName,
     Unknown,
 }
+
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FnType {
     pub name: String,
-    pub arg_types: Vec<(String, CType, bool, bool)>,
+    pub arg_types: Vec<(String, CType, bool, bool, SymbolMutability)>,
     pub type_args: Vec<String>,
     pub ret_type: Box<CType>,
     pub is_varargs: bool,
     pub is_pub: bool,
+    pub is_mut: bool,
     pub is_static: bool,
     pub has_body: bool,
 }
@@ -62,6 +68,7 @@ impl FnType {
             ret_type: Box::new(CType::Any),
             is_varargs: false,
             is_pub: false,
+            is_mut: false,
             is_static: false,
             has_body: false,
         }
@@ -116,14 +123,14 @@ pub struct LambdaType {
     pub name: String,
     pub ret_type: Box<CType>,
     pub captures: Vec<String>,
-    pub arg_types: Vec<(String, CType, bool, bool)>,
+    pub arg_types: Vec<(String, CType, bool, bool, SymbolMutability)>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct StructType {
     pub name: String,
     pub generics: Option<Vec<CType>>,
-    pub fields: Vec<(String, CType, bool)>,
+    pub fields: Vec<(String, CType, bool, SymbolMutability)>,
     pub static_methods: Vec<(String, CType)>,
     pub methods: Vec<(String, CType)>,
     pub bases: Vec<String>,
@@ -188,20 +195,122 @@ impl CType {
         }
     }
 
-    pub fn attri_type(&self, index: usize, name: String) -> &CType {
+    pub fn attri_index(&self, index: i32) -> &CType {
         //struct的属性类型需要名称，而tuple需要索引值;
         match self {
-            CType::Tuple(s) => s.as_ref().get(index).unwrap(),
-            _ => self
+            CType::Tuple(s) => s.as_ref().get(index as usize).unwrap(),
+            _ => &CType::Unknown
         }
     }
+    pub fn attri_name_type(&self, name: String) -> (i32, &CType) {
+        if let CType::Struct(ty) = self {
+            //1为字段，2为普通函数，3为静态函数
+            for (method_name, cty, is_pub, ..) in ty.fields.iter() {
+                if method_name.eq(&name) {
+                    return (1, cty);
+                }
+            }
+            for (method_name, cty) in ty.methods.iter() {
+                if method_name.eq(&name) {
+                    return (2, cty);
+                }
+            }
+            for (method_name, cty) in ty.static_methods.iter() {
+                if method_name.eq(&name) {
+                    return (3, cty);
+                }
+            }
+        } else if let CType::Enum(ty) = self {
+            //1为无参属性，2为有参属性，3为普通函数，4为静态函数
+            for (method_name, cty) in ty.items.iter() {
+                if method_name.eq(&name) {
+                    if let CType::Reference(_, v) = cty {
+                        if v.is_empty() {
+                            return (1, cty);
+                        } else {
+                            return (2, cty);
+                        }
+                    }
+                }
+            }
 
-    pub fn param_type(&self) -> Vec<(CType, bool, bool)> {
+            for (method_name, cty) in ty.methods.iter() {
+                if method_name.eq(&name) {
+                    return (3, cty);
+                }
+            }
+            for (method_name, cty) in ty.static_methods.iter() {
+                if method_name.eq(&name) {
+                    return (4, cty);
+                }
+            }
+        }
+        (0, &CType::Unknown)
+    }
+
+    pub fn param_type(&self) -> Vec<(CType, bool, bool, SymbolMutability)> {
         match self {
-            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2.clone(), s.3.clone())).collect(),
+            CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2.clone(), s.3.clone(), s.4.clone())).collect(),
             _ => Vec::new()
         }
     }
+
+    pub fn is_mut_fun(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_mut
+        } else {
+            false
+        };
+    }
+    // pub fn is_struct_ty(&self) -> bool {
+    //     return if let CType::Struct(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_enum_ty(&self) -> bool {
+    //     return if let CType::Enum(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_bound_ty(&self) -> bool {
+    //     return if let CType::Bound(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_lambda_ty(&self) -> bool {
+    //     return if let CType::Lambda(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_fn_ty(&self) -> bool {
+    //     return if let CType::Fn(n) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_generic_ty(&self) -> bool {
+    //     return if let CType::Generic(..) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
+    // pub fn is_reference(&self) -> bool {
+    //     return if let CType::Reference(..) = self {
+    //         true
+    //     } else {
+    //         false
+    //     };
+    // }
 }
 
 impl PartialOrd for FnType {
@@ -213,7 +322,6 @@ impl PartialOrd for FnType {
         }
     }
 }
-
 
 impl PartialOrd for StructType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -254,3 +362,4 @@ impl PartialOrd for BoundType {
         }
     }
 }
+

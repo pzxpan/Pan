@@ -1,3 +1,4 @@
+package default;
 pub enum Color {
    Red(i32),
    Single(i128),
@@ -6,7 +7,7 @@ pub enum Color {
    Black,
    pub fun is_warm() {
            match self {
-               White(_,_)-> {print(20);}
+               White(c,bb)-> {print(20);}
                Black -> {print(30);}
                Red(a) -> { print(a); return true;}
                Single(a) -> { print(a); return 1;}

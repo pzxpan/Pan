@@ -1,6 +1,7 @@
 use crate::ctype::CType;
 use crate::ctype::FnType;
-use crate::symboltable::SymbolUsage;
+use crate::symboltable::{SymbolUsage, SymbolMutability};
+use crate::compile::insert_builtin_name;
 
 pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     let mut vec = Vec::new();
@@ -31,8 +32,9 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("FunType".to_owned(), CType::Fn(FnType::new()), SymbolUsage::Builtin));
 
     let mut arg_types = Vec::new();
-    arg_types.push((String::from("value"), CType::Any, false, false));
+    arg_types.push((String::from("value"), CType::Any, false, false, SymbolMutability::ImmRef));
     let tt = CType::Fn(FnType {
+        is_mut: false,
         name: "print".to_string(),
         arg_types: arg_types.clone(),
         type_args: Vec::new(),
@@ -45,6 +47,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("print".to_owned(), tt, SymbolUsage::Builtin));
 
     let ty = CType::Fn(FnType {
+        is_mut: false,
         name: "format".to_string(),
         arg_types: arg_types.clone(),
         type_args: Vec::new(),
@@ -58,6 +61,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("format".to_owned(), ty, SymbolUsage::Builtin));
 
     let ty = CType::Fn(FnType {
+        is_mut: false,
         name: "typeof".to_string(),
         arg_types: arg_types.clone(),
         type_args: Vec::new(),
@@ -71,6 +75,7 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("typeof".to_owned(), ty, SymbolUsage::Builtin));
 
     let ty = CType::Fn(FnType {
+        is_mut: false,
         name: "sleep".to_string(),
         arg_types: arg_types.clone(),
         type_args: Vec::new(),
@@ -83,5 +88,8 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
 
     vec.push(("sleep".to_owned(), ty, SymbolUsage::Builtin));
 
+    for n in &vec {
+        insert_builtin_name(n.0.clone());
+    }
     vec
 }

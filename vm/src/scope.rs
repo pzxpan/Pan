@@ -1,7 +1,8 @@
 use std::fmt;
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::borrow::BorrowMut;
-use std::collections::{HashMap};
+use std::collections::HashMap;
+
 
 use pan_bytecode::value::Value;
 
@@ -26,21 +27,20 @@ impl fmt::Debug for Scope {
 }
 
 impl Scope {
-    pub fn new(locals: Vec<PanDictRef>, globals: PanDictRef, vm: &VirtualMachine) -> Scope {
+    pub fn new(locals: Vec<PanDictRef>, globals: RefCell<HashMap<String, Value>>) -> Scope {
         let mut v = Vec::new();
         for a in locals {
             v.push(RefCell::new(a));
         }
-        let scope = Scope { locals: RefCell::new(v), globals: RefCell::new(globals) };
+        let scope = Scope { locals: RefCell::new(v), globals };
         scope
     }
 
     pub fn with_builtins(
         locals: Vec<PanDictRef>,
-        globals: PanDictRef,
-        vm: &VirtualMachine,
+        globals: RefCell<HashMap<String, Value>>,
     ) -> Scope {
-        Scope::new(locals, globals, vm)
+        Scope::new(locals, globals)
     }
 
     pub fn get_locals(&self) -> PanDictRef {
@@ -50,17 +50,22 @@ impl Scope {
         }
     }
 
-    pub fn new_child_scope_with_locals(&self) -> Scope {
-        let mut new_locals = Vec::with_capacity(self.locals.borrow_mut().len() + 1);
-        let v = HashMap::new();
-        new_locals.push(RefCell::new(v));
-        for a in self.locals.borrow_mut().iter() {
-            new_locals.push(a.clone());
-        }
-        Scope {
-            locals: RefCell::new(new_locals),
-            globals: self.globals.clone(),
-        }
+    pub fn add_local_value(&self, values: HashMap<String, Value>) {
+        self.locals.borrow_mut().push(RefCell::new(values));
+    }
+
+    pub fn load_capture_reference(&self, idx: usize, name: String) -> Value {
+        let v = self.locals.borrow();
+        let vv = v.get(idx);
+        let vvv = vv.unwrap().borrow();
+        let vvvv = vvv.get(&name).unwrap();
+        vvvv.clone()
+    }
+
+    pub fn store_capture_reference(&self, idx: usize, name: String, value: Value) {
+        let v = self.locals.borrow_mut();
+        let vv = v.get(idx).unwrap();
+        vv.borrow_mut().insert(name, value);
     }
 }
 

@@ -17,27 +17,34 @@ use crate::variable_type::HasType;
 use crate::ctype::{CType, StructType, FnType};
 use itertools::Tuples;
 use dynformat::check;
+use std::borrow::Borrow;
+use crate::util;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
-    let system_path = "/usr/local/Cellar/";
-    let mut s1 = String::from(system_path);
-    s1.push_str("demo");
-
+    // let system_path = "/usr/local/Cellar/";
+    // let mut s1 = String::from(system_path);
+    // s1.push_str("demo");
+    //
     let work_dir = env::current_dir().unwrap();
     let mut s2 = String::from(work_dir.to_str().unwrap());
     s2.push_str("/demo");
+    //
+    // let sub_dict = "..";
+    // let mut s3 = String::from(sub_dict);
+    // s3.push_str("/demo");
 
-    let sub_dict = "..";
-    let mut s3 = String::from(sub_dict);
-    s3.push_str("/demo");
+    // let import_paths: [String; 3] = [s2, s1, s3];
+    // for s in import_paths.iter() {
+    //     let r = scan_import_symbol_inner(s.to_string(), build, idents, as_name.clone(), is_all);
+    //     if r.is_ok() {
+    //         return Ok(());
+    //     }
+    // }
 
-    let import_paths: [String; 3] = [s2, s1, s3];
-    for s in import_paths.iter() {
-        let r = scan_import_symbol_inner(s.to_string(), build, idents, as_name.clone(), is_all);
-        if r.is_ok() {
-            return Ok(());
-        }
+    let r = scan_import_symbol_inner(s2.to_string(), build, idents, as_name.clone(), is_all);
+    if r.is_ok() {
+        return Ok(());
     }
     Ok(())
 }
@@ -60,7 +67,6 @@ fn scan_import_symbol_inner(whole_name: String, build: &mut SymbolTableBuilder, 
         slice.push_str(".pan");
         let mut path = env::current_dir().unwrap();
         path.push(slice);
-        // println!("path{:?}", path);
         if path.is_file() {
             scan_import_file(build, &path, Some(item_name), as_name, is_all)?;
         } else {
@@ -88,12 +94,15 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     let mut file = File::open(path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let ast = parse(&contents, path.clone().into_os_string().into_string().unwrap()).unwrap();
-    build.scan_top_symbol_types(&ast, true, *is_all, item_name, as_name)?;
+    let ast = parse(&contents, path.clone().into_os_string().into_string().unwrap());
+    let module_name = util::get_mod_name(String::from(path.to_str().unwrap()));
+    let module = ast.unwrap();
+    let md = ModuleDefinition { module_parts: module.content, name: Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: util::get_package_name(module.package) };
+    build.scan_top_symbol_types(&md, true, *is_all, item_name, as_name)?;
     Ok(())
 }
 
-pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
+pub fn resolve_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
     let mut result_ty = st.clone();
     if st.generics.is_some() {
         let mut generics = st.generics.clone().unwrap();
@@ -104,13 +113,12 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
             let expected_ty = arg.expr.get_type(tables);
             let arg_name = &arg.name.name;
             let mut generic_type_name = "".to_string();
-            for (idx, content) in st.fields.iter().enumerate()
-            {
+            for (idx, content) in st.fields.iter().enumerate() {
                 if content.0.eq(arg_name) {
                     if let CType::Generic(n, cty) = content.1.clone() {
                         if expected_ty < cty.as_ref().clone() {
                             fields.swap_remove(idx);
-                            fields.insert(idx, (content.0.clone(), expected_ty.clone(), content.2));
+                            fields.insert(idx, (content.0.clone(), expected_ty.clone(), content.2, content.3.clone()));
                             generic_type_name = n.clone();
                         }
                     }
@@ -134,7 +142,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                             if n.eq(&generic_type_name) {
                                 if expected_ty < fnarg.1 {
                                     fn_arg_tys.swap_remove(idx);
-                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone(), fnarg.3.clone()));
+                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone(), fnarg.3.clone(), fnarg.4.clone()));
                                 }
                             }
                         }
@@ -155,6 +163,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                     }
                     methods.insert(i, (fty.0.clone(), CType::Fn(FnType {
                         name: fnty.name.clone(),
+                        is_mut: fnty.is_mut,
                         arg_types: fn_arg_tys,
                         type_args: fnty.type_args.clone(),
                         ret_type: fn_ret_ty,
@@ -175,7 +184,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                             if n.eq(&generic_type_name) {
                                 if expected_ty < fnarg.1 {
                                     fn_arg_tys.remove(idx);
-                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2, fnarg.3.clone()));
+                                    fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2, fnarg.3.clone(), fnarg.4.clone()));
                                 }
                             }
                         }
@@ -196,6 +205,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
                     }
                     static_fields.insert(1, (fty.0.clone(), CType::Fn(FnType {
                         name: fnty.name.clone(),
+                        is_mut: fnty.is_mut,
                         arg_types: fn_arg_tys,
                         type_args: fnty.type_args.clone(),
                         ret_type: fn_ret_ty,
@@ -218,7 +228,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
         }
     }
 
-    // println!("result_ty:{:?}", result_ty);
+    println!("result_ty:{:?}", result_ty);
     return result_ty;
 }
 
@@ -260,7 +270,7 @@ pub fn resolve_bounds(build: &mut SymbolTableBuilder, sty: &StructType, bounds: 
     Ok(())
 }
 
-pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &Vec<Expression>) -> SymbolTableResult {
+pub fn resovle_build_funs(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &Vec<Expression>) -> SymbolTableResult {
     if var_args.is_empty() {
         return Err(SymbolTableError {
             error: format!("参数为空"),
@@ -279,6 +289,14 @@ pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: 
             error: format!("格式化参数需要静态字符串"),
             location: fmt_expr.loc().clone(),
         });
+    } else {
+        let c = fmt_expr.get_type(&build.tables);
+        if c == CType::Unknown {
+            return Err(SymbolTableError {
+                error: format!("变量{:?}为定义", fmt_expr.expr_name()),
+                location: fmt_expr.loc().clone(),
+            });
+        }
     }
 
     let a = check(&s);
@@ -328,6 +346,8 @@ pub fn resovle_varargs_fun(build: &mut SymbolTableBuilder, loc: &Loc, var_args: 
 
     Ok(())
 }
+
+
 
 
 
