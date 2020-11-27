@@ -111,7 +111,7 @@ impl VirtualMachine {
     }
 
     pub fn store_capture_reference(
-        &self,
+        &mut self,
         idx: usize,
         name: String,
         value: Value,
@@ -120,7 +120,7 @@ impl VirtualMachine {
     }
 
     pub fn store_name(
-        &self,
+        &mut self,
         name: &str,
         obj: Value,
         name_scope: &bytecode::NameScope,
@@ -903,7 +903,7 @@ impl VirtualMachine {
 }
 
 
-pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> JoinHandle<()> {
+pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) -> JoinHandle<()> {
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
         println!("handler:{:?}", thread::current().id());
@@ -916,7 +916,7 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
     });
 }
 
-pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) {
+pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) {
     thread::spawn(|| {
         println!("local_hash_map:{:?},", locals);
         println!("global_:{:?},", global);

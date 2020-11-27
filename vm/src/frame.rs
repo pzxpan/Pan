@@ -449,7 +449,7 @@ impl Frame {
         Frame::create_new_thread(code, hash_map, vm.scope.globals.clone());
         None
     }
-    fn create_new_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> FrameResult {
+    fn create_new_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: HashMap<String, Value>) -> FrameResult {
         run_code_in_sub_thread(code, hash_map, global);
         return None;
     }
