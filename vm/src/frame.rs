@@ -71,9 +71,9 @@ impl Frame {
         }
     }
 
-    pub fn run(&self, vm: &mut VirtualMachine) -> FrameResult {
+    pub fn run(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
         loop {
-            let result = self.execute_instruction(vm);
+            let result = self.execute_instruction(vm, idx);
             match result {
                 None => {}
                 Some(value) => {
@@ -96,7 +96,7 @@ impl Frame {
     // thread_id:ThreadId(2),instruction is:StoreName("aabb", Local),
     // thread_id:ThreadId(2),instruction is:LoadName("$default$aabb", Local),
     /// 中间指令处理
-    fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
+    fn execute_instruction(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
         let instruction = self.fetch_instruction();
         println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
         match instruction {
@@ -114,14 +114,14 @@ impl Frame {
                 ref name,
                 ref scope,
             ) => {
-                let v = vm.load_name(name, scope);
+                let v = vm.load_name(name, scope, idx);
                 self.push_value(v);
                 None
             }
             bytecode::Instruction::StoreName(
                 ref name,
                 ref scope,
-            ) => vm.store_name(name, self.pop_value(), scope),
+            ) => vm.store_name(name, self.pop_value(), scope, idx),
             bytecode::Instruction::Subscript => self.execute_subscript(vm),
             bytecode::Instruction::StoreSubscript => self.execute_store_subscript(vm),
             bytecode::Instruction::DeleteSubscript => self.execute_delete_subscript(vm),
@@ -708,7 +708,7 @@ impl Frame {
         let value = self.pop_value();
         let update_value = vm.set_attribute(&mut parent, attr_name.to_owned(), value);
         println!("update_value:{:?}", update_value);
-        self.push_value(update_value);
+        self.push_value(parent);
         None
     }
 

@@ -33,7 +33,16 @@ lazy_static! {
 
 pub fn add_local_value(hash_map: HashMap<String, Value>) {
     let ref mut map = SCOPE.lock().unwrap();
-    map.locals.push(hash_map);
+    println!("locals:len:{:?},", map.locals.len());
+    map.locals.insert(0, hash_map);
+    println!("locals:len:{:?},", map.locals.len());
+}
+
+pub fn remove() {
+    let ref mut map = SCOPE.lock().unwrap();
+    println!("locals:len:{:?},", map.locals.len());
+    map.locals.remove(0);
+    println!("locals:len:{:?},", map.locals.len());
 }
 
 pub fn load_capture_reference(idx: usize, name: String) -> Value {
@@ -61,9 +70,15 @@ fn store_global(name: String, value: Value) {
     scope.globals.insert(name, value);
 }
 
-fn load_name(name: String) -> Option<Value> {
+fn load_name(name: String, idx: usize) -> Option<Value> {
     let ref mut scope = SCOPE.lock().unwrap();
+    let skip = scope.locals.len() - idx;
+    println!("skip:{:?},idx:{:?}", scope.locals.len(), idx);
     for dict in scope.locals.iter() {
+        // println!("index:{:?}", index);
+        // if index > idx {
+        //     break;
+        // }
         let v = dict.get(&name);
         if let Some(value) = v {
             return Some(value.clone());
@@ -75,9 +90,9 @@ fn load_name(name: String) -> Option<Value> {
     None
 }
 
-fn store_name(key: String, value: Value) {
+fn store_name(key: String, value: Value, idx: usize) {
     let ref mut scope = SCOPE.lock().unwrap();
-    scope.locals.first_mut().unwrap().insert(key.to_string(), value);
+    scope.locals.get_mut(idx - 1).unwrap().insert(key.to_string(), value);
 }
 
 
@@ -115,23 +130,23 @@ impl VirtualMachine {
         let frame = Frame::new(code);
         self.frame_count += 1;
         add_local_value(hash_map);
-        let r = self.run_frame(frame);
+        let r = self.run_frame(frame, self.frame_count);
+        // remove();
         self.frame_count -= 1;
         r
     }
 
-    pub fn run_frame_full(&mut self, frame:
-    Frame) -> FrameResult {
-        match self.run_frame(frame)? {
+    pub fn run_frame_full(&mut self, frame: Frame, idx: usize) -> FrameResult {
+        match self.run_frame(frame, idx)? {
             ExecutionResult::Return(value) => Some(ExecutionResult::Return(value)),
             ExecutionResult::Ignore => Some(ExecutionResult::Ignore),
             _ => panic!("Got unexpected result from function"),
         }
     }
 
-    pub fn run_frame(&mut self, frame: Frame) -> FrameResult {
+    pub fn run_frame(&mut self, frame: Frame, idx: usize) -> FrameResult {
         //self.frames.push(Rc::from(frame.clone()));
-        let result = frame.run(self);
+        let result = frame.run(self, idx);
         //self.frames.pop();
         result
     }
@@ -141,10 +156,11 @@ impl VirtualMachine {
         &self,
         name: &str,
         name_scope: &bytecode::NameScope,
+        idx: usize,
     ) -> Value {
         let optional_value = match name_scope {
             bytecode::NameScope::Global => load_global(name.to_string()),
-            bytecode::NameScope::Local => load_name(name.to_string()),
+            bytecode::NameScope::Local => load_name(name.to_string(), idx),
             bytecode::NameScope::Const => load_global(name.to_string()),
         };
 
@@ -178,13 +194,14 @@ impl VirtualMachine {
         name: &str,
         obj: Value,
         name_scope: &bytecode::NameScope,
+        idx: usize,
     ) -> FrameResult {
         match name_scope {
             bytecode::NameScope::Global => {
                 store_global(name.to_string(), obj);
             }
             bytecode::NameScope::Local => {
-                store_name(name.to_string(), obj);
+                store_name(name.to_string(), obj, idx);
             }
             bytecode::NameScope::Const => {
                 store_global(name.to_string(), obj);
@@ -964,7 +981,7 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
         let mut vm = VirtualMachine::new();
         let frame = Frame::new(code);
         vm.frame_count += 1;
-        vm.run_frame(frame);
+        vm.run_frame(frame, vm.frame_count);
         vm.frame_count -= 1;
         let handle = thread::current();
     });
@@ -978,8 +995,9 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, 
         println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new();
         let frame = Frame::new(code);
+        add_local_value(locals);
         vm.frame_count += 1;
-        vm.run_frame(frame);
+        vm.run_frame(frame, vm.frame_count);
         vm.frame_count -= 1;
         let handle = thread::current();
     });
