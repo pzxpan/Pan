@@ -5,8 +5,10 @@ use crate::ctype::*;
 use crate::ctype::CType::Bool;
 use std::ops::Deref;
 use crate::util::get_attribute_vec;
+use crate::resolve_symbol::resolve_generic;
 use crate::util::get_full_name;
 use crate::util::get_mutability;
+use crate::symboltable::SymbolTableType::Struct;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
@@ -263,8 +265,12 @@ impl HasType for Expression {
                 };
             }
 
-            Expression::NamedFunctionCall(_, name, _) => {
+            Expression::NamedFunctionCall(_, name, args) => {
                 let ty = name.get_type(&tables).clone();
+                if let CType::Struct(tty) = ty {
+                    return CType::Struct(resolve_generic(tty,args.clone(),tables));
+                }
+               // TODO 解决函数范型,FunctionCall也需要;
                 return ty.ret_type().clone();
             }
 

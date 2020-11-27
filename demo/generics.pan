@@ -9,7 +9,7 @@ pub bound Add<T> {
 pub struct Pair<T:Add> {
     pub x: T,
     pub y: T,
-    pub fun x_add_number(n: T) : T {
+    pub fun x_add_number<T>(n: T) : T {
         return x + n;
     }
 }

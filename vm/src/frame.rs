@@ -485,6 +485,7 @@ impl Frame {
                         hash_map.insert(k, v);
                     }
                     if code.is_mut {
+                        //struct
                         hash_map.insert("capture$$idx".to_string(), Value::USize(vm.frame_count - 2));
                         println!("self.nth_value(1):{:?}", self.nth_value(1));
                         hash_map.insert("capture$$name".to_string(), self.nth_value(1));

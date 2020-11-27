@@ -102,7 +102,7 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     Ok(())
 }
 
-pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
+pub fn resolve_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
     let mut result_ty = st.clone();
     if st.generics.is_some() {
         let mut generics = st.generics.clone().unwrap();
@@ -228,7 +228,7 @@ pub fn resovle_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
         }
     }
 
-    // println!("result_ty:{:?}", result_ty);
+    println!("result_ty:{:?}", result_ty);
     return result_ty;
 }
 

@@ -42,13 +42,13 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("bound.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();
     // b = &mut c;
     // println!("{}",b);
-    // test_all_demo_file();
+   // test_all_demo_file();
 }
 
 fn test_all_demo_file() {

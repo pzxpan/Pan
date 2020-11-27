@@ -14,7 +14,7 @@ use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::{scan_import_symbol, resovle_generic, resolve_bounds, resovle_build_funs};
+use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds, resovle_build_funs};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
@@ -1348,12 +1348,15 @@ impl SymbolTableBuilder {
             }
             Number(_, _) => {}
             NamedFunctionCall(_, exp, args) => {
-                println!("named_call:{:?},", expression);
+              //  println!("named_call:{:?},", expression);
                 let mut ty = self.get_register_type(exp.as_ref().expr_name());
+                println!("named_call:{:?},ty:{:?}", expression,ty);
                 if let CType::Struct(sty) = ty.clone() {
-                    let struct_ty = resovle_generic(sty, args.clone(), &self.tables);
+                    let struct_ty = resolve_generic(sty, args.clone(), &self.tables);
                     ty = CType::Struct(struct_ty);
+                    println!("11111named_call:{:?},ty:{:?}", expression,ty);
                     for arg in args {
+
 
                         //不在struct当前作用域，则需要检查Named参数的可见性
                         if !self.in_struct_scope(arg.name.name.clone()) {

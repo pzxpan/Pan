@@ -8,7 +8,7 @@ pub fun ad(b:i64) :i64 {
 fun main() {
   let sum = add(40,30);
   print(sum);
-  let ss = add(1000,ad(20_i64) as i32);
+  let ss = add(1000,20);
   print(ss);
 
   let aa = add(3000);
