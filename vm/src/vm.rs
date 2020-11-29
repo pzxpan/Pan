@@ -33,16 +33,12 @@ lazy_static! {
 
 pub fn add_local_value(hash_map: HashMap<String, Value>) {
     let ref mut map = SCOPE.lock().unwrap();
-    println!("locals:len:{:?},", map.locals.len());
     map.locals.insert(0, hash_map);
-    println!("locals:len:{:?},", map.locals.len());
 }
 
 pub fn remove() {
     let ref mut map = SCOPE.lock().unwrap();
-    println!("locals:len:{:?},", map.locals.len());
     map.locals.remove(0);
-    println!("locals:len:{:?},", map.locals.len());
 }
 
 pub fn load_capture_reference(idx: usize, name: String) -> Value {
