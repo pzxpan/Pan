@@ -1079,6 +1079,11 @@ impl SymbolTableBuilder {
         use ast::Expression::*;
         println!("expression:{:?}", expression);
         match &expression {
+            Unit(loc, name, exprs) => {
+                for expr in exprs {
+                   // self.scan_expression(expr, &ExpressionContext::Load);
+                }
+            }
             Subscript(_, a, b) => {
                 self.scan_expression(a, context)?;
                 self.scan_expression(b, context)?;
@@ -1172,7 +1177,10 @@ impl SymbolTableBuilder {
                 }
             }
             Not(loc, name) => {
-                let ty = name.get_type(&self.tables);
+                let mut ty = name.get_type(&self.tables);
+                if let Fn(_) = ty {
+                    ty = ty.ret_type().clone();
+                }
                 if ty == CType::Bool {
                     self.scan_expression(name, &ExpressionContext::Load)?;
                 } else {

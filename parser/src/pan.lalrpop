@@ -329,6 +329,9 @@ ObjAttribute: Expression = {
 }
 
 Precedence0: Expression = {
+    <e:Identifier> <a:@L>  "<" <b:@R> <v:Comma<Identifier>> <a1:@L> ">" <b1:@R> => {
+       Expression::Unit(Loc(file_no, a, b), Box::new(Expression::Variable(e)),v)
+     },
     <FunctionCall> => <>,
     <ObjAttribute> => <>,
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),

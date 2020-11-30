@@ -302,6 +302,7 @@ pub enum Expression {
     Range(Loc, Option<Box<Expression>>, Option<Box<Expression>>),
     Slice(Loc, Vec<Expression>),
     Attribute(Loc, Box<Expression>, Option<Identifier>, Option<i32>),
+    Unit(Loc, Box<Expression>, Vec<Identifier>),
 
     FunctionCall(Loc, Box<Expression>, Vec<Expression>),
     NamedFunctionCall(Loc, Box<Expression>, Vec<NamedArgument>),

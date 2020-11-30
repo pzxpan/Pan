@@ -39,7 +39,8 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo/core").join("bool.pan"));
+    let x: Result<u32, &str>= Ok(3);
+    test_one_file(&env::current_dir().unwrap().join("demo").join("result.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();
