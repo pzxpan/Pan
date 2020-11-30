@@ -61,7 +61,7 @@ Identifier: Identifier = {
 }
 
 VariableDeclaration: VariableDeclaration = {
-    <l:@L> "let" <is_mut: "const"?> <name:Identifier>  <ty: (":" Precedence0)?> <r:@R> => VariableDeclaration {
+    <l:@L> "let" <is_mut: "const"?> <name:Identifier>  <ty:(":" Type)?> <r:@R> => VariableDeclaration {
         loc: Loc(file_no, l, r), ty:ty.map(|x|x.1), name,is_mut: is_mut.is_none()
     },
 
@@ -182,6 +182,15 @@ ConstVariableDefinition: Box<ConstVariableDefinition> = {
     },
 }
 
+Type: Type = {
+    <i:Identifier> <v:("<" <Comma<Identifier>>">")?> => Type::Type(i,v),
+     "[" <i:Identifier> ":" <n:LexNumber> "]" => {
+        let s: String = n.chars().filter(|v| *v != '_').collect();
+        let num = s.parse::<BigInt>().unwrap().to_usize().unwrap();
+        Type::Array(i,num)
+     },
+     <v:("(" <Comma<Identifier>> ")")?> => Type::Tuple(v),
+}
 Expression: Expression = {
     Precedence14,
 }
@@ -227,6 +236,7 @@ Precedence11: Expression = {
     <l:Precedence11> <a:@L> "!=" <b:@R> <r:Precedence10> => Expression::NotEqual(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     Precedence10,
 }
+
 
 Precedence10: Expression = {
     <l:Precedence10> <a:@L> "<" <b:@R> <r:Precedence9> => Expression::Less(Loc(file_no, a, b), Box::new(l), Box::new(r)),
@@ -328,10 +338,9 @@ ObjAttribute: Expression = {
      },
 }
 
+
 Precedence0: Expression = {
-    <e:Identifier> <a:@L>  "<" <b:@R> <v:Comma<Identifier>> <a1:@L> ">" <b1:@R> => {
-       Expression::Unit(Loc(file_no, a, b), Box::new(Expression::Variable(e)),v)
-     },
+
     <FunctionCall> => <>,
     <ObjAttribute> => <>,
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),

@@ -14,6 +14,24 @@ pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType;
 }
 
+impl HasType for Type {
+    fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
+        match self {
+            Type::Type(name, ids) => { return get_register_type(tables, name.name.clone()); }
+            Type::Array(name, _) => { return CType::Array(Box::new(get_register_type(tables, name.name.clone()))); }
+            Type::Tuple(ids) => {
+                let mut v = Vec::new();
+                if ids.is_some() {
+                    for id in ids.as_ref().unwrap() {
+                        v.push(get_register_type(tables, id.name.clone()));
+                    }
+                }
+                return CType::Tuple(Box::new(v));
+            }
+        }
+    }
+}
+
 impl HasType for Parameter {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> CType {
         self.ty.get_type(tables)

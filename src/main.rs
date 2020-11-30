@@ -17,11 +17,15 @@ use pan_vm::vm::run_code_in_thread;
 use std::time::Duration;
 use std::borrow::Borrow;
 use std::cell::{Ref, RefCell};
-use std::collections::{HashSet};
+use std::collections::HashSet;
 use pan_bytecode::value;
 use std::sync::Mutex;
 use std::sync::Arc;
 
+struct aaa<A, B> {
+    pub a: A,
+    pub b: B,
+}
 
 
 fn main() {
@@ -39,7 +43,8 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    let x: Result<u32, &str>= Ok(3);
+    let a: aaa<i32, i32>= aaa { a: 12, b: 13 };
+    let x: Result<u32, &str> = Ok(3);
     test_one_file(&env::current_dir().unwrap().join("demo").join("result.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;

@@ -27,6 +27,12 @@ pub struct Module {
     pub content: Vec<ModulePart>,
     pub package: Vec<Identifier>,
 }
+#[derive(Debug, PartialEq, Clone)]
+pub enum Type {
+    Type(Identifier, Option<Vec<Identifier>>),
+    Array(Identifier, usize),
+    Tuple(Option<Vec<Identifier>>),
+}
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleDefinition {
@@ -76,7 +82,7 @@ pub enum DestructType {
 #[derive(Debug, PartialEq, Clone)]
 pub struct VariableDeclaration {
     pub loc: Loc,
-    pub ty: Option<Expression>,
+    pub ty: Option<Type>,
     pub name: Identifier,
     pub is_mut: bool,
 }
