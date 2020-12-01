@@ -378,14 +378,14 @@ impl HasType for Expression {
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
                 return if min < CType::I8 {
                     Err(SymbolTableError {
-                        error: format!("只有数字和字符串类型才能想加{:?}", left.expr_name()),
+                        error: format!("只有数字才能减法、除法、乘法运算,其类型{:?}", min),
                         location: loc.clone(),
                     })
                 } else if max <= CType::Float {
                     Ok(max)
                 } else {
                     Err(SymbolTableError {
-                        error: format!("只有数字和字符串类型才能相加{:?}", left.expr_name()),
+                        error: format!("只有数字才能减法、除法、乘法运算,其类型{:?}", max),
                         location: loc.clone(),
                     })
                 };

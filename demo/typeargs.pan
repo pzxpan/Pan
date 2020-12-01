@@ -36,8 +36,13 @@ pub fun type_args(a: Result<i32,string>) : Result<u32,string> {
 }
 
 fun main() {
-    let a = Result::Ok(40000);
+    let a = Result::Ok(400000);
     let b = a.unwrap();
+
+
+
+    let ccc = b - 2 ;
+    print(ccc);
 
     let aa = typeof(a);
     print(aa);
