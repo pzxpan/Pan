@@ -14,7 +14,6 @@ fun main() {
    let color2 = Color::Black;
    let color1 = Color::Red(10);
 
-
    let bb = color1.is_warm();
    print(bb);
    let c = 20;

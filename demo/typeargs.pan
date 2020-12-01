@@ -24,10 +24,10 @@ pub bound Add<T:Self> {
         return rhs;
     }
 }
-pub fun type_args(a:Result<i32,string>) : Result<u32,string> {
+pub fun type_args(a: Result<i32,string>) : Result<u32,string> {
     let a = 0_u32;
     match a {
-        Result::Ok(aa) -> {  print(aa);}
+        Result::Ok(aa) -> { print(aa);}
         Result::Err(_) -> {}
     }
     return Result::Ok(a);

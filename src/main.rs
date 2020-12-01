@@ -46,7 +46,7 @@ fn main() {
     let xxx: Result<std::collections::HashMap<String, Value>, i32> = Ok(HashMap::new());
     let a: aaa<i32, i32> = aaa { a: 12, b: 13 };
     let x: Result<u32, &str> = Ok(3);
-    test_one_file(&env::current_dir().unwrap().join("demo").join("match.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("typeargs.pan"));
     // let mut a = "addd".to_string();
     // let mut b = &mut a;
     // let mut c = "ddd".to_string();

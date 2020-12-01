@@ -857,13 +857,14 @@ impl SymbolTableBuilder {
                             }
                         } else {
                             println!("eddd:{:?},", e);
-                            if let ast::Expression::FunctionCall(_, name, ie) = e {
+                            if let ast::Expression::FunctionCall(_, name, attri) = e {
                                 println!("222eddd:{:?},ty:{:?}", e, ty);
                                 if let ast::Expression::Variable(_) = name.as_ref() {
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
-                                } else {
-                                    let tmp = self.resolve_attribute(e, &ty)?;
-                                    self.register_name(decl.name.borrow().name.borrow(), tmp, muttable.clone(), decl.loc)?;
+                                } else if let ast::Expression::Attribute(_, n, Some(ident), _) = name.as_ref() {
+                                    ty = self.get_register_type(n.expr_name())?;
+                                    ty = self.resovle_method(name, &ty)?;
+                                    self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                                 }
                             } else {
                                 println!("eeee:{:?},", e);
@@ -1952,13 +1953,13 @@ impl SymbolTableBuilder {
                             location: expr.loc().clone(),
                         });
                     }
-                    if attri_type > 1 {
+                    if attri_type > 2 {
                         self.verify_fun_visible(&cty, name.0.clone(), attri_name.0.clone())?;
+                        cty = tmp.1.clone();
                     } else {
                         self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
                     }
 
-                    // cty = tmp.1.clone();
                     return Ok(cty);
                 } else if let CType::Fn(fntype) = cty.clone() {
                     self.resolve_fn(&name.1, &cty.clone())?;
