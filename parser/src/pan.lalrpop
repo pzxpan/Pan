@@ -242,7 +242,9 @@ Precedence10: Expression = {
     <l:Precedence10> <a:@L> "<" <b:@R> <r:Precedence9> => Expression::Less(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence10> <a:@L> ">" <b:@R> <r:Precedence9> => Expression::More(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence10> <a:@L> "<=" <b:@R> <r:Precedence9> => Expression::LessEqual(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence10> <a:@L> ">=" <b:@R> <r:Precedence9> => Expression::MoreEqual(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence10> <a:@L> ">"  "="  <b:@R> <r:Precedence9> => {
+        Expression::MoreEqual(Loc(file_no, a, b), Box::new(l), Box::new(r))
+    },
     Precedence9,
 }
 
@@ -581,6 +583,7 @@ extern {
         LexIdentifier => Token::Identifier(<&'input str>),
         LexStringLiteral => Token::StringLiteral(<&'input str>),
         LexNumber => Token::Number(<&'input str>),
+        " " => Token::WhiteSpace,
         ";" => Token::Semicolon,
         ".." => Token::TwoDot,
         ".*" => Token::All,

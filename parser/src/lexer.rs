@@ -12,6 +12,7 @@ use num_traits::identities::Zero;
 use num_traits::{Num, ToPrimitive};
 
 use crate::diagnostics::Location;
+use crate::lexer::Token::Equal;
 
 pub type Spanned<Token, Loc, Error> = Result<(Loc, Token, Loc), Error>;
 
@@ -67,6 +68,7 @@ pub enum Token<'input> {
     String,
     Semicolon,
     TwoDot,
+    WhiteSpace,
     All,
     ReadOnlyRef,
     Comma,
@@ -174,6 +176,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Char(c) => write!(f, "{:?}", c),
 
             Token::TwoDot => write!(f, ".."),
+            Token::WhiteSpace => write!(f, " "),
             Token::All => write!(f, ".*"),
             Token::ReadOnlyRef => write!(f, "ref"),
             Token::Semicolon => write!(f, ";"),
@@ -268,6 +271,8 @@ pub struct Lexer<'input> {
     input: &'input str,
     chars: Peekable<CharIndices<'input>>,
     last_tokens: [Option<Token<'input>>; 2],
+    assign: Option<Result<(usize, Token<'input>, usize), LexicalError>>,
+    found_white: bool,
     column: usize,
     row: usize,
 }
@@ -358,6 +363,8 @@ impl<'input> Lexer<'input> {
             last_tokens: [None, None],
             row: 1,
             column: 0,
+            found_white: false,
+            assign: None,
         }
     }
 
@@ -910,10 +917,10 @@ impl<'input> Lexer<'input> {
                 }
                 Some((_, '>')) => {
                     return match self.chars.peek() {
-                        Some((_, '=')) => {
-                            self.chars.next();
-                            Some(Ok((self.row, Token::MoreEqual, self.column)))
-                        }
+                        // Some((_, '=')) => {
+                        //     self.chars.next();
+                        //     Some(Ok((self.row, Token::MoreEqual, self.column)))
+                        // }
                         Some((_, '>')) => {
                             self.chars.next();
                             return match self.chars.peek() {
@@ -951,7 +958,13 @@ impl<'input> Lexer<'input> {
                     return Some(Ok((self.row, Token::Colon, self.column)));
                 }
                 Some((_, '?')) => return Some(Ok((self.row, Token::Question, self.column))),
-                Some((_, ch)) if ch.is_whitespace() => (),
+                Some((_, ch)) if ch.is_whitespace() => {
+                    if let Some(Token::More) = self.last_tokens[1] {
+                        return Some(Ok((self.row, Token::WhiteSpace, self.column)));
+                    } else {
+                        ()
+                    }
+                }
                 Some((start, _)) => {
                     let mut end;
 
@@ -985,14 +998,48 @@ impl<'input> Iterator for Lexer<'input> {
 
     /// 下一个Token
     fn next(&mut self) -> Option<Self::Item> {
-        let token = self.next();
-        self.last_tokens = [
-            self.last_tokens[1],
-            match token {
-                Some(Ok((_, n, _))) => Some(n),
-                _ => None,
-            },
-        ];
+        if self.found_white {
+            self.found_white = false;
+            let a = self.assign.as_ref().unwrap().as_ref().unwrap().clone();
+            return Some(Result::Ok(a));
+        }
+        let mut token = self.next();
+        println!("0000token:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
+        if let Some(Ok((_, Token::WhiteSpace, _))) = token {
+            println!("1111last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
+            self.last_tokens = [
+                self.last_tokens[1],
+                Some(Token::WhiteSpace),
+            ];
+            let tmp = token;
+            token = self.next();
+            if let Some(Ok((_, Token::Assign, _))) = token {
+                self.last_tokens = [
+                    Some(Token::WhiteSpace),
+                    Some(Token::Assign),
+                ];
+                self.assign = token;
+                self.found_white = true;
+                return tmp;
+            } else {
+                self.last_tokens = [
+                    self.last_tokens[0],
+                    match token {
+                        Some(Ok((_, n, _))) => Some(n),
+                        _ => None,
+                    },
+                ];
+            }
+        } else {
+            self.last_tokens = [
+                self.last_tokens[1],
+                match token {
+                    Some(Ok((_, n, _))) => Some(n),
+                    _ => None,
+                },
+            ];
+        }
+        println!("2222last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
         token
     }
 }
