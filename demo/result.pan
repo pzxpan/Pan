@@ -21,7 +21,7 @@ pub enum Result<T, E> {
 }
 
 fun main() {
-   let x: Result<u32,string>=  Result::Ok(2);
+   let x: Result<u32,Result<u32,string>> =  Result::Ok(2);
    let xx: [i32:4] = [1,2,3,4];
    let xxx: (i32,string) = (12,"ddd");
 
@@ -32,6 +32,9 @@ fun main() {
    if a  >= 0 {
        print(a);
    }
+   let a = 2000;
+   a >>= 4;
+   print(a);
 }
 
 

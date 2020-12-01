@@ -27,12 +27,23 @@ pub struct Module {
     pub content: Vec<ModulePart>,
     pub package: Vec<Identifier>,
 }
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
-    Type(Identifier, Option<Vec<Identifier>>),
+    Type(Identifier, Option<Vec<Type>>),
     Array(Identifier, usize),
-    Tuple(Option<Vec<Identifier>>),
+    Tuple(Option<Vec<Type>>),
 }
+
+// impl Type {
+//     pub fn name(&self) -> String {
+//         match self {
+//             Type::Type(n, _) => n.name.clone(),
+//             Type::Array(n, _) => n.name.clone(),
+//
+//         }
+//     }
+// }
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleDefinition {

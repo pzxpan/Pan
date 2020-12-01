@@ -183,13 +183,13 @@ ConstVariableDefinition: Box<ConstVariableDefinition> = {
 }
 
 Type: Type = {
-    <i:Identifier> <v:("<" <Comma<Identifier>>">" " "?)?> => Type::Type(i,v),
+    <i:Identifier> <v:("<" <CommaOne<Type>>">")?> => Type::Type(i,v),
      "[" <i:Identifier> ":" <n:LexNumber> "]" => {
         let s: String = n.chars().filter(|v| *v != '_').collect();
         let num = s.parse::<BigInt>().unwrap().to_usize().unwrap();
         Type::Array(i,num)
      },
-     <v:("(" <Comma<Identifier>> ")")?> => Type::Tuple(v),
+     <v:("(" <CommaOne<Type>> ")")?> => Type::Tuple(v),
 }
 Expression: Expression = {
     Precedence14,
@@ -242,7 +242,7 @@ Precedence10: Expression = {
     <l:Precedence10> <a:@L> "<" <b:@R> <r:Precedence9> => Expression::Less(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence10> <a:@L> ">" <b:@R> <r:Precedence9> => Expression::More(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence10> <a:@L> "<=" <b:@R> <r:Precedence9> => Expression::LessEqual(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence10> <a:@L> ">"  "="  <b:@R> <r:Precedence9> => {
+    <l:Precedence10> <a:@L> ">="  <b:@R> <r:Precedence9> => {
      Expression::MoreEqual(Loc(file_no, a, b), Box::new(l), Box::new(r))
     },
     Precedence9,

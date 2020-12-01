@@ -271,8 +271,8 @@ pub struct Lexer<'input> {
     input: &'input str,
     chars: Peekable<CharIndices<'input>>,
     last_tokens: [Option<Token<'input>>; 2],
-    assign: Option<Result<(usize, Token<'input>, usize), LexicalError>>,
-    found_white: bool,
+    back_sign: Vec<Option<Result<(usize, Token<'input>, usize), LexicalError>>>,
+    found_let: bool,
     column: usize,
     row: usize,
 }
@@ -363,8 +363,8 @@ impl<'input> Lexer<'input> {
             last_tokens: [None, None],
             row: 1,
             column: 0,
-            found_white: false,
-            assign: None,
+            found_let: false,
+            back_sign: Vec::new(),
         }
     }
 
@@ -917,10 +917,10 @@ impl<'input> Lexer<'input> {
                 }
                 Some((_, '>')) => {
                     return match self.chars.peek() {
-                        // Some((_, '=')) => {
-                        //     self.chars.next();
-                        //     Some(Ok((self.row, Token::MoreEqual, self.column)))
-                        // }
+                        Some((_, '=')) => {
+                            self.chars.next();
+                            Some(Ok((self.row, Token::MoreEqual, self.column)))
+                        }
                         Some((_, '>')) => {
                             self.chars.next();
                             return match self.chars.peek() {
@@ -958,13 +958,8 @@ impl<'input> Lexer<'input> {
                     return Some(Ok((self.row, Token::Colon, self.column)));
                 }
                 Some((_, '?')) => return Some(Ok((self.row, Token::Question, self.column))),
-                Some((_, ch)) if ch.is_whitespace() => {
-                    if let Some(Token::More) = self.last_tokens[1] {
-                        return Some(Ok((self.row, Token::WhiteSpace, self.column)));
-                    } else {
-                        ()
-                    }
-                }
+                Some((_, ch)) if ch.is_whitespace() => (),
+
                 Some((start, _)) => {
                     let mut end;
 
@@ -998,32 +993,38 @@ impl<'input> Iterator for Lexer<'input> {
 
     /// 下一个Token
     fn next(&mut self) -> Option<Self::Item> {
-        if self.found_white {
-            self.found_white = false;
-            let a = self.assign.as_ref().unwrap().as_ref().unwrap().clone();
-            return Some(Result::Ok(a));
+        if self.found_let {
+            if !self.back_sign.is_empty() {
+                println!("2222last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
+                return self.back_sign.pop().unwrap();
+            }
         }
         let mut token = self.next();
-        println!("0000token:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
-        if let Some(Ok((_, Token::WhiteSpace, _))) = token {
-            println!("1111last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
-            self.last_tokens = [
-                self.last_tokens[1],
-                Some(Token::WhiteSpace),
-            ];
-            let tmp = token;
-            token = self.next();
-            if let Some(Ok((_, Token::Assign, _))) = token {
-                self.last_tokens = [
-                    Some(Token::WhiteSpace),
-                    Some(Token::Assign),
-                ];
-                self.assign = token;
-                self.found_white = true;
-                return tmp;
+        if let Some(Ok((_, Token::Let, _))) = token {
+            self.found_let = true;
+        }
+
+        if let Some(Ok((_, Token::Semicolon, _))) = token {
+            self.found_let = false;
+        }
+
+        if self.found_let {
+            if let Some(Ok((a, Token::MoreEqual, b))) = token {
+                self.back_sign.push(Some(Ok((a, Token::Assign, b))));
+                self.back_sign.push(Some(Ok((a, Token::More, b))));
+                return self.back_sign.pop().unwrap();
+            } else if let Some(Ok((a, Token::ShiftRight, b))) = token {
+                self.back_sign.push(Some(Ok((a, Token::More, b))));
+                self.back_sign.push(Some(Ok((a, Token::More, b))));
+                return self.back_sign.pop().unwrap();
+            } else if let Some(Ok((a, Token::ShiftRightAssign, b))) = token {
+                self.back_sign.push(Some(Ok((a, Token::Assign, b))));
+                self.back_sign.push(Some(Ok((a, Token::More, b))));
+                self.back_sign.push(Some(Ok((a, Token::More, b))));
+                return self.back_sign.pop().unwrap();
             } else {
                 self.last_tokens = [
-                    self.last_tokens[0],
+                    self.last_tokens[1],
                     match token {
                         Some(Ok((_, n, _))) => Some(n),
                         _ => None,

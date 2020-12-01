@@ -23,7 +23,7 @@ impl HasType for Type {
                 let mut v = Vec::new();
                 if ids.is_some() {
                     for id in ids.as_ref().unwrap() {
-                        v.push(get_register_type(tables, id.name.clone()));
+                        v.push(id.get_type(&tables));
                     }
                 }
                 return CType::Tuple(Box::new(v));
