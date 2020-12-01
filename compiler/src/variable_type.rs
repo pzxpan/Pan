@@ -40,13 +40,17 @@ impl HasType for Parameter {
 
 pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool, SymbolMutability) {
     let ty_res = s.1.as_ref().unwrap().get_type(tables);
+    println!("ty_res:{:?}",ty_res);
     let mut ty = CType::Unknown;
     if ty_res.is_ok() {
         ty = ty_res.unwrap();
         if ty == CType::Unknown {
+            println!("1111tyyy:{:?}",ty);
             ty = CType::Args(s.1.as_ref().unwrap().ty.name());
         }
+        println!("222tyyy:{:?}",ty);
     }
+
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
     let is_optional = s.1.as_ref().unwrap().default.is_some();
     let mutability = get_mutability(s.1.as_ref().unwrap().mut_own.clone(), &ty);
@@ -206,7 +210,9 @@ impl HasType for EnumDefinition {
                     let mut ref_type: Vec<CType> = Vec::new();
                     if let Some(tys) = &v.tys {
                         for t in tys.iter() {
-                            ref_type.push(t.get_type(tables)?);
+                            let tt = t.get_type(&local_tables)?;
+                            println!("enum_value_ty:{:?}",tt);
+                            ref_type.push(tt);
                         }
                     }
                     variants.push((v.name.name.clone(), CType::Reference(v.name.name.clone(), ref_type)));
