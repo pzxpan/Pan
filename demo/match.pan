@@ -17,14 +17,15 @@ fun main() {
 
    let bb = color1.is_warm();
    print(bb);
-   
+   let c = 20;
    let num = 1000;
    match num {
-        num < 100 -> {print(1);}
+        num < 100 -> {print(1);  bb = false;}
         200 -> {print(2);}
-        1000 -> {print(1000);}
+        1000 -> {print(1000);c = 40;}
         //没做完全匹配检查，通配符_必须要有,起保护作用
         _ -> {print(200);}
    }
+   print(c);
    return;
 }

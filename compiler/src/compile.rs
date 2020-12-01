@@ -1339,9 +1339,9 @@ impl<O: OutputStream> Compiler<O> {
             BitwiseOr(_, a, b) |
             And(_, a, b) |
             Or(_, a, b) => {
-                let rt = expression.get_type(&self.symbol_table_stack);
-                let at = a.get_type(&self.symbol_table_stack);
-                let bt = b.get_type(&self.symbol_table_stack);
+                let rt = expression.get_type(&self.symbol_table_stack)?;
+                let at = a.get_type(&self.symbol_table_stack)?;
+                let bt = b.get_type(&self.symbol_table_stack)?;
                 let max = if at < bt { bt.clone() } else { at.clone() };
                 if max > CType::Str {
                     self.compile_expression(a)?;
@@ -1370,7 +1370,7 @@ impl<O: OutputStream> Compiler<O> {
                 }
             }
             As(_, a, b) => {
-                let bt = b.get_type(&self.symbol_table_stack);
+                let bt = b.get_type(&self.symbol_table_stack)?;
                 self.compile_expression(a)?;
                 let idx = get_number_type(bt);
                 self.emit(Instruction::PrimitiveTypeChange(idx));
@@ -1623,7 +1623,7 @@ impl<O: OutputStream> Compiler<O> {
                 });
             }
             let arg = args.get(0).unwrap();
-            let ty = arg.get_type(&self.symbol_table_stack);
+            let ty = arg.get_type(&self.symbol_table_stack)?;
             if ty <= CType::I8 || ty > CType::U64 {
                 return Err(CompileError {
                     statement: None,
@@ -1685,7 +1685,7 @@ impl<O: OutputStream> Compiler<O> {
         //     }
         // }
 
-        let ty = function.get_type(&self.symbol_table_stack);
+        let ty = function.get_type(&self.symbol_table_stack)?;
         let mut need_count = 0;
         let mut must_unpack = false;
         for (idx, arg_type) in ty.param_type().iter().enumerate() {

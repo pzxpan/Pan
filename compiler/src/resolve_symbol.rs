@@ -110,7 +110,7 @@ pub fn resolve_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
         let mut methods = st.methods.clone();
         let mut static_fields = st.static_methods.clone();
         for arg in args {
-            let expected_ty = arg.expr.get_type(tables);
+            let expected_ty = arg.expr.get_type(tables).unwrap();
             let arg_name = &arg.name.name;
             let mut generic_type_name = "".to_string();
             for (idx, content) in st.fields.iter().enumerate() {
@@ -290,10 +290,10 @@ pub fn resovle_build_funs(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &
             location: fmt_expr.loc().clone(),
         });
     } else {
-        let c = fmt_expr.get_type(&build.tables);
+        let c = fmt_expr.get_type(&build.tables)?;
         if c == CType::Unknown {
             return Err(SymbolTableError {
-                error: format!("变量{:?}为定义", fmt_expr.expr_name()),
+                error: format!("变量{:?}未定义", fmt_expr.expr_name()),
                 location: fmt_expr.loc().clone(),
             });
         }
@@ -304,7 +304,7 @@ pub fn resovle_build_funs(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &
         let mut v = Vec::new();
         v = a.unwrap();
         for e in var_args.iter().skip(1).enumerate() {
-            let ty = e.1.get_type(&build.tables);
+            let ty = e.1.get_type(&build.tables)?;
             if v.len() > 0 {
                 let nty = v.get(0).unwrap();
                 if *nty == 1 {
