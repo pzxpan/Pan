@@ -38,7 +38,7 @@ pub struct Person {
     }
 }
 
-fun add(a:i32,b:32) : i32 {
+fun add(a:i32,b:i32) : i32 {
     return a + b;
 }
 

@@ -364,15 +364,6 @@ Precedence0: Expression = {
         let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
         Expression::NumberLiteral(Loc(file_no, l, r), num)
     },
-    <l:@L> <a:ParameterList> <r:@R> => {
-        if a.len() == 1 {
-            if let Some(Parameter{ ty,  name: None, .. }) = &a[0].1 {
-                return ty.clone();
-            }
-        }
-
-        Expression::List(Loc(file_no, l, r), a)
-    },
 
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
    <LambdaDefinition> => <>,
@@ -407,13 +398,13 @@ MutOrOwn: MutOrOwn = {
     "mut" => MutOrOwn::Mut,
 }
 Parameter: Parameter = {
-    <l:@L><name:Identifier?> ":" <mut_own:MutOrOwn?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> => {
+    <l:@L><name:Identifier?> ":" <mut_own:MutOrOwn?> <ty:Type> <e:("=" <Expression>)?> <r:@R> => {
         let loc = Loc(file_no, l, r);
         Parameter{ loc, ty, mut_own, name,default:e,is_varargs:false }
     },
     <l:@L>".." <name:Identifier?> <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty:Expression::List(Loc(file_no, l, r), vec![]), mut_own: None, name,default:None,is_varargs:true}
+        Parameter{loc, ty:Type::Tuple(None), mut_own: None, name,default:None,is_varargs:true}
     }
 }
 
@@ -435,7 +426,7 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 FunctionDefinition: Box<FunctionDefinition> = {
     <doc:DocComments> <is_pub:"pub"?> <c:"const"?> <l:@L> "fun"  <nl:@L> <is_static: "::"?> <name:Identifier?> <nr:@R> <generics:Generics> <params:ParameterList>
-    <returns:(":" Expression)?> <body:BlockStatementOrSemiColon> <r:@R> => {
+    <returns:(":" Type)?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let is_pub = is_pub.is_some();
         let is_static = is_static.is_some();
         Box::new(FunctionDefinition {

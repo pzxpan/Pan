@@ -319,6 +319,7 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
+
     pub fn scan_program(&mut self, program: &ast::ModuleDefinition) -> SymbolTableResult {
         for part in &program.module_parts {
             match part {
@@ -337,9 +338,10 @@ impl SymbolTableBuilder {
                                     let ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
                                     self.register_name(&name.name, tt, SymbolUsage::Mut, def.loc)?;
-                                    if let Some(expression) = &def.as_ref().returns {
-                                        self.scan_expression(expression, &ExpressionContext::Load)?;
-                                        return_name = expression.expr_name();
+                                    if let Some(tys) = &def.as_ref().returns {
+                                        let ty = tys.get_type(&self.tables);
+                                       // self.scan_expression(expression, &ExpressionContext::Load)?;
+                                        return_name = tys.name();
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                                     self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
@@ -402,8 +404,8 @@ impl SymbolTableBuilder {
                                     let mut return_name = "".to_string();
                                     self.register_name(&name.name, tt, SymbolUsage::Attribute, def.loc)?;
                                     if let Some(expression) = &def.as_ref().returns {
-                                        self.scan_expression(expression, &ExpressionContext::Load)?;
-                                        return_name = expression.expr_name();
+                                        let tty = expression.get_type(&self.tables);
+                                        return_name = expression.name();
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
                                     self.in_struct_func = true;
@@ -440,7 +442,8 @@ impl SymbolTableBuilder {
                     let tt = def.get_type(&self.tables);
                     if let Some(name) = &def.name {
                         if let Some(expression) = &def.as_ref().returns {
-                            self.scan_expression(expression, &ExpressionContext::Load)?;
+                            let ty = expression.get_type(&self.tables);
+                           // self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
                         self.enter_function(&get_full_name(&program.package, &name.name), &def.as_ref().params, def.loc.1)?;
                         if def.body.is_some() {
@@ -479,8 +482,9 @@ impl SymbolTableBuilder {
                         self.register_name(&func_name, tt, SymbolUsage::Attribute, part.loc)?;
                         let mut return_name = "".to_string();
                         if let Some(expression) = &part.as_ref().returns {
-                            self.scan_expression(expression, &ExpressionContext::Load)?;
-                            return_name = expression.expr_name();
+                            let tty = expression.get_type(&self.tables);
+                            //self.scan_expression(expression, &ExpressionContext::Load)?;
+                            return_name = expression.name();
                         }
                         self.enter_function(&func_name, &part.as_ref().params, part.loc.1)?;
                         self.in_struct_func = true;
@@ -1046,6 +1050,20 @@ impl SymbolTableBuilder {
         Ok(())
     }
 
+    // fn scan_type(&mut self, ty: &Type) -> SymbolTableResult {
+    //     match ty {
+    //         ast::Type::Type(name, tys) => {
+    //             let ty = self.get_register_type(name.clone().name);
+    //             if let Struct(ty) = ty {
+    //                 resolve_generic(n,tys,self.tables);
+    //             }
+    //         }
+    //         ast::Type::Tuple(item_ty) => {}
+    //         ast::Type::Array(key, value) => {}
+    //     }
+    //     Ok(())
+    // }
+
     fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> SymbolTableResult {
         match part {
             MultiDeclarationPart::Single(ident) => {
@@ -1081,7 +1099,7 @@ impl SymbolTableBuilder {
         match &expression {
             Unit(loc, name, exprs) => {
                 for expr in exprs {
-                   // self.scan_expression(expr, &ExpressionContext::Load);
+                    // self.scan_expression(expr, &ExpressionContext::Load);
                 }
             }
             Subscript(_, a, b) => {

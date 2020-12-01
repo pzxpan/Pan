@@ -1022,25 +1022,19 @@ impl<'input> Iterator for Lexer<'input> {
                 self.back_sign.push(Some(Ok((a, Token::More, b))));
                 self.back_sign.push(Some(Ok((a, Token::More, b))));
                 return self.back_sign.pop().unwrap();
-            } else {
-                self.last_tokens = [
-                    self.last_tokens[1],
-                    match token {
-                        Some(Ok((_, n, _))) => Some(n),
-                        _ => None,
-                    },
-                ];
             }
-        } else {
-            self.last_tokens = [
-                self.last_tokens[1],
-                match token {
-                    Some(Ok((_, n, _))) => Some(n),
-                    _ => None,
-                },
-            ];
+            if let Some(Ok((a, Token::Assign, b))) = token {
+                self.found_let = false;
+            }
         }
-        println!("2222last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
+        self.last_tokens = [
+            self.last_tokens[1],
+            match token {
+                Some(Ok((_, n, _))) => Some(n),
+                _ => None,
+            },
+        ];
+        // println!("2222last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
         token
     }
 }

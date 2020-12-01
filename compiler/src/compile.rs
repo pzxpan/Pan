@@ -646,7 +646,7 @@ impl<O: OutputStream> Compiler<O> {
         name: &str,
         args: &[ast::Parameter],
         body: &ast::Statement,
-        returns: &Option<ast::Expression>,
+        returns: &Option<ast::Type>,
         is_mut: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
@@ -690,11 +690,11 @@ impl<O: OutputStream> Compiler<O> {
         self.leave_scope();
 
 
-        for arg in args.iter() {
-            self.emit(Instruction::LoadConst(
-                bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
-            self.compile_expression(&arg.ty)?;
-        }
+        // for arg in args.iter() {
+        //     self.emit(Instruction::LoadConst(
+        //         bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
+        //     self.compile_expression(&arg.ty)?;
+        // }
 
         self.emit(Instruction::LoadConst(
             bytecode::Constant::Code(Box::new(code))));
@@ -714,7 +714,7 @@ impl<O: OutputStream> Compiler<O> {
         name: &str,
         args: &[ast::Parameter],
         body: &ast::Statement,
-        returns: &Option<ast::Expression>,
+        returns: &Option<ast::Type>,
         is_mut: bool,
         in_lambda: bool,
     ) -> Result<(), CompileError> {
@@ -755,14 +755,14 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::LoadConst(
                 bytecode::Constant::String("return".to_string())));
             // value:
-            self.compile_expression(annotation)?;
+          //  self.compile_expression(annotation)?;
             num_annotations += 1;
         }
 
         for arg in args.iter() {
             self.emit(Instruction::LoadConst(
                 bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
-            self.compile_expression(&arg.ty)?;
+          //  self.compile_expression(&arg.ty)?;
             num_annotations += 1;
         }
 

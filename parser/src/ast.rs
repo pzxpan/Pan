@@ -35,15 +35,23 @@ pub enum Type {
     Tuple(Option<Vec<Type>>),
 }
 
-// impl Type {
-//     pub fn name(&self) -> String {
-//         match self {
-//             Type::Type(n, _) => n.name.clone(),
-//             Type::Array(n, _) => n.name.clone(),
-//
-//         }
-//     }
-// }
+impl Type {
+    pub fn name(&self) -> String {
+        match self {
+            Type::Type(n, _) => n.name.clone(),
+            Type::Array(n, _) => n.name.clone(),
+            Type::Tuple(n) => {
+                if n.is_none() { return "Unit".to_string(); } else {
+                    let mut v = vec![];
+                    for i in n.as_ref().unwrap() {
+                        v.push(i.name());
+                    }
+                    return format!("Tuple:{:?}", v);
+                }
+            }
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleDefinition {
@@ -474,7 +482,7 @@ impl Expression {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Parameter {
     pub loc: Loc,
-    pub ty: Expression,
+    pub ty: Type,
     pub mut_own: Option<MutOrOwn>,
     pub is_varargs: bool,
     pub name: Option<Identifier>,
@@ -558,7 +566,7 @@ pub struct FunctionDefinition {
     pub is_pub: bool,
     pub is_static: bool,
     pub is_mut: bool,
-    pub returns: Option<Expression>,
+    pub returns: Option<Type>,
     pub body: Option<Statement>,
 }
 
