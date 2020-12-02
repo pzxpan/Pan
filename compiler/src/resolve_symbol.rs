@@ -19,6 +19,7 @@ use itertools::Tuples;
 use dynformat::check;
 use std::borrow::Borrow;
 use crate::util;
+use std::collections::HashMap;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
@@ -101,135 +102,284 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     build.scan_top_symbol_types(&md, true, *is_all, item_name, as_name)?;
     Ok(())
 }
-// pub fn resolve_enum_generic(st: EnumType, args: Type, tables: &Vec<SymbolTable>) -> EnumType {
-//     let mut result_ty = st.clone();
-//     if st.generics.is_some() {
-//         let mut generics = st.generics.clone().unwrap();
-//         let mut fields = st.fields.clone();
-//         let mut methods = st.methods.clone();
-//         let mut static_fields = st.static_methods.clone();
-//         for arg in args {
-//             let expected_ty = arg.get_type(tables).unwrap();
-//             let arg_name = &arg.name.name;
-//             let mut generic_type_name = "".to_string();
-//             for (idx, content) in st.fields.iter().enumerate() {
-//                 if content.0.eq(arg_name) {
-//                     if let CType::Generic(n, cty) = content.1.clone() {
-//                         if expected_ty < cty.as_ref().clone() {
-//                             fields.swap_remove(idx);
-//                             fields.insert(idx, (content.0.clone(), expected_ty.clone(), content.2, content.3.clone()));
-//                             generic_type_name = n.clone();
-//                         }
-//                     }
-//                 }
-//             }
-//             let mut generics_copy = generics.clone();
-//             for (idx, generic) in generics.iter().enumerate() {
-//                 if let CType::Generic(name, _) = generic {
-//                     if name.eq(&generic_type_name) {
-//                         generics_copy.remove(idx);
-//                     }
-//                 }
-//             }
-//             generics = generics_copy;
-//             //抹去函数中的泛型
-//             for (i, fty) in st.methods.iter().enumerate() {
-//                 if let CType::Fn(fnty) = fty.1.clone() {
-//                     let mut fn_arg_tys = fnty.arg_types.clone();
-//                     for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
-//                         if let CType::Generic(n, _) = fnarg.1.clone() {
-//                             if n.eq(&generic_type_name) {
-//                                 if expected_ty < fnarg.1 {
-//                                     fn_arg_tys.swap_remove(idx);
-//                                     fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone(), fnarg.3.clone(), fnarg.4.clone()));
-//                                 }
-//                             }
-//                         }
-//                     }
-//
-//                     let mut fn_ret_ty = fnty.ret_type.clone();
-//                     if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
-//                         if n.eq(&generic_type_name) {
-//                             if expected_ty < *fn_ret_ty.as_ref() {
-//                                 fn_ret_ty = Box::new(expected_ty.clone());
-//                             }
-//                         }
-//                     }
-//                     methods.remove(i);
-//                     let mut is_varargs = false;
-//                     if fn_arg_tys.len() > 0 {
-//                         is_varargs = fn_arg_tys.last().unwrap().3;
-//                     }
-//                     methods.insert(i, (fty.0.clone(), CType::Fn(FnType {
-//                         name: fnty.name.clone(),
-//                         is_mut: fnty.is_mut,
-//                         arg_types: fn_arg_tys,
-//                         type_args: fnty.type_args.clone(),
-//                         ret_type: fn_ret_ty,
-//                         is_pub: fnty.is_pub,
-//                         is_static: fnty.is_static,
-//                         has_body: fnty.has_body,
-//                         is_varargs,
-//                     })));
-//                 }
-//             }
-//
-//             //抹去静态方法中的泛型
-//             for (i, fty) in st.static_methods.iter().enumerate() {
-//                 if let CType::Fn(fnty) = fty.1.clone() {
-//                     let mut fn_arg_tys = fnty.arg_types.clone();
-//                     for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
-//                         if let CType::Generic(n, _) = fnarg.1.clone() {
-//                             if n.eq(&generic_type_name) {
-//                                 if expected_ty < fnarg.1 {
-//                                     fn_arg_tys.remove(idx);
-//                                     fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2, fnarg.3.clone(), fnarg.4.clone()));
-//                                 }
-//                             }
-//                         }
-//                     }
-//
-//                     let mut fn_ret_ty = fnty.ret_type.clone();
-//                     if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
-//                         if n.eq(&generic_type_name) {
-//                             if expected_ty < *fn_ret_ty.as_ref() {
-//                                 fn_ret_ty = Box::new(expected_ty.clone());
-//                             }
-//                         }
-//                     }
-//                     static_fields.remove(i);
-//                     let mut is_varargs = false;
-//                     if fn_arg_tys.len() > 0 {
-//                         is_varargs = fn_arg_tys.last().unwrap().3;
-//                     }
-//                     static_fields.insert(1, (fty.0.clone(), CType::Fn(FnType {
-//                         name: fnty.name.clone(),
-//                         is_mut: fnty.is_mut,
-//                         arg_types: fn_arg_tys,
-//                         type_args: fnty.type_args.clone(),
-//                         ret_type: fn_ret_ty,
-//                         is_pub: fnty.is_pub,
-//                         is_static: fnty.is_static,
-//                         has_body: fnty.has_body,
-//                         is_varargs,
-//                     })));
-//                 }
-//             }
-//         }
-//
-//         result_ty.static_methods = static_fields;
-//         result_ty.methods = methods;
-//         result_ty.fields = fields;
-//         if generics.len() > 0 {
-//             result_ty.generics = Some(generics);
-//         } else {
-//             result_ty.generics = None;
-//         }
-//     }
-//
-//     println!("result_ty:{:?}", result_ty);
-//     return result_ty;
-// }
+
+pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> EnumType {
+    let mut result_ty = st.clone();
+    if st.generics.is_some() {
+        let mut generics = st.generics.clone().unwrap();
+        let mut hash_map: HashMap<String, CType> = HashMap::new();
+        let mut items: Vec<(String, CType)> = Vec::new();
+        let mut methods: Vec<(String, CType)> = Vec::new();
+        let mut static_fields: Vec<(String, CType)> = Vec::new();
+        println!("generics:{:?},args:{:?}", generics, args);
+        for ge in generics.iter() {
+            if let CType::Generic(name, _) = ge {
+                if args.contains_key(name) {
+                    hash_map.insert(name.clone(), args.get(name).unwrap().clone());
+                }
+            }
+        }
+        let mut generics_copy = Vec::new();
+        for (idx, generic) in generics.iter().enumerate() {
+            if let CType::Generic(name, _) = generic {
+                if !hash_map.contains_key(name) {
+                    generics_copy.push(generic.clone());
+                }
+            }
+        }
+        if generics_copy.is_empty() {
+            result_ty.generics = None;
+        } else {
+            result_ty.generics = Some(generics_copy);
+        }
+
+        for (name, ty) in st.items.iter() {
+            println!("tttty:{:?}", ty);
+            if let CType::Reference(ref_name, tys) = ty.clone() {
+                let mut tys_copy = Vec::new();
+                for tty in tys {
+                    if let CType::Generic(n, _) = tty.clone() {
+                        if hash_map.contains_key(&n) {
+                            let tty = hash_map.get(&n).unwrap().clone();
+                            tys_copy.push(tty);
+                            continue;
+                        }
+                    }
+                    tys_copy.push(tty.clone());
+                }
+                println!("222tttty:{:?}", tys_copy);
+                items.push((name.clone(), CType::Reference(ref_name, tys_copy.clone())));
+            } else {
+                println!("3333tttty:{:?}", ty.clone());
+                items.push((name.clone(), ty.clone()));
+            }
+        }
+        result_ty.items = items;
+
+
+        for (i, fty) in st.methods.iter().enumerate() {
+            if let CType::Fn(fnty) = fty.1.clone() {
+                let mut fn_arg_tys = fnty.arg_types.clone();
+                for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
+                    if let CType::Generic(n, _) = fnarg.1.clone() {
+                        if hash_map.contains_key(&n) {
+                            let expected_ty = hash_map.get(&n).unwrap().clone();
+                            fn_arg_tys.swap_remove(idx);
+                            fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone(), fnarg.3.clone(), fnarg.4.clone()));
+                        }
+                    }
+                }
+
+                let mut fn_ret_ty = fnty.ret_type.clone();
+                if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
+                    if hash_map.contains_key(n) {
+                        let expected_ty = hash_map.get(n).unwrap().clone();
+                        fn_ret_ty = Box::new(expected_ty.clone());
+                    }
+                }
+                let mut is_varargs = false;
+                if fn_arg_tys.len() > 0 {
+                    is_varargs = fn_arg_tys.last().unwrap().3;
+                }
+                methods.push((fty.0.clone(), CType::Fn(FnType {
+                    name: fnty.name.clone(),
+                    is_mut: fnty.is_mut,
+                    arg_types: fn_arg_tys,
+                    type_args: fnty.type_args.clone(),
+                    ret_type: fn_ret_ty,
+                    is_pub: fnty.is_pub,
+                    is_static: fnty.is_static,
+                    has_body: fnty.has_body,
+                    is_varargs,
+                })));
+            }
+        }
+        result_ty.methods = methods;
+        //         //抹去静态方法中的泛型
+        for (i, fty) in st.static_methods.iter().enumerate() {
+            if let CType::Fn(fnty) = fty.1.clone() {
+                let mut fn_arg_tys = fnty.arg_types.clone();
+                for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
+                    if let CType::Generic(n, _) = fnarg.1.clone() {
+                        if hash_map.contains_key(&n) {
+                            let expected_ty = hash_map.get(&n).unwrap().clone();
+                            if expected_ty < fnarg.1 {
+                                fn_arg_tys.remove(idx);
+                                fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2, fnarg.3.clone(), fnarg.4.clone()));
+                            }
+                        }
+                    }
+                }
+
+                let mut fn_ret_ty = fnty.ret_type.clone();
+                if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
+                    if hash_map.contains_key(n) {
+                        let expected_ty = hash_map.get(n).unwrap().clone();
+                        if expected_ty < *fn_ret_ty.as_ref() {
+                            fn_ret_ty = Box::new(expected_ty.clone());
+                        }
+                    }
+                }
+                let mut is_varargs = false;
+                if fn_arg_tys.len() > 0 {
+                    is_varargs = fn_arg_tys.last().unwrap().3;
+                }
+                static_fields.push((fty.0.clone(), CType::Fn(FnType {
+                    name: fnty.name.clone(),
+                    is_mut: fnty.is_mut,
+                    arg_types: fn_arg_tys,
+                    type_args: fnty.type_args.clone(),
+                    ret_type: fn_ret_ty,
+                    is_pub: fnty.is_pub,
+                    is_static: fnty.is_static,
+                    has_body: fnty.has_body,
+                    is_varargs,
+                })));
+            }
+        }
+        result_ty.static_methods = static_fields;
+    }
+    return result_ty;
+}
+
+pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
+    let mut result_ty = st.clone();
+    if st.generics.is_some() {
+        let mut generics = st.generics.clone().unwrap();
+        let mut hash_map: HashMap<String, CType> = HashMap::new();
+        let mut items: Vec<(String, CType)> = Vec::new();
+        let mut methods: Vec<(String, CType)> = Vec::new();
+        let mut static_fields: Vec<(String, CType)> = Vec::new();
+        println!("generics:{:?},args:{:?}", generics, args);
+        for arg in args.iter().enumerate() {
+            println!("index:{:?},", arg.0);
+            let a = generics.get(arg.0).unwrap();
+            if let CType::Generic(name, _) = a {
+                hash_map.insert(name.clone(), arg.1.clone());
+            }
+        }
+        let mut generics_copy = Vec::new();
+        for (idx, generic) in generics.iter().enumerate() {
+            if let CType::Generic(name, _) = generic {
+                if !hash_map.contains_key(name) {
+                    generics_copy.push(generic.clone());
+                }
+            }
+        }
+        if generics_copy.is_empty() {
+            result_ty.generics = None;
+        } else {
+            result_ty.generics = Some(generics_copy);
+        }
+
+        for (name, ty) in st.items.iter() {
+            println!("tttty:{:?}", ty);
+            if let CType::Reference(ref_name, tys) = ty.clone() {
+                let mut tys_copy = Vec::new();
+                for tty in tys {
+                    if let CType::Generic(n, _) = tty.clone() {
+                        if hash_map.contains_key(&n) {
+                            let tty = hash_map.get(&n).unwrap().clone();
+                            tys_copy.push(tty);
+                            continue;
+                        }
+                    }
+                    tys_copy.push(tty.clone());
+                }
+                items.push((name.clone(), CType::Reference(ref_name, tys_copy.clone())));
+            } else {
+                items.push((name.clone(), ty.clone()));
+            }
+        }
+        result_ty.items = items;
+
+
+        for (i, fty) in st.methods.iter().enumerate() {
+            if let CType::Fn(fnty) = fty.1.clone() {
+                let mut fn_arg_tys = fnty.arg_types.clone();
+                for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
+                    if let CType::Generic(n, _) = fnarg.1.clone() {
+                        if hash_map.contains_key(&n) {
+                            let expected_ty = hash_map.get(&n).unwrap().clone();
+                            fn_arg_tys.swap_remove(idx);
+                            fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2.clone(), fnarg.3.clone(), fnarg.4.clone()));
+                        }
+                    }
+                }
+
+                let mut fn_ret_ty = fnty.ret_type.clone();
+                if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
+                    if hash_map.contains_key(n) {
+                        let expected_ty = hash_map.get(n).unwrap().clone();
+                        fn_ret_ty = Box::new(expected_ty.clone());
+                    }
+                }
+                let mut is_varargs = false;
+                if fn_arg_tys.len() > 0 {
+                    is_varargs = fn_arg_tys.last().unwrap().3;
+                }
+                methods.push((fty.0.clone(), CType::Fn(FnType {
+                    name: fnty.name.clone(),
+                    is_mut: fnty.is_mut,
+                    arg_types: fn_arg_tys,
+                    type_args: fnty.type_args.clone(),
+                    ret_type: fn_ret_ty,
+                    is_pub: fnty.is_pub,
+                    is_static: fnty.is_static,
+                    has_body: fnty.has_body,
+                    is_varargs,
+                })));
+            }
+        }
+        result_ty.methods = methods;
+        //         //抹去静态方法中的泛型
+        for (i, fty) in st.static_methods.iter().enumerate() {
+            if let CType::Fn(fnty) = fty.1.clone() {
+                let mut fn_arg_tys = fnty.arg_types.clone();
+                for (idx, fnarg) in fnty.arg_types.iter().enumerate() {
+                    if let CType::Generic(n, _) = fnarg.1.clone() {
+                        if hash_map.contains_key(&n) {
+                            let expected_ty = hash_map.get(&n).unwrap().clone();
+                            if expected_ty < fnarg.1 {
+                                fn_arg_tys.remove(idx);
+                                fn_arg_tys.insert(idx, (fnarg.0.clone(), expected_ty.clone(), fnarg.2, fnarg.3.clone(), fnarg.4.clone()));
+                            }
+                        }
+                    }
+                }
+
+                let mut fn_ret_ty = fnty.ret_type.clone();
+                if let CType::Generic(n, _) = fnty.ret_type.as_ref() {
+                    if hash_map.contains_key(n) {
+                        let expected_ty = hash_map.get(n).unwrap().clone();
+                        if expected_ty < *fn_ret_ty.as_ref() {
+                            fn_ret_ty = Box::new(expected_ty.clone());
+                        }
+                    }
+                }
+                let mut is_varargs = false;
+                if fn_arg_tys.len() > 0 {
+                    is_varargs = fn_arg_tys.last().unwrap().3;
+                }
+                static_fields.push((fty.0.clone(), CType::Fn(FnType {
+                    name: fnty.name.clone(),
+                    is_mut: fnty.is_mut,
+                    arg_types: fn_arg_tys,
+                    type_args: fnty.type_args.clone(),
+                    ret_type: fn_ret_ty,
+                    is_pub: fnty.is_pub,
+                    is_static: fnty.is_static,
+                    has_body: fnty.has_body,
+                    is_varargs,
+                })));
+            }
+        }
+        result_ty.static_methods = static_fields;
+    }
+    return result_ty;
+}
+
+
 pub fn resolve_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
     let mut result_ty = st.clone();
     if st.generics.is_some() {

@@ -14,13 +14,13 @@ use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds, resovle_build_funs};
+use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds, resovle_build_funs, resolve_enum_generic, resolve_enum_generic_fn};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
 use crate::util::get_pos_lambda_name;
 use crate::util::get_attribute_vec;
-use std::process::exit;
+use std::process::{exit, id};
 use crate::util::get_full_name;
 use crate::util::get_last_name;
 use crate::compile::is_builtin_name;
@@ -28,7 +28,7 @@ use crate::error::CompileErrorType::SyntaxError;
 use crate::ctype::CType;
 
 pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable, SymbolTableError> {
-    let mut builder: SymbolTableBuilder = Default::default();
+    let mut builder: SymbolTableBuilder = SymbolTableBuilder::new();
     builder.package = program.package.clone();
     builder.prepare(program.package.clone());
     builder.insert_builtin_symbol();
@@ -241,7 +241,6 @@ pub enum SymbolUsage {
 
 }
 
-#[derive(Default)]
 pub struct SymbolTableBuilder {
     pub tables: Vec<SymbolTable>,
     lambda_name: String,
@@ -249,6 +248,7 @@ pub struct SymbolTableBuilder {
     fun_call: bool,
     in_struct_func: bool,
     is_const_fun: bool,
+    ret_ty: CType,
 }
 
 enum ExpressionContext {
@@ -257,6 +257,17 @@ enum ExpressionContext {
 }
 
 impl SymbolTableBuilder {
+    fn new() -> SymbolTableBuilder {
+        SymbolTableBuilder {
+            tables: Vec::new(),
+            lambda_name: "".to_string(),
+            package: "".to_string(),
+            fun_call: false,
+            in_struct_func: false,
+            is_const_fun: false,
+            ret_ty: CType::Any,
+        }
+    }
     fn prepare(&mut self, name: String) {
         self.enter_scope(&name, SymbolTableType::Module, 0);
     }
@@ -277,6 +288,76 @@ impl SymbolTableBuilder {
         let table = self.tables.pop().unwrap();
         self.tables.last_mut().unwrap().sub_tables.push(table);
     }
+    fn veriry_fun_return(&mut self, expression: &Expression) -> SymbolTableResult {
+        println!("return_expression:{:?},", expression);
+        let mut r_ty = CType::Any;
+        let loc = expression.loc();
+        if expression.expr_name().eq("self") {
+            return if self.ret_ty.name().eq("Self") {
+                Ok(())
+            } else {
+                Err(SymbolTableError {
+                    error: format!("返回值的Self类型与定义的类型{:?}不匹配", self.ret_ty),
+                    location: loc,
+                })
+            };
+        } else {
+            if let ast::Expression::FunctionCall(_, name, args) = expression {
+                if let ast::Expression::Variable(_) = name.as_ref() {
+                    r_ty = self.get_register_type(name.expr_name())?;
+                    if let CType::Enum(ety) = r_ty.clone() {
+                        let mut v = HashMap::new();
+                        for arg in args.iter().enumerate() {
+                            v.insert(name.expr_name(), arg.1.get_type(&self.tables)?);
+                        }
+                        r_ty = CType::Enum(resolve_enum_generic_fn(ety, v));
+                    }
+                    r_ty = r_ty.ret_type().clone();
+                } else if let ast::Expression::Attribute(_, n, Some(ident), _) = name.as_ref() {
+                    r_ty = self.get_register_type(n.expr_name())?;
+                    r_ty = self.resovle_method(name.as_ref(), &r_ty)?;
+                    let attri_name = get_attribute_vec(name).last().unwrap().0.clone();
+                    let a = r_ty.attri_name_type(attri_name);
+                    let mut attri_type_name: Vec<String> = Vec::new();
+                    if let CType::Reference(_, nty) = a.1 {
+                        for ty in nty.iter() {
+                            if let Generic(n, _) = ty {
+                                attri_type_name.push(n.clone());
+                            }
+                        }
+                    }
+                    if let CType::Enum(ety) = r_ty.clone() {
+                        let mut v = HashMap::new();
+                        for arg in args.iter().enumerate() {
+                            v.insert(attri_type_name.get(arg.0).unwrap().clone(), self.get_register_type(arg.1.expr_name())?);
+                        }
+                        r_ty = CType::Enum(resolve_enum_generic_fn(ety, v));
+                    }
+                    r_ty = r_ty.ret_type().clone();
+                }
+            } else {
+                r_ty = expression.get_type(&self.tables)?;
+            }
+        }
+        if r_ty != self.ret_ty {
+            return Err(SymbolTableError {
+                error: format!("函数返回值的类型{:?}与定义的类型{:?}不匹配", r_ty, self.ret_ty),
+                location: loc,
+            });
+        }
+        Ok(())
+    }
+
+    // SyntaxError("函数返回值的类型Enum(EnumType { name: \"Result\", generics: Some([Generic(\"E\", Any)]),\
+    //  items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Generic(\"E\", Any)]))],\
+    //   static_methods: [], methods: [(\"is_ok\", Fn(FnType { name: \"is_ok\", arg_types: [], type_args: [], \
+    //   ret_type: Bool, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), \
+    //   (\"is_err\", Fn(FnType { name: \"is_err\", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub: true,\
+    //    is_mut: false, is_static: false, has_body: true }))], bases: [], is_pub: true })与\
+    //    定义的类型Enum(EnumType { name: \"Result\", generics: None,
+    // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Str]))],
+    // static_methods: [], methods: [(\"is_ok\", Fn(FnType { name: \"is_ok\", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), (\"is_err\", Fn(FnType { name: \"is_err\", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true }))], bases: [], is_pub: true })不匹配"), location: Loc(1, 30, 25), source_path: Some("/Users/cuiqingbo/Desktop/Pan/Pan/demo/typeargs.pan") }
+
     fn get_body_return_ty(&self, body: &Statement, ty: &CType, self_ty: bool) -> SymbolTableResult {
         let mut r_ty = CType::Any;
 
@@ -333,6 +414,12 @@ impl SymbolTableBuilder {
                         for tys in e.items {
                             self.register_name(&tys.0, tys.1, SymbolUsage::Attribute, Loc::default());
                         }
+                        if e.generics.is_some() {
+                            for generic in e.generics.unwrap().iter() {
+                                println!("&generic.name():{:?}, ggg:{:?}", &generic.name(), generic.clone());
+                                self.register_name(&generic.name(), generic.clone(), SymbolUsage::Attribute, Loc::default());
+                            }
+                        }
                     }
                     let self_name = &def.name.name.clone();
                     for part in &def.parts {
@@ -340,7 +427,7 @@ impl SymbolTableBuilder {
                             EnumPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables)?;
-                                    let ret_ty = tt.ret_type().clone();
+                                    self.ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
                                     self.register_name(&name.name, tt, SymbolUsage::Mut, def.loc)?;
                                     if let Some(tys) = &def.as_ref().returns {
@@ -349,21 +436,21 @@ impl SymbolTableBuilder {
                                         return_name = tys.name();
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+
                                     self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                                     //函数范型又调用方确定类型再验证，不然验证的流程太长;
-                                    if def.generics.is_empty() {
-                                        self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &ret_ty, self_name.eq(&return_name))?;
-                                    }
+                                    // if def.generics.is_empty() {
+                                    //     self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &ret_ty, self_name.eq(&return_name))?;
+                                    // }
                                     self.leave_scope();
                                 }
                             }
                             EnumPart::EnumVariableDefinition(def) => {
                                 let mut ref_type: Vec<CType> = Vec::new();
-                               // let ty = self.get_register_type(def.name.name.clone()).unwrap();
-                                     }
+                                // let ty = self.get_register_type(def.name.name.clone()).unwrap();
+                            }
                         }
                     }
-
 
 
                     self.leave_scope();
@@ -403,7 +490,7 @@ impl SymbolTableBuilder {
                             StructPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables)?;
-                                    let r_ty = tt.ret_type().clone();
+                                    self.ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
                                     self.register_name(&name.name, tt, SymbolUsage::Attribute, def.loc)?;
                                     if let Some(expression) = &def.as_ref().returns {
@@ -415,9 +502,9 @@ impl SymbolTableBuilder {
                                     self.is_const_fun = !def.is_mut;
                                     if def.body.is_some() {
                                         self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
-                                        if def.generics.is_empty() {
-                                            self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
-                                        }
+                                        // if def.generics.is_empty() {
+                                        //     self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
+                                        // }
                                     }
                                     self.is_const_fun = false;
                                     //更新self为可变状态;
@@ -458,12 +545,13 @@ impl SymbolTableBuilder {
                             let ty = expression.get_type(&self.tables)?;
                             // self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
+                        self.ret_ty = tt.ret_type().clone();
                         self.enter_function(&get_full_name(&program.package, &name.name), &def.as_ref().params, def.loc.1)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
-                            if def.generics.is_empty() {
-                                self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), tt.ret_type(), false)?;
-                            }
+                            // if def.generics.is_empty() {
+                            //     self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), tt.ret_type(), false)?;
+                            // }
                         }
                         self.leave_scope();
                     }
@@ -502,11 +590,12 @@ impl SymbolTableBuilder {
                         self.enter_function(&func_name, &part.as_ref().params, part.loc.1)?;
                         self.in_struct_func = true;
                         self.is_const_fun = !part.is_mut;
+                        self.ret_ty = r_ty;
                         if part.body.is_some() {
                             self.scan_statement(&part.body.as_ref().unwrap())?;
-                            if part.generics.is_empty() {
-                                self.get_body_return_ty(&part.body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
-                            }
+                            // if part.generics.is_empty() {
+                            //     self.get_body_return_ty(&part.body.as_ref().unwrap(), &r_ty, self_name.eq(&return_name))?;
+                            // }
                         }
                         self.is_const_fun = false;
                         self.update_self_mutability("self".to_string(), SymbolMutability::Mut);
@@ -858,6 +947,7 @@ impl SymbolTableBuilder {
                         //如果是函数或获取属性，就获取注册了的函数和返回类型，
                         ty = self.get_register_type(e.expr_name())?;
                     }
+
                     if decl.ty.is_none() {
                         if lookup_symbol {
                             //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
@@ -870,13 +960,43 @@ impl SymbolTableBuilder {
                             }
                         } else {
                             println!("eddd:{:?},", e);
-                            if let ast::Expression::FunctionCall(_, name, attri) = e {
+                            if let ast::Expression::FunctionCall(_, name, args) = e {
                                 println!("222eddd:{:?},ty:{:?}", e, ty);
                                 if let ast::Expression::Variable(_) = name.as_ref() {
+                                    if let CType::Enum(ety) = ty.clone() {
+                                        if ty.is_generic() {
+                                            let mut v = HashMap::new();
+                                            for arg in args.iter().enumerate() {
+                                                v.insert(name.expr_name(), arg.1.get_type(&self.tables)?);
+                                            }
+                                            ty = CType::Enum(resolve_enum_generic_fn(ety, v));
+                                        }
+                                    }
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                                 } else if let ast::Expression::Attribute(_, n, Some(ident), _) = name.as_ref() {
                                     ty = self.get_register_type(n.expr_name())?;
                                     ty = self.resovle_method(name, &ty)?;
+                                    if ty.is_generic() {
+                                        println!("ident.name:{:?},", ident.name.clone());
+                                        let a = ty.attri_name_type(ident.name.clone());
+                                        let mut attri_type_name: Vec<String> = Vec::new();
+                                        println!("ident.name:{:?},", a.1.clone());
+                                        if let CType::Reference(_, nty) = a.1 {
+                                            for ty in nty.iter() {
+                                                if let Generic(n, _) = ty {
+                                                    attri_type_name.push(n.clone());
+                                                }
+                                            }
+                                        }
+                                        if let CType::Enum(ety) = ty.clone() {
+                                            let mut v = HashMap::new();
+                                            for arg in args.iter().enumerate() {
+                                                v.insert(attri_type_name.get(arg.0).unwrap().clone(), arg.1.get_type(&self.tables)?);
+                                            }
+                                            println!("vvvv:{:?}", v);
+                                            ty = CType::Enum(resolve_enum_generic_fn(ety, v));
+                                        }
+                                    }
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                                 }
                             } else {
@@ -907,6 +1027,7 @@ impl SymbolTableBuilder {
             }
             Return(_, expression) => {
                 if let Some(e) = expression {
+                    self.veriry_fun_return(e)?;
                     self.scan_expression(e, &ExpressionContext::Load)?;
                 }
             }
@@ -1796,7 +1917,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        // println!("register name={:?}, ty: {:?}", name, ty);
+        println!("register name={:?}, ty: {:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());

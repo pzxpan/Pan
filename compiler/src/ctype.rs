@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use crate::symboltable::SymbolMutability;
+use crate::ctype::CType::Generic;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
@@ -57,7 +58,6 @@ pub struct FnType {
     pub is_static: bool,
     pub has_body: bool,
 }
-
 
 impl FnType {
     pub fn new() -> Self {
@@ -145,7 +145,7 @@ pub struct BoundType {
     pub is_pub: bool,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct EnumType {
     pub name: String,
     pub generics: Option<Vec<CType>>,
@@ -154,6 +154,61 @@ pub struct EnumType {
     pub methods: Vec<(String, CType)>,
     pub bases: Vec<String>,
     pub is_pub: bool,
+}
+
+impl EnumType {
+    pub fn get_concrete_ty(&self) -> HashMap<String, Vec<CType>> {
+        let mut vv: HashMap<String, Vec<CType>> = HashMap::new();
+        for item in self.items.iter() {
+            if let CType::Reference(name, nty) = item.1.clone() {
+                let mut vvv = Vec::new();
+                for i in nty {
+                    vvv.push(i);
+                }
+                vv.insert(item.0.clone(), vvv);
+            }
+        }
+        return vv;
+    }
+}
+// items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Generic(\"E\", Any)]))],
+// items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Str]))],
+
+impl PartialEq for EnumType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name.eq(&other.name) {
+            println!("herereis ");
+            let this_item = self.get_concrete_ty();
+            let other_item = other.get_concrete_ty();
+
+
+            println!("herereis {:?},equal:{:?}", other_item, this_item);
+            for (name, tys) in this_item.iter() {
+                let other_tys = other_item.get(name).unwrap().clone();
+                for i in tys.iter().enumerate() {
+                    if let CType::Generic(_, _) = i.1.clone() {
+                        continue;
+                    } else if let CType::Generic(_, _) = other_tys.get(i.0).unwrap().clone() {
+                        continue;
+                    } else {
+                        if i.1.clone() != other_tys.get(i.0).unwrap().clone() {
+                            println!("aaa:{:?},", other_tys.get(i.0).unwrap().clone());
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+//     Enum(EnumType { name: "Result", generics: None, items: [("Ok", Reference("Ok", [I32])), ("Err", Reference("Err", [Str]))],
+//     static_methods: [], methods: [("is_ok", Fn(FnType { name: "is_ok", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub:
+//     true, is_mut: false, is_static: false, has_body: true })), ("is_err", Fn(FnType { name: "is_err", arg_types: [], type_args: [], ret_type: Bool,
+// is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), ("unwrap", Fn(FnType { name: "unwrap",
+// arg_types: [], type_args: [], ret_type: I32, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true }))],
+// bases: [], is_pub: true }),aaa:U32,
 }
 
 impl CType {
@@ -193,6 +248,21 @@ impl CType {
             CType::Lambda(s) => s.ret_type.as_ref(),
             _ => self
         }
+    }
+
+    pub fn is_generic(&self) -> bool {
+        let mut generics = false;
+        if let CType::Enum(ety) = self {
+            if ety.generics.is_some() {
+                generics = true;
+            }
+        }
+        if let CType::Struct(cty) = self {
+            if cty.generics.is_some() {
+                generics = true;
+            }
+        }
+        return generics;
     }
 
     pub fn attri_index(&self, index: i32) -> &CType {
