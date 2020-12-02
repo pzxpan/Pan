@@ -33,6 +33,7 @@ pub enum Type {
     Type(Identifier, Option<Vec<Type>>),
     Array(Identifier, usize),
     Tuple(Option<Vec<Type>>),
+    FunType(Option<Vec<Type>>, Option<Box<Type>>),
 }
 
 impl Type {
@@ -48,6 +49,19 @@ impl Type {
                     }
                     return format!("Tuple:{:?}", v);
                 }
+            }
+            Type::FunType(args, ret) => {
+                let mut v = vec![];
+                if args.is_some() {
+                    for i in args.as_ref().unwrap() {
+                        v.push(i.name());
+                    }
+                }
+                let mut ret_name = "".to_string();
+                if ret.is_some() {
+                    ret_name = ret.as_ref().unwrap().name();
+                }
+                return format!("FunType:{:?}{:?}", args, ret_name);
             }
         }
     }

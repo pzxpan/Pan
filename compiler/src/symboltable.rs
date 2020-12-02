@@ -436,12 +436,13 @@ impl SymbolTableBuilder {
                                         return_name = tys.name();
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
-
+                                    self.in_struct_func = true;
                                     self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                                     //函数范型又调用方确定类型再验证，不然验证的流程太长;
                                     // if def.generics.is_empty() {
                                     //     self.get_body_return_ty(&def.as_ref().body.as_ref().unwrap(), &ret_ty, self_name.eq(&return_name))?;
                                     // }
+                                    self.in_struct_func = false;
                                     self.leave_scope();
                                 }
                             }

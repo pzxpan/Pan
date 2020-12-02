@@ -195,7 +195,7 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
             }
         }
         result_ty.methods = methods;
-        //         //抹去静态方法中的泛型
+        //抹去静态方法中的泛型
         for (i, fty) in st.static_methods.iter().enumerate() {
             if let CType::Fn(fnty) = fty.1.clone() {
                 let mut fn_arg_tys = fnty.arg_types.clone();

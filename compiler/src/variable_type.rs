@@ -28,7 +28,7 @@ impl HasType for Type {
                 if let CType::Enum(ety) = ty {
                     ty = CType::Enum(resolve_enum_generic(ety, v));
                 }
-                println!("tyddd:{:?}",ty);
+                println!("tyddd:{:?}", ty);
                 return Ok(ty);
             }
             Type::Array(name, _) => { return Ok(CType::Array(Box::new(get_register_type(tables, name.name.clone())))); }
@@ -40,6 +40,31 @@ impl HasType for Type {
                     }
                 }
                 return Ok(CType::Tuple(Box::new(v)));
+            }
+            Type::FunType(args, ret) => {
+                let mut v = Vec::new();
+                let mut type_args = Vec::new();
+                if args.is_some() {
+                    for arg in args.as_ref().unwrap() {
+                        v.push((arg.name, arg.get_type(&tables)?, false, false, SymbolMutability::ImmRef));
+                        type_args.push(arg.name);
+                    }
+                }
+                let mut ret_ty = CType::Any;
+                if ret.is_some() {
+                    ret_ty = ret.as_ref().unwrap().get_type(tables)?;
+                }
+                return Ok(CType::Fn(FnType {
+                    name: "pan".to_string(),
+                    is_mut: false,
+                    arg_types: v,
+                    type_args,
+                    ret_type: Box::new(ret_ty),
+                    is_pub: true,
+                    is_static: false,
+                    has_body: false,
+                    is_varargs: false,
+                }));
             }
         }
     }
@@ -733,11 +758,14 @@ fn resovle_method(expr: &Expression, ty: &CType, tables: &Vec<SymbolTable>) -> R
                 attri_type = tmp.0;
                 cty = tmp.1.clone();
             } else if let CType::Enum(_) = cty.clone() {
-                // let attri_name = v.get(idx + 1).unwrap().clone();
-                // let tmp = cty.attri_name_type(attri_name.0.clone());
-                // attri_type = tmp.0;
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                let tmp = cty.attri_name_type(attri_name.0.clone());
+                attri_type = tmp.0;
+                if tmp.0 > 2 {
+                    cty = tmp.1.clone();
+                    return Ok(cty);
+                }
                 return Ok(cty);
-                //  cty = tmp.1.clone();
             } else if let CType::Fn(fntype) = cty.clone() {
                 cty = cty.ret_type().clone();
             } else if CType::Module == cty.clone() {
