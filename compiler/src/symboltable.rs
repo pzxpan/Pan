@@ -248,6 +248,7 @@ pub struct SymbolTableBuilder {
     fun_call: bool,
     in_struct_func: bool,
     is_const_fun: bool,
+    in_lambda: bool,
     ret_ty: CType,
 }
 
@@ -263,6 +264,7 @@ impl SymbolTableBuilder {
             lambda_name: "".to_string(),
             package: "".to_string(),
             fun_call: false,
+            in_lambda: false,
             in_struct_func: false,
             is_const_fun: false,
             ret_ty: CType::Any,
@@ -288,11 +290,13 @@ impl SymbolTableBuilder {
         let table = self.tables.pop().unwrap();
         self.tables.last_mut().unwrap().sub_tables.push(table);
     }
-    fn veriry_fun_return(&mut self, expression: &Expression) -> SymbolTableResult {
+    fn verify_fun_return(&mut self, expression: &Expression) -> SymbolTableResult {
         let mut r_ty = CType::Any;
         let loc = expression.loc();
         if expression.expr_name().eq("self") {
-            return if self.ret_ty.name().eq("Self") {
+            let ty = self.get_register_type("self".to_string()).unwrap();
+
+            return if self.ret_ty.name().eq(&ty.name()) {
                 Ok(())
             } else {
                 Err(SymbolTableError {
@@ -339,6 +343,11 @@ impl SymbolTableBuilder {
             }
         }
         if r_ty != self.ret_ty {
+            if self.in_lambda {
+                let ty = self.get_register_type(self.lambda_name.clone())?;
+                println!("lambda_ty:{:?}", ty);
+                return Ok(());
+            }
             return Err(SymbolTableError {
                 error: format!("函数返回值的类型{:?}与定义的类型{:?}不匹配", r_ty, self.ret_ty),
                 location: loc,
@@ -611,7 +620,9 @@ impl SymbolTableBuilder {
 
     fn scan_lambda(&mut self, name: String, lambda: LambdaDefinition) -> SymbolTableResult {
         self.enter_function(&name, &lambda.params, lambda.loc.1)?;
+        self.in_lambda = true;
         self.scan_statement(&lambda.body)?;
+        self.in_lambda = false;
         self.leave_scope();
         Ok(())
     }
@@ -918,13 +929,14 @@ impl SymbolTableBuilder {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
                         self.enter_function(name, params, loc.1)?;
+                        self.in_lambda = true;
                         self.scan_statement(body.as_ref())?;
 
                         //需要在子域获取到相应变量的类型，才能计算出返回值的，因此需要在pop之前推断返回值类型;
                         //lambda中捕获的环境变量需要在其定义之前确定类型;
 
                         let mut ty = lambda.get_type(&self.tables)?;
-
+                        self.in_lambda = false;
                         self.leave_scope();
                         self.lambda_name = name.clone();
                         self.register_name(name, ty, muttable.clone(), decl.loc)?;
@@ -1025,7 +1037,7 @@ impl SymbolTableBuilder {
             }
             Return(_, expression) => {
                 if let Some(e) = expression {
-                    self.veriry_fun_return(e)?;
+                    self.verify_fun_return(e)?;
                     self.scan_expression(e, &ExpressionContext::Load)?;
                 }
             }
@@ -2004,7 +2016,6 @@ impl SymbolTableBuilder {
                 if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
-                    println!("tmp:{:?}", tmp);
                     if !self.in_struct_scope(attri_name.0.clone()) {
                         self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
                     }
@@ -2024,7 +2035,7 @@ impl SymbolTableBuilder {
                 } else if let CType::Enum(n) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
-                    println!("tmp:{:?}", tmp);
+                    //println!("tmp:{:?}", tmp);
                     if !self.in_struct_scope(attri_name.0.clone()) {
                         self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
                     }
@@ -2054,7 +2065,7 @@ impl SymbolTableBuilder {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     attri_type = tmp.0;
-                    println!("tmp:{:?}", tmp);
+                    //println!("tmp:{:?}", tmp);
                     if attri_type < 1 {
                         return Err(SymbolTableError {
                             error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),
@@ -2070,7 +2081,7 @@ impl SymbolTableBuilder {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     attri_type = tmp.0;
-                    println!("tmp:{:?}", tmp);
+                    //println!("tmp:{:?}", tmp);
                     if attri_type < 1 {
                         return Err(SymbolTableError {
                             error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),

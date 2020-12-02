@@ -995,7 +995,6 @@ impl<'input> Iterator for Lexer<'input> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.found_let {
             if !self.back_sign.is_empty() {
-                println!("2222last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
                 return self.back_sign.pop().unwrap();
             }
         }

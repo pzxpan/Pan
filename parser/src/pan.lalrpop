@@ -151,7 +151,7 @@ EnumDefinition: Box<EnumDefinition> = {
 }
 
 StructVariableDefinition: Box<StructVariableDefinition> = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Type> <e:("=" <Expression>)?> <r:@R> "," => {
         Box::new(StructVariableDefinition {
             doc, loc: Loc(file_no, l, r), ty, is_pub:is_pub.is_some(), name, initializer: e,mut_own
         })
@@ -167,7 +167,7 @@ EnumVariableDefinition: Box<EnumVariableDefinition> = {
 }
 
 DataVariableDefinition: Box<StructVariableDefinition> = {
-    <doc:DocComments> <l:@L>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
+    <doc:DocComments> <l:@L>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Type> <e:("=" <Expression>)?> <r:@R> "," => {
         Box::new(StructVariableDefinition {
             doc, loc: Loc(file_no, l, r), ty, is_pub:true, name, initializer: e,mut_own
         })
@@ -413,7 +413,7 @@ Parameter: Parameter = {
     },
     <l:@L>".." <name:Identifier?> <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty:Type::FunType(None,None), mut_own: None, name,default:None,is_varargs:true}
+        Parameter{loc, ty:Type::Array(Identifier{loc: Loc(file_no, l, r), name: "Any".to_string()},0), mut_own: None, name,default:None,is_varargs:true}
     }
 }
 

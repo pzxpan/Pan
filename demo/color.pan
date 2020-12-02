@@ -9,9 +9,9 @@ pub enum Color {
            match self {
                White(c,bb)-> {print(20);}
                Black -> {print(30);}
-               Red(a) -> { print(a); return true;}
-               Single(a) -> { print(a); return 1;}
-               Three(a,b,c) -> {print(a); print(b);print(c);return 2;}
+               Red(a) -> { print(a); }
+               Single(a) -> { print(a); }
+               Three(a,b,c) -> {print(a); print(b);print(c);}
            }
       }
 }

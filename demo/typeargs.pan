@@ -35,7 +35,7 @@ pub fun type_args(a: Result<i32,string>) : Result<u32,string> {
 }
 
 fun main() {
-    let adddd = Result::Err(400000);
+    let adddd = Result::Ok(400000);
     let b = adddd.unwrap();
 }
 

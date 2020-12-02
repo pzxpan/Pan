@@ -305,7 +305,7 @@ impl Frame {
 
             bytecode::Instruction::LoadReference(idx, name, ref_name) => {
                 let v = vm.load_capture_reference(*idx, name.clone());
-                println!("load_value:{:?}", v);
+               // println!("load_value:{:?}", v);
                 self.push_value(v);
                 None
             }
@@ -314,7 +314,6 @@ impl Frame {
                 let name = self.pop_value();
                 let idx = self.pop_value();
                 let value = self.pop_value();
-                println!("bbbbname:{:?}", name);
                 vm.store_capture_reference(idx.usize(), name.name(), value);
                 None
             }
@@ -492,7 +491,11 @@ impl Frame {
                         //struct
                         hash_map.insert("capture$$idx".to_string(), Value::USize(vm.frame_count - 2));
                         // println!("self.nth_value(1):{:?}", self.nth_value(1));
-                        hash_map.insert("capture$$name".to_string(), self.nth_value(1));
+                        if self.stack.borrow().len() > 1 {
+                            hash_map.insert("capture$$name".to_string(), self.nth_value(1));
+                        } else {
+                            hash_map.insert("capture$$name".to_string(), self.nth_value(0));
+                        }
                     }
                     hash_map.insert("self".to_string(), last_value);
                     self.pop_value();
@@ -710,8 +713,7 @@ impl Frame {
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let mut parent = self.pop_value();
         let value = self.pop_value();
-        let update_value = vm.set_attribute(&mut parent, attr_name.to_owned(), value);
-        println!("update_value:{:?}", update_value);
+         vm.set_attribute(&mut parent, attr_name.to_owned(), value);
         self.push_value(parent);
         None
     }

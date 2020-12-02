@@ -34,6 +34,7 @@ pub enum Type {
     Array(Identifier, usize),
     Tuple(Option<Vec<Type>>),
     FunType(Option<Vec<Type>>, Option<Box<Type>>),
+
 }
 
 impl Type {
@@ -215,7 +216,7 @@ pub struct BoundDefinition {
 pub struct StructVariableDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
-    pub ty: Expression,
+    pub ty: Type,
     pub is_pub: bool,
     pub mut_own: Option<MutOrOwn>,
     pub name: Identifier,

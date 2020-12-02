@@ -1,8 +1,8 @@
 package default;
 pub struct Thread {
-    f: FunType,
+    f: fun()->(),
     state: i32,
-    pub fun ::new(fff: FunType): Thread {
+    pub fun ::new(fff: fun()->()): Thread {
         return Thread! {f:fff,state:0};
     }
     pub fun run() :Any {
