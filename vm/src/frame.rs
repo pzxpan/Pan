@@ -105,6 +105,11 @@ impl Frame {
                 std::thread::sleep(Duration::from_millis(time.u64()));
                 None
             }
+            bytecode::Instruction::Panic => {
+                let v = self.pop_value();
+                panic!(v.to_string());
+                None
+            }
             bytecode::Instruction::LoadConst(ref value) => {
                 let obj = vm.unwrap_constant(value);
                 self.push_value(obj);

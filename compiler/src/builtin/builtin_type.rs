@@ -88,6 +88,20 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
 
     vec.push(("sleep".to_owned(), ty, SymbolUsage::Builtin));
 
+    let ty = CType::Fn(FnType {
+        is_mut: false,
+        name: "panic".to_string(),
+        arg_types: arg_types.clone(),
+        type_args: Vec::new(),
+        ret_type: Box::from(CType::Any),
+        is_pub: true,
+        is_static: false,
+        has_body: true,
+        is_varargs: true,
+    });
+
+    vec.push(("panic".to_owned(), ty, SymbolUsage::Builtin));
+
     for n in &vec {
         insert_builtin_name(n.0.clone());
     }

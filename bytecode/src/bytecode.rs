@@ -129,6 +129,7 @@ pub enum Instruction {
     MapAdd(usize),
     Print,
     TypeOf,
+    Panic,
     //感觉不靠谱，得换这两个指令
     LoadBuildStruct,
     LoadBuildEnum(usize),
@@ -415,6 +416,7 @@ impl Instruction {
             SetupLoop(start, end) => w!(SetupLoop, label_map[start], label_map[end]),
             Sleep => w!(Sleep),
             StartThread => w!(StartThread),
+            Panic => w!(Panic),
 
             BeforeAsyncWith => w!(BeforeAsyncWith),
             SetupAsyncWith(end) => w!(SetupAsyncWith, label_map[end]),

@@ -83,7 +83,7 @@ fn test_one_file(home_path: &Path) {
         let code = code_object.unwrap().1;
         // let mut vm = VirtualMachine::new(v);
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
-        handle.join().unwrap();
+        handle.join();
         // std::thread::sleep(Duration::from_millis(10000));
         // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
         // let mut f = File::create(byte_file).unwrap();

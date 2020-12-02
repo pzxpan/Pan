@@ -755,14 +755,14 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::LoadConst(
                 bytecode::Constant::String("return".to_string())));
             // value:
-          //  self.compile_expression(annotation)?;
+            //  self.compile_expression(annotation)?;
             num_annotations += 1;
         }
 
         for arg in args.iter() {
             self.emit(Instruction::LoadConst(
                 bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
-          //  self.compile_expression(&arg.ty)?;
+            //  self.compile_expression(&arg.ty)?;
             num_annotations += 1;
         }
 
@@ -1635,6 +1635,9 @@ impl<O: OutputStream> Compiler<O> {
             self.gather_elements(args)?;
             self.emit(Instruction::Sleep);
             return Ok(true);
+        } else if function.expr_name().eq("panic") {
+            self.gather_elements(args)?;
+            self.emit(Instruction::Panic);
         }
         return Ok(false);
     }
