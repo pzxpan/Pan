@@ -46,7 +46,7 @@ pub enum CType {
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct FnType {
     pub name: String,
     pub arg_types: Vec<(String, CType, bool, bool, SymbolMutability)>,
@@ -174,15 +174,23 @@ impl EnumType {
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Generic(\"E\", Any)]))],
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Str]))],
 
+impl PartialEq for FnType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name.eq(&other.name) {
+            return true;
+        }
+        let s1 = self.get_fn_args_ret_str();
+        let s2 = other.get_fn_args_ret_str();
+        return s1.eq(&s2);
+    }
+}
+
 impl PartialEq for EnumType {
     fn eq(&self, other: &Self) -> bool {
         if self.name.eq(&other.name) {
-            println!("herereis ");
             let this_item = self.get_concrete_ty();
             let other_item = other.get_concrete_ty();
 
-
-            println!("herereis {:?},equal:{:?}", other_item, this_item);
             for (name, tys) in this_item.iter() {
                 let other_tys = other_item.get(name).unwrap().clone();
                 for i in tys.iter().enumerate() {
@@ -192,7 +200,6 @@ impl PartialEq for EnumType {
                         continue;
                     } else {
                         if i.1.clone() != other_tys.get(i.0).unwrap().clone() {
-                            println!("aaa:{:?},", other_tys.get(i.0).unwrap().clone());
                             return false;
                         }
                     }
@@ -381,6 +388,23 @@ impl CType {
     //         false
     //     };
     // }
+}
+
+impl FnType {
+    pub fn get_fn_args_ret_str(&self) -> String {
+        let mut s = String::new();
+        for i in &self.arg_types {
+            s.push_str(i.1.name().as_str());
+            s.push_str("$");
+        }
+        for i in &self.type_args {
+            s.push_str(i.as_str());
+            s.push_str("$");
+        }
+        s.push_str(self.ret_type.name().as_str());
+
+        return s;
+    }
 }
 
 impl PartialOrd for FnType {

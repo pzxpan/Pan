@@ -98,7 +98,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
         let instruction = self.fetch_instruction();
-        println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
+        //println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -480,7 +480,6 @@ impl Frame {
 
         // self.scope.new_child_scope_with_locals();
         let mut hash_map = HashMap::new();
-        println!("len:{:?},stack is :{:?}", self.stack.borrow().len(), self.stack.borrow());
         if self.stack.borrow_mut().len() > 0 {
             let last_value = self.last_value();
             match last_value.is_obj_instant() {
@@ -492,7 +491,7 @@ impl Frame {
                     if code.is_mut {
                         //struct
                         hash_map.insert("capture$$idx".to_string(), Value::USize(vm.frame_count - 2));
-                        println!("self.nth_value(1):{:?}", self.nth_value(1));
+                        // println!("self.nth_value(1):{:?}", self.nth_value(1));
                         hash_map.insert("capture$$name".to_string(), self.nth_value(1));
                     }
                     hash_map.insert("self".to_string(), last_value);
@@ -748,7 +747,6 @@ impl Frame {
     }
 
     pub fn push_value(&self, obj: Value) {
-        println!("push_value:{:?}", obj);
         self.stack.borrow_mut().push(obj);
     }
 

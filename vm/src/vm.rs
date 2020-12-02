@@ -69,7 +69,7 @@ fn store_global(name: String, value: Value) {
 fn load_name(name: String, idx: usize) -> Option<Value> {
     let ref mut scope = SCOPE.lock().unwrap();
     let skip = scope.locals.len() - idx;
-    println!("skip:{:?},idx:{:?}", scope.locals.len(), idx);
+    // println!("skip:{:?},idx:{:?}", scope.locals.len(), idx);
     for dict in scope.locals.iter() {
         // println!("index:{:?}", index);
         // if index > idx {
@@ -272,7 +272,6 @@ impl VirtualMachine {
 
     pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
         let mut update_value = Value::Nil;
-        println!("attr:{:?},value:{:?}", attr, value);
         match obj {
             Value::Obj(ref mut e) => {
                 match e.as_mut() {
@@ -569,7 +568,6 @@ impl VirtualMachine {
         }
     }
     pub fn add(&self, a: Value, b: Value) -> Value {
-        println!("add:{:?},b:{:?},", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)
@@ -973,7 +971,6 @@ impl VirtualMachine {
 pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) -> JoinHandle<()> {
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
-        println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new();
         let frame = Frame::new(code);
         vm.frame_count += 1;
@@ -988,7 +985,6 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, 
         // println!("local_hash_map:{:?},", locals);
         // println!("global_:{:?},", global);
         //  let scope = Scope::new(vec![locals], global);
-        println!("handler:{:?}", thread::current().id());
         let mut vm = VirtualMachine::new();
         let frame = Frame::new(code);
         add_local_value(locals);

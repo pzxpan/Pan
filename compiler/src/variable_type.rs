@@ -28,7 +28,6 @@ impl HasType for Type {
                 if let CType::Enum(ety) = ty {
                     ty = CType::Enum(resolve_enum_generic(ety, v));
                 }
-                println!("tyddd:{:?}", ty);
                 return Ok(ty);
             }
             Type::Array(name, _) => { return Ok(CType::Array(Box::new(get_register_type(tables, name.name.clone())))); }
@@ -42,22 +41,20 @@ impl HasType for Type {
                 return Ok(CType::Tuple(Box::new(v)));
             }
             Type::FunType(args, ret) => {
-                let mut v = Vec::new();
                 let mut type_args = Vec::new();
+                let mut ret_ty = CType::Any;
                 if args.is_some() {
                     for arg in args.as_ref().unwrap() {
-                        v.push((arg.name, arg.get_type(&tables)?, false, false, SymbolMutability::ImmRef));
-                        type_args.push(arg.name);
+                        type_args.push(arg.name());
                     }
                 }
-                let mut ret_ty = CType::Any;
                 if ret.is_some() {
                     ret_ty = ret.as_ref().unwrap().get_type(tables)?;
                 }
                 return Ok(CType::Fn(FnType {
                     name: "pan".to_string(),
                     is_mut: false,
-                    arg_types: v,
+                    arg_types: vec![],
                     type_args,
                     ret_type: Box::new(ret_ty),
                     is_pub: true,
@@ -78,15 +75,12 @@ impl HasType for Parameter {
 
 pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* arg_name: */ String, /* arg_type: */ CType, /* is_optional: */  bool, /*is_varargs*/bool, SymbolMutability) {
     let ty_res = s.1.as_ref().unwrap().get_type(tables);
-    println!("ty_res:{:?}", ty_res);
     let mut ty = CType::Unknown;
     if ty_res.is_ok() {
         ty = ty_res.unwrap();
         if ty == CType::Unknown {
-            println!("1111tyyy:{:?}", ty);
             ty = CType::Args(s.1.as_ref().unwrap().ty.name());
         }
-        println!("222tyyy:{:?}", ty);
     }
 
     let arg_name = s.1.as_ref().unwrap().name.as_ref().unwrap().name.to_owned();
@@ -249,7 +243,6 @@ impl HasType for EnumDefinition {
                     if let Some(tys) = &v.tys {
                         for t in tys.iter() {
                             let tt = t.get_type(&local_tables)?;
-                            println!("enum_value_ty:{:?}", tt);
                             ref_type.push(tt);
                         }
                     }

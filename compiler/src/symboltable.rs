@@ -289,7 +289,6 @@ impl SymbolTableBuilder {
         self.tables.last_mut().unwrap().sub_tables.push(table);
     }
     fn veriry_fun_return(&mut self, expression: &Expression) -> SymbolTableResult {
-        println!("return_expression:{:?},", expression);
         let mut r_ty = CType::Any;
         let loc = expression.loc();
         if expression.expr_name().eq("self") {
@@ -416,7 +415,6 @@ impl SymbolTableBuilder {
                         }
                         if e.generics.is_some() {
                             for generic in e.generics.unwrap().iter() {
-                                println!("&generic.name():{:?}, ggg:{:?}", &generic.name(), generic.clone());
                                 self.register_name(&generic.name(), generic.clone(), SymbolUsage::Attribute, Loc::default());
                             }
                         }
@@ -540,7 +538,6 @@ impl SymbolTableBuilder {
 
                 ModulePart::FunctionDefinition(def) => {
                     let tt = def.get_type(&self.tables)?;
-                    println!("function_ty:{:?}", tt);
                     if let Some(name) = &def.name {
                         if let Some(expression) = &def.as_ref().returns {
                             let ty = expression.get_type(&self.tables)?;
@@ -917,7 +914,6 @@ impl SymbolTableBuilder {
             Args(_, _) => {}
             VariableDefinition(location, decl, expression) => {
                 let muttable = if decl.is_mut { SymbolUsage::Mut } else { SymbolUsage::Immutable };
-                println!("ssssexpression:{:?},mutt:{:?},lambda:{:?}", decl, muttable, expression.as_ref().unwrap());
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
@@ -960,9 +956,7 @@ impl SymbolTableBuilder {
                                 self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                             }
                         } else {
-                            println!("eddd:{:?},", e);
                             if let ast::Expression::FunctionCall(_, name, args) = e {
-                                println!("222eddd:{:?},ty:{:?}", e, ty);
                                 if let ast::Expression::Variable(_) = name.as_ref() {
                                     if let CType::Enum(ety) = ty.clone() {
                                         if ty.is_generic() {
@@ -978,10 +972,8 @@ impl SymbolTableBuilder {
                                     ty = self.get_register_type(n.expr_name())?;
                                     ty = self.resovle_method(name, &ty)?;
                                     if ty.is_generic() {
-                                        println!("ident.name:{:?},", ident.name.clone());
                                         let a = ty.attri_name_type(ident.name.clone());
                                         let mut attri_type_name: Vec<String> = Vec::new();
-                                        println!("ident.name:{:?},", a.1.clone());
                                         if let CType::Reference(_, nty) = a.1 {
                                             for ty in nty.iter() {
                                                 if let Generic(n, _) = ty {
@@ -994,14 +986,12 @@ impl SymbolTableBuilder {
                                             for arg in args.iter().enumerate() {
                                                 v.insert(attri_type_name.get(arg.0).unwrap().clone(), arg.1.get_type(&self.tables)?);
                                             }
-                                            println!("vvvv:{:?}", v);
                                             ty = CType::Enum(resolve_enum_generic_fn(ety, v));
                                         }
                                     }
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                                 }
                             } else {
-                                println!("eeee:{:?},", e);
                                 self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
                             }
                         }
@@ -1010,8 +1000,15 @@ impl SymbolTableBuilder {
                         if let ast::Expression::Variable(Identifier { .. }) = e {
                             //函数和lambda特殊，直接删除原有定义，用右侧的覆盖;
                             if let Fn(_) = left_ty {
-                                self.delete_name(decl.name.borrow().name.borrow());
-                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
+                                if left_ty == ty.clone() {
+                                    self.delete_name(decl.name.borrow().name.borrow());
+                                    self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
+                                } else {
+                                    return Err(SymbolTableError {
+                                        error: format!("类型不匹配,右侧类型 {:?}\n, 左侧类型 {:?}", ty.clone(), left_ty),
+                                        location: location.clone(),
+                                    });
+                                }
                             }
                             return Ok(());
                         }
@@ -1047,16 +1044,13 @@ impl SymbolTableBuilder {
                 self.scan_multi_value_def(decls, &ty);
             }
             Match(loc, test, items) => {
-                println!("match statement:{:?},{:?}", test, items);
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 let mut ty = self.get_register_type(test.expr_name())?;
-                println!("a_ty:{:?}", ty);
                 if let CType::Enum(enum_type) = ty {
                     let mut hash_set = self.get_test_item(&enum_type);
                     for (expr, item) in items.iter() {
                         self.enter_scope(&expr.expr_name(), SymbolTableType::MatchItem, expr.loc().1);
                         self.scan_match_item(expr, &ExpressionContext::Load, &mut hash_set)?;
-                        println!("item is :{:?}", item);
                         self.scan_statement(item)?;
                         self.leave_scope();
                     }
@@ -1075,7 +1069,6 @@ impl SymbolTableBuilder {
                         }
                         self.enter_scope(&name, SymbolTableType::MatchItem, expr.loc().1);
                         self.scan_match_item(expr, &ExpressionContext::Load, &mut HashSet::new())?;
-                        println!("item:{:?}", item);
                         self.scan_statement(item)?;
                         self.leave_scope();
                     }
@@ -1106,11 +1099,9 @@ impl SymbolTableBuilder {
 
     //剩下问题，tuple匹配，Variable匹配查找问题
     fn scan_match_item(&mut self, expression: &Expression, context: &ExpressionContext, items: &mut HashSet<String>) -> SymbolTableResult {
-        println!("item_expression:{:?}", expression);
         if let Expression::FunctionCall(_, name, args) = expression {
             let item_ty = self.get_register_type(name.expr_name())?;
             if let Expression::Attribute(_, name, Some(ident), _) = name.as_ref() {
-                println!("enumty::{:?}", item_ty);
                 if let Enum(enum_type) = item_ty {
                     let mut found = false;
                     for (c, item_ty) in enum_type.items.iter() {
@@ -1118,7 +1109,6 @@ impl SymbolTableBuilder {
                             found = true;
                             items.remove(c);
                             if let CType::Reference(_, tys) = item_ty {
-                                println!("item_ty:{:?},", tys);
                                 if args.len() == tys.len() {
                                     for i in 0..args.len() {
                                         self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Mut, name.loc())?;
@@ -1136,13 +1126,11 @@ impl SymbolTableBuilder {
                 }
             } else if let Expression::Variable(v) = name.as_ref() {
                 //TODO
-                println!("ttt_ddd{:?}", item_ty);
                 if let CType::Reference(_, tys) = item_ty {
                     items.remove(&*v.name);
 
                     if args.len() == tys.len() {
                         for i in 0..args.len() {
-                            println!("ttt_{:?}", tys);
                             self.register_name(args.get(i).unwrap().expr_name().borrow(), tys.get(i).unwrap().clone(), SymbolUsage::Mut, name.loc())?;
                         }
                     }
@@ -1249,7 +1237,6 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
-        println!("expression:{:?}", expression);
         match &expression {
             Unit(loc, name, exprs) => {
                 for expr in exprs {
@@ -1405,7 +1392,6 @@ impl SymbolTableBuilder {
             Assign(loc, a, b) => {
                 //有重复
                 let ty = expression.get_type(&self.tables)?;
-                println!("ty:{:?}", ty);
                 if ty == CType::Unknown {
                     return Err(SymbolTableError {
                         error: format!("未定义变量{:?}", a.expr_name()),
@@ -1531,11 +1517,9 @@ impl SymbolTableBuilder {
             NamedFunctionCall(_, exp, args) => {
                 //  println!("named_call:{:?},", expression);
                 let mut ty = self.get_register_type(exp.as_ref().expr_name())?;
-                println!("named_call:{:?},ty:{:?}", expression, ty);
                 if let CType::Struct(sty) = ty.clone() {
                     let struct_ty = resolve_generic(sty, args.clone(), &self.tables);
                     ty = CType::Struct(struct_ty);
-                    println!("11111named_call:{:?},ty:{:?}", expression, ty);
                     for arg in args {
 
 
@@ -1600,7 +1584,6 @@ impl SymbolTableBuilder {
         if name.is_empty() || name.eq("Thread") {
             return Ok(());
         }
-        println!("namessss {:?} change to {:?}", name, mutability);
         let table = self.tables.last_mut().unwrap();
         let mut symbol = table.symbols.get(&name).unwrap().clone();
         symbol.mutability = mutability;
@@ -1626,7 +1609,6 @@ impl SymbolTableBuilder {
     }
 
     pub fn verify_mutability(&mut self, name: String, mutability: SymbolMutability, loc: Loc) -> SymbolTableResult {
-        println!("ssssname:{:?},loc:{:?},mut::{:?}", name, loc, mutability);
         let t = self.get_variable_mutbility(name.clone());
         match t {
             SymbolMutability::ImmRef => {
@@ -1918,7 +1900,6 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        println!("register name={:?}, ty: {:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());
@@ -2127,7 +2108,6 @@ impl SymbolTableBuilder {
             for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
                 if let Some(e) = args.get(i) {
                     let cty = e.get_type(&self.tables)?;
-                    println!("cty::{:?},", cty);
                     if let CType::Fn(fnty) = ety {
                         if let Lambda(n) = cty {
                             continue;

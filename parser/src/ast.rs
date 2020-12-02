@@ -61,7 +61,7 @@ impl Type {
                 if ret.is_some() {
                     ret_name = ret.as_ref().unwrap().name();
                 }
-                return format!("FunType:{:?}{:?}", args, ret_name);
+                return format!("fun:{:?}{:?}", args, ret_name);
             }
         }
     }

@@ -111,7 +111,6 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
         let mut items: Vec<(String, CType)> = Vec::new();
         let mut methods: Vec<(String, CType)> = Vec::new();
         let mut static_fields: Vec<(String, CType)> = Vec::new();
-        println!("generics:{:?},args:{:?}", generics, args);
         for ge in generics.iter() {
             if let CType::Generic(name, _) = ge {
                 if args.contains_key(name) {
@@ -134,7 +133,6 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
         }
 
         for (name, ty) in st.items.iter() {
-            println!("tttty:{:?}", ty);
             if let CType::Reference(ref_name, tys) = ty.clone() {
                 let mut tys_copy = Vec::new();
                 for tty in tys {
@@ -147,10 +145,8 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
                     }
                     tys_copy.push(tty.clone());
                 }
-                println!("222tttty:{:?}", tys_copy);
                 items.push((name.clone(), CType::Reference(ref_name, tys_copy.clone())));
             } else {
-                println!("3333tttty:{:?}", ty.clone());
                 items.push((name.clone(), ty.clone()));
             }
         }
@@ -250,9 +246,7 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
         let mut items: Vec<(String, CType)> = Vec::new();
         let mut methods: Vec<(String, CType)> = Vec::new();
         let mut static_fields: Vec<(String, CType)> = Vec::new();
-        println!("generics:{:?},args:{:?}", generics, args);
         for arg in args.iter().enumerate() {
-            println!("index:{:?},", arg.0);
             let a = generics.get(arg.0).unwrap();
             if let CType::Generic(name, _) = a {
                 hash_map.insert(name.clone(), arg.1.clone());
@@ -273,7 +267,6 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
         }
 
         for (name, ty) in st.items.iter() {
-            println!("tttty:{:?}", ty);
             if let CType::Reference(ref_name, tys) = ty.clone() {
                 let mut tys_copy = Vec::new();
                 for tty in tys {
@@ -506,7 +499,7 @@ pub fn resolve_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<Sy
         }
     }
 
-    println!("result_ty:{:?}", result_ty);
+    //println!("result_ty:{:?}", result_ty);
     return result_ty;
 }
 
