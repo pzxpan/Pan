@@ -20,6 +20,7 @@ use dynformat::check;
 use std::borrow::Borrow;
 use crate::util;
 use std::collections::HashMap;
+use std::future::get_context;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
@@ -101,6 +102,17 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     let md = ModuleDefinition { module_parts: module.content, name: Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: util::get_package_name(module.package) };
     build.scan_top_symbol_types(&md, true, *is_all, item_name, as_name)?;
     Ok(())
+}
+
+pub fn resolve_function_call_generic(obj_ty: &CType, fn_ty: &CType, args_ty: &Vec<CType>, tables: &Vec<SymbolTableType>) -> Result<CType, SymbolTableError> {
+    let mut obj_generics: HashMap<String, CType> = HashMap::new();
+
+    if let CType::Enum(ety) = obj_ty {
+        for i in &ety.items {
+            obj_generics.insert(i.0.clone(), i.1.clone());
+        }
+    }
+    return Ok(CType::Unknown);
 }
 
 pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> EnumType {
@@ -374,9 +386,7 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
 
 pub fn resolve_fn_generic(st: FnType, args: Vec<Parameter>, tables: &Vec<SymbolTable>) -> FnType {
     let mut result_ty = st.clone();
-    if !st.type_args.is_empty() {
-
-    }
+    if !st.type_args.is_empty() {}
     //println!("result_ty:{:?}", result_ty);
     return result_ty;
 }
