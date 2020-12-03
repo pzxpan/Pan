@@ -345,7 +345,7 @@ impl SymbolTableBuilder {
         if r_ty != self.ret_ty {
             if self.in_lambda {
                 let ty = self.get_register_type(self.lambda_name.clone())?;
-                println!("lambda_ty:{:?}", ty);
+                //  println!("lambda_ty:{:?}", ty);
                 return Ok(());
             }
             return Err(SymbolTableError {
@@ -659,6 +659,7 @@ impl SymbolTableBuilder {
                     //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
                 }
                 ModulePart::EnumDefinition(def) => {
+                    resovle_def_generics(&def.generics, &mut self.tables)?;
                     let ty = def.get_type(&self.tables)?;
                     //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     if !in_import {
@@ -685,6 +686,7 @@ impl SymbolTableBuilder {
                 }
 
                 ModulePart::StructDefinition(def) => {
+                    resovle_def_generics(&def.generics, &mut self.tables)?;
                     let ty = def.get_type(&self.tables)?;
                     //   self.register_name(&def.name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
                     for part in &def.parts {
@@ -768,6 +770,7 @@ impl SymbolTableBuilder {
                     }
                 }
                 ModulePart::FunctionDefinition(def) => {
+                    resovle_def_generics(&def.generics, &mut self.tables)?;
                     let ty = def.get_type(&self.tables)?;
                     let name = &def.as_ref().name.as_ref().unwrap().name;
                     // self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
@@ -793,6 +796,7 @@ impl SymbolTableBuilder {
                     }
                 }
                 ModulePart::BoundDefinition(def) => {
+                    resovle_def_generics(&def.generics, &mut self.tables)?;
                     let ty = def.get_type(&self.tables)?;
                     //self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
                     if !in_import {
@@ -864,7 +868,7 @@ impl SymbolTableBuilder {
     }
 
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
-        println!("statement is {:?}", statement);
+        // println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(loc, stmts) => {
@@ -971,15 +975,20 @@ impl SymbolTableBuilder {
                         //如果是函数或获取属性，就获取注册了的函数和返回类型，
                         ty = self.get_register_type(e.expr_name())?;
                     }
-
                     if decl.ty.is_none() {
                         if lookup_symbol {
                             //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
                             // 那右侧表示符应该是变量，需要从表中查找到的类型进行推断
                             if let Some(ast::Expression::Attribute(_, _, name, idx)) = expression {
-                                let tmp = self.resolve_attribute(expression.as_ref().unwrap(), &ty)?;
+                                let mut tmp = self.resolve_attribute(expression.as_ref().unwrap(), &ty)?;
+                                if let CType::Generic(_, cty) = tmp.clone() {
+                                    tmp = cty.as_ref().clone();
+                                }
                                 self.register_name(decl.name.borrow().name.borrow(), tmp, muttable.clone(), decl.loc)?;
                             } else {
+                                if let CType::Generic(_, cty) = ty.clone() {
+                                    ty = cty.as_ref().clone();
+                                }
                                 self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                             }
                         } else {
@@ -993,6 +1002,8 @@ impl SymbolTableBuilder {
                                             }
                                             ty = CType::Enum(resolve_enum_generic_fn(ety, v));
                                         }
+                                    } else if let CType::Generic(_, cty) = ty.clone() {
+                                        ty = cty.as_ref().clone();
                                     }
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                                 } else if let ast::Expression::Attribute(_, n, Some(ident), _) = name.as_ref() {
@@ -1016,9 +1027,15 @@ impl SymbolTableBuilder {
                                             ty = CType::Enum(resolve_enum_generic_fn(ety, v));
                                         }
                                     }
+                                    if let CType::Generic(_, cty) = ty.clone() {
+                                        ty = cty.as_ref().clone();
+                                    }
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                                 }
                             } else {
+                                if let CType::Generic(_, cty) = ty.clone() {
+                                    ty = cty.as_ref().clone();
+                                }
                                 self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
                             }
                         }
@@ -1039,7 +1056,9 @@ impl SymbolTableBuilder {
                             }
                             return Ok(());
                         }
-
+                        if let CType::Generic(_, cty) = ty.clone() {
+                            ty = cty.as_ref().clone();
+                        }
                         let mut right_ty = ty.ret_type().clone();
                         if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
                             return Err(SymbolTableError {
@@ -1281,7 +1300,18 @@ impl SymbolTableBuilder {
                 let ty = self.get_register_type(obj.expr_name())?;
                 self.resolve_attribute(&expression.clone(), &ty)?;
             }
+            // Enum(EnumType { name: "Result", generics: Some([Generic("E", Any)]), items:
+            // [("Ok", Reference("Ok", [I32])), ("Err", Reference("Err", [Generic("E", Any)]))], static_methods: [],
+            //          methods:
+            //          [("is_ok", Fn(FnType { name: "is_ok", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false,
+            //                            is_pub: true, is_mut: false, is_static: false, has_body: true })),
+            //          ("map", Fn(FnType { name: "map", arg_types: [("op", Generic("F", Fn(FnType { name: "pan", arg_types: [],
+            //                                                                                  type_args: [("T", Generic("T", Any))],
+            //                                                                                  ret_type: Generic("U", Any),
+            //                                                                                  is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: false })), false, false, ImmRef)], type_args: [("U", Any), ("F", Fn(FnType { name: "pan", arg_types: [], type_args: [("T", Generic("T", Any))], ret_type: Generic("U", Any), is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: false }))], ret_type: Args("Result"), is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), ("is_err", Fn(FnType { name: "is_err", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true }))], bases: [], is_pub: true })
+
             FunctionCall(loc, name, args) => {
+                println!("FunctionCall:{:?}", expression);
                 if is_builtin_name(&name.expr_name()) && name.is_a_variable() {
                     if name.expr_name().eq("print") || name.expr_name().eq("format") {
                         resovle_build_funs(self, &name.loc(), &args)?;
@@ -1307,6 +1337,8 @@ impl SymbolTableBuilder {
                             //     ty = self.get_register_type(get_full_name(&self.package, &n.expr_name()));
                             // }
                         }
+
+                        println!("ttty:{:?}", ty);
                         if let CType::Fn(fnty) = ty.clone() {
                             if self.is_const_fun {
                                 if fnty.is_mut {
@@ -1346,7 +1378,7 @@ impl SymbolTableBuilder {
                             }
                         }
                     }
-
+                    println!("ttty2222:{:?}", ty);
                     if ty == CType::Unknown {
                         return Err(SymbolTableError {
                             error: format!("未定义{:?}的类型，", name.expr_name()),
@@ -2135,11 +2167,9 @@ impl SymbolTableBuilder {
             for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
                 if let Some(e) = args.get(i) {
                     let mut cty = e.get_type(&self.tables)?;
-
                     if let Expression::FunctionCall(..) = e {
                         cty = cty.ret_type().clone();
                     }
-
                     if ety != &cty {
                         if ety != &CType::Any {
                             if *is_varargs {
@@ -2148,7 +2178,8 @@ impl SymbolTableBuilder {
                                 }
                             }
                             //TODO 引用自身的类型，还不能处理package.Point这样的Expression;
-                            if let CType::Args(s) = ety {
+                            if let CType::Args(s, _) = ety {
+                                println!("sssss:{:?},cty:{:?}", s, ety);
                                 if cty == self.get_register_type(s.clone())? {
                                     continue;
                                 }
@@ -2156,7 +2187,7 @@ impl SymbolTableBuilder {
                             //Todo ety如果是无参函数类型，让其过，没搞明白，这里要咋样处理,是否允许定义函数类型时带参数呢，还是只能推导;以函数为参数的函数，其函数参数如何确定，需要处理;
 
                             if let CType::Generic(_, fnty) = ety {
-                                println!("fnty:{:?},cty:{:?}", fnty, cty);
+                                // println!("fnty:{:?},cty:{:?}", fnty, cty);
                                 if fnty.as_ref() == &cty {
                                     continue;
                                 }

@@ -27,9 +27,29 @@ impl HasType for Type {
                     }
                 }
                 if let CType::Enum(ety) = ty {
-                    ty = CType::Enum(resolve_enum_generic(ety, v));
+                    ty = CType::Enum(resolve_enum_generic(ety, v.clone()));
+                } else if let CType::Struct(sty) = ty {
+                    let named_argument = Vec::new();
+                    if ids.is_some() {
+                        // for (name,sty) in ids.unwrap().iter().zip(v.iter()) {
+                            //TODO 需要验证struct的范型参数
+                            // named_argument.push(NamedArgument{loc:Loc::default(),name: Identifier {
+                            // loc: Loc::default(),
+                            // name: name,
+                            // },sty})
+                        // }
+                    }
+                    ty = CType::Struct(resolve_generic(sty,named_argument,&tables));
                 }
-                return Ok(ty);
+                if ty == CType::Unknown {
+                    let table_name = &tables.last().unwrap().name.clone();
+                    println!("Fuck_name:{:?}",table_name);
+                    return Ok(CType::Args(name.name.clone(),v.clone()));
+                    // if ty.name().eq(&get_register_type(tables,"Self".to_string()).name()) {
+                    //     return Ok(CType::Reference(ty.name(),v.clone()));
+                    // }
+                }
+                return  Ok(ty);
             }
             Type::Array(name, _) => { return Ok(CType::Array(Box::new(get_register_type(tables, name.name.clone())))); }
             Type::Tuple(ids) => {
@@ -80,7 +100,10 @@ pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* 
     if ty_res.is_ok() {
         ty = ty_res.unwrap();
         if ty == CType::Unknown {
-            ty = CType::Args(s.1.as_ref().unwrap().ty.name());
+            let a = s.1.as_ref().unwrap().ty.get_type(tables);
+            if a.is_ok() {
+                ty  = a.unwrap();
+            }
         }
     }
 
@@ -103,7 +126,6 @@ pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* 
 // ("map", Fn(FnType { name: "map", arg_types: [("op", Args("F"), false, false, ImmRef)], : [("U", Any), ("F", Fn(FnType { name: "pan", arg_types: [], type_args: [("T", Generic("T", Any))], ret_type: Generic("U", Any), is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: false }))], ret_type: Unknown, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), self:FunctionDefinition { doc: [], loc: Loc(1, 27, 1), name: Some(Identifier { loc: Loc(1, 27, 14), name: "to_str" }), name_loc: Loc(1, 27, 14), params: [(Loc(1, 27, 20), Some(Parameter { loc: Loc(1, 27, 20), ty: Type(Identifier { loc: Loc(1, 27, 20), name: "i32" }, None), mut_own: None, is_varargs: false, name: Some(Identifier { loc: Loc(1, 27, 16), name: "a" }), default: None }))], generics: [], is_pub: true, is_static:
 impl HasType for FunctionDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
-        println!("self:{:?}", self);
         let mut type_args: Vec<(String, CType)> = Vec::new();
         let mut local_tables = tables.clone();
         let table = local_tables.last_mut().unwrap();
@@ -127,9 +149,6 @@ impl HasType for FunctionDefinition {
 
         if let Some(ty) = self.returns.as_ref() {
             ret_type = Box::new(ty.get_type(&local_tables)?);
-            if ret_type.as_ref() == &Unknown {
-                ret_type = Box::new(CType::Args(self.returns.as_ref().unwrap().name()));
-            }
         }
         let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = self.params.iter().map(|s| transfer(s, &local_tables)).collect();
 
@@ -246,20 +265,28 @@ fn get_register_type(tables: &Vec<SymbolTable>, name: String) -> CType {
     CType::Unknown
 }
 
+
+pub fn resovle_def_generics(generics: &Vec<Generic>, tables: &mut Vec<SymbolTable>) -> Result<(), SymbolTableError> {
+    for ty in generics {
+        let mut cty = get_register_type(&tables, ty.name.name.clone());
+        let mut g_ty = CType::Generic(ty.name.name.clone(), Box::new(cty.clone()));
+        if cty == CType::Unknown {
+            g_ty = CType::Generic(ty.name.name.clone(), Box::new(CType::Any));
+        }
+        let table = tables.last_mut().unwrap();
+        let symbol = Symbol::new(&ty.name.name.clone(), g_ty.clone());
+        table.symbols.insert(ty.name.name.clone(), symbol);
+    }
+    Ok(())
+}
+
 impl HasType for EnumDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
         let mut type_args = Vec::new();
         let mut local_tables = tables.clone();
-        let table = local_tables.last_mut().unwrap();
         for ty in &self.generics {
-            let mut cty = get_register_type(&tables, ty.name.name.clone());
-            let mut g_ty = CType::Generic(ty.name.name.clone(), Box::new(cty.clone()));
-            if cty == CType::Unknown {
-                g_ty = CType::Generic(ty.name.name.clone(), Box::new(CType::Any));
-            }
-            type_args.push(g_ty.clone());
-            let symbol = Symbol::new(&ty.name.name.clone(), g_ty.clone());
-            table.symbols.insert(ty.name.name.clone(), symbol);
+            let cty = get_register_type(&tables, ty.name.name.clone());
+            type_args.push(cty.clone());
         }
 
         let mut methods: Vec<(String, CType)> = Vec::new();

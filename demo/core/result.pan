@@ -14,7 +14,9 @@ pub enum Result<T, E> {
     pub const fun map<U, F: fun(T)->U>(op: F) : Result<U, E> {
        match self {
              Ok(t) -> {
-                return Result::Ok(op(t));
+                let addaaa = op(t);
+                let fffff = Result::Ok(addaaa);
+                return fffff;
              }
              Err(e) -> return Result::Err(e);
         }
@@ -32,7 +34,9 @@ fun main() {
    let xxx: (i32,string) = (12,"ddd");
    let a_str:fun(i32) -> string = to_str;
    let aaa = Result::Ok(40);
+   print(aaa.is_ok());
    let cc = aaa.map(a_str);
+   let ccc = cc.is_ok();
 
 }
 

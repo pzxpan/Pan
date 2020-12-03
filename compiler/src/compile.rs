@@ -1660,7 +1660,7 @@ impl<O: OutputStream> Compiler<O> {
 
         if let FunctionContext::StructFunction(_) = self.ctx.func {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                if self.is_current_scope(name.as_str()) {
+                if self.variable_local_scope(name.as_str()) {
                     self.emit(LoadName(name.clone(), NameScope::Local));
                 } else if self.is_struct_item_def("self".to_string(), name.clone()) {
                     self.emit(Instruction::LoadName(
@@ -1669,7 +1669,8 @@ impl<O: OutputStream> Compiler<O> {
                     ));
                     self.emit(Instruction::LoadAttr(name.clone()));
                 } else {
-                    self.emit(LoadName(name.clone(), NameScope::Local));
+                    self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+                    // self.emit(LoadName(name.clone(), NameScope::Local));
                 }
             } else if let ast::Expression::Attribute(_, expr, name, _) = function {
                 self.resolve_compile_attribute(function)?;
@@ -1730,7 +1731,8 @@ impl<O: OutputStream> Compiler<O> {
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
             is_constructor = self.is_constructor(name);
             if self.variable_local_scope(name.as_str()) {
-                self.emit(LoadName(name.clone(), NameScope::Local));
+                self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+               // self.emit(LoadName(name.clone(), NameScope::Local));
             } else {
                 self.emit(LoadName(name.clone(), NameScope::Global));
             }
@@ -2053,6 +2055,9 @@ impl<O: OutputStream> Compiler<O> {
 
     fn is_current_scope(&mut self, name: &str) -> bool {
         let table = self.symbol_table_stack.last_mut().unwrap();
+        // for symobl in table.symbols.iter() {
+        //     println!("current_scope:{:?}", symobl);
+        // }
         let symbol = table.lookup(name);
         if symbol.is_some() {
             return true;

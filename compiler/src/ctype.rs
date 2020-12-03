@@ -37,7 +37,7 @@ pub enum CType {
     Bound(BoundType),
     Generic(String, Box<CType>),
     Reference(String, Vec<CType>),
-    Args(String),
+    Args(String, Vec<CType>),
     Any,
     TSelf,
     //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;
@@ -187,7 +187,6 @@ impl PartialEq for FnType {
             return false;
         }
         for (i1, i2) in s1.iter().zip(s2.iter()) {
-            println!("i1:{:?},i2:{:?}", i1, i2);
             if i1.eq(&"Any") || i2.eq(&"Any") {
                 continue;
             } else if i1.eq(i2) {

@@ -372,6 +372,14 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
     return result_ty;
 }
 
+pub fn resolve_fn_generic(st: FnType, args: Vec<Parameter>, tables: &Vec<SymbolTable>) -> FnType {
+    let mut result_ty = st.clone();
+    if !st.type_args.is_empty() {
+
+    }
+    //println!("result_ty:{:?}", result_ty);
+    return result_ty;
+}
 
 pub fn resolve_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
     let mut result_ty = st.clone();
