@@ -2,13 +2,14 @@ use pan_parser::ast::*;
 
 use crate::symboltable::*;
 use crate::ctype::*;
-use crate::ctype::CType::Bool;
+use crate::ctype::CType::{Bool, Unknown};
 use std::ops::Deref;
 use crate::util::get_attribute_vec;
 use crate::util::get_full_name;
 use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
 use crate::resolve_symbol::{resolve_enum_generic, resolve_generic};
+use std::borrow::Borrow;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError>;
@@ -45,7 +46,7 @@ impl HasType for Type {
                 let mut ret_ty = CType::Any;
                 if args.is_some() {
                     for arg in args.as_ref().unwrap() {
-                        type_args.push(arg.name());
+                        type_args.push((arg.name(), arg.get_type(tables)?));
                     }
                 }
                 if ret.is_some() {
@@ -89,14 +90,49 @@ pub fn transfer(s: &(Loc, Option<Parameter>), tables: &Vec<SymbolTable>) -> (/* 
     (arg_name, ty, is_optional, s.1.as_ref().unwrap().is_varargs, mutability)
 }
 
+// FunctionDefinition { doc: [], loc: Loc(1, 14, 4), name:
+// Some(Identifier { loc: Loc(1, 14, 21), name: "map" }),
+// name_loc: Loc(1, 14, 21), params: [(Loc(1, 14, 43),
+// Some(Parameter { loc: Loc(1, 14, 43), ty: Type(Identifier { loc: Loc(1, 14, 43), name: "F" }, None),
+// mut_own: None, is_varargs: false, name: Some(Identifier { loc: Loc(1, 14, 40), name: "op" }), default: None }))],
+// generics: [Generic { loc: Loc(1, 14, 23), name: Identifier { loc: Loc(1, 14, 23), name: "U" }, bounds: None },
+// Generic { loc: Loc(1, 14, 36), name: Identifier { loc: Loc(1, 14, 26), name: "F" },
+// bounds: Some(FunType(Some([Type(Identifier { loc: Loc(1, 14, 33), name: "T" }, None)]),
+// Some(Type(Identifier { loc: Loc(1, 14, 36), name: "U" }, None)))) }],
+// is_pub: true, is_static: false, is_mut: false, returns: Some(Type(Identifier { loc: Loc(1, 14, 53), name: "Result" }, Some([Type(Identifier { loc: Loc(1, 14, 55), name: "U" }, None), Type(Identifier { loc: Loc(1, 14, 58), name: "E" }, None)]))), body: Some(Block(Loc(1, 14, 4), [Match(Loc(1, 15, 9), Variable(Identifier { loc: Loc(1, 15, 17), name: "self" }), [(FunctionCall(Loc(1, 16, 18), Variable(Identifier { loc: Loc(1, 16, 15), name: "Ok" }), [Variable(Identifier { loc: Loc(1, 16, 17), name: "t" })]), Return(Loc(1, 16, 37), Some(FunctionCall(Loc(1, 16, 37), Variable(Identifier { loc: Loc(1, 16, 30), name: "Ok" }), [FunctionCall(Loc(1, 16, 36), Variable(Identifier { loc: Loc(1, 16, 33), name: "op" }), [Variable(Identifier { loc: Loc(1, 16, 35), name: "t" })])])))), (FunctionCall(Loc(1, 17, 19), Variable(Identifier { loc: Loc(1, 17, 16), name: "Err" }), [Variable(Identifier { loc: Loc(1, 17, 18), name: "e" })]), Return(Loc(1, 17, 35), Some(FunctionCall(Loc(1, 17, 35), Variable(Identifier { loc: Loc(1, 17, 32), name: "Err" }), [Variable(Identifier { loc: Loc(1, 17, 34), name: "e" })]))))])])) }
+// ("map", Fn(FnType { name: "map", arg_types: [("op", Args("F"), false, false, ImmRef)], : [("U", Any), ("F", Fn(FnType { name: "pan", arg_types: [], type_args: [("T", Generic("T", Any))], ret_type: Generic("U", Any), is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: false }))], ret_type: Unknown, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), self:FunctionDefinition { doc: [], loc: Loc(1, 27, 1), name: Some(Identifier { loc: Loc(1, 27, 14), name: "to_str" }), name_loc: Loc(1, 27, 14), params: [(Loc(1, 27, 20), Some(Parameter { loc: Loc(1, 27, 20), ty: Type(Identifier { loc: Loc(1, 27, 20), name: "i32" }, None), mut_own: None, is_varargs: false, name: Some(Identifier { loc: Loc(1, 27, 16), name: "a" }), default: None }))], generics: [], is_pub: true, is_static:
 impl HasType for FunctionDefinition {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
-        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = self.params.iter().map(|s| transfer(s, tables)).collect();
-        let type_args = Vec::new();
-        let mut ret_type = Box::new(CType::Any);
-        if let Some(ty) = self.returns.as_ref() {
-            ret_type = Box::new(ty.get_type(tables)?);
+        println!("self:{:?}", self);
+        let mut type_args: Vec<(String, CType)> = Vec::new();
+        let mut local_tables = tables.clone();
+        let table = local_tables.last_mut().unwrap();
+        for generic in &self.generics {
+            let mut bound_type = CType::Any;
+            if let Some(ident) = &generic.bounds {
+                bound_type = ident.get_type(&local_tables).unwrap();
+                if bound_type == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("找不到{}的定义", ident.name()),
+                        location: generic.loc.clone(),
+                    });
+                }
+            }
+            let table = local_tables.last_mut().unwrap();
+            let symbol = Symbol::new(&generic.name.name.clone(), CType::Generic(generic.name.name.clone(), Box::new(bound_type.clone())));
+            table.symbols.insert(generic.name.name.clone(), symbol);
+            type_args.push((generic.name.name.clone(), bound_type));
         }
+        let mut ret_type = Box::new(CType::Any);
+
+        if let Some(ty) = self.returns.as_ref() {
+            ret_type = Box::new(ty.get_type(&local_tables)?);
+            if ret_type.as_ref() == &Unknown {
+                ret_type = Box::new(CType::Args(self.returns.as_ref().unwrap().name()));
+            }
+        }
+        let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = self.params.iter().map(|s| transfer(s, &local_tables)).collect();
+
         let name = self.name.as_ref().unwrap().name.clone();
         let mut is_varargs = false;
         if arg_types.len() > 0 {

@@ -433,6 +433,21 @@ impl SymbolTableBuilder {
                         match part {
                             EnumPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
+                                    for generic in &def.generics {
+                                        if let Some(ident) = &generic.bounds {
+                                            let bound_type = ident.get_type(&self.tables).unwrap();
+                                            if bound_type == CType::Unknown {
+                                                return Err(SymbolTableError {
+                                                    error: format!("找不到{}的定义", ident.name()),
+                                                    location: generic.loc.clone(),
+                                                });
+                                            } else {
+                                                self.register_name(&generic.name.name.clone(), CType::Generic(generic.name.name.clone(), Box::new(bound_type)), SymbolUsage::Used, generic.loc)?;
+                                            }
+                                        } else {
+                                            self.register_name(&generic.name.name.clone(), CType::Generic(generic.name.name.clone(), Box::new(CType::Any)), SymbolUsage::Used, generic.loc)?;
+                                        }
+                                    }
                                     let tt = def.get_type(&self.tables)?;
                                     self.ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
@@ -472,10 +487,10 @@ impl SymbolTableBuilder {
                     let self_name = def.name.name.clone();
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
-                            let bound_type = self.get_register_type(ident.name.clone())?;
+                            let bound_type = ident.get_type(&self.tables).unwrap();
                             if bound_type == CType::Unknown {
                                 return Err(SymbolTableError {
-                                    error: format!("找不到{}的定义", ident.name.clone()),
+                                    error: format!("找不到{}的定义", ident.name()),
                                     location: generic.loc.clone(),
                                 });
                             } else {
@@ -569,10 +584,10 @@ impl SymbolTableBuilder {
                     let self_name = def.name.name.clone();
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
-                            let bound_type = self.get_register_type(ident.name.clone())?;
+                            let bound_type = ident.get_type(&self.tables).unwrap();
                             if bound_type == CType::Unknown {
                                 return Err(SymbolTableError {
-                                    error: format!("找不到{}的定义", ident.name.clone()),
+                                    error: format!("找不到{}的定义", ident.name()),
                                     location: generic.loc.clone(),
                                 });
                             } else {
@@ -849,7 +864,7 @@ impl SymbolTableBuilder {
     }
 
     fn scan_statement(&mut self, statement: &Statement) -> SymbolTableResult {
-        // println!("statement is {:?}", statement);
+        println!("statement is {:?}", statement);
         use ast::Statement::*;
         match &statement {
             Block(loc, stmts) => {
@@ -1640,17 +1655,17 @@ impl SymbolTableBuilder {
                 }
             }
             SymbolMutability::MutRef => {
-                if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut || mutability == SymbolMutability::ImmRef {
-                    return Err(SymbolTableError {
-                        error: format!("变量{:?}已存在可变引用，不能再被修改", name),
-                        location: loc,
-                    });
-                } else if mutability == SymbolMutability::Moved {
-                    return Err(SymbolTableError {
-                        error: format!("变量{:?}已存在可变引用，不能被moved", name),
-                        location: loc,
-                    });
-                }
+                // if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Mut || mutability == SymbolMutability::ImmRef {
+                //     return Err(SymbolTableError {
+                //         error: format!("变量{:?}已存在可变引用，不能再被修改", name),
+                //         location: loc,
+                //     });
+                // } else if mutability == SymbolMutability::Moved {
+                //     return Err(SymbolTableError {
+                //         error: format!("变量{:?}已存在可变引用，不能被moved", name),
+                //         location: loc,
+                //     });
+                // }
             }
             SymbolMutability::Mut => {
                 if mutability == SymbolMutability::MutRef || mutability == SymbolMutability::Moved {
@@ -1912,6 +1927,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
+        println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());
@@ -2118,17 +2134,13 @@ impl SymbolTableBuilder {
             let args_type = ty.param_type();
             for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
                 if let Some(e) = args.get(i) {
-                    let cty = e.get_type(&self.tables)?;
-                    if let CType::Fn(fnty) = ety {
-                        if let Lambda(n) = cty {
-                            continue;
-                        }
-                        if let Fn(fnty) = cty {
-                            continue;
-                        }
+                    let mut cty = e.get_type(&self.tables)?;
+
+                    if let Expression::FunctionCall(..) = e {
+                        cty = cty.ret_type().clone();
                     }
-                    let ret_ty = cty.ret_type();
-                    if ety != ret_ty {
+
+                    if ety != &cty {
                         if ety != &CType::Any {
                             if *is_varargs {
                                 if let CType::Array(_) = ety {
@@ -2137,15 +2149,20 @@ impl SymbolTableBuilder {
                             }
                             //TODO 引用自身的类型，还不能处理package.Point这样的Expression;
                             if let CType::Args(s) = ety {
-                                if ret_ty == &self.get_register_type(s.clone())? {
+                                if cty == self.get_register_type(s.clone())? {
                                     continue;
                                 }
                             }
                             //Todo ety如果是无参函数类型，让其过，没搞明白，这里要咋样处理,是否允许定义函数类型时带参数呢，还是只能推导;以函数为参数的函数，其函数参数如何确定，需要处理;
 
-
+                            if let CType::Generic(_, fnty) = ety {
+                                println!("fnty:{:?},cty:{:?}", fnty, cty);
+                                if fnty.as_ref() == &cty {
+                                    continue;
+                                }
+                            }
                             return Err(SymbolTableError {
-                                error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, ret_ty),
+                                error: format!("第{:?}个参数不匹配,期望类型为{:?},实际类型为:{:?}", i + 1, ety, cty),
                                 location: expr.loc().clone(),
                             });
                         }

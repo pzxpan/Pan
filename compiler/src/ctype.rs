@@ -50,7 +50,7 @@ pub enum CType {
 pub struct FnType {
     pub name: String,
     pub arg_types: Vec<(String, CType, bool, bool, SymbolMutability)>,
-    pub type_args: Vec<String>,
+    pub type_args: Vec<(String, CType)>,
     pub ret_type: Box<CType>,
     pub is_varargs: bool,
     pub is_pub: bool,
@@ -179,9 +179,24 @@ impl PartialEq for FnType {
         if self.name.eq(&other.name) {
             return true;
         }
-        let s1 = self.get_fn_args_ret_str();
-        let s2 = other.get_fn_args_ret_str();
-        return s1.eq(&s2);
+        let s = self.get_fn_args_ret_str();
+        let s1: Vec<_> = s.split("$").collect();
+        let s = other.get_fn_args_ret_str();
+        let s2: Vec<_> = s.split("$").collect();
+        if s1.len() != s2.len() {
+            return false;
+        }
+        for (i1, i2) in s1.iter().zip(s2.iter()) {
+            println!("i1:{:?},i2:{:?}", i1, i2);
+            if i1.eq(&"Any") || i2.eq(&"Any") {
+                continue;
+            } else if i1.eq(i2) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
@@ -398,11 +413,19 @@ impl FnType {
             s.push_str("$");
         }
         for i in &self.type_args {
-            s.push_str(i.as_str());
-            s.push_str("$");
+            if let Generic(_, ty) = i.1.clone() {
+                s.push_str(ty.name().as_str());
+                s.push_str("$");
+            } else {
+                s.push_str(i.1.name().as_str());
+                s.push_str("$");
+            }
         }
-        s.push_str(self.ret_type.name().as_str());
-
+        if let Generic(_, ty) = self.ret_type.as_ref() {
+            s.push_str(ty.as_ref().name().as_str());
+        } else {
+            s.push_str(self.ret_type.name().as_str());
+        }
         return s;
     }
 }

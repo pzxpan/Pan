@@ -111,7 +111,7 @@ Generics: Vec<Generic> = {
 }
 
 Generic: Generic = {
-    <l:@L> <name:Identifier> <bounds: (":" <Identifier>)?> <r:@R> => {
+    <l:@L> <name:Identifier> <bounds: (":" <Type>)?> <r:@R> => {
         if bounds.is_some() {
             Generic {
                 loc: Loc(file_no, l, r),

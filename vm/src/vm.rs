@@ -159,7 +159,7 @@ impl VirtualMachine {
             bytecode::NameScope::Local => load_name(name.to_string(), idx),
             bytecode::NameScope::Const => load_global(name.to_string()),
         };
-
+        println!("load_name:{:?},value:{:?}", name, optional_value);
         match optional_value {
             Some(value) => value,
             None => {

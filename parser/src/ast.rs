@@ -176,7 +176,7 @@ impl fmt::Display for StructTy {
 pub struct Generic {
     pub loc: Loc,
     pub name: Identifier,
-    pub bounds: Option<Identifier>,
+    pub bounds: Option<Type>,
 }
 
 #[derive(Debug, PartialEq)]

@@ -98,7 +98,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
         let instruction = self.fetch_instruction();
-        //println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
+        println!("instruction is:{:?},", instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -305,7 +305,7 @@ impl Frame {
 
             bytecode::Instruction::LoadReference(idx, name, ref_name) => {
                 let v = vm.load_capture_reference(*idx, name.clone());
-               // println!("load_value:{:?}", v);
+                // println!("load_value:{:?}", v);
                 self.push_value(v);
                 None
             }
@@ -520,7 +520,7 @@ impl Frame {
                 }
             }
         }
-
+        println!("hash_map is:{:?}", hash_map);
         let value = vm.run_code_obj(func_ref.code().to_owned(), hash_map);
         match value {
             Some(ExecutionResult::Return(v)) => {
@@ -713,7 +713,7 @@ impl Frame {
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let mut parent = self.pop_value();
         let value = self.pop_value();
-         vm.set_attribute(&mut parent, attr_name.to_owned(), value);
+        vm.set_attribute(&mut parent, attr_name.to_owned(), value);
         self.push_value(parent);
         None
     }

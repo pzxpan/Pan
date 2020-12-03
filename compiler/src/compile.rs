@@ -1669,7 +1669,7 @@ impl<O: OutputStream> Compiler<O> {
                     ));
                     self.emit(Instruction::LoadAttr(name.clone()));
                 } else {
-                    self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+                    self.emit(LoadName(name.clone(), NameScope::Local));
                 }
             } else if let ast::Expression::Attribute(_, expr, name, _) = function {
                 self.resolve_compile_attribute(function)?;
@@ -1730,7 +1730,7 @@ impl<O: OutputStream> Compiler<O> {
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
             is_constructor = self.is_constructor(name);
             if self.variable_local_scope(name.as_str()) {
-                self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+                self.emit(LoadName(name.clone(), NameScope::Local));
             } else {
                 self.emit(LoadName(name.clone(), NameScope::Global));
             }
