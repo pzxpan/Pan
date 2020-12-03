@@ -8,7 +8,7 @@ use crate::util::get_attribute_vec;
 use crate::util::get_full_name;
 use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
-use crate::resolve_symbol::{resolve_enum_generic, resolve_generic};
+use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type};
 use std::borrow::Borrow;
 
 pub trait HasType {
@@ -253,17 +253,7 @@ impl HasType for StructDefinition {
     }
 }
 
-fn get_register_type(tables: &Vec<SymbolTable>, name: String) -> CType {
-    let len = tables.len();
-    for i in 0..len {
-        let t = tables.get(len - i - 1);
-        let a = t.unwrap().lookup(name.as_str());
-        if a.is_some() {
-            return a.unwrap().ty.clone();
-        }
-    }
-    CType::Unknown
-}
+
 
 
 pub fn resovle_def_generics(generics: &Vec<Generic>, tables: &mut Vec<SymbolTable>) -> Result<(), SymbolTableError> {

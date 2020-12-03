@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use crate::symboltable::SymbolMutability;
 use crate::ctype::CType::Generic;
+use std::ptr::hash;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
@@ -171,6 +172,8 @@ impl EnumType {
         return vv;
     }
 }
+
+
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Generic(\"E\", Any)]))],
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Str]))],
 
@@ -283,7 +286,44 @@ impl CType {
                 generics = true;
             }
         }
+        if let CType::Fn(cty) = self {
+            if !cty.type_args.is_empty() {
+                generics = true;
+            }
+        }
         return generics;
+    }
+
+    pub fn generic_map(&self) -> HashMap<String, CType> {
+        let mut map = HashMap::new();
+        if let CType::Enum(ety) = self {
+            if ety.generics.is_some() {
+                for item in ety.generics.as_ref().unwrap().iter() {
+                    if let CType::Generic(name, ty) = item {
+                        map.insert(name.clone(), ty.as_ref().clone());
+                    }
+                }
+            }
+        }
+        if let CType::Struct(cty) = self {
+            if cty.generics.is_some() {
+                for item in cty.generics.as_ref().unwrap().iter() {
+                    if let CType::Generic(name, ty) = item {
+                        map.insert(name.clone(), ty.as_ref().clone());
+                    }
+                }
+            }
+        }
+        if let CType::Fn(cty) = self {
+            if !cty.type_args.is_empty() {
+                for item in cty.type_args.iter() {
+                    if let CType::Generic(name, ty) = item.1.clone() {
+                        map.insert(name.clone(), ty.as_ref().clone());
+                    }
+                }
+            }
+        }
+        return map;
     }
 
     pub fn attri_index(&self, index: i32) -> &CType {
@@ -342,6 +382,14 @@ impl CType {
     pub fn param_type(&self) -> Vec<(CType, bool, bool, SymbolMutability)> {
         match self {
             CType::Fn(s) => s.arg_types.iter().map(|s| (s.1.clone(), s.2.clone(), s.3.clone(), s.4.clone())).collect(),
+            _ => Vec::new()
+        }
+    }
+
+    pub fn param_type_args(&self) -> Vec<(String, CType)> {
+        println!("self:{:?}",self);
+        match self {
+            CType::Fn(s) => s.type_args.clone(),
             _ => Vec::new()
         }
     }
