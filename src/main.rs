@@ -43,18 +43,10 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo/core").join("result.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo/core").join("intrinsics.pan"));
 
     //test_all_demo_file();
 }
-// CompileError { statement: None, error: SyntaxError("第1个参数不匹配,期望类型为Fn(\
-// FnType { name: \"pan\", arg_types: [], \type_args: [(\"Unit\", Tuple([]))], ret_type: Tuple([Tuple([])]), is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: false })\
-// ,实际类型为:Lambda(LambdaType { name: \"lambda\", ret_type: Any, captures: [], arg_types: [] })"), location: Loc(1, 27, 10), source_path: Some("/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan") }
-// SyntaxError("函数返回值的类型Generic(\"T\", Bound(BoundType { name: \"Add\", generics: Some([Generic(\"T\", Any)]), \
-// methods: [(\"add\", Fn(FnType { name: \"add\", arg_types: [(\"rhs\", Generic(\"T\", Any), false, false, ImmRef)],\
-//  type_args: [(\"T\", Any)], ret_type: Generic(\"T\", Any), is_varargs: false, is_pub: false, is_mut: true, is_static: false, has_body: true }))], \
-//  is_pub: true }))与定义的类型Generic(\"T\", Any)不匹配"), location: Loc(1, 13, 19), source_path: Some("/Users/cuiqingbo/Desktop/Pan/Pan/demo/generics.pan") }
-
 
 fn test_all_demo_file() {
     for f in WalkDir::new(env::current_dir().unwrap().join("demo")).max_depth(1) {
