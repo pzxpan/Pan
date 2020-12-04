@@ -1,15 +1,15 @@
 package default;
 pub struct Thread {
-    f: fun()->(),
+    f: fun()->None,
     state: i32,
-    pub fun ::new(fff: fun()->()): Thread {
+    pub fun ::new(fff: fun()->None): Thread {
         return Thread! {f:fff,state:0};
     }
-    pub fun run() :Any {
+    pub fun run() {
         self.state = 1;
         self.f();
     }
-    pub fun stop() : Any {
+    pub fun stop() {
         self.state = 2;
     }
 }

@@ -38,6 +38,13 @@ pub enum Result<T, E> {
            Err(e) -> {panic("cccc");}
         }
      }
+
+    pub fun and_then<U, F: fun(T) -> Result<U, E> > (op: F) : Result<U, E> {
+           match self {
+               Ok(t) -> return op(t);
+               Err(e) -> return Err(e);
+           }
+       }
 }
 
 pub fun to_str(a:i32): string {

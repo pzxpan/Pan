@@ -104,7 +104,6 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
 }
 
 pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_tys: &Vec<CType>, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
-    println!("real_arg_tys:{:?},", real_arg_tys);
     let fun_arg_tys = fun_ty.param_type();
     if fun_arg_tys.len() != real_arg_tys.len() {
         return Err(SymbolTableError {
@@ -125,9 +124,8 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
                 let rr = r.param_type();
                 for (idx, type_args) in fnty.arg_types.iter().enumerate() {
                     let rrr = rr.get(idx).unwrap().0.clone();
-                    println!("1111范型赋值:{:?},,rrrr:{:?}", obj_map, rrr);
+
                     if let CType::Generic(name, ty) = type_args.1.clone() {
-                        println!("范型赋值:{:?},,rrrr:{:?}", obj_map, rrr);
                         //防止覆盖插入不同的值
                         if obj_map.contains_key(&name) {
                             let tmp = obj_map.get(type_args.0.as_str()).unwrap().clone();
@@ -163,7 +161,6 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
                     obj_map.insert(name, r.ret_type().clone());
                 }
             } else {
-                println!("5555范型赋值:{:?},,rrrr:{:?},rr:{:?}", obj_map, r, r.ret_type().clone());
                 obj_map.insert(name, r.clone());
             }
         } else if r != f {
@@ -174,10 +171,9 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
         }
     }
     let ret = fun_ty.ret_type().clone();
-    println!("111ret_ty:{:?},", ret);
     if let CType::Args(name, args) = ret.clone() {
         let a = get_register_type(tables, name);
-        println!("222ret_ty:{:?},", a);
+
         let mut v = Vec::new();
         for item in args {
             if let CType::Generic(name, ty) = item {
@@ -192,7 +188,6 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
             let ee = resolve_enum_generic(ety, v);
             return Ok(CType::Enum(ee));
         }
-        println!("3333ret_ty:{:?},", a);
         return Ok(a.clone());
     }
     return Ok(ret.clone());

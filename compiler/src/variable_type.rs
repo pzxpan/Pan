@@ -43,7 +43,6 @@ impl HasType for Type {
                 }
                 if ty == CType::Unknown {
                     let table_name = &tables.last().unwrap().name.clone();
-                    println!("Fuck_name:{:?}", table_name);
                     return Ok(CType::Args(name.name.clone(), v.clone()));
                     // if ty.name().eq(&get_register_type(tables,"Self".to_string()).name()) {
                     //     return Ok(CType::Reference(ty.name(),v.clone()));
@@ -76,6 +75,17 @@ impl HasType for Type {
                 if ret.is_some() {
                     ret_ty = ret.as_ref().unwrap().get_type(tables)?;
                 }
+                // //消除空的Tuple,语法上不好消除，这里消除以下;fun()->();
+                // if let CType::Tuple(n) = ret_ty.clone() {
+                //     if n.len() == 1 {
+                //         if let CType::Tuple(nn) = n.get(0).unwrap() {
+                //             if nn.len() == 0 {
+                //                 ret_ty = CType::Tuple(Box::new(Vec::new()));
+                //             }
+                //         }
+                //     }
+                // }
+
                 return Ok(CType::Fn(FnType {
                     name: "pan".to_string(),
                     is_mut: false,
@@ -149,7 +159,7 @@ impl HasType for FunctionDefinition {
             table.symbols.insert(generic.name.name.clone(), symbol);
             type_args.push((generic.name.name.clone(), bound_type));
         }
-        let mut ret_type = Box::new(CType::Any);
+        let mut ret_type = Box::new(CType::None);
 
         if let Some(ty) = self.returns.as_ref() {
             ret_type = Box::new(ty.get_type(&local_tables)?);
@@ -762,10 +772,10 @@ impl HasType for LambdaDefinition {
                         let ty = e.as_ref().unwrap().get_type(tables)?;
                         ty
                     }
-                    _ => { CType::Any }
+                    _ => { CType::None }
                 }
             }
-            _ => { CType::Any }
+            _ => { CType::None }
         });
         Ok(CType::Lambda(LambdaType { name, arg_types, ret_type, captures: vec![] }))
     }
