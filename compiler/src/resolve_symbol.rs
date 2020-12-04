@@ -131,28 +131,35 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
                         //防止覆盖插入不同的值
                         if obj_map.contains_key(&name) {
                             let tmp = obj_map.get(type_args.0.as_str()).unwrap().clone();
-                            if tmp != rrr {
+                            if tmp != rrr && tmp != CType::Any {
                                 return Err(SymbolTableError {
-                                    error: format!("泛型参数类型不匹配，期望是:{:?},实际是:{:?}", tmp, rrr),
+                                    error: format!("泛型参数有重复，且类型不一致，初始类型为:{:?},赋值类型为是:{:?}", tmp, rrr),
                                     location: Loc::default(),
                                 });
                             }
-                        } else {
-                            obj_map.insert(name, rrr.clone());
-                            continue;
                         }
+                        obj_map.insert(name, rrr.clone());
+                        continue;
                     }
                     let obj_ty_generic = obj_map.get(type_args.0.as_str()).unwrap().clone();
                     if rrr != obj_ty_generic {
                         return Err(SymbolTableError {
-                            error: format!("泛型参数类型不匹配，期望是:{:?},实际是:{:?}", obj_ty_generic, rrr),
+                            error: format!("泛型参数有重复，且类型不一致，初始类型为:{:?},赋值类型为是:{:?}", obj_ty_generic, rrr),
                             location: Loc::default(),
                         });
                     }
                 }
                 //参数类型验证通过，注册返回值的具体值到obj_map;
                 if let CType::Generic(name, ty) = fnty.ret_type.as_ref().clone() {
-                    println!("4444范型赋值:{:?},,rrrr:{:?}", obj_map, r.ret_type().clone());
+                    if obj_map.contains_key(&name) {
+                        let tmp = obj_map.get(&name).unwrap().clone();
+                        if &tmp != r.ret_type() && tmp != CType::Any {
+                            return Err(SymbolTableError {
+                                error: format!("泛型参数有重复，且类型不一致，初始类型为:{:?},赋值类型为是:{:?}", tmp, r.ret_type()),
+                                location: Loc::default(),
+                            });
+                        }
+                    }
                     obj_map.insert(name, r.ret_type().clone());
                 }
             } else {

@@ -471,6 +471,7 @@ impl SymbolTableBuilder {
                                         return_name = tys.name();
                                     }
                                     self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+                                    self.register_name(&"self".to_string(), enum_ty.clone(), SymbolUsage::Used, Loc::default())?;
                                     for generic in &def.generics {
                                         if let Some(ident) = &generic.bounds {
                                             let bound_type = ident.get_type(&self.tables).unwrap();
@@ -1060,7 +1061,17 @@ impl SymbolTableBuilder {
                                             let obj_ty = self.get_register_type(n.expr_name())?;
                                             let mut v = Vec::new();
                                             for arg in args {
-                                                v.push(self.get_register_type(arg.expr_name())?);
+                                                let mut ty = self.get_register_type(arg.expr_name())?;
+                                                if ty == CType::Unknown {
+                                                    ty = arg.get_type(&self.tables)?;
+                                                }
+                                                if ty == CType::Unknown {
+                                                    return Err(SymbolTableError {
+                                                        error: format!("变量{:?},未定义", arg.expr_name()),
+                                                        location: location.clone(),
+                                                    });
+                                                }
+                                                v.push(ty);
                                             }
                                             println!("obj_ty:{:?},v:{:?}", obj_ty, v);
                                             ty = resolve_function_call_generic(&obj_ty, &ty, &v, &self.tables)?;

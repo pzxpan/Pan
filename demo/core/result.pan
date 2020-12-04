@@ -31,10 +31,19 @@ pub enum Result<T, E> {
     pub const fun is_err() : bool {
         return !self.is_ok();
    }
+
+   pub const fun unwrap(): T {
+        match self {
+           Ok(t) -> {return t;}
+           Err(e) -> {panic("cccc");}
+        }
+     }
 }
-pub fun to_str(a:i32):string {
+
+pub fun to_str(a:i32): string {
     return a + "";
 }
+
 fun main() {
    let x: Result<u32,Result<u32,string>> =  Result::Ok(2);
    let xx: [i32:4] = [1,2,3,4];
@@ -46,9 +55,7 @@ fun main() {
    let ccc = cc.is_ok();
    print(cc);
    let i = 40_u64;
-   let ab = Result::Ok(4440);
-   let ac = ab.map_or(i,to_str);
-   print(ac);
+   let ab = Result::Err("eeee");
 }
 
 
