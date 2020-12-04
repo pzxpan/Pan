@@ -198,7 +198,19 @@ Type: Type = {
             Type::FunType(v,None)
         }
      },
-      <v:("(" <CommaOne<Type>> ")")?> => Type::Tuple(v),
+      <v:("(" <CommaOne<Type>> ")")?> => {
+          if v.is_some() {
+                let vv = v.unwrap();
+                if vv.len() > 0 {
+                    Type::Tuple(Some(vv))
+                } else {
+                    Type::Tuple(None)
+                }
+            } else {
+                Type::Tuple(None)
+            }
+      }
+
 }
 Expression: Expression = {
     Precedence14,

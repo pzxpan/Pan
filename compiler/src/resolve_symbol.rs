@@ -122,18 +122,42 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
             f = ty.as_ref().clone();
             if let CType::Fn(fnty) = f {
                 let rr = r.param_type();
-                for (idx, type_args) in fnty.type_args.iter().enumerate() {
-                    let obj_ty_generic = obj_map.get(type_args.0.as_str()).unwrap().clone();
+                for (idx, type_args) in fnty.arg_types.iter().enumerate() {
                     let rrr = rr.get(idx).unwrap().0.clone();
+
+                    if let CType::Generic(name, ty) = type_args.1.clone() {
+                        //防止覆盖插入不同的值
+                        if obj_map.contains_key(&name) {
+                            let tmp = obj_map.get(type_args.0.as_str()).unwrap().clone();
+                            if tmp != rrr && tmp != CType::Any {
+                                return Err(SymbolTableError {
+                                    error: format!("泛型参数有重复，且类型不一致，初始类型为:{:?},赋值类型为是:{:?}", tmp, rrr),
+                                    location: Loc::default(),
+                                });
+                            }
+                        }
+                        obj_map.insert(name, rrr.clone());
+                        continue;
+                    }
+                    let obj_ty_generic = obj_map.get(type_args.0.as_str()).unwrap().clone();
                     if rrr != obj_ty_generic {
                         return Err(SymbolTableError {
-                            error: format!("泛型参数类型不匹配，期望是:{:?},实际是:{:?}", obj_ty_generic, rrr),
+                            error: format!("泛型参数有重复，且类型不一致，初始类型为:{:?},赋值类型为是:{:?}", obj_ty_generic, rrr),
                             location: Loc::default(),
                         });
                     }
                 }
                 //参数类型验证通过，注册返回值的具体值到obj_map;
                 if let CType::Generic(name, ty) = fnty.ret_type.as_ref().clone() {
+                    if obj_map.contains_key(&name) {
+                        let tmp = obj_map.get(&name).unwrap().clone();
+                        if &tmp != r.ret_type() && tmp != CType::Any {
+                            return Err(SymbolTableError {
+                                error: format!("泛型参数有重复，且类型不一致，初始类型为:{:?},赋值类型为是:{:?}", tmp, r.ret_type()),
+                                location: Loc::default(),
+                            });
+                        }
+                    }
                     obj_map.insert(name, r.ret_type().clone());
                 }
             } else {
@@ -147,9 +171,9 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
         }
     }
     let ret = fun_ty.ret_type().clone();
-
-    if let CType::Args(name, args) = ret {
+    if let CType::Args(name, args) = ret.clone() {
         let a = get_register_type(tables, name);
+
         let mut v = Vec::new();
         for item in args {
             if let CType::Generic(name, ty) = item {
@@ -164,8 +188,9 @@ pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_ty
             let ee = resolve_enum_generic(ety, v);
             return Ok(CType::Enum(ee));
         }
+        return Ok(a.clone());
     }
-    return Ok(CType::Unknown);
+    return Ok(ret.clone());
 }
 
 pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> EnumType {

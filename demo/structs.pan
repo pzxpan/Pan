@@ -42,17 +42,29 @@ pub struct Person {
         print("age:{:d}", age);
         return age > a;
     }
+
+    pub fun ::ceshi(a:i32) :i32 {
+        return a + 1000;
+    }
 }
 
 
 fun main() {
    let person = Person!{age:50,name:"pan",house: House!{size:111.0,price:1_000_000.0}};
-
    let cc = person.older_than(40);
  //  person.name = "ddddd";
    print(cc);
    print(person.age);
-
+   let {age,name,ceshi,house:{size,price,static}} = person;
+   print(size);
+   let a = age + 1000;
+   print(a);
+   name = name + "coweqasdflkja";
+   print(name);
+   let c = ceshi(1);
+   print(size);
+   print(c);
+   print(static());
    return;
 }
 

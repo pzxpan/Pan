@@ -7,7 +7,7 @@ pub enum Color {
    Black,
    pub fun is_warm() {
            match self {
-               White(c,bb)-> {print(20);}
+               White(c,bb)-> {print(bb);}
                Black -> {print(30);}
                Red(a) -> { print(a); }
                Single(a) -> { print(a); }
