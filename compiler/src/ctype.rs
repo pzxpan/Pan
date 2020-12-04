@@ -387,7 +387,7 @@ impl CType {
     }
 
     pub fn param_type_args(&self) -> Vec<(String, CType)> {
-        println!("self:{:?}",self);
+        println!("self:{:?}", self);
         match self {
             CType::Fn(s) => s.type_args.clone(),
             _ => Vec::new()
@@ -397,6 +397,13 @@ impl CType {
     pub fn is_mut_fun(&self) -> bool {
         return if let CType::Fn(n) = self {
             n.is_mut
+        } else {
+            false
+        };
+    }
+    pub fn is_fun(&self) -> bool {
+        return if let CType::Fn(..) = self {
+            true
         } else {
             false
         };
@@ -456,18 +463,23 @@ impl FnType {
     pub fn get_fn_args_ret_str(&self) -> String {
         let mut s = String::new();
         for i in &self.arg_types {
-            s.push_str(i.1.name().as_str());
-            s.push_str("$");
-        }
-        for i in &self.type_args {
-            if let Generic(_, ty) = i.1.clone() {
-                s.push_str(ty.name().as_str());
-                s.push_str("$");
+            if let CType::Generic(n,ty) = i.1.clone() {
+                s.push_str(ty.as_ref().name().as_str());
             } else {
                 s.push_str(i.1.name().as_str());
-                s.push_str("$");
             }
+
+            s.push_str("$");
         }
+        // for i in &self.type_args {
+        //     if let Generic(_, ty) = i.1.clone() {
+        //         s.push_str(ty.name().as_str());
+        //         s.push_str("$");
+        //     } else {
+        //         s.push_str(i.1.name().as_str());
+        //         s.push_str("$");
+        //     }
+        // }
         if let Generic(_, ty) = self.ret_type.as_ref() {
             s.push_str(ty.as_ref().name().as_str());
         } else {
