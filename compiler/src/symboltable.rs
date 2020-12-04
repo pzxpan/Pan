@@ -1156,7 +1156,7 @@ impl SymbolTableBuilder {
                         location: loc.clone(),
                     });
                 }
-                self.scan_multi_value_def(decls, &ty);
+                self.scan_multi_value_def(decls, &ty)?;
             }
             Match(loc, test, items) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
@@ -1301,8 +1301,35 @@ impl SymbolTableBuilder {
                     self.scan_multi_value_part(part, cty);
                 }
             }
-            //TODO
-            _ => {}
+            CType::Struct(sty) => {
+                // println!("multi_part:{:?}", decls);
+                let v: Vec<(String, CType)> = sty.fields.iter().filter(|s| s.2).map(|s| (s.0.clone(), s.1.clone())).collect();
+                let mut hash_map = HashMap::new();
+                for i in v.clone() {
+                    hash_map.insert(i.0, i.1);
+                }
+
+                for i in &sty.static_methods {
+                    hash_map.insert(i.0.clone(), i.1.clone());
+                }
+
+                for part in decls.variables.iter() {
+                    if hash_map.contains_key(&part.name()) {
+                        self.scan_multi_value_part(part, hash_map.get(&part.name()).unwrap());
+                    } else {
+                        return Err(SymbolTableError {
+                            error: format!("在类型{:?}中，未找到{:?}属性或属性不可见", ty.name(), part.name()),
+                            location: decls.loc.clone(),
+                        });
+                    }
+                }
+            }
+            _ => {
+                return Err(SymbolTableError {
+                    error: format!("只有struct,Array,Tuple,HashMap类型的值才能解构赋值，而{:?}的类型为:{:?}", ty.name(), ty),
+                    location: decls.loc.clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -1321,16 +1348,32 @@ impl SymbolTableBuilder {
     //     Ok(())
     // }
 
-    fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> SymbolTableResult {
+//     Struct(StructType { name: "House", generics: None, fields:
+//     [("size", Float, true, Immutable), ("price", Float, true, Immutable)],
+//     static_methods: [("static", Fn(FnType { name: "static", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub:
+//     false, is_mut: true, is_static: true, has_body: true }))], methods: [("idea", Fn(FnType { name: "idea", arg_types: [], type_args: [],
+// ret_type: Bool, is_varargs: false, is_pub: false, is_mut: true, is_static: false, has_body: true }))], bases: [], is_pub: true }),"house"
+
+fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> SymbolTableResult {
         match part {
             MultiDeclarationPart::Single(ident) => {
                 self.register_name(ident.name.borrow(), ty.clone(), SymbolUsage::Mut, ident.loc)?;
             }
             MultiDeclarationPart::TupleOrArray(decl) => {
-                self.scan_multi_value_def(decl, ty);
+                self.scan_multi_value_def(decl, ty)?;
             }
-            //TODO
-            _ => {}
+
+            MultiDeclarationPart::Struct(ident, decl) => {
+                self.register_name(ident.name.borrow(), ty.clone(), SymbolUsage::Mut, ident.loc)?;
+                if let CType::Struct(sty) = ty {
+                    self.scan_multi_value_def(decl, ty)?;
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("只有struct类型才能嵌套解构,{:?}的类型为:{:?}", ident.name, ty),
+                        location: decl.loc.clone(),
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -2197,7 +2240,7 @@ impl SymbolTableBuilder {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     attri_type = tmp.0;
-                  // println!("tmp:{:?}", tmp);
+                    // println!("tmp:{:?}", tmp);
                     if attri_type < 1 {
                         return Err(SymbolTableError {
                             error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),
@@ -2232,7 +2275,7 @@ impl SymbolTableBuilder {
     fn resolve_fn(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
         if let Expression::FunctionCall(_, name, args) = expr {
             let args_type = ty.param_type();
-           // println!("real_ty:{:?},expected_ty:{:?},", args, args_type);
+            // println!("real_ty:{:?},expected_ty:{:?},", args, args_type);
             for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
                 if let Some(e) = args.get(i) {
                     let mut cty = e.get_type(&self.tables)?;

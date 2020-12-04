@@ -128,6 +128,19 @@ pub enum MultiDeclarationPart {
     Struct(Identifier, MultiVariableDeclaration),
 }
 
+impl MultiDeclarationPart {
+    pub fn name(&self) -> String {
+        match self {
+            MultiDeclarationPart::Single(ident) => { return ident.name.clone(); }
+            MultiDeclarationPart::TupleOrArray(n) => {
+                //按位置解构，不需要名称，
+                return "".to_string();
+            }
+            MultiDeclarationPart::Struct(ident, ..) => { return ident.name.clone(); }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct MultiVariableDeclaration {
     pub loc: Loc,

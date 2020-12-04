@@ -43,9 +43,9 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo/").join("generics.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo/").join("structs.pan"));
 
-   // test_all_demo_file();
+    //test_all_demo_file();
 }
 // CompileError { statement: None, error: SyntaxError("第1个参数不匹配,期望类型为Fn(\
 // FnType { name: \"pan\", arg_types: [], \type_args: [(\"Unit\", Tuple([]))], ret_type: Tuple([Tuple([])]), is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: false })\

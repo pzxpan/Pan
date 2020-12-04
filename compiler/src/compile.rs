@@ -571,7 +571,10 @@ impl<O: OutputStream> Compiler<O> {
                         self.emit(Instruction::Subscript);
                         self.store_name(ident.name.clone().as_ref());
                     }
-                    _ => {}
+                    DestructType::Struct => {
+                        self.emit(Instruction::LoadAttr(ident.name.clone()));
+                        self.store_name(ident.name.clone().as_ref());
+                    }
                 }
             }
             MultiDeclarationPart::TupleOrArray(decl) => {
@@ -580,7 +583,13 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::Subscript);
                 self.compile_store_multi_value_def(decl)?;
             }
-            _ => {}
+
+            MultiDeclarationPart::Struct(ident, decl) => {
+                self.emit(Instruction::LoadAttr(ident.name.clone()));
+                self.store_name(ident.name.clone().as_ref());
+                self.load_name(ident.name.clone().as_ref());
+                self.compile_store_multi_value_def(decl)?;
+            }
         }
         Ok(())
     }
@@ -1732,7 +1741,7 @@ impl<O: OutputStream> Compiler<O> {
             is_constructor = self.is_constructor(name);
             if self.variable_local_scope(name.as_str()) {
                 self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
-               // self.emit(LoadName(name.clone(), NameScope::Local));
+                // self.emit(LoadName(name.clone(), NameScope::Local));
             } else {
                 self.emit(LoadName(name.clone(), NameScope::Global));
             }
@@ -1896,7 +1905,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-       // println!("Looking up {:?}", name);
+        // println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);

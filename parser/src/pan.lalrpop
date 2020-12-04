@@ -185,7 +185,7 @@ ConstVariableDefinition: Box<ConstVariableDefinition> = {
 Type: Type = {
 
     <i:Identifier> <v:("<" <CommaOne<Type>>">")?> => Type::Type(i,v),
-     "[" <i:Identifier> ";" <n:LexNumber> "]" => {
+     "[" <i:Identifier> ":" <n:LexNumber> "]" => {
         let s: String = n.chars().filter(|v| *v != '_').collect();
         let num = s.parse::<BigInt>().unwrap().to_usize().unwrap();
         Type::Array(i,num)
