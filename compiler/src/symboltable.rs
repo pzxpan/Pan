@@ -14,7 +14,7 @@ use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds, resovle_build_funs, resolve_enum_generic, resolve_enum_generic_fn};
+use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds, resovle_build_funs, resolve_enum_generic, resolve_enum_generic_fn, resolve_function_call_generic};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
@@ -290,6 +290,7 @@ impl SymbolTableBuilder {
         let table = self.tables.pop().unwrap();
         self.tables.last_mut().unwrap().sub_tables.push(table);
     }
+
     fn verify_fun_return(&mut self, expression: &Expression) -> SymbolTableResult {
         let mut r_ty = CType::Any;
         let loc = expression.loc();
@@ -1009,6 +1010,8 @@ impl SymbolTableBuilder {
                                 } else if let ast::Expression::Attribute(_, n, Some(ident), _) = name.as_ref() {
                                     ty = self.get_register_type(n.expr_name())?;
                                     ty = self.resovle_method(name, &ty)?;
+
+                                    println!("dddd:ty:{:?}", ty);
                                     if ty.is_generic() {
                                         let a = ty.attri_name_type(ident.name.clone());
                                         let mut attri_type_name: Vec<String> = Vec::new();
@@ -1025,6 +1028,15 @@ impl SymbolTableBuilder {
                                                 v.insert(attri_type_name.get(arg.0).unwrap().clone(), arg.1.get_type(&self.tables)?);
                                             }
                                             ty = CType::Enum(resolve_enum_generic_fn(ety, v));
+                                        } else if let CType::Fn(fnty) = ty.clone() {
+                                            let obj_ty = self.get_register_type(n.expr_name())?;
+                                            let mut v = Vec::new();
+                                            for arg in args {
+                                                v.push(self.get_register_type(arg.expr_name())?);
+                                            }
+                                            println!("obj_ty:{:?},v:{:?}", obj_ty, v);
+                                            ty = resolve_function_call_generic(&obj_ty, &ty, &v, &self.tables)?;
+                                            println!("generic:{:?}", ty);
                                         }
                                     }
                                     if let CType::Generic(_, cty) = ty.clone() {
@@ -2129,7 +2141,7 @@ impl SymbolTableBuilder {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     attri_type = tmp.0;
-                    //println!("tmp:{:?}", tmp);
+                    println!("tmp:{:?}", tmp);
                     if attri_type < 1 {
                         return Err(SymbolTableError {
                             error: format!("{:?}中找不到{:?}的函数", name.0, attri_name.0),

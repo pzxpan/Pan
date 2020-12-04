@@ -20,7 +20,6 @@ use dynformat::check;
 use std::borrow::Borrow;
 use crate::util;
 use std::collections::HashMap;
-use std::future::get_context;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
@@ -104,12 +103,66 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     Ok(())
 }
 
-pub fn resolve_function_call_generic(obj_ty: &CType, fn_ty: &CType, args_ty: &Vec<CType>, tables: &Vec<SymbolTableType>) -> Result<CType, SymbolTableError> {
-    let mut obj_generics: HashMap<String, CType> = HashMap::new();
+pub fn resolve_function_call_generic(obj_ty: &CType, fun_ty: &CType, real_arg_tys: &Vec<CType>, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
+    let fun_arg_tys = fun_ty.param_type();
+    if fun_arg_tys.len() != real_arg_tys.len() {
+        return Err(SymbolTableError {
+            error: format!("参数数量不匹配"),
+            location: Loc::default(),
+        });
+    }
+    let len = fun_arg_tys.len();
+    let mut obj_map: HashMap<String, CType> = obj_ty.generic_map();
+    // let mut fn_map: HashMap<String, CType> = fun_ty.generic_map();
 
-    if let CType::Enum(ety) = obj_ty {
-        for i in &ety.items {
-            obj_generics.insert(i.0.clone(), i.1.clone());
+    for i in 0..len {
+        let r = real_arg_tys.get(i).unwrap().clone();
+        let mut f = fun_arg_tys.get(i).unwrap().0.clone();
+        if let CType::Generic(name, ty) = f {
+            f = ty.as_ref().clone();
+            if let CType::Fn(fnty) = f {
+                let rr = r.param_type();
+                for (idx, type_args) in fnty.type_args.iter().enumerate() {
+                    let obj_ty_generic = obj_map.get(type_args.0.as_str()).unwrap().clone();
+                    let rrr = rr.get(idx).unwrap().0.clone();
+                    if rrr != obj_ty_generic {
+                        return Err(SymbolTableError {
+                            error: format!("泛型参数类型不匹配，期望是:{:?},实际是:{:?}", obj_ty_generic, rrr),
+                            location: Loc::default(),
+                        });
+                    }
+                }
+                //参数类型验证通过，注册返回值的具体值到obj_map;
+                if let CType::Generic(name, ty) = fnty.ret_type.as_ref().clone() {
+                    obj_map.insert(name, r.ret_type().clone());
+                }
+            } else {
+                obj_map.insert(name, r.clone());
+            }
+        } else if r != f {
+            return Err(SymbolTableError {
+                error: format!("参数类型不匹配，期望是:{:?},实际是:{:?}", r, f),
+                location: Loc::default(),
+            });
+        }
+    }
+    let ret = fun_ty.ret_type().clone();
+
+    if let CType::Args(name, args) = ret {
+        let a = get_register_type(tables, name);
+        let mut v = Vec::new();
+        for item in args {
+            if let CType::Generic(name, ty) = item {
+                if obj_map.contains_key(&name) {
+                    v.push(obj_map.get(&name).unwrap().clone());
+                } else {
+                    v.push(ty.as_ref().clone());
+                }
+            }
+        }
+        if let CType::Enum(ety) = a {
+            let ee = resolve_enum_generic(ety, v);
+            return Ok(CType::Enum(ee));
         }
     }
     return Ok(CType::Unknown);
@@ -133,7 +186,9 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
         let mut generics_copy = Vec::new();
         for (idx, generic) in generics.iter().enumerate() {
             if let CType::Generic(name, _) = generic {
-                if !hash_map.contains_key(name) {
+                if hash_map.contains_key(name) {
+                    generics_copy.push(CType::Generic(name.clone(), Box::new(hash_map.get(name).unwrap().clone())));
+                } else {
                     generics_copy.push(generic.clone());
                 }
             }
@@ -267,7 +322,9 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
         let mut generics_copy = Vec::new();
         for (idx, generic) in generics.iter().enumerate() {
             if let CType::Generic(name, _) = generic {
-                if !hash_map.contains_key(name) {
+                if hash_map.contains_key(name) {
+                    generics_copy.push(CType::Generic(name.clone(), Box::new(hash_map.get(name).unwrap().clone())));
+                } else {
                     generics_copy.push(generic.clone());
                 }
             }
@@ -634,6 +691,18 @@ pub fn resovle_build_funs(build: &mut SymbolTableBuilder, loc: &Loc, var_args: &
     }
 
     Ok(())
+}
+
+pub fn get_register_type(tables: &Vec<SymbolTable>, name: String) -> CType {
+    let len = tables.len();
+    for i in 0..len {
+        let t = tables.get(len - i - 1);
+        let a = t.unwrap().lookup(name.as_str());
+        if a.is_some() {
+            return a.unwrap().ty.clone();
+        }
+    }
+    CType::Unknown
 }
 
 
