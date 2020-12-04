@@ -272,7 +272,7 @@ pub struct Lexer<'input> {
     chars: Peekable<CharIndices<'input>>,
     last_tokens: [Option<Token<'input>>; 2],
     back_sign: Vec<Option<Result<(usize, Token<'input>, usize), LexicalError>>>,
-    found_let: bool,
+    need_broken: bool,
     column: usize,
     row: usize,
 }
@@ -363,7 +363,7 @@ impl<'input> Lexer<'input> {
             last_tokens: [None, None],
             row: 1,
             column: 0,
-            found_let: false,
+            need_broken: false,
             back_sign: Vec::new(),
         }
     }
@@ -993,21 +993,33 @@ impl<'input> Iterator for Lexer<'input> {
 
     /// 下一个Token
     fn next(&mut self) -> Option<Self::Item> {
-        if self.found_let {
+        if self.need_broken {
             if !self.back_sign.is_empty() {
                 return self.back_sign.pop().unwrap();
             }
         }
         let mut token = self.next();
+        //暂时先这样粗糙的判断下，感觉不太对
         if let Some(Ok((_, Token::Let, _))) = token {
-            self.found_let = true;
+            self.need_broken = true;
         }
-
+        if let Some(Ok((_, Token::Enum, _))) = token {
+            self.need_broken = true;
+        }
+        if let Some(Ok((_, Token::Struct, _))) = token {
+            self.need_broken = true;
+        }
+        if let Some(Ok((_, Token::Function, _))) = token {
+            self.need_broken = true;
+        }
         if let Some(Ok((_, Token::Semicolon, _))) = token {
-            self.found_let = false;
+            self.need_broken = false;
+        }
+        if let Some(Ok((_, Token::OpenCurlyBrace, _))) = token {
+            self.need_broken = false;
         }
 
-        if self.found_let {
+        if self.need_broken {
             if let Some(Ok((a, Token::MoreEqual, b))) = token {
                 self.back_sign.push(Some(Ok((a, Token::Assign, b))));
                 self.back_sign.push(Some(Ok((a, Token::More, b))));
@@ -1023,7 +1035,7 @@ impl<'input> Iterator for Lexer<'input> {
                 return self.back_sign.pop().unwrap();
             }
             if let Some(Ok((a, Token::Assign, b))) = token {
-                self.found_let = false;
+                self.need_broken = false;
             }
         }
         self.last_tokens = [

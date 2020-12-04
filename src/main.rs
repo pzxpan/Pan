@@ -43,7 +43,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo/").join("structs.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo/core").join("result.pan"));
 
     //test_all_demo_file();
 }

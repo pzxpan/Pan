@@ -89,16 +89,10 @@ impl Frame {
         self.lasti.set(self.lasti.get() + 1);
         ins2
     }
-
-    // thread_id:ThreadId(2),instruction is:LoadConst(Code(<code object aabb at ??? file "/Users/panzhenxing/Desktop/PanPan/Pan/demo/structs.pan", line 31>)),
-    // thread_id:ThreadId(2),instruction is:LoadConst(String("older_than.<locals>.aabb")),
-    // thread_id:ThreadId(2),instruction is:MakeFunction,
-    // thread_id:ThreadId(2),instruction is:StoreName("aabb", Local),
-    // thread_id:ThreadId(2),instruction is:LoadName("$default$aabb", Local),
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
         let instruction = self.fetch_instruction();
-        println!("instruction is:{:?},", instruction);
+      //  println!("instruction is:{:?},", instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();

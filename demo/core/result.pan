@@ -39,7 +39,7 @@ pub enum Result<T, E> {
         }
      }
 
-    pub fun and_then<U, F: fun(T) -> Result<U, E> > (op: F) : Result<U, E> {
+    pub fun and_then<U, F: fun(T) -> Result<U, E>> (op: F) : Result<U, E> {
            match self {
                Ok(t) -> return op(t);
                Err(e) -> return Err(e);
