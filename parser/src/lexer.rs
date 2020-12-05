@@ -68,6 +68,7 @@ pub enum Token<'input> {
     String,
     Semicolon,
     TwoDot,
+    RangeInclude,
     WhiteSpace,
     All,
     ReadOnlyRef,
@@ -178,6 +179,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Char(c) => write!(f, "{:?}", c),
 
             Token::TwoDot => write!(f, ".."),
+            Token::RangeInclude => write!(f, "..="),
             Token::WhiteSpace => write!(f, " "),
             Token::All => write!(f, ".*"),
             Token::ReadOnlyRef => write!(f, "ref"),
@@ -354,6 +356,7 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "in" => Token::In,
     "pub" => Token::Pub,
     ".." => Token::TwoDot,
+    "..=" => Token::RangeInclude,
     "_" => Token::Hole,
     "ref" => Token::ReadOnlyRef,
 };
@@ -945,7 +948,15 @@ impl<'input> Lexer<'input> {
                     match *ch {
                         '.' => {
                             self.chars.next();
-                            return Some(Ok((self.row, Token::TwoDot, self.column)));
+                            if let Some((_, cch)) = self.chars.peek() {
+                                match *cch {
+                                    '=' => {
+                                        self.chars.next();
+                                        return Some(Ok((self.row, Token::RangeInclude, self.column)));
+                                    }
+                                    _ => { return Some(Ok((self.row, Token::TwoDot, self.column))); }
+                                }
+                            }
                         }
                         '*' => {
                             self.chars.next();

@@ -41,5 +41,10 @@ fun main() {
         _ -> {print("C");}
    }
    print(c);
+   let sum = 0;
+   for a in 0..100 {
+      sum += a;
+   }
+   print(sum);
    return;
 }

@@ -684,14 +684,14 @@ impl HasType for Expression {
                     });
                 }
             }
-            Expression::Range(loc, start, end) => {
+            Expression::Range(loc, start, end, include) => {
                 let mut l = CType::Unknown;
                 let mut r = CType::Unknown;
-                if start.is_some() {
-                    l = start.as_ref().unwrap().get_type(&tables)?;
+                if start.as_ref().is_some() {
+                    l = start.as_ref().as_ref().unwrap().get_type(&tables)?;
                 }
-                if end.is_some() {
-                    r = end.as_ref().unwrap().get_type(&tables)?;
+                if end.as_ref().is_some() {
+                    r = end.as_ref().as_ref().unwrap().get_type(&tables)?;
                 }
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
                 //0..100

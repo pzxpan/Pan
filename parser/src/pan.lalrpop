@@ -361,9 +361,33 @@ ObjAttribute: Expression = {
      },
 }
 
+Range : Expression = {
+   <l:@L> <c:Precedence0?> ".."  <d:Identifier> <r:@R>=> {
+       Expression::Range(Loc(file_no, l, r),Box::new(c),Box::new(Some(Expression::Variable(d))),false)
+   },
+   <l:@L> <c:Precedence0?> "..="  <d:Identifier> <r:@R>=> {
+          Expression::Range(Loc(file_no, l, r),Box::new(c),Box::new(Some(Expression::Variable(d))),true)
+      },
+   <a:@L> <e:Precedence0?> ".." <n:LexNumber> <b:@R> => {
+      let s: String = n.chars().filter(|v| *v != '_').collect();
+      let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
+      Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::NumberLiteral(Loc(file_no, a, b), num))),false)
+   },
+   <a:@L> <e:Precedence0?> "..=" <n:LexNumber> <b:@R> => {
+         let s: String = n.chars().filter(|v| *v != '_').collect();
+         let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
+         Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::NumberLiteral(Loc(file_no, a, b), num))),true)
+      },
+
+   <a:@L> <e:Precedence0?> ".."  <b:@R> => {
+       Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(None),false)
+   },
+
+}
+
 
 Precedence0: Expression = {
-
+    <Range> => <>,
     <FunctionCall> => <>,
     <ObjAttribute> => <>,
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),
@@ -423,10 +447,10 @@ Parameter: Parameter = {
         let loc = Loc(file_no, l, r);
         Parameter{ loc, ty, mut_own, name,default:e,is_varargs:false }
     },
-    <l:@L> <name:Identifier?> ".." <r:@R> => {
-        let loc = Loc(file_no, l, r);
-        Parameter{loc, ty:Type::Array(Identifier{loc: Loc(file_no, l, r), name: "Any".to_string()},0), mut_own: None, name,default:None,is_varargs:true}
-    }
+   // <l:@L> <name:Identifier?> ".." <r:@R> => {
+  //      let loc = Loc(file_no, l, r);
+    //    Parameter{loc, ty:Type::Array(Identifier{loc: Loc(file_no, l, r), name: "Any".to_string()},0), mut_own: None, name,default:None,is_varargs:true}
+  //  }
 }
 
 OptParameter: (Loc, Option<Parameter>) = {
@@ -511,9 +535,9 @@ Statement: Statement = {
    <l:@L> "for"  <b:Expression>  "in"  <c:Expression>  <block:BlockStatement> <r:@R> => {
       Statement::For(Loc(file_no, l, r), b, c,Some(Box::new(block)))
    },
-   <l:@L> "for"  <b:Expression>  "in"  <c:Precedence0> ".." <d:Precedence0> <block:BlockStatement> <r:@R> => {
-         Statement::For(Loc(file_no, l, r), b, Expression::Range(Loc(file_no, l, r), Some(Box::new(c)),Some(Box::new(d))),Some(Box::new(block)))
-       },
+  // <l:@L> "for"  <b:Expression>  "in"  <c:Precedence0> ".." <d:Precedence0> <block:BlockStatement> <r:@R> => {
+   //      Statement::For(Loc(file_no, l, r), b, Expression::Range(Loc(file_no, l, r),Box::new(Some(c)),Box::new(Some(d))),Some(Box::new(block)))
+    //   },
    <l:@L> "match"  <e:Expression>  "{" <b1:( <Expression> "->"  <Statement>)*> "}" <r:@R> => {
         let a = b1.iter().map(|s| (Box::new(s.0.clone()),Box::new(s.1.clone()))).collect();
         Statement::Match(Loc(file_no, l, r),e,a)
@@ -602,6 +626,7 @@ extern {
         " " => Token::WhiteSpace,
         ";" => Token::Semicolon,
         ".." => Token::TwoDot,
+        "..=" => Token::RangeInclude,
         ".*" => Token::All,
         "::" => Token::TwoColon,
         "ref" => Token::ReadOnlyRef,

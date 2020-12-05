@@ -352,7 +352,7 @@ pub enum Expression {
     AssignShiftRight(Loc, Box<Expression>, Box<Expression>),
 
     Subscript(Loc, Box<Expression>, Box<Expression>),
-    Range(Loc, Option<Box<Expression>>, Option<Box<Expression>>),
+    Range(Loc, Box<Option<Expression>>, Box<Option<Expression>>, bool/*是否后闭区间*/),
     Slice(Loc, Vec<Expression>),
     Attribute(Loc, Box<Expression>, Option<Identifier>, Option<i32>),
     Unit(Loc, Box<Expression>, Vec<Identifier>),

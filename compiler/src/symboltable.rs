@@ -1788,7 +1788,7 @@ impl SymbolTableBuilder {
                 }
             }
             MatchExpression(_, _, _) => {}
-            Range(_, _, _) => {}
+            Range(_, _, _, _) => {}
             Hole(_) => {}
             //DestructEqual(_, _, _) => {}
             Error => {}

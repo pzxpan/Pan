@@ -1100,7 +1100,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::SetupLoop(start_label, end_label));
 
         self.compile_expression(iter)?;
-        if let Expression::Range(_, _, _) = iter {
+        if let Expression::Range(..) = iter {
             self.emit(Instruction::BuildRange);
         } else {
             self.emit(Instruction::GetIter);
@@ -1542,17 +1542,17 @@ impl<O: OutputStream> Compiler<O> {
 
                 self.set_label(end_label);
             }
-            Range(loc, start, end) => {
+            Range(loc, start, end, include) => {
                 if start.is_none() {
                     self.emit(Instruction::LoadConst(Constant::I32(0)));
                 } else {
-                    self.compile_expression(start.as_ref().unwrap());
+                    self.compile_expression(&start.as_ref().as_ref().unwrap());
                 }
 
                 if end.is_none() {
                     self.emit(Instruction::LoadConst(Constant::I32(2147483647)));
                 } else {
-                    self.compile_expression(end.as_ref().unwrap());
+                    self.compile_expression(&end.as_ref().as_ref().unwrap());
                 }
             }
             _ => {}
