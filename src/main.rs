@@ -56,7 +56,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo/core").join("option.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("match.pan"));
 
     //test_all_demo_file();
 }

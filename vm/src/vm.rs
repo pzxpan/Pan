@@ -321,6 +321,12 @@ impl VirtualMachine {
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a == b)
             }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::String(a), Value::String(b)) => {
+                Value::Bool(a == b)
+            }
             //TODO
             (Value::Obj(a), Value::Obj(b)) => {
                 Value::Bool(true)

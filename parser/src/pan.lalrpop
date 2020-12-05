@@ -423,7 +423,7 @@ Parameter: Parameter = {
         let loc = Loc(file_no, l, r);
         Parameter{ loc, ty, mut_own, name,default:e,is_varargs:false }
     },
-    <l:@L>".." <name:Identifier?> <r:@R> => {
+    <l:@L> <name:Identifier?> ".." <r:@R> => {
         let loc = Loc(file_no, l, r);
         Parameter{loc, ty:Type::Array(Identifier{loc: Loc(file_no, l, r), name: "Any".to_string()},0), mut_own: None, name,default:None,is_varargs:true}
     }

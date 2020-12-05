@@ -1147,7 +1147,7 @@ impl SymbolTableBuilder {
                             location: loc.clone(),
                         });
                     }
-                } else if ty >= CType::I8 && ty < CType::Float {
+                } else if (ty >= CType::Char && ty < CType::Float) || ty == CType::Str {
                     let mut found_hole = false;
                     for (expr, item) in items.iter() {
                         let mut name = expr.expr_name();
@@ -1167,7 +1167,7 @@ impl SymbolTableBuilder {
                     }
                 } else {
                     return Err(SymbolTableError {
-                        error: format!("关键字类型不是迭代类型{:?}", test),
+                        error: format!("只支持char,string,整数类型、enum类型作为比较关键字{:?}", test),
                         location: loc.clone(),
                     });
                 }
