@@ -18,7 +18,7 @@ use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds,
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
-use crate::util::get_pos_lambda_name;
+use crate::util::{get_pos_lambda_name, get_package_name};
 use crate::util::get_attribute_vec;
 use std::process::{exit, id};
 use crate::util::get_full_name;
@@ -1200,11 +1200,39 @@ impl SymbolTableBuilder {
                     });
                 }
             }
-            Statement::Destruct(loc, _, _) => {}
+            Statement::Destruct(loc, names, statement) => {
+                let scope_name = get_package_name(names);
+                self.enter_scope(&scope_name, SymbolTableType::Block, loc.1);
+                for item in names.iter().map(|s| s.name.clone()) {
+                    let ty = self.get_register_type(item.clone())?;
+                    let tty = self.get_exhaust_ty(ty);
+                    self.register_name(&item, tty, SymbolUsage::Used, loc.clone())?;
+                }
+                self.scan_statement(statement)?;
+                self.leave_scope();
+            }
         }
         Ok(())
     }
 
+    fn get_exhaust_ty(&self, ty: CType) -> CType {
+        if let Enum(ety) = ty.clone() {
+            if ty.name().eq("Option") || ty.name().eq("Result") {
+                println!("ety:{:?},", ety);
+                let tty = ety.generics.unwrap();
+                let tty = tty.get(0).unwrap();
+                if let CType::Generic(_, sty) = tty {
+                    println!("sty:{:?},", sty);
+                    if let Enum(sety) = sty.as_ref() {
+                        return self.get_exhaust_ty(sty.as_ref().clone());
+                    } else {
+                        return sty.as_ref().clone();
+                    }
+                }
+            }
+        }
+        return ty;
+    }
     fn get_test_item(&self, enum_type: &EnumType) -> HashSet<String> {
         let mut hash_set: HashSet<String> = HashSet::new();
         for item in &enum_type.items {
@@ -2072,7 +2100,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        //println!("register_name:{:?},ty:{:?}", name, ty);
+        println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());

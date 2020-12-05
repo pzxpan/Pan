@@ -159,7 +159,7 @@ impl VirtualMachine {
             bytecode::NameScope::Local => load_name(name.to_string(), idx),
             bytecode::NameScope::Const => load_global(name.to_string()),
         };
-       // println!("load_name:{:?},value:{:?}", name, optional_value);
+        // println!("load_name:{:?},value:{:?}", name, optional_value);
         match optional_value {
             Some(value) => value,
             None => {
@@ -292,6 +292,7 @@ impl VirtualMachine {
         }
         return update_value;
     }
+
 
     pub fn _match(&self, obj: Value, b: Value) -> (Value, Vec<Value>) {
         match obj {
@@ -568,6 +569,7 @@ impl VirtualMachine {
         }
     }
     pub fn add(&self, a: Value, b: Value) -> Value {
+        println!("value:{:?},v2:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)

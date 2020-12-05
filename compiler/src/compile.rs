@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, Constant};
 use pan_bytecode::value::*;
-use pan_parser::ast::{Loc, Number};
+use pan_parser::ast::{Loc, Number, Identifier};
 use pan_parser::diagnostics::ErrorType;
 use pan_parser::{ast, parse};
 use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType, Import};
@@ -107,7 +107,7 @@ pub fn compile(
     if ast.is_ok() {
         let module_name = get_mod_name(source_path.clone());
         let module = ast.unwrap();
-        let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(module.package) };
+        let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(&module.package) };
         compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
                 err.source_path = Some(source_path);
@@ -515,11 +515,51 @@ impl<O: OutputStream> Compiler<O> {
                 //弹出被比较的数据
                 self.emit(Instruction::Pop);
             }
+            Destruct(loc, names, body) => {
+                self.compile_exaust_unwrap(names, body.as_ref());
+            }
             _ => {}
         }
         Ok(())
     }
 
+    fn compile_exaust_unwrap(&mut self, names: &Vec<Identifier>, body: &ast::Statement) -> Result<(), CompileError> {
+        let end_label = self.new_label();
+        let mut out_side_tys = Vec::new();
+        for name in names.iter().map(|s| s.name.clone()) {
+            let ty = self.lookup_name(name.clone().as_str()).ty.clone();
+            out_side_tys.push(ty);
+        }
+        self.enter_scope();
+        for (ty, name) in out_side_tys.iter().zip(names.iter().map(|s| s.name.clone())) {
+            self.emit(Instruction::LoadName(name.clone(), NameScope::Local));
+            self.get_exhaust_ty(name.clone(), ty, end_label);
+            self.emit(Instruction::StoreName(name.clone(), NameScope::Local));
+        }
+        self.compile_statement(body)?;
+        self.leave_scope();
+        self.set_label(end_label);
+        Ok(())
+    }
+
+    fn get_exhaust_ty(&mut self, name: String, ty: &CType, end: Label) {
+        if let CType::Enum(ety) = ty.clone() {
+            if ty.name().eq("Option") {
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(("Some").to_string())));
+            } else if ty.name().eq("Result") {
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(("Ok").to_string())));
+            }
+            self.emit(Instruction::Match);
+            self.emit(Instruction::JumpIfFalse(end));
+            let tty = ety.generics.unwrap();
+            let tty = tty.get(0).unwrap();
+            if let CType::Generic(_, sty) = tty {
+                if let CType::Enum(sety) = sty.as_ref() {
+                    self.get_exhaust_ty(name.clone(), sty.as_ref(), end);
+                }
+            }
+        }
+    }
     fn compile_match_item(&mut self, expression: &Expression) -> Result<(), CompileError> {
         if let Expression::FunctionCall(_, name, _) = expression {
             if let Expression::Attribute(_, _, Some(ident), _) = name.as_ref() {
