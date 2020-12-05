@@ -1200,6 +1200,7 @@ impl SymbolTableBuilder {
                     });
                 }
             }
+            Statement::Destruct(loc, _, _) => {}
         }
         Ok(())
     }
@@ -1354,7 +1355,7 @@ impl SymbolTableBuilder {
 //     false, is_mut: true, is_static: true, has_body: true }))], methods: [("idea", Fn(FnType { name: "idea", arg_types: [], type_args: [],
 // ret_type: Bool, is_varargs: false, is_pub: false, is_mut: true, is_static: false, has_body: true }))], bases: [], is_pub: true }),"house"
 
-fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> SymbolTableResult {
+    fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> SymbolTableResult {
         match part {
             MultiDeclarationPart::Single(ident) => {
                 self.register_name(ident.name.borrow(), ty.clone(), SymbolUsage::Mut, ident.loc)?;
@@ -1745,6 +1746,7 @@ fn scan_multi_value_part(&mut self, part: &MultiDeclarationPart, ty: &CType) -> 
             MatchExpression(_, _, _) => {}
             Range(_, _, _) => {}
             Hole(_) => {}
+            //DestructEqual(_, _, _) => {}
             Error => {}
         }
         Ok(())

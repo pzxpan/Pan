@@ -539,6 +539,10 @@ SimpleStatement: Statement = {
 NonIfStatement: Statement = {
     BlockStatement => <>,
     <SimpleStatement> ";" => <>,
+    <l:@L> <names:CommaOne<(<Identifier> "!!")>> <s:BlockStatement> <r:@R> => {
+        //let a = names.iter().map(|s| s.0).collect();
+        Statement::Destruct(Loc(file_no, l, r),names,Box::new(s))
+     },
     <l:@L> "continue" <r:@R> ";" => {
         Statement::Continue(Loc(file_no, l, r))
     },
@@ -636,6 +640,7 @@ extern {
         "<=" => Token::LessEqual,
         ">" => Token::More,
         ">=" => Token::MoreEqual,
+        "!!" => Token::Destruct,
         "|" => Token::BitwiseOr,
         "&" => Token::BitwiseAnd,
         "^" => Token::BitwiseXor,

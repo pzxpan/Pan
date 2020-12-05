@@ -380,6 +380,7 @@ pub enum Expression {
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
     IfExpression(Loc, Box<Expression>, Box<Expression>, Box<Expression>),
     MatchExpression(Loc, Box<Expression>, Vec<(Box<Expression>, Box<Expression>)>),
+
     Hole(Loc),
     Error,
 }
@@ -620,6 +621,7 @@ pub enum Statement {
     ConstDefinition(Loc, VariableDeclaration, Option<Expression>),
     While(Loc, Expression, Box<Statement>),
     Match(Loc, Expression, Vec<(Box<Expression>, Box<Statement>)>),
+    Destruct(Loc, Vec<Identifier>, Box<Statement>),
     For(
         Loc,
         Expression,
@@ -650,7 +652,8 @@ impl Statement {
             | Statement::Break(loc)
             | Statement::ConstDefinition(loc, _, _)
             | Statement::Match(loc, _, _)
-            | Statement::Return(loc, _) => *loc,
+            | Statement::Return(loc, _)
+            | Statement::Destruct(loc, _, _) => *loc,
         }
     }
 }

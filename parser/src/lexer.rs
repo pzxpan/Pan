@@ -128,6 +128,8 @@ pub enum Token<'input> {
     More,
     MoreEqual,
 
+    Destruct,
+
     Member,
     Colon,
     TwoColon,
@@ -213,6 +215,7 @@ impl<'input> fmt::Display for Token<'input> {
             Token::ShiftLeftAssign => write!(f, "<<="),
             Token::More => write!(f, ">"),
             Token::MoreEqual => write!(f, ">="),
+            Token::Destruct => write!(f, "!!"),
             Token::Mod => write!(f, "mod"),
             Token::Member => write!(f, "."),
             Token::TwoColon => write!(f, "::"),
@@ -810,6 +813,10 @@ impl<'input> Lexer<'input> {
                     if let Some((_, '=')) = self.chars.peek() {
                         self.chars.next();
                         return Some(Ok((self.row, Token::NotEqual, self.column)));
+                    }
+                    if let Some((_, '!')) = self.chars.peek() {
+                        self.chars.next();
+                        return Some(Ok((self.row, Token::Destruct, self.column)));
                     } else {
                         return Some(Ok((self.row, Token::Not, self.column)));
                     }
@@ -1002,20 +1009,15 @@ impl<'input> Iterator for Lexer<'input> {
         //暂时先这样粗糙的判断下，感觉不太对
         if let Some(Ok((_, Token::Let, _))) = token {
             self.need_broken = true;
-        }
-        if let Some(Ok((_, Token::Enum, _))) = token {
+        } else if let Some(Ok((_, Token::Enum, _))) = token {
             self.need_broken = true;
-        }
-        if let Some(Ok((_, Token::Struct, _))) = token {
+        } else if let Some(Ok((_, Token::Struct, _))) = token {
             self.need_broken = true;
-        }
-        if let Some(Ok((_, Token::Function, _))) = token {
+        } else if let Some(Ok((_, Token::Function, _))) = token {
             self.need_broken = true;
-        }
-        if let Some(Ok((_, Token::Semicolon, _))) = token {
+        } else if let Some(Ok((_, Token::Semicolon, _))) = token {
             self.need_broken = false;
-        }
-        if let Some(Ok((_, Token::OpenCurlyBrace, _))) = token {
+        } else if let Some(Ok((_, Token::OpenCurlyBrace, _))) = token {
             self.need_broken = false;
         }
 

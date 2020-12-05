@@ -27,6 +27,19 @@ struct aaa<A, B> {
     pub b: B,
 }
 
+fn neverend() -> i32 {
+    loop {}
+    return 10;
+}
+
+fn test() -> i32 {
+    let a = 30;
+    if a > neverend() {
+        return a;
+    } else {
+        return neverend();
+    }
+}
 
 fn main() {
     // let num = 1000;
@@ -43,7 +56,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    test_one_file(&env::current_dir().unwrap().join("demo/core").join("intrinsics.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo/core").join("option.pan"));
 
     //test_all_demo_file();
 }
