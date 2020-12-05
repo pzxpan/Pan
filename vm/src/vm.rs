@@ -569,7 +569,6 @@ impl VirtualMachine {
         }
     }
     pub fn add(&self, a: Value, b: Value) -> Value {
-        println!("value:{:?},v2:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)

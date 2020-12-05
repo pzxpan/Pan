@@ -1005,6 +1005,10 @@ impl SymbolTableBuilder {
                                        decl.ty.as_ref().unwrap().get_type(&self.tables)?,
                                        muttable.clone(), decl.loc)?;
                 }
+                // Some(FunctionCall(Loc(1, 24, 39), Attribute(Loc(1, 24, 23),
+                //                                             Variable(Identifier { loc: Loc(1, 24, 18), name: "Option" }),
+                //                                             Some(Identifier { loc: Loc(1, 24, 23), name: "Some" }), None),
+                //                   [FunctionCall(Loc(1, 24, 38), Attribute(Loc(1, 24, 35), Variable(Identifier { loc: Loc(1, 24, 30), name: "Option" }), Some(Identifier { loc: Loc(1, 24, 35), name: "Some" }), None), [NumberLiteral(Loc(1, 24, 37), 20)])])),
 
                 if let Some(e) = expression {
                     self.scan_expression(e, &ExpressionContext::Load)?;
@@ -1048,44 +1052,12 @@ impl SymbolTableBuilder {
                                         ty = self.get_register_type(name)?;
                                     }
                                     self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
-                                } else if let ast::Expression::Attribute(_, n, Some(ident), _) = name.as_ref() {
+                                } else if let ast::Expression::Attribute(loc, n, Some(ident), _) = name.as_ref() {
                                     ty = self.get_register_type(n.expr_name())?;
                                     ty = self.resovle_method(name, &ty)?;
 
                                     if ty.is_generic() {
-                                        let a = ty.attri_name_type(ident.name.clone());
-                                        let mut attri_type_name: Vec<String> = Vec::new();
-                                        if let CType::Reference(_, nty) = a.1 {
-                                            for ty in nty.iter() {
-                                                if let Generic(n, _) = ty {
-                                                    attri_type_name.push(n.clone());
-                                                }
-                                            }
-                                        }
-                                        if let CType::Enum(ety) = ty.clone() {
-                                            let mut v = HashMap::new();
-                                            for arg in args.iter().enumerate() {
-                                                v.insert(attri_type_name.get(arg.0).unwrap().clone(), arg.1.get_type(&self.tables)?);
-                                            }
-                                            ty = CType::Enum(resolve_enum_generic_fn(ety, v));
-                                        } else if let CType::Fn(fnty) = ty.clone() {
-                                            let obj_ty = self.get_register_type(n.expr_name())?;
-                                            let mut v = Vec::new();
-                                            for arg in args {
-                                                let mut ty = self.get_register_type(arg.expr_name())?;
-                                                if ty == CType::Unknown {
-                                                    ty = arg.get_type(&self.tables)?;
-                                                }
-                                                if ty == CType::Unknown {
-                                                    return Err(SymbolTableError {
-                                                        error: format!("变量{:?},未定义", arg.expr_name()),
-                                                        location: location.clone(),
-                                                    });
-                                                }
-                                                v.push(ty);
-                                            }
-                                            ty = resolve_function_call_generic(&obj_ty, &ty, &v, &self.tables)?;
-                                        }
+                                        ty = self.get_recurse_ty(&ty, n.expr_name(), ident.name.clone(), args, loc.clone())?;
                                     }
                                     if let CType::Generic(_, cty) = ty.clone() {
                                         ty = cty.as_ref().clone();
@@ -1214,15 +1186,59 @@ impl SymbolTableBuilder {
         }
         Ok(())
     }
-
+    fn get_recurse_ty(&self, ty: &CType, obj_name: String, attri_name: String, args: &Vec<Expression>, loc: ast::Loc) -> Result<CType, SymbolTableError> {
+        let mut return_ty = ty.clone();
+        let a = ty.attri_name_type(attri_name);
+        let mut attri_type_name: Vec<String> = Vec::new();
+        if let CType::Reference(_, nty) = a.1 {
+            for ty in nty.iter() {
+                if let Generic(n, _) = ty {
+                    attri_type_name.push(n.clone());
+                }
+            }
+        }
+        if let CType::Enum(ety) = ty.clone() {
+            let mut v = HashMap::new();
+            for arg in args.iter().enumerate() {
+                let v_ty = arg.1.get_type(&self.tables)?;
+                if v_ty.is_generic() {
+                    if let ast::Expression::FunctionCall(loc1, n, args1) = arg.1.clone() {
+                        if let ast::Expression::Attribute(_, name, ident, _) = n.as_ref() {
+                            let r_ty = self.get_recurse_ty(&v_ty, name.expr_name(), ident.as_ref().unwrap().name.clone(), &args1, loc1)?;
+                            v.insert(attri_type_name.get(arg.0).unwrap().clone(), r_ty);
+                        }
+                    }
+                } else {
+                    v.insert(attri_type_name.get(arg.0).unwrap().clone(), v_ty);
+                }
+            }
+            return_ty = CType::Enum(resolve_enum_generic_fn(ety, v));
+        } else if let CType::Fn(fnty) = ty.clone() {
+            let obj_ty = self.get_register_type(obj_name)?;
+            let mut v = Vec::new();
+            for arg in args {
+                let mut ty = self.get_register_type(arg.expr_name())?;
+                if ty == CType::Unknown {
+                    ty = arg.get_type(&self.tables)?;
+                }
+                if ty == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("变量{:?},未定义", arg.expr_name()),
+                        location: loc.clone(),
+                    });
+                }
+                v.push(ty);
+            }
+            return_ty = resolve_function_call_generic(&obj_ty, &ty, &v, &self.tables)?;
+        }
+        return Ok(return_ty);
+    }
     fn get_exhaust_ty(&self, ty: CType) -> CType {
         if let Enum(ety) = ty.clone() {
             if ty.name().eq("Option") || ty.name().eq("Result") {
-                println!("ety:{:?},", ety);
                 let tty = ety.generics.unwrap();
                 let tty = tty.get(0).unwrap();
                 if let CType::Generic(_, sty) = tty {
-                    println!("sty:{:?},", sty);
                     if let Enum(sety) = sty.as_ref() {
                         return self.get_exhaust_ty(sty.as_ref().clone());
                     } else {
@@ -2100,7 +2116,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        println!("register_name:{:?},ty:{:?}", name, ty);
+        //println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());

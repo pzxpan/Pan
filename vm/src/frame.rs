@@ -92,7 +92,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
         let instruction = self.fetch_instruction();
-        println!("instruction is:{:?},", instruction);
+        //println!("instruction is:{:?},", instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -265,16 +265,13 @@ impl Frame {
             bytecode::Instruction::Match => {
                 let a = self.pop_value();
                 let b = self.last_value();
-                println!("a:{:?},b:{:?}", a, b);
                 if let Value::Obj(_) = b {
-                    println!("dddd");
                     let (matched, values) = vm._match(b, a);
                     for value in values {
                         self.push_value(value);
                     }
                     self.push_value(matched)
                 } else {
-                    println!("2222dddd");
                     self.push_value(vm._eq(a, b));
                 }
 
