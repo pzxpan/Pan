@@ -225,7 +225,6 @@ pub enum BinaryOperator {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum UnaryOperator {
     Not,
-    Invert,
     Minus,
     Plus,
 }

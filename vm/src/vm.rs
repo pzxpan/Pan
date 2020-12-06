@@ -1188,31 +1188,47 @@ impl VirtualMachine {
     pub fn neg(&self, value: Value) -> Value {
         println!("ddd:{:?}", value);
         match value {
+            Value::I8(i) => Value::I8(-i),
+            Value::I16(i) => Value::I16(-i),
             Value::I32(i) => Value::I32(-i),
+            Value::I64(i) => Value::I64(-i),
+            Value::I128(i) => Value::I128(-i),
+            Value::ISize(i) => Value::ISize(-i),
             Value::Float(i) => Value::Float(-i),
-            _ => unreachable!()
+
+            _ => { return value; }
         }
     }
     pub fn plus(&self, value: Value) -> Value {
         match value {
-            Value::I32(i) => Value::I32(i),
-            Value::Float(i) => Value::Float(i),
-            _ => unreachable!()
+            Value::I8(i) => if i < 0 { Value::I8(-i) } else { value },
+            Value::I16(i) => if i < 0 { Value::I16(-i) } else { value },
+            Value::I32(i) => if i < 0 { Value::I32(-i) } else { value },
+            Value::I64(i) => if i < 0 { Value::I64(-i) } else { value },
+            Value::I128(i) => if i < 0 { Value::I128(-i) } else { value },
+            Value::ISize(i) => if i < 0 { Value::ISize(-i) } else { value },
+            _ => { return value; }
         }
     }
     pub fn not(&self, value: Value) -> Value {
         match value {
             Value::Bool(i) => Value::Bool(!i),
-            _ => unreachable!()
+            Value::I8(i) => Value::I8(!i),
+            Value::I16(i) => Value::I16(!i),
+            Value::I32(i) => Value::I32(!i),
+            Value::I64(i) => Value::I64(!i),
+            Value::I128(i) => Value::I128(!i),
+            Value::ISize(i) => Value::ISize(!i),
+            Value::U8(i) => Value::U8(!i),
+            Value::U16(i) => Value::U16(!i),
+            Value::U32(i) => Value::U32(!i),
+            Value::U64(i) => Value::U64(!i),
+            Value::U128(i) => Value::U128(!i),
+            Value::USize(i) => Value::USize(!i),
+            _ => { return value; }
         }
     }
 
-    pub fn invert(&self, value: Value) -> Value {
-        match value {
-            Value::I32(i) => Value::I32(!i),
-            _ => unreachable!()
-        }
-    }
 
     pub fn unwrap_constant(&mut self, value: &bytecode::Constant) -> Value {
         use bytecode::Constant::*;

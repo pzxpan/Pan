@@ -654,7 +654,6 @@ impl Frame {
         let value = match *op {
             bytecode::UnaryOperator::Minus => vm.neg(a),
             bytecode::UnaryOperator::Plus => vm.plus(a),
-            bytecode::UnaryOperator::Invert => vm.invert(a),
             bytecode::UnaryOperator::Not => vm.not(a),
         };
         self.push_value(value);

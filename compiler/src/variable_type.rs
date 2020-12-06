@@ -649,9 +649,12 @@ impl HasType for Expression {
             Expression::LessEqual(loc, _, _) |
             Expression::And(loc, _, _) |
             Expression::Or(loc, _, _) |
-            Expression::Not(loc, _) |
             Expression::BoolLiteral(loc, _)
             => { Ok(CType::Bool) }
+
+            Expression::Not(loc, e) => {
+                return e.get_type(tables);
+            }
             Expression::FunctionCall(_, name, _) => {
                 //  println!("&name.get_type(&table):{:?},", &name);
                 if let Expression::Variable(n) = name.as_ref() {

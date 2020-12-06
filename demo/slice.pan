@@ -29,5 +29,9 @@ fun main() {
    let ceshi = "ceshi";
    let cc = ceshi[2..=4];
    print(cc);
+
+   let a = 0b110011;
+   let bb = !a;
+   print("{:b}",bb);
    return;
 }

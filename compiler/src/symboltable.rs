@@ -1581,7 +1581,7 @@ impl SymbolTableBuilder {
                 if let Fn(_) = ty {
                     ty = ty.ret_type().clone();
                 }
-                if ty == CType::Bool {
+                if ty == CType::Bool || CType::I8 <= ty && ty <= CType::U128 {
                     self.scan_expression(name, &ExpressionContext::Load)?;
                 } else {
                     return Err(SymbolTableError {
