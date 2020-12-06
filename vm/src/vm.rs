@@ -318,14 +318,47 @@ impl VirtualMachine {
 
     pub fn _eq(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a == b)
+            }
             (Value::I32(a), Value::I32(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
                 Value::Bool(a == b)
             }
             (Value::Char(a), Value::Char(b)) => {
                 Value::Bool(a == b)
             }
             (Value::String(a), Value::String(b)) => {
-                Value::Bool(a == b)
+                Value::Bool(a.eq(&b))
             }
             //TODO
             (Value::Obj(a), Value::Obj(b)) => {
@@ -343,8 +376,47 @@ impl VirtualMachine {
 
     pub fn _ne(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a != b)
+            }
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a != b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::String(a), Value::String(b)) => {
+                Value::Bool(a.ne(&b))
             }
             _ => unreachable!()
         }
@@ -487,7 +559,40 @@ impl VirtualMachine {
 
     pub fn _le(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a <= b)
+            }
             (Value::I32(a), Value::I32(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
                 Value::Bool(a <= b)
             }
             (Value::Char(a), Value::Char(b)) => {
@@ -499,7 +604,40 @@ impl VirtualMachine {
 
     pub fn _ge(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a >= b)
+            }
             (Value::I32(a), Value::I32(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
                 Value::Bool(a >= b)
             }
             (Value::Char(a), Value::Char(b)) => {
@@ -511,10 +649,40 @@ impl VirtualMachine {
 
     pub fn _gt(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a > b)
+            }
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a > b)
             }
-            (Value::Float(a), Value::Float(b)) => {
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
                 Value::Bool(a > b)
             }
             (Value::Char(a), Value::Char(b)) => {
@@ -526,7 +694,40 @@ impl VirtualMachine {
 
     pub fn _lt(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a < b)
+            }
             (Value::I32(a), Value::I32(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
                 Value::Bool(a < b)
             }
             (Value::Char(a), Value::Char(b)) => {

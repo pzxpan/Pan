@@ -3,8 +3,8 @@ package default;
 
 fun main() {
    let num = 1000;
-   if num > 30 && num < 100 {
-    print("ok");
+   for i in -10 .. 20 {
+        print(i);
    }
 
    match num {
@@ -18,8 +18,13 @@ fun main() {
 
    let c = 'c';
    match c {
-    'a'..'d' -> {print("ok");}
-    _ -> {print("not_ok");}
+    'a'..'d' -> {print("ok"); print("ddd");}
+    _ -> print("not_ok");
+   }
+   let ccc = "pan";
+   match ccc {
+    "pan" -> {print("ok:{}",ccc);}
+    _ -> {print("err");}
    }
    let ceshi = "ceshi";
    let cc = ceshi[2..=4];
