@@ -1727,7 +1727,9 @@ impl SymbolTableBuilder {
             Dict(_, entries) => {
                 for entry in entries {
                     self.scan_expression(&entry.key, context)?;
-                    self.scan_expression(&entry.value, context)?;
+                    if entry.value.is_some() {
+                        self.scan_expression(&entry.value.as_ref().unwrap(), context)?;
+                    }
                 }
             }
             Set(_, elements) => {

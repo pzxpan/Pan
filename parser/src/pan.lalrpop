@@ -330,14 +330,12 @@ NamedArgument: NamedArgument = {
 }
 
 DictEntry: DictEntry = {
-    <l:@L> <key:StringLiteral+> ":" <value:Expression> <r:@R> => {
-        DictEntry{ loc: Loc(file_no, l, r),key:Expression::StringLiteral(key), value }
+    <l:@L> <key:StringLiteral+> <value:(":" Expression)?> <r:@R> => {
+        DictEntry{ loc: Loc(file_no, l, r),key:Expression::StringLiteral(key),value:value.map(|s|s.1) }
     },
-    <l:@L> <n:LexNumber> ":" <value:Expression> <r:@R> => {
-        let s: String = n.chars().filter(|v| *v != '_').collect();
-        let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
-        let key = Expression::NumberLiteral(Loc(file_no, l, r), num);
-        DictEntry{ loc: Loc(file_no, l, r),key, value }
+    <l:@L> <n:Number>  <value:(":" Expression)?> <r:@R> => {
+        let key = Expression::Number(Loc(file_no, l, r), n);
+        DictEntry{ loc: Loc(file_no, l, r),key, value:value.map(|s|s.1) }
      }
 }
 
@@ -383,10 +381,10 @@ Range : Expression = {
 
 }
 
-
 Precedence0: Expression = {
     <FunctionCall> => <>,
     <ObjAttribute> => <>,
+
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),
     <a:@L> "true" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), true),
     <a:@L> "false" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), false),

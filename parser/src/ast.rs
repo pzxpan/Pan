@@ -277,7 +277,7 @@ pub struct NamedArgument {
 pub struct DictEntry {
     pub loc: Loc,
     pub key: Expression,
-    pub value: Expression,
+    pub value: Option<Expression>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

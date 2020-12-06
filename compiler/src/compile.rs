@@ -1337,12 +1337,21 @@ impl<O: OutputStream> Compiler<O> {
         pairs: &Vec<ast::DictEntry>,
     ) -> Result<(), CompileError> {
         let mut subsize = 0;
+        let mut is_set = false;
         for entry in pairs {
             self.compile_expression(&entry.key)?;
-            self.compile_expression(&entry.value)?;
+            if entry.value.is_some() {
+                self.compile_expression(&entry.value.as_ref().unwrap())?;
+            } else {
+                is_set = true;
+            }
             subsize += 1;
         }
-        self.emit(Instruction::BuildMap(subsize, false, false));
+        if is_set {
+            self.emit(Instruction::BuildSet(subsize, false));
+        } else {
+            self.emit(Instruction::BuildMap(subsize, false, false));
+        }
         Ok(())
     }
 

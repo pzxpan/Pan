@@ -591,9 +591,18 @@ impl HasType for Expression {
             Expression::Dict(loc, dicts) => {
                 if dicts.len() > 0 {
                     let key_ty = dicts.get(0).unwrap().key.get_type(tables)?;
-                    let value_ty = dicts.get(0).unwrap().value.get_type(tables)?;
+
+                    let mut value_ty = CType::None;
+                    if dicts.get(0).unwrap().value.is_some() {
+                        value_ty = dicts.get(0).unwrap().value.as_ref().unwrap().get_type(tables)?;
+                    }
                     for e in dicts {
-                        if e.key.get_type(tables)? != key_ty || e.value.get_type(tables)? != value_ty {
+                        let k_ty = e.key.get_type(tables)?;
+                        let mut v_ty = CType::None;
+                        if e.value.is_some() {
+                            v_ty = e.value.as_ref().unwrap().get_type(tables)?;
+                        }
+                        if k_ty != key_ty || v_ty != value_ty {
                             return Err(SymbolTableError {
                                 error: format!("Map中的键必须是同类型{:?}的,且值也必须是同一类型{:?}", key_ty, value_ty),
                                 location: loc.clone(),

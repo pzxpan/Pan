@@ -56,11 +56,7 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-
-    let a = 0b110011;
-    let b = !a;
-    println!("bb:{:b}",b);
-    test_one_file(&env::current_dir().unwrap().join("demo").join("slice.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("set.pan"));
 
     //test_all_demo_file();
 }
