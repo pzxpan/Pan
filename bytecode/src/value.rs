@@ -250,8 +250,8 @@ impl Value {
         Value::Obj(Box::new(arr))
     }
 
-    pub fn new_range_obj(start: Value, end: Value, up: Value) -> Value {
-        let range = Obj::RangObj(start, end, up);
+    pub fn new_range_obj(start: Value, end: Value, up: bool, include: bool) -> Value {
+        let range = Obj::RangObj(start, end, up, include);
         Value::Obj(Box::new(range))
     }
 
@@ -330,7 +330,7 @@ pub struct EnumObj {
 pub enum Obj {
     StringObj(String),
     ArrayObj(Vec<Value>),
-    RangObj(Value, Value, Value),
+    RangObj(Value, Value, bool, bool),
     MapObj(HashMap<String, Value>),
     // SetObj(HashSet<Value>),
     InstanceObj(InstanceObj),
@@ -345,8 +345,8 @@ impl Obj {
             Obj::ArrayObj(value) => {
                 value.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(",")
             }
-            Obj::RangObj(start, end, up) => {
-                format!("<{},{},{}>", start, end, up)
+            Obj::RangObj(start, end, up, include) => {
+                format!("<{},{},{},{}>", start, end, up, include)
             }
             Obj::MapObj(_) => "<map>".to_string(),
             Obj::InstanceObj(inst) => {

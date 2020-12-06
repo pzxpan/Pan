@@ -564,7 +564,10 @@ impl<'input> Lexer<'input> {
                 return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
                 )));
             }
-            return Some(Ok((self.row, Token::Number(&self.input[start_pos..end_pos]), self.column)));
+
+            end_pos = end_pos + value_text.len() ;
+            return Some(Ok((start_pos, Token::I32(value.to_i32().unwrap()), end_pos)));
+           // return Some(Ok((self.row, Token::Number(&self.input[start_pos..end_pos]), self.column)));
         }
     }
     /// 可以用 _ 分割数字 '1_2_3_4_' == '1234'

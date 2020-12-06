@@ -46,5 +46,11 @@ fun main() {
       sum += a;
    }
    print(sum);
+   let arr = [10,20,30,40];
+   let ab = arr[0..=2];
+   let ac = arr[1..];
+   let ad = arr[..];
+   let ae = arr[-2..1000];
+   print(ab);
    return;
 }

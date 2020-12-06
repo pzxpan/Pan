@@ -92,7 +92,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
         let instruction = self.fetch_instruction();
-        //println!("instruction is:{:?},", instruction);
+        println!("instruction is:{:?},", instruction);
         match instruction {
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
@@ -122,6 +122,7 @@ impl Frame {
                 ref scope,
             ) => vm.store_name(name, self.pop_value(), scope, idx),
             bytecode::Instruction::Subscript => self.execute_subscript(vm),
+            bytecode::Instruction::Slice => self.execute_slice(vm),
             bytecode::Instruction::StoreSubscript => self.execute_store_subscript(vm),
             bytecode::Instruction::DeleteSubscript => self.execute_delete_subscript(vm),
             bytecode::Instruction::Pop => {
@@ -200,17 +201,18 @@ impl Frame {
             }
             bytecode::Instruction::GetIter => {
                 let end = self.pop_value();
-                self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), Value::Bool(false)));
+                self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), false, false));
                 None
             }
             bytecode::Instruction::ForIter(target) => self.execute_for_iter(vm, *target),
             bytecode::Instruction::BuildRange => {
+                let include = self.pop_value();
                 let end = self.pop_value();
                 let start = self.pop_value();
                 if vm._gt(end.clone(), start.clone()).bool_value() {
-                    self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(true)));
+                    self.push_value(Value::new_range_obj(start.clone(), end, true, include.bool_value()));
                 } else {
-                    self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
+                    self.push_value(Value::new_range_obj(start.clone(), end, false, include.bool_value()));
                 }
                 None
             }
@@ -387,6 +389,16 @@ impl Frame {
         None
     }
 
+
+    fn execute_slice(&self, vm: &VirtualMachine) -> FrameResult {
+        let include = self.pop_value();
+        let end = self.pop_value();
+        let start = self.pop_value();
+        let arr = self.pop_value();
+        let value = vm.get_slice(arr, start, end, include);
+        self.push_value(value);
+        None
+    }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let subscript = self.pop_value();

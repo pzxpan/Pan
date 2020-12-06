@@ -1440,15 +1440,41 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
+        println!("expression:{:?},", expression);
         match &expression {
             Unit(loc, name, exprs) => {
                 for expr in exprs {
                     // self.scan_expression(expr, &ExpressionContext::Load);
                 }
             }
-            Subscript(_, a, b) => {
-                self.scan_expression(a, context)?;
-                self.scan_expression(b, context)?;
+            Subscript(loc, a, b) => {
+                let sty = a.get_type(&self.tables)?;
+                if let CType::Array(_) = sty {
+                    self.scan_expression(a, context)?;
+                } else if let CType::Str = sty {
+                    self.scan_expression(a, context)?;
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("只有数组类型和string类型才有切片，{:?}的类型为{:?}", a.expr_name(), sty),
+                        location: loc.clone(),
+                    });
+                }
+                if let Range(loc, start, end, include) = b.as_ref() {
+                    let a = self.scan_range(loc, start, end, *include)?;
+                    if a == CType::Char {
+                        return Err(SymbolTableError {
+                            error: format!("char类型不能作用切片的参数"),
+                            location: loc.clone(),
+                        });
+                    }
+                    if start.as_ref().is_some() {
+                        self.scan_expression(&start.as_ref().as_ref().unwrap(), &ExpressionContext::Load)?;
+                    }
+                    if end.as_ref().is_some() {
+                        self.scan_expression(&end.as_ref().as_ref().unwrap(), &ExpressionContext::Load)?;
+                    }
+                }
+                // self.scan_expression(b, context)?;
             }
             //   Expression(Loc(1, 3, 20), AssignAdd(Loc(1, 3, 12), Variable(Identifier { loc: Loc(1, 3, 8), name: "sum" }),
             // Attribute(Loc(1, 3, 20), Variable(Identifier { loc: Loc(1, 3, 18), name: "varargs" }), None, Some(0))))
@@ -1651,6 +1677,13 @@ impl SymbolTableBuilder {
             }
             List(_, _) => {}
             Variable(Identifier { loc, name }) => {
+                let ty = self.get_register_type(name.to_string())?;
+                if ty == CType::Unknown {
+                    return Err(SymbolTableError {
+                        error: format!("{:?}的变量未定义", name),
+                        location: loc.clone(),
+                    });
+                }
                 match context {
                     ExpressionContext::Load => {
                         let m = self.get_variable_mutbility(name.to_string());
@@ -1667,19 +1700,6 @@ impl SymbolTableBuilder {
                         }
                     }
                     ExpressionContext::Store => {
-                        let mut ty = Unknown;
-                        ty = self.get_register_type(name.to_string())?;
-                        // if self.in_struct_func {
-                        //     ty = self.get_register_type(name.to_string()).clone();
-                        // } else {
-                        //     ty = self.get_register_type(get_full_name(&self.package, &name.to_string())).clone();
-                        // }
-                        if ty == Unknown {
-                            return Err(SymbolTableError {
-                                error: format!("找不到{}的定义", name),
-                                location: loc.clone(),
-                            });
-                        }
                         if self.in_struct_func {
                             if self.in_current_scope(name.clone()) {
                                 self.register_name(name, ty, SymbolUsage::Mut, loc.clone())?;
@@ -1788,14 +1808,63 @@ impl SymbolTableBuilder {
                 }
             }
             MatchExpression(_, _, _) => {}
-            Range(_, _, _, _) => {}
+            Range(loc, start, end, include) => {
+                self.scan_range(loc, start, end, *include)?;
+                if start.as_ref().is_some() {
+                    self.scan_expression(&start.as_ref().as_ref().unwrap(), &ExpressionContext::Load)?;
+                }
+                if end.as_ref().is_some() {
+                    self.scan_expression(&end.as_ref().as_ref().unwrap(), &ExpressionContext::Load)?;
+                }
+            }
             Hole(_) => {}
             //DestructEqual(_, _, _) => {}
             Error => {}
         }
         Ok(())
     }
+    fn scan_range(&mut self, loc: &Loc, start: &Box<Option<Expression>>, end: &Box<Option<Expression>>, include: bool) -> Result<CType, SymbolTableError> {
+        let mut sty = CType::Unknown;
+        let mut ety = CType::Unknown;
+        if start.as_ref().is_some() {
+            sty = start.as_ref().as_ref().unwrap().get_type(&self.tables)?;
+        }
+        if end.as_ref().is_some() {
+            ety = end.as_ref().as_ref().unwrap().get_type(&self.tables)?;
+        } else {
+            //将start的类型赋值给end
+            if sty == CType::Char {
+                return Err(SymbolTableError {
+                    error: format!("切片参数类型为char，需要明确指定结束的位置"),
+                    location: loc.clone(),
+                });
+            }
+            ety = sty.clone();
+        }
+        if sty == CType::Unknown {
+            if ety == CType::Char {
+                return Err(SymbolTableError {
+                    error: format!("切片参数类型为char，需要明确指定开始的位置"),
+                    location: loc.clone(),
+                });
+            }
+            sty = ety.clone();
+        }
+        println!("sty:{:?},ety:{:?}", sty, ety);
+        if sty != ety {
+            return Err(SymbolTableError {
+                error: format!("切片参数需要相同的类型;只能是I32类型或者是char类型"),
+                location: loc.clone(),
+            });
+        } else if sty != CType::I32 && sty != CType::Char && sty != CType::Unknown {
+            return Err(SymbolTableError {
+                error: format!("只能是I32类型或者是char类型"),
+                location: loc.clone(),
+            });
+        }
 
+        Ok(sty)
+    }
     pub fn update_mutability(&mut self, name: String, mutability: SymbolMutability) -> SymbolTableResult {
         if name.is_empty() || name.eq("Thread") {
             return Ok(());
@@ -2116,7 +2185,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        //println!("register_name:{:?},ty:{:?}", name, ty);
+        println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());

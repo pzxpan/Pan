@@ -23,6 +23,7 @@ use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_m
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_bytecode::bytecode::Instruction::{LoadName, LoadAttr};
 use crate::compile::FunctionContext::Function;
+use crate::symboltable::SymbolScope::Const;
 
 
 lazy_static! {
@@ -1331,8 +1332,13 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::ConstStart);
                 }
                 self.compile_expression(a)?;
-                self.compile_expression(b)?;
-                self.emit(Instruction::Subscript);
+                if let Expression::Range(..) = b.as_ref() {
+                    self.compile_expression(b)?;
+                    self.emit(Instruction::Slice);
+                } else {
+                    self.compile_expression(b)?;
+                    self.emit(Instruction::Subscript);
+                }
                 if self.scope_for_name(&a.expr_name()) == NameScope::Const {
                     self.emit(Instruction::ConstEnd);
                 }
@@ -1554,12 +1560,12 @@ impl<O: OutputStream> Compiler<O> {
                 } else {
                     self.compile_expression(&end.as_ref().as_ref().unwrap());
                 }
+                self.emit(Instruction::LoadConst(Constant::Boolean(*include)));
             }
             _ => {}
         }
         Ok(())
     }
-
     fn compile_load_constant_number(&mut self, number: ast::Number) -> Result<(), CompileError> {
         use ast::Number::*;
         match number {

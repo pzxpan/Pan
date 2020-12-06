@@ -662,6 +662,19 @@ impl HasType for Expression {
             }
             Expression::Subscript(loc, a, b) => {
                 let a_ty = a.get_type(&tables)?;
+                if let Expression::Range(..) = b.as_ref() {
+                    if let CType::Array(..) = a_ty {
+                        return Ok(a_ty.clone());
+                    } else if let CType::Str = a_ty {
+                        return Ok(a_ty.clone());
+                    } else {
+                        return Err(SymbolTableError {
+                            error: format!("只有string和数组类型才能切片"),
+                            location: loc.clone(),
+                        });
+                    }
+                }
+
                 if let CType::Tuple(tys) = a_ty {
                     if let Expression::NumberLiteral(_, n) = b.as_ref() {
                         let ty = tys.get(*n as usize);
@@ -677,12 +690,16 @@ impl HasType for Expression {
                     return Ok(ty.as_ref().clone());
                 } else if let CType::Dict(key, value) = a_ty {
                     return Ok(value.as_ref().clone());
-                } else {
+                } else if CType::Str == a_ty {
                     return Err(SymbolTableError {
-                        error: format!("只有数组，map类型才有下标"),
+                        error: format!("只有数组，map类型,string,才有下标"),
                         location: loc.clone(),
                     });
                 }
+                return Err(SymbolTableError {
+                    error: format!("只有数组，map类型,string,才有切片和下标操作"),
+                    location: loc.clone(),
+                });
             }
             Expression::Range(loc, start, end, include) => {
                 let mut l = CType::Unknown;
@@ -695,20 +712,20 @@ impl HasType for Expression {
                 }
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
                 //0..100
-                if max < CType::Float && min >= CType::I8 {
+                if max < CType::Float && min >= CType::Char {
                     return Ok(CType::Array(Box::new(min)));
                 }
                 // ..100
-                if start.is_none() || min >= CType::I8 && min < CType::Float {
+                if start.is_none() || min >= CType::Char && min < CType::Float {
                     return Ok(CType::Array(Box::new(min)));
                 }
                 // 2..
-                if end.is_none() || min >= CType::I8 && min < CType::Float {
+                if end.is_none() || min >= CType::Char && min < CType::Float {
                     return Ok(CType::Array(Box::new(min)));
                 }
 
                 return Err(SymbolTableError {
-                    error: format!("Range需要整数类型"),
+                    error: format!("Range需要Char,I32类型"),
                     location: loc.clone(),
                 });
             }

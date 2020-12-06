@@ -376,6 +376,34 @@ impl VirtualMachine {
         }
     }
 
+    pub fn get_slice(&self, arr: Value, start: Value, end: Value, include: Value) -> Value {
+        if let Value::Obj(e) = arr {
+            if let Obj::ArrayObj(arr) = e.as_ref() {
+                let mut start = start.int_value();
+                let mut end = end.int_value();
+                if end < start || start >= arr.len() as i32 {
+                    return Value::Obj(Box::new(Obj::ArrayObj(vec![])));
+                }
+                if start < 0 {
+                    start = 0;
+                }
+                let mut start = start as usize;
+                let mut end = end as usize;
+                if end >= arr.len() {
+                    end = arr.len() - 1;
+                }
+                if include.bool_value() {
+                    let a = &arr[start..=end];
+                    return Value::Obj(Box::new(Obj::ArrayObj(a.to_vec())));
+                } else {
+                    let a = &arr[start..end];
+                    return Value::Obj(Box::new(Obj::ArrayObj(a.to_vec())));
+                }
+            }
+        }
+        unreachable!()
+    }
+
     pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) -> Value {
         let mut update_value = Value::Nil;
         match (obj, idx) {
@@ -478,23 +506,37 @@ impl VirtualMachine {
         let mut ret = Value::Nil;
         if let Value::Obj(ref mut e) = v {
             match e.as_mut() {
-                Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
+                Obj::RangObj(ref mut start, ref mut end, ref mut up, ref mut include) => {
                     if let Value::I32(_) = start {
-                        if up.bool_value() {
+                        if *up {
                             let item = start.int_value();
                             let a = item + 1;
                             let b = end.int_value();
-                            if item < b {
-                                *start = Value::I32(a);
-                                ret = Value::I32(item);
+                            if *include {
+                                if item <= b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
+                            } else {
+                                if item < b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
                             }
                         } else {
                             let item = start.int_value();
                             let a = item - 1;
                             let b = end.int_value();
-                            if item > b {
-                                *start = Value::I32(a);
-                                ret = Value::I32(item);
+                            if *include {
+                                if item >= b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
+                            } else {
+                                if item > b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
                             }
                         }
                         *v = Value::Obj(e.clone())
@@ -910,6 +952,7 @@ impl VirtualMachine {
 
 
     pub fn neg(&self, value: Value) -> Value {
+        println!("ddd:{:?}", value);
         match value {
             Value::I32(i) => Value::I32(-i),
             Value::Float(i) => Value::Float(-i),

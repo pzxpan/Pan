@@ -287,6 +287,7 @@ Precedence7: Expression = {
 Precedence6: Expression = {
     <l:Precedence6> <a:@L> "<<" <b:@R> <r:Precedence5> => Expression::ShiftLeft(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence6> <a:@L> ">>" <b:@R> <r:Precedence5> => Expression::ShiftRight(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <Range> => <>,
     Precedence5,
 }
 
@@ -310,6 +311,7 @@ Precedence3: Expression = {
 }
 
 Precedence2: Expression = {
+
     <a:@L> "!" <b:@R> <e:Precedence2> => Expression::Not(Loc(file_no, a, b), Box::new(e)),
     <a:@L> "+" <b:@R> <e:Precedence2> => Expression::UnaryPlus(Loc(file_no, a, b), Box::new(e)),
     <a:@L> "-" <b:@R> <e:Precedence2> => Expression::UnaryMinus(Loc(file_no, a, b), Box::new(e)),
@@ -362,24 +364,20 @@ ObjAttribute: Expression = {
 }
 
 Range : Expression = {
-   <l:@L> <c:Precedence0?> ".."  <d:Identifier> <r:@R>=> {
+   <l:@L> <c:Precedence5?> ".."  <d:Identifier> <r:@R>=> {
        Expression::Range(Loc(file_no, l, r),Box::new(c),Box::new(Some(Expression::Variable(d))),false)
    },
-   <l:@L> <c:Precedence0?> "..="  <d:Identifier> <r:@R>=> {
+   <l:@L> <c:Precedence5?> "..="  <d:Identifier> <r:@R>=> {
           Expression::Range(Loc(file_no, l, r),Box::new(c),Box::new(Some(Expression::Variable(d))),true)
       },
-   <a:@L> <e:Precedence0?> ".." <n:LexNumber> <b:@R> => {
-      let s: String = n.chars().filter(|v| *v != '_').collect();
-      let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
-      Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::NumberLiteral(Loc(file_no, a, b), num))),false)
+   <a:@L> <e:Precedence5?> ".." <n:Number> <b:@R> => {
+      Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::Number(Loc(file_no, a, b), n))),false)
    },
-   <a:@L> <e:Precedence0?> "..=" <n:LexNumber> <b:@R> => {
-         let s: String = n.chars().filter(|v| *v != '_').collect();
-         let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
-         Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::NumberLiteral(Loc(file_no, a, b), num))),true)
+   <a:@L> <e:Precedence5?> "..=" <n:Number> <b:@R> => {
+      Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::Number(Loc(file_no, a, b), n))),true)
       },
 
-   <a:@L> <e:Precedence0?> ".."  <b:@R> => {
+   <a:@L> <e:Precedence5?> ".."  <b:@R> => {
        Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(None),false)
    },
 
@@ -387,7 +385,6 @@ Range : Expression = {
 
 
 Precedence0: Expression = {
-    <Range> => <>,
     <FunctionCall> => <>,
     <ObjAttribute> => <>,
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),
