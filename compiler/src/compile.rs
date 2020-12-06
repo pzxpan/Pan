@@ -490,23 +490,48 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::Duplicate);
                     self.enter_scope();
                     if let ast::Expression::Hole(_) = expr.0.as_ref() {} else {
-                        if expr.0.as_ref().is_compare_operation() {
+                        if let ast::Expression::Range(_, start, end, include) = expr.0.as_ref() {
+                            self.emit(Instruction::Duplicate);
+                            self.compile_expression(start.as_ref().as_ref().unwrap())?;
+                            self.emit(Instruction::CompareOperation(bytecode::ComparisonOperator::Greater));
+                            if index + 1 < len {
+                                self.emit(Instruction::JumpIfFalse(labels[index + 1]));
+                            } else {
+                                self.emit(Instruction::JumpIfFalse(end_label));
+                            }
+                            self.emit(Instruction::Duplicate);
+                            self.compile_expression(end.as_ref().as_ref().unwrap())?;
+                            if *include {
+                                self.emit(Instruction::CompareOperation(bytecode::ComparisonOperator::LessOrEqual));
+                            } else {
+                                self.emit(Instruction::CompareOperation(bytecode::ComparisonOperator::Less));
+                            }
+                            if index + 1 < len {
+                                self.emit(Instruction::JumpIfFalse(labels[index + 1]));
+                            } else {
+                                self.emit(Instruction::JumpIfFalse(end_label));
+                            }
+                        } else if expr.0.as_ref().is_compare_operation() {
                             self.emit(Instruction::Pop);
                             self.compile_match_item(expr.0.as_ref())?;
+                            if index + 1 < len {
+                                self.emit(Instruction::JumpIfFalse(labels[index + 1]));
+                            } else {
+                                self.emit(Instruction::JumpIfFalse(end_label));
+                            }
                         } else if expr.0.as_ref().is_logic_operation() {
                             //有问题，暂缓
                             //  self.compile_jump_if(test, false, end_label)?;
                         } else {
                             self.compile_match_item(expr.0.as_ref())?;
                             self.emit(Instruction::Match);
+                            if index + 1 < len {
+                                self.emit(Instruction::JumpIfFalse(labels[index + 1]));
+                            } else {
+                                self.emit(Instruction::JumpIfFalse(end_label));
+                            }
+                            self.store_match_content(expr.0.as_ref())?;
                         }
-
-                        if index + 1 < len {
-                            self.emit(Instruction::JumpIfFalse(labels[index + 1]));
-                        } else {
-                            self.emit(Instruction::JumpIfFalse(end_label));
-                        }
-                        self.store_match_content(expr.0.as_ref())?;
                     }
                     self.compile_statements(expr.1.as_ref())?;
                     self.emit(Instruction::Jump(end_label));

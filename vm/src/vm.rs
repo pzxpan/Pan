@@ -400,6 +400,27 @@ impl VirtualMachine {
                     return Value::Obj(Box::new(Obj::ArrayObj(a.to_vec())));
                 }
             }
+        } else if let Value::String(s) = arr {
+            let mut start = start.int_value();
+            let mut end = end.int_value();
+            if end < start || start >= s.len() as i32 {
+                return Value::String("".to_string());
+            }
+            if start < 0 {
+                start = 0;
+            }
+            let mut start = start as usize;
+            let mut end = end as usize;
+            if end >= s.len() {
+                end = s.len() - 1;
+            }
+            if include.bool_value() {
+                let a = &s[start..=end];
+                return Value::String(String::from(a));
+            } else {
+                let a = &s[start..end];
+                return Value::String(String::from(a));
+            }
         }
         unreachable!()
     }
@@ -469,6 +490,9 @@ impl VirtualMachine {
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a <= b)
             }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a <= b)
+            }
             _ => unreachable!()
         }
     }
@@ -476,6 +500,9 @@ impl VirtualMachine {
     pub fn _ge(&self, a: Value, b: Value) -> Value {
         match (a, b) {
             (Value::I32(a), Value::I32(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
                 Value::Bool(a >= b)
             }
             _ => unreachable!()
@@ -490,6 +517,9 @@ impl VirtualMachine {
             (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a > b)
             }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a > b)
+            }
             _ => unreachable!()
         }
     }
@@ -497,6 +527,9 @@ impl VirtualMachine {
     pub fn _lt(&self, a: Value, b: Value) -> Value {
         match (a, b) {
             (Value::I32(a), Value::I32(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
                 Value::Bool(a < b)
             }
             _ => unreachable!()

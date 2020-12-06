@@ -1440,7 +1440,7 @@ impl SymbolTableBuilder {
         context: &ExpressionContext,
     ) -> SymbolTableResult {
         use ast::Expression::*;
-        println!("expression:{:?},", expression);
+        // println!("expression:{:?},", expression);
         match &expression {
             Unit(loc, name, exprs) => {
                 for expr in exprs {
@@ -1850,7 +1850,6 @@ impl SymbolTableBuilder {
             }
             sty = ety.clone();
         }
-        println!("sty:{:?},ety:{:?}", sty, ety);
         if sty != ety {
             return Err(SymbolTableError {
                 error: format!("切片参数需要相同的类型;只能是I32类型或者是char类型"),
@@ -2185,7 +2184,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        println!("register_name:{:?},ty:{:?}", name, ty);
+        //println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());
