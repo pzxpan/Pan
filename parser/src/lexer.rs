@@ -428,7 +428,7 @@ impl<'input> Lexer<'input> {
         let end_pos = start_pos + 2 + value_text.len();
         let value = BigInt::from_str_radix(&value_text, radix);
         if value.is_ok() {
-            Some(Ok((start_pos, Token::I32(value.unwrap().to_i32().unwrap()), end_pos)))
+            Some(Ok((self.row, Token::I32(value.unwrap().to_i32().unwrap()), self.column)))
         } else {
             return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned())));
         }
@@ -478,9 +478,9 @@ impl<'input> Lexer<'input> {
             if ch1 == 'j' || ch1 == 'J' {
                 self.chars.next();
                 end_pos = end_pos + 1;
-                return Some(Ok((start_pos, Token::Float(value), end_pos)));
+                return Some(Ok((self.row, Token::Float(value), self.column)));
             } else {
-                return Some(Ok((start_pos, Token::Float(value), end_pos)));
+                return Some(Ok((self.row, Token::Float(value), self.column)));
             }
         } else if ch1 == 'u' || ch1 == 'i' {
             end_pos = start_pos + value_text.len();
@@ -495,9 +495,9 @@ impl<'input> Lexer<'input> {
                 self.next();
                 end_pos = end_pos + 2;
                 if signed {
-                    return Some(Ok((start_pos, Token::ISize(value.to_isize().unwrap()), end_pos)));
+                    return Some(Ok((self.row, Token::ISize(value.to_isize().unwrap()), self.column)));
                 } else {
-                    return Some(Ok((start_pos, Token::USize(value.to_usize().unwrap()), end_pos)));
+                    return Some(Ok((self.row, Token::USize(value.to_usize().unwrap()), self.column)));
                 }
             } else {
                 let ty = self.radix_run(10);
@@ -506,23 +506,23 @@ impl<'input> Lexer<'input> {
                     match ty_value {
                         8 => {
                             end_pos = end_pos + ty.len() + 1;
-                            return Some(Ok((start_pos, Token::I8(value.to_i8().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::I8(value.to_i8().unwrap()), self.column)));
                         }
                         16 => {
                             end_pos = end_pos + ty.len() + 2;
-                            return Some(Ok((start_pos, Token::I16(value.to_i16().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::I16(value.to_i16().unwrap()), self.column)));
                         }
                         32 => {
                             end_pos = end_pos + ty.len() + 2;
-                            return Some(Ok((start_pos, Token::I32(value.to_i32().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::I32(value.to_i32().unwrap()), self.column)));
                         }
                         64 => {
                             end_pos = end_pos + ty.len() + 2;
-                            return Some(Ok((start_pos, Token::I64(value.to_i64().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::I64(value.to_i64().unwrap()), self.column)));
                         }
                         128 => {
                             end_pos = end_pos + ty.len() + 3;
-                            return Some(Ok((start_pos, Token::I128(value.to_i128().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::I128(value.to_i128().unwrap()), self.column)));
                         }
                         _ => {
                             return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
@@ -533,23 +533,23 @@ impl<'input> Lexer<'input> {
                     match ty_value {
                         8 => {
                             end_pos = end_pos + ty.len() + 1;
-                            return Some(Ok((start_pos, Token::U8(value.to_u8().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::U8(value.to_u8().unwrap()), self.column)));
                         }
                         16 => {
                             end_pos = end_pos + ty.len() + 2;
-                            return Some(Ok((start_pos, Token::U16(value.to_u16().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::U16(value.to_u16().unwrap()), self.column)));
                         }
                         32 => {
                             end_pos = end_pos + ty.len() + 2;
-                            return Some(Ok((start_pos, Token::U32(value.to_u32().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::U32(value.to_u32().unwrap()), self.column)));
                         }
                         64 => {
                             end_pos = end_pos + ty.len() + 2;
-                            return Some(Ok((start_pos, Token::U64(value.to_u64().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::U64(value.to_u64().unwrap()), self.column)));
                         }
                         128 => {
                             end_pos = end_pos + ty.len() + 3;
-                            return Some(Ok((start_pos, Token::U128(value.to_u128().unwrap()), end_pos)));
+                            return Some(Ok((self.row, Token::U128(value.to_u128().unwrap()), self.column)));
                         }
                         _ => {
                             return Some(Err(LexicalError::UnrecognisedToken(self.row, self.column, self.input[start_pos..end_pos].to_owned(),
@@ -565,9 +565,9 @@ impl<'input> Lexer<'input> {
                 )));
             }
 
-            end_pos = end_pos + value_text.len() ;
-            return Some(Ok((start_pos, Token::I32(value.to_i32().unwrap()), end_pos)));
-           // return Some(Ok((self.row, Token::Number(&self.input[start_pos..end_pos]), self.column)));
+            end_pos = end_pos + value_text.len();
+            return Some(Ok((self.row, Token::I32(value.to_i32().unwrap()), self.column)));
+            // return Some(Ok((self.row, Token::Number(&self.input[start_pos..end_pos]), self.column)));
         }
     }
     /// 可以用 _ 分割数字 '1_2_3_4_' == '1234'
@@ -1020,6 +1020,7 @@ impl<'input> Iterator for Lexer<'input> {
             }
         }
         let mut token = self.next();
+        println!("token:{:?},", token);
         //暂时先这样粗糙的判断下，感觉不太对
         if let Some(Ok((_, Token::Let, _))) = token {
             self.need_broken = true;
@@ -1061,7 +1062,6 @@ impl<'input> Iterator for Lexer<'input> {
                 _ => None,
             },
         ];
-        // println!("2222last_tokens:{:?},next_token:{:?}", self.last_tokens[0], self.last_tokens[1]);
         token
     }
 }
