@@ -665,11 +665,12 @@ impl HasType for Expression {
                 return e.get_type(tables);
             }
             Expression::FunctionCall(_, name, _) => {
-                //  println!("&name.get_type(&table):{:?},", &name);
                 if let Expression::Variable(n) = name.as_ref() {
-                    return name.get_type(tables);
+                    let ty = name.get_type(tables)?;
+                    return Ok(ty.ret_type().clone());
                 } else {
-                    return resovle_method(name, &name.get_type(&tables)?, tables);
+                    let ty = resovle_method(name, &name.get_type(&tables)?, tables)?;
+                    return Ok(ty.ret_type().clone());
                 }
             }
             Expression::Subscript(loc, a, b) => {

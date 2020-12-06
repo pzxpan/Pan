@@ -1,11 +1,12 @@
 package default;
+import core.option.*;
 fun main() {
-  let a = {"a","b","c"};
-  let aa = {1:"dd",2:"cc",3:"cc"};
-  for i in aa {
-    print(i);
+  let b = Option::Some(10);
+  b!! { print(b); }
+
+  if b.is_some() {
+    print("ok");
   }
-  return;
 }
 
 

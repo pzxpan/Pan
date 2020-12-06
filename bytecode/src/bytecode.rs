@@ -115,6 +115,9 @@ pub enum Instruction {
     YieldFrom,
     SetupLoop(Label, Label),
 
+    IntoBlock,
+    OutBlock,
+
     PopBlock,
     FormatString(usize),
     BuildRange,
@@ -408,6 +411,8 @@ impl Instruction {
             MakeFunction => w!(MakeFunction),
             MakeLambda(usize) => w!(MakeLambda,usize),
             CallFunction(typ) => w!(CallFunction, format!("{:?}", typ)),
+            IntoBlock => w!(IntoBlock),
+            OutBlock => w!(OutBlock),
             ForIter(target) => w!(ForIter, label_map[target]),
             ReturnValue => w!(ReturnValue),
             YieldValue => w!(YieldValue),

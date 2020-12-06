@@ -33,12 +33,12 @@ lazy_static! {
 
 pub fn add_local_value(hash_map: HashMap<String, Value>) {
     let ref mut map = SCOPE.lock().unwrap();
-    map.locals.insert(0, hash_map);
+    map.locals.push(hash_map);
 }
 
 pub fn remove() {
     let ref mut map = SCOPE.lock().unwrap();
-    map.locals.remove(0);
+    map.locals.pop();
 }
 
 pub fn load_capture_reference(idx: usize, name: String) -> Value {
@@ -68,18 +68,23 @@ fn store_global(name: String, value: Value) {
 
 fn load_name(name: String, idx: usize) -> Option<Value> {
     let ref mut scope = SCOPE.lock().unwrap();
-    let skip = scope.locals.len() - idx;
-    // println!("skip:{:?},idx:{:?}", scope.locals.len(), idx);
-    for dict in scope.locals.iter() {
-        // println!("index:{:?}", index);
-        // if index > idx {
-        //     break;
-        // }
+    for index in (0..=idx).rev() {
+        let dict = scope.locals.get(index).unwrap();
         let v = dict.get(&name);
         if let Some(value) = v {
             return Some(value.clone());
         }
     }
+    // for dict in scope.locals.iter() {
+    //     // println!("index:{:?}", index);
+    //     // if index > idx {
+    //     //     break;
+    //     // }
+    //     let v = dict.get(&name);
+    //     if let Some(value) = v {
+    //         return Some(value.clone());
+    //     }
+    // }
     if let Some(v) = scope.load_global(name.clone()) {
         return Some(v.clone());
     }
@@ -88,7 +93,8 @@ fn load_name(name: String, idx: usize) -> Option<Value> {
 
 fn store_name(key: String, value: Value, idx: usize) {
     let ref mut scope = SCOPE.lock().unwrap();
-    scope.locals.get_mut(idx - 1).unwrap().insert(key.to_string(), value);
+    // println!("store_name index:{:?},value:{:?}", idx, value);
+    scope.locals.get_mut(idx).unwrap().insert(key.to_string(), value);
 }
 
 
@@ -123,26 +129,27 @@ impl VirtualMachine {
     }
 
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
-        let frame = Frame::new(code);
+        // let frame = Frame::new(code);
+        let mut frame = Frame::new(code, self.frame_count);
         self.frame_count += 1;
         add_local_value(hash_map);
-        let r = self.run_frame(frame, self.frame_count);
+        let r = self.run_frame(&mut frame);
         // remove();
         self.frame_count -= 1;
         r
     }
 
-    pub fn run_frame_full(&mut self, frame: Frame, idx: usize) -> FrameResult {
-        match self.run_frame(frame, idx)? {
+    pub fn run_frame_full(&mut self, frame: &mut Frame) -> FrameResult {
+        match self.run_frame(frame)? {
             ExecutionResult::Return(value) => Some(ExecutionResult::Return(value)),
             ExecutionResult::Ignore => Some(ExecutionResult::Ignore),
             _ => panic!("Got unexpected result from function"),
         }
     }
 
-    pub fn run_frame(&mut self, frame: Frame, idx: usize) -> FrameResult {
+    pub fn run_frame(&mut self, frame: &mut Frame) -> FrameResult {
         //self.frames.push(Rc::from(frame.clone()));
-        let result = frame.run(self, idx);
+        let result = frame.run(self);
         //self.frames.pop();
         result
     }
@@ -159,7 +166,7 @@ impl VirtualMachine {
             bytecode::NameScope::Local => load_name(name.to_string(), idx),
             bytecode::NameScope::Const => load_global(name.to_string()),
         };
-        // println!("load_name:{:?},value:{:?}", name, optional_value);
+        //println!("load_name:{:?},value:{:?}", name, optional_value);
         match optional_value {
             Some(value) => value,
             None => {
@@ -210,7 +217,7 @@ impl VirtualMachine {
         None
     }
     pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
-        //println!("obj:{:?},attri:{:?}", obj, attr);
+       // println!("obj:{:?},attri:{:?}", obj, attr);
         match obj {
             Value::Obj(mut e) => {
                 match e.as_mut() {
@@ -1272,9 +1279,10 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
-        let frame = Frame::new(code);
+        let mut frame = Frame::new(code, vm.frame_count);
         vm.frame_count += 1;
-        vm.run_frame(frame, vm.frame_count);
+
+        vm.run_frame(&mut frame);
         vm.frame_count -= 1;
         let handle = thread::current();
     });
@@ -1286,10 +1294,10 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, 
         // println!("global_:{:?},", global);
         //  let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
-        let frame = Frame::new(code);
+        let mut frame = Frame::new(code, vm.frame_count);
         add_local_value(locals);
         vm.frame_count += 1;
-        vm.run_frame(frame, vm.frame_count);
+        vm.run_frame(&mut frame);
         vm.frame_count -= 1;
         let handle = thread::current();
     });

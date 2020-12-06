@@ -557,6 +557,7 @@ impl<O: OutputStream> Compiler<O> {
             out_side_tys.push(ty);
         }
         self.enter_scope();
+        self.emit(Instruction::IntoBlock);
         for (ty, name) in out_side_tys.iter().zip(names.iter().map(|s| s.name.clone())) {
             self.emit(Instruction::LoadName(name.clone(), NameScope::Local));
             self.get_exhaust_ty(name.clone(), ty, end_label);
@@ -565,6 +566,7 @@ impl<O: OutputStream> Compiler<O> {
         self.compile_statement(body)?;
         self.leave_scope();
         self.set_label(end_label);
+        self.emit(Instruction::OutBlock);
         Ok(())
     }
 

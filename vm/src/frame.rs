@@ -11,6 +11,7 @@ use pan_bytecode::bytecode::CodeObject;
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
 use crate::vm::VirtualMachine;
+use crate::vm::{add_local_value, remove};
 use crate::scope::{Scope, NameProtocol};
 
 use crate::util::change_to_primitive_type;
@@ -50,6 +51,7 @@ pub struct Frame {
     blocks: RefCell<Vec<Block>>,
     /// PC计数
     pub lasti: Cell<usize>,
+    idx: usize,
 }
 
 // 栈处理结果
@@ -62,18 +64,19 @@ pub enum ExecutionResult {
 pub type FrameResult = Option<ExecutionResult>;
 
 impl Frame {
-    pub fn new(code: CodeObject) -> Frame {
+    pub fn new(code: CodeObject, idx: usize) -> Frame {
         Frame {
             code,
             stack: RefCell::new(vec![]),
             blocks: RefCell::new(vec![]),
             lasti: Cell::new(0),
+            idx,
         }
     }
 
-    pub fn run(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
+    pub fn run(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         loop {
-            let result = self.execute_instruction(vm, idx);
+            let result = self.execute_instruction(vm);
             match result {
                 None => {}
                 Some(value) => {
@@ -90,10 +93,20 @@ impl Frame {
         ins2
     }
     /// 中间指令处理
-    fn execute_instruction(&self, vm: &mut VirtualMachine, idx: usize) -> FrameResult {
+    fn execute_instruction(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        //println!("instruction is:{:?},", instruction);
+        // println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
         match instruction {
+            bytecode::Instruction::OutBlock => {
+                remove();
+                self.idx -= 1;
+                None
+            }
+            bytecode::Instruction::IntoBlock => {
+                add_local_value(HashMap::new());
+                self.idx += 1;
+                None
+            }
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
                 std::thread::sleep(Duration::from_millis(time.u64()));
@@ -113,14 +126,14 @@ impl Frame {
                 ref name,
                 ref scope,
             ) => {
-                let v = vm.load_name(name, scope, idx);
+                let v = vm.load_name(name, scope, self.idx);
                 self.push_value(v);
                 None
             }
             bytecode::Instruction::StoreName(
                 ref name,
                 ref scope,
-            ) => vm.store_name(name, self.pop_value(), scope, idx),
+            ) => vm.store_name(name, self.pop_value(), scope, self.idx),
             bytecode::Instruction::Subscript => self.execute_subscript(vm),
             bytecode::Instruction::Slice => self.execute_slice(vm),
             bytecode::Instruction::StoreSubscript => self.execute_store_subscript(vm),

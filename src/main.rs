@@ -56,6 +56,12 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
+
+    let a= 10 ;
+    for i in (0..10).rev() {
+        println!("{}",i);
+
+    }
     test_one_file(&env::current_dir().unwrap().join("demo").join("set.pan"));
 
     //test_all_demo_file();
