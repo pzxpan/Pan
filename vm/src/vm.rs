@@ -326,6 +326,7 @@ impl VirtualMachine {
     }
 
     pub fn _eq(&self, a: Value, b: Value) -> Value {
+        println!("a:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::Bool(a == b)
@@ -371,7 +372,10 @@ impl VirtualMachine {
             }
             //TODO
             (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(true)
+                Value::Bool(a.as_ref() == b.as_ref())
+            }
+            (Value::Enum(a), Value::Enum(b)) => {
+                Value::Bool(a == b)
             }
             (Value::Nil, Value::Nil) => {
                 Value::Bool(true)

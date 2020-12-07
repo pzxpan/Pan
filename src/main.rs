@@ -57,9 +57,9 @@ fn main() {
     //     }
     // }
 
-    //test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo/core").join("cmp.pan"));
 
-    test_all_demo_file();
+    //test_all_demo_file();
 }
 
 fn test_all_demo_file() {
