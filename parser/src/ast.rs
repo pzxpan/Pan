@@ -299,6 +299,23 @@ pub enum Number {
     Float(f64),
 }
 
+impl Number {
+    pub fn to_i32(&self) -> i32 {
+        match self {
+            Number::I32(v) => return *v,
+            _ => 0,
+        }
+    }
+    pub fn to_usize(&self) -> usize {
+        match self {
+            Number::I32(v) => return *v as usize,
+            Number::USize(v) => return *v,
+            _ => return 0,
+        }
+    }
+}
+
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     //逻辑表达式

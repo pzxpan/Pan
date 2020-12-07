@@ -10,7 +10,7 @@ use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::CodeObject;
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::VirtualMachine;
+use crate::vm::{VirtualMachine, len};
 use crate::vm::{add_local_value, remove};
 use crate::scope::{Scope, NameProtocol};
 
@@ -51,7 +51,10 @@ pub struct Frame {
     blocks: RefCell<Vec<Block>>,
     /// PC计数
     pub lasti: Cell<usize>,
+
     idx: usize,
+
+    inner_scope: usize,
 }
 
 // 栈处理结果
@@ -70,6 +73,7 @@ impl Frame {
             stack: RefCell::new(vec![]),
             blocks: RefCell::new(vec![]),
             lasti: Cell::new(0),
+            inner_scope: 0,
             idx,
         }
     }
@@ -95,16 +99,18 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        // println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
+        //println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 remove();
                 self.idx -= 1;
+                self.inner_scope -= 1;
                 None
             }
             bytecode::Instruction::IntoBlock => {
                 add_local_value(HashMap::new());
                 self.idx += 1;
+                self.inner_scope += 1;
                 None
             }
             bytecode::Instruction::Sleep => {
@@ -188,9 +194,19 @@ impl Frame {
             bytecode::Instruction::ShallowOperation(ref op) => self.execute_compare_shallow(op),
             bytecode::Instruction::ReturnValue => {
                 let value = self.pop_value();
+                for a in 0..self.inner_scope {
+                    self.idx -= 1;
+                    remove();
+                }
+                self.inner_scope = 0;
                 Some(ExecutionResult::Return(value))
             }
             bytecode::Instruction::Ignore => {
+                for a in 0..self.inner_scope {
+                    self.idx -= 1;
+                    remove();
+                }
+                self.inner_scope = 0;
                 Some(ExecutionResult::Ignore)
             }
             bytecode::Instruction::SetupLoop(start, end) => {
@@ -231,7 +247,17 @@ impl Frame {
             }
             bytecode::Instruction::MakeFunction => self.execute_make_function(vm),
             bytecode::Instruction::MakeLambda(size) => self.execute_make_lambda(vm, *size),
-            bytecode::Instruction::CallFunction(typ) => self.execute_call_function(vm, typ),
+            bytecode::Instruction::CallFunction(typ) => {
+                let value = self.execute_call_function(vm, typ);
+                match value {
+                    Some(ExecutionResult::Return(v)) => {
+                        self.push_value(v);
+                    }
+                    Some(ExecutionResult::Ignore) => {}
+                    _ => self.push_value(Value::Nil)
+                }
+                None
+            }
             bytecode::Instruction::StartThread => self.start_thread(vm),
             bytecode::Instruction::Jump(target) => {
                 self.jump(*target);
@@ -455,6 +481,7 @@ impl Frame {
         let func_ref = self.pop_value();
         let code = func_ref.code();
         let mut hash_map = HashMap::new();
+
         if self.stack.borrow_mut().len() > 0
         {
             let last_value = self.last_value();
@@ -508,7 +535,7 @@ impl Frame {
                     }
                     if code.is_mut {
                         //struct
-                        hash_map.insert("capture$$idx".to_string(), Value::USize(vm.frame_count - 2));
+                        hash_map.insert("capture$$idx".to_string(), Value::USize(len() - 2));
                         // println!("self.nth_value(1):{:?}", self.nth_value(1));
                         if self.stack.borrow().len() > 1 {
                             hash_map.insert("capture$$name".to_string(), self.nth_value(1));
@@ -540,15 +567,8 @@ impl Frame {
             }
         }
         // println!("hash_map is:{:?}", hash_map);
-        let value = vm.run_code_obj(func_ref.code().to_owned(), hash_map);
-        match value {
-            Some(ExecutionResult::Return(v)) => {
-                self.push_value(v);
-            }
-            Some(ExecutionResult::Ignore) => {}
-            _ => self.push_value(Value::Nil)
-        }
-        None
+
+        vm.run_code_obj(func_ref.code().to_owned(), hash_map)
     }
 
     fn jump(&self, label: bytecode::Label) {

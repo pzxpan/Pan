@@ -57,14 +57,9 @@ fn main() {
     //     }
     // }
 
-    let a= 10 ;
-    for i in (0..10).rev() {
-        println!("{}",i);
+    //test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
 
-    }
-    test_one_file(&env::current_dir().unwrap().join("demo").join("set.pan"));
-
-    //test_all_demo_file();
+    test_all_demo_file();
 }
 
 fn test_all_demo_file() {

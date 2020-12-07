@@ -68,6 +68,8 @@ pub enum Token<'input> {
     String,
     Semicolon,
     TwoDot,
+    ThreeDot,
+    ShortReturn,
     RangeInclude,
     WhiteSpace,
     All,
@@ -179,6 +181,8 @@ impl<'input> fmt::Display for Token<'input> {
             Token::Char(c) => write!(f, "{:?}", c),
 
             Token::TwoDot => write!(f, ".."),
+            Token::ThreeDot => write!(f, "..."),
+            Token::ShortReturn => write!(f, "|;"),
             Token::RangeInclude => write!(f, "..="),
             Token::WhiteSpace => write!(f, " "),
             Token::All => write!(f, ".*"),
@@ -356,6 +360,8 @@ static KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
     "in" => Token::In,
     "pub" => Token::Pub,
     ".." => Token::TwoDot,
+    "..." => Token::ThreeDot,
+    "|;" => Token::ShortReturn,
     "..=" => Token::RangeInclude,
     "_" => Token::Hole,
     "ref" => Token::ReadOnlyRef,
@@ -837,6 +843,10 @@ impl<'input> Lexer<'input> {
                             self.chars.next();
                             Some(Ok((self.row, Token::Or, self.column + 1)))
                         }
+                        Some((_, ';')) => {
+                            self.chars.next();
+                            Some(Ok((self.row, Token::ShortReturn, self.column + 1)))
+                        }
                         _ => Some(Ok((self.row, Token::BitwiseOr, self.column))),
                     };
                 }
@@ -957,6 +967,10 @@ impl<'input> Lexer<'input> {
                                         self.chars.next();
                                         return Some(Ok((self.row, Token::RangeInclude, self.column)));
                                     }
+                                    '.' => {
+                                        self.chars.next();
+                                        return Some(Ok((self.row, Token::ThreeDot, self.column)));
+                                    }
                                     _ => { return Some(Ok((self.row, Token::TwoDot, self.column))); }
                                 }
                             }
@@ -1020,7 +1034,7 @@ impl<'input> Iterator for Lexer<'input> {
             }
         }
         let mut token = self.next();
-        println!("token:{:?},", token);
+        // println!("token:{:?},", token);
         //暂时先这样粗糙的判断下，感觉不太对
         if let Some(Ok((_, Token::Let, _))) = token {
             self.need_broken = true;

@@ -1453,6 +1453,8 @@ impl SymbolTableBuilder {
                     self.scan_expression(a, context)?;
                 } else if let CType::Str = sty {
                     self.scan_expression(a, context)?;
+                } else if let CType::Dict(_, _) = sty {
+                    self.scan_expression(a, context)?;
                 } else {
                     return Err(SymbolTableError {
                         error: format!("只有数组类型和string类型才有切片，{:?}的类型为{:?}", a.expr_name(), sty),
@@ -1473,6 +1475,8 @@ impl SymbolTableBuilder {
                     if end.as_ref().is_some() {
                         self.scan_expression(&end.as_ref().as_ref().unwrap(), &ExpressionContext::Load)?;
                     }
+                } else {
+                    self.scan_expression(b, context)?;
                 }
                 // self.scan_expression(b, context)?;
             }

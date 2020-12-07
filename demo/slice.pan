@@ -4,7 +4,7 @@ package default;
 fun main() {
    let num = 1000;
    for i in -10 .. 20 {
-        print(i);
+       // print(i);
    }
 
    match num {

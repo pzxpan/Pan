@@ -36,6 +36,11 @@ pub fn add_local_value(hash_map: HashMap<String, Value>) {
     map.locals.push(hash_map);
 }
 
+pub fn len() -> usize {
+    let ref mut map = SCOPE.lock().unwrap();
+    return map.locals.len();
+}
+
 pub fn remove() {
     let ref mut map = SCOPE.lock().unwrap();
     map.locals.pop();
@@ -129,13 +134,9 @@ impl VirtualMachine {
     }
 
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
-        // let frame = Frame::new(code);
-        let mut frame = Frame::new(code, self.frame_count);
-        self.frame_count += 1;
+        let mut frame = Frame::new(code, len());
         add_local_value(hash_map);
         let r = self.run_frame(&mut frame);
-        // remove();
-        self.frame_count -= 1;
         r
     }
 
@@ -217,7 +218,7 @@ impl VirtualMachine {
         None
     }
     pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
-       // println!("obj:{:?},attri:{:?}", obj, attr);
+        // println!("obj:{:?},attri:{:?}", obj, attr);
         match obj {
             Value::Obj(mut e) => {
                 match e.as_mut() {
@@ -278,6 +279,7 @@ impl VirtualMachine {
     }
 
     pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
+        // println!("obj_attribute:{:?},", obj);
         let mut update_value = Value::Nil;
         match obj {
             Value::Obj(ref mut e) => {
@@ -605,6 +607,9 @@ impl VirtualMachine {
             (Value::Char(a), Value::Char(b)) => {
                 Value::Bool(a <= b)
             }
+            (Value::Float(a), Value::Float(b)) => {
+                Value::Bool(a <= b)
+            }
             _ => unreachable!()
         }
     }
@@ -650,11 +655,15 @@ impl VirtualMachine {
             (Value::Char(a), Value::Char(b)) => {
                 Value::Bool(a >= b)
             }
+            (Value::Float(a), Value::Float(b)) => {
+                Value::Bool(a >= b)
+            }
             _ => unreachable!()
         }
     }
 
     pub fn _gt(&self, a: Value, b: Value) -> Value {
+        println!("a:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::Bool(a > b)
@@ -693,6 +702,9 @@ impl VirtualMachine {
                 Value::Bool(a > b)
             }
             (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a > b)
             }
             _ => unreachable!()
@@ -738,6 +750,9 @@ impl VirtualMachine {
                 Value::Bool(a < b)
             }
             (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a < b)
             }
             _ => unreachable!()
@@ -1279,14 +1294,23 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
-        let mut frame = Frame::new(code, vm.frame_count);
-        vm.frame_count += 1;
+        let mut frame = Frame::new(code, len() - 1);
+
+        // vm.frame_count += 1;
 
         vm.run_frame(&mut frame);
-        vm.frame_count -= 1;
+        // vm.frame_count -= 1;
         let handle = thread::current();
     });
 }
+// {"f": Fn(FnValue { name: "main.<locals>.lambda_35_13",
+// code: <code object lambda_35_13 at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }),
+// "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Thread", methods:
+// [("run", <code object run at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 6>),
+// ("stop", <code object stop at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 10>)],
+// static_fields: [("new", <code object new at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 0>)] }),
+// field_map: Obj(MapObj({"f": Fn(FnValue { name: "main.<locals>.lambda_35_13", code: <code object lambda_35_13 at ??? file
+// "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }), "state": I32(0)})) })), "state": I32(0)}
 
 pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) {
     thread::spawn(|| {
@@ -1294,11 +1318,13 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, 
         // println!("global_:{:?},", global);
         //  let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
-        let mut frame = Frame::new(code, vm.frame_count);
         add_local_value(locals);
-        vm.frame_count += 1;
+        let mut frame = Frame::new(code, len() - 1);
+
+
+        //vm.frame_count += 1;
         vm.run_frame(&mut frame);
-        vm.frame_count -= 1;
+        //vm.frame_count -= 1;
         let handle = thread::current();
     });
 

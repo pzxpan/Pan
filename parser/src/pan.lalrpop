@@ -185,9 +185,8 @@ ConstVariableDefinition: Box<ConstVariableDefinition> = {
 Type: Type = {
 
     <i:Identifier> <v:("<" <CommaOne<Type>>">")?> => Type::Type(i,v),
-     "[" <i:Identifier> ":" <n:LexNumber> "]" => {
-        let s: String = n.chars().filter(|v| *v != '_').collect();
-        let num = s.parse::<BigInt>().unwrap().to_usize().unwrap();
+     "[" <i:Identifier> ":" <n:Number> "]" => {
+        let num = n.to_usize();
         Type::Array(i,num)
      },
      "fun" <v:("(" <CommaOne<Type>> ")")?> <r:("->" Type)?> => {
@@ -351,9 +350,8 @@ ObjAttribute: Expression = {
     <a:@L> <e:Precedence0> "."  <i:Identifier> <b:@R> => {
         Expression::Attribute(Loc(file_no, a, b), Box::new(e),Some(i), None)
      },
-     <a:@L> <e:Precedence0> "."  <n:LexNumber> <b:@R> => {
-        let s: String = n.chars().filter(|v| *v != '_').collect();
-        let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
+     <a:@L> <e:Precedence0> "."  <n:Number> <b:@R> => {
+        let num = n.to_i32();
         Expression::Attribute(Loc(file_no, a, b), Box::new(e), None, Some(num))
      },
      <a:@L> <e:Precedence0> "::"  <i:Identifier> <b:@R> => {
@@ -442,10 +440,10 @@ Parameter: Parameter = {
         let loc = Loc(file_no, l, r);
         Parameter{ loc, ty, mut_own, name,default:e,is_varargs:false }
     },
-   // <l:@L> <name:Identifier?> ".." <r:@R> => {
-  //      let loc = Loc(file_no, l, r);
-    //    Parameter{loc, ty:Type::Array(Identifier{loc: Loc(file_no, l, r), name: "Any".to_string()},0), mut_own: None, name,default:None,is_varargs:true}
-  //  }
+    <l:@L> <name:Identifier?> "..." <r:@R> => {
+        let loc = Loc(file_no, l, r);
+        Parameter{loc, ty:Type::Array(Identifier{loc: Loc(file_no, l, r), name: "Any".to_string()},0), mut_own: None, name,default:None,is_varargs:true}
+    }
 }
 
 OptParameter: (Loc, Option<Parameter>) = {
@@ -571,9 +569,13 @@ NonIfStatement: Statement = {
     <l:@L> "return" <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), None)
     },
+
     <l:@L> "return" <e:Expression> <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), Some(e))
     },
+    <l:@L>  <e:Expression> "|;" <r:@R>   => {
+        Statement::Return(Loc(file_no, l, r), Some(e))
+     },
 }
 
 Dot<T>: Vec<T> = {
@@ -621,6 +623,8 @@ extern {
         " " => Token::WhiteSpace,
         ";" => Token::Semicolon,
         ".." => Token::TwoDot,
+        "|;" => Token::ShortReturn,
+        "..." => Token::ThreeDot,
         "..=" => Token::RangeInclude,
         ".*" => Token::All,
         "::" => Token::TwoColon,

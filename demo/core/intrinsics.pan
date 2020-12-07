@@ -2,7 +2,7 @@ package intrinsics;
 import mem;
 import ptr.drop_in_place;
 pub mod pan_intrinsic {
-     pub fun atomic_cxchg<T>(dst: T, old: T, src: T) : (T, bool);
+     pub fun atomic_cxchg<T>(dst: ptr<T>, old: const T, src: mut T) : (T, bool);
      pub fun atomic_cxchg_acq<T>(dst:  T, old: T, src: T) : (T, bool);
      pub fun atomic_cxchg_rel<T>(dst:  T, old: T, src: T) : (T, bool);
      pub fun atomic_cxchg_acqrel<T>(dst: T, old: T, src: T) : (T, bool);
