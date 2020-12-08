@@ -349,7 +349,7 @@ impl Frame {
                 let name = self.pop_value();
                 let idx = self.pop_value();
                 let value = self.pop_value();
-                vm.store_capture_reference(1, name.name(), value);
+                vm.store_capture_reference(idx.usize(), name.name(), value);
                 None
             }
             bytecode::Instruction::Print => {

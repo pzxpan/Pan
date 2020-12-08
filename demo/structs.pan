@@ -40,7 +40,7 @@ pub struct Person {
         let aa = aabb();
         age += aa;
         let a = self.age;
-        age = 1000000;
+        self.age = 1000000;
 
         print("age:{:d}", age);
         return age > a;
@@ -56,9 +56,19 @@ fun main() {
    let person = Person!{age:50,name:"pan",house: House!{size:111.0,price:1_000_000.0}};
    person.change_age(1000);
    print("age111:{}",person.age);
-   //let cc = person.older_than(40);
- //  person.name = "ddddd";
 
+   let cc = person.older_than(40);
+ //  person.name = "ddddd";
+   let {age,name,ceshi,house:{size,price,static}} = person;
+   print(size);
+   let a = age + 1000;
+   print(a);
+   name = name + "coweqasdflkja";
+   print(name);
+   let c = ceshi(1);
+   print(size);
+   print(c);
+   print(static());
    return;
 }
 

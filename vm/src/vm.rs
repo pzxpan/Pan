@@ -71,6 +71,16 @@ pub fn store_capture_reference(idx: usize, name: String, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
     scope.locals.get_mut(idx).unwrap().insert(name, value);
 }
+// ddddvalue:Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", <code objec
+// t fff at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15>), ("is_older", <code o
+// bject is_older at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24>), ("change_a\
+// ge", <code object change_age at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28>)
+// , ("older_than", <code object older_than at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31>)],
+// static_fields: [("ceshi", <code object ceshi at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46>)] }),
+// field_map: Obj(MapObj({"age": I32(1000), "name": String("pan"), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue
+// { name: "House", methods: [("idea", <code object idea at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2>)], s
+// tatic_fields: [("static", <code object static at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7>)] }), fiel
+// d_map: Obj(MapObj({"size": Float(111.0), "price": Float(1000000.0)})) }))})) })),idx:"person",string:1
 
 fn load_global(name: String) -> Option<Value> {
     let ref mut scope = SCOPE.lock().unwrap();
@@ -300,7 +310,6 @@ impl VirtualMachine {
     }
 
     pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
-        // println!("obj_attribute:{:?},", obj);
         let mut update_value = Value::Nil;
         match obj {
             Value::Obj(ref mut e) => {
@@ -309,10 +318,6 @@ impl VirtualMachine {
                         if let InstanceObj { field_map, typ } = o {
                             if let Value::Obj(map) = field_map {
                                 map.as_mut().insert(attr, value);
-                                // let mut cc = field_map.hash_map_value();
-                                // cc.insert(attr, value);
-                                // let field = Value::new_map_obj(cc);
-                                // update_value = Value::new_instance_obj(typ.as_ref().clone(), field);
                             }
                         }
                     }

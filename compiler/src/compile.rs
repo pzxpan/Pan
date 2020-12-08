@@ -2263,10 +2263,13 @@ impl<O: OutputStream> Compiler<O> {
                         //     self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
                         // }
                         capture_name = name.0.clone();
-                        self.emit(Instruction::LoadConst(Constant::USize(self.symbol_table_stack.len())));
-                        self.emit(Instruction::StoreName("capture$$idx".to_string(),NameScope::Local));
-                        self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
-                        self.emit(Instruction::StoreName("capture$$name".to_string(),NameScope::Local));
+                        if capture_name.ne("self") {
+                            self.emit(Instruction::LoadConst(Constant::USize(self.symbol_table_stack.len() - 1)));
+                            self.emit(Instruction::StoreName("capture$$idx".to_string(), NameScope::Local));
+                            self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                            self.emit(Instruction::StoreName("capture$$name".to_string(), NameScope::Local));
+                        }
+
                         instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));

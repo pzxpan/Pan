@@ -88,8 +88,17 @@ impl Value {
     }
 
     pub fn usize(&self) -> usize {
-        match self {
-            Value::USize(v) => { *v }
+        match *self {
+            Value::USize(v) => { v }
+            Value::I8(v) => { v as usize }
+            Value::U8(v) => { v as usize }
+            Value::I16(v) => { v as usize }
+            Value::U16(v) => { v as usize }
+            Value::U32(v) => { v as usize }
+            Value::I32(v) => { v as usize }
+            Value::U64(v) => { v as usize }
+            Value::I64(v) => { v as usize }
+            Value::USize(v) => { v as usize }
             _ => unreachable!()
         }
     }
@@ -103,7 +112,6 @@ impl Value {
     pub fn int_value(&self) -> i32 {
         println!("ddd:{:?},", self);
         match *self {
-            Value::I32(v) => { v }
             Value::I8(v) => { v as i32 }
             Value::U8(v) => { v as i32 }
             Value::I16(v) => { v as i32 }
