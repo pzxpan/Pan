@@ -57,7 +57,7 @@ fn main() {
     //     }
     // }
 
-    test_one_file(&env::current_dir().unwrap().join("demo/core").join("cmp.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("multi_thread_update.pan"));
 
     //test_all_demo_file();
 }
@@ -91,7 +91,7 @@ fn test_one_file(home_path: &Path) {
         // let mut vm = VirtualMachine::new(v);
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
         handle.join();
-        //std::thread::sleep(Duration::from_millis(10000));
+        std::thread::sleep(Duration::from_millis(10000));
         // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
         // let mut f = File::create(byte_file).unwrap();
         // f.write(&code.clone().to_bytes()).unwrap();

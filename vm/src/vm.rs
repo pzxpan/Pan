@@ -164,7 +164,14 @@ impl VirtualMachine {
     ) -> Value {
         let optional_value = match name_scope {
             bytecode::NameScope::Global => load_global(name.to_string()),
-            bytecode::NameScope::Local => load_name(name.to_string(), idx),
+            bytecode::NameScope::Local => {
+                // if name.eq("arr") {
+                //     load_name(name.to_string(), 1)
+                // } else {
+                //     load_name(name.to_string(), idx)
+                // }
+                load_name(name.to_string(), idx)
+            }
             bytecode::NameScope::Const => load_global(name.to_string()),
         };
         //println!("load_name:{:?},value:{:?}", name, optional_value);
@@ -527,19 +534,21 @@ impl VirtualMachine {
         unreachable!()
     }
 
-    pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) -> Value {
-        let mut update_value = Value::Nil;
+    pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) {
+        //println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
+        // let mut update_value = Value::Nil;
         match (obj, idx) {
             (Value::Obj(ref mut e), Value::I32(sub)) => {
                 match e.as_mut() {
                     Obj::ArrayObj(ref mut arr) => {
-                        arr.swap_remove(sub as usize);
-                        arr.insert(sub as usize, value);
-                        update_value = Value::new_array_obj(arr.clone());
+                        *arr.get_mut(sub as usize).unwrap() = value;
+                        // arr.remove(sub as usize);
+                        // arr.insert(sub as usize, value);
+                        //  update_value = Value::new_array_obj(arr.clone());
                     }
                     Obj::MapObj(ref mut map) => {
                         map.insert(sub.to_string(), value);
-                        update_value = Value::new_map_obj(map.clone());
+                        //  update_value = Value::new_map_obj(map.clone());
                     }
                     _ => unreachable!()
                 }
@@ -549,7 +558,7 @@ impl VirtualMachine {
                 match e.as_mut() {
                     Obj::MapObj(ref mut map) => {
                         map.insert(sub.to_string(), value);
-                        update_value = Value::new_map_obj(map.clone());
+                        //    update_value = Value::new_map_obj(map.clone());
                     }
                     _ => unreachable!()
                 }
@@ -557,7 +566,7 @@ impl VirtualMachine {
 
             _ => unreachable!()
         }
-        return update_value;
+        return;
     }
     pub fn set_item(&self, obj: &mut Value, idx: Value, value: Value) {
         match (obj, idx) {
@@ -1264,7 +1273,6 @@ impl VirtualMachine {
 
 
     pub fn neg(&self, value: Value) -> Value {
-        println!("ddd:{:?}", value);
         match value {
             Value::I8(i) => Value::I8(-i),
             Value::I16(i) => Value::I16(-i),
@@ -1273,7 +1281,6 @@ impl VirtualMachine {
             Value::I128(i) => Value::I128(-i),
             Value::ISize(i) => Value::ISize(-i),
             Value::Float(i) => Value::Float(-i),
-
             _ => { return value; }
         }
     }

@@ -1176,7 +1176,14 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
                 //TODO这里需要修改，struct中的subscript数据怎么办;
-                self.store_name(&a.expr_name());
+                if self.is_current_scope(a.expr_name().as_str()) {
+                    self.store_name(&a.expr_name());
+                } else {
+                    let idx = self.variable_scope_index(a.expr_name().as_str());
+                    self.emit(Instruction::LoadConst(Constant::I32(idx)));
+                    self.emit(Instruction::LoadConst(Constant::String(a.expr_name())));
+                    self.emit(Instruction::StoreReference);
+                }
             }
             ast::Expression::Attribute(_, obj, attr, idx) => {
                 self.compile_expression(obj)?;
@@ -2141,6 +2148,16 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         return false;
+    }
+    fn variable_scope_index(&self, name: &str) -> i32 {
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len - 2).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if symbol.is_some() {
+                return i as i32;
+            }
+        }
+        return 0;
     }
 
 

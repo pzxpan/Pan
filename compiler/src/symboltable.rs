@@ -1886,10 +1886,19 @@ impl SymbolTableBuilder {
         if name.is_empty() || name.eq("Thread") {
             return Ok(());
         }
+        // println!("name:{:?},",name);
         let table = self.tables.last_mut().unwrap();
-        let mut symbol = table.symbols.get(&name).unwrap().clone();
-        symbol.mutability = mutability;
-        table.symbols.insert(name.to_owned(), symbol.clone());
+        let mut symbol = table.symbols.get(&name);
+        if symbol.is_some() {
+            let mut symbol = symbol.unwrap().clone();
+            symbol.mutability = mutability;
+            table.symbols.insert(name.to_owned(), symbol.clone());
+        } else {
+            return Err(SymbolTableError {
+                error: format!("找不到变量{:?}的定义",name),
+                location: Loc::default(),
+            });
+        }
         Ok(())
     }
     // 循环取最近一个self进行修改

@@ -349,7 +349,7 @@ impl Frame {
                 let name = self.pop_value();
                 let idx = self.pop_value();
                 let value = self.pop_value();
-                vm.store_capture_reference(idx.usize(), name.name(), value);
+                vm.store_capture_reference(idx.int_value() as usize, name.name(), value);
                 None
             }
             bytecode::Instruction::Print => {
@@ -451,8 +451,8 @@ impl Frame {
         let idx = self.pop_value();
         let mut obj = self.pop_value();
         let value = self.pop_value();
-        let v = vm.update_item(&mut obj, idx, value);
-        self.push_value(v);
+        vm.update_item(&mut obj, idx, value);
+        self.push_value(obj);
         None
     }
 
@@ -580,7 +580,9 @@ impl Frame {
         //不能用clone语义
         let mut last_mut = self.stack.borrow_mut();
         let top_of_stack = last_mut.last_mut().unwrap();
+        //println!("top_of_stack1111:{:?},", top_of_stack);
         let next_obj = vm.get_next_iter(top_of_stack);
+        //println!("top_of_stack:{:?},next_obj:{:?},idx:{:?}", top_of_stack, next_obj, self.idx);
         if Value::Nil != next_obj {
             last_mut.push(next_obj);
             None
@@ -634,7 +636,7 @@ impl Frame {
             fields = Some(args);
         }
 
-        let v = Value::new_enum_obj(typ, fields, item_name,idx.int_value());
+        let v = Value::new_enum_obj(typ, fields, item_name, idx.int_value());
         self.push_value(v);
         None
     }

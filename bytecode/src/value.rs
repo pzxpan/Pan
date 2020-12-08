@@ -90,7 +90,7 @@ impl Value {
     pub fn usize(&self) -> usize {
         match self {
             Value::USize(v) => { *v }
-            _ => { 0 }
+            _ => unreachable!()
         }
     }
     pub fn bool_value(&self) -> bool {
