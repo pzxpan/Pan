@@ -99,7 +99,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        //println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
+       // println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 scope_remove();
@@ -440,8 +440,10 @@ impl Frame {
     }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
+
         let subscript = self.pop_value();
         let arr = self.pop_value();
+       // println!("subscript:{:?},arr{:?}",subscript,arr);
         let value = vm.get_item(arr, subscript).unwrap();
         self.push_value(value);
         None

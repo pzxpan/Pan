@@ -5,6 +5,7 @@ fun main() {
     print(a);
   }
   arr[3] = 100;
+  arr[4] = 200;
   for a in arr {
       print(a);
   }

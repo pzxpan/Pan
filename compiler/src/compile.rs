@@ -2167,7 +2167,7 @@ impl<O: OutputStream> Compiler<O> {
     }
     fn variable_scope_index(&self, name: &str) -> i32 {
         let len: usize = self.symbol_table_stack.len();
-        for i in (0..len - 2).rev() {
+        for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
             if symbol.is_some() {
                 return i as i32;

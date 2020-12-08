@@ -99,9 +99,15 @@ fn test_one_file(home_path: &Path) {
         //vm.run_code_obj(code_object.unwrap(),scope);
 
         let code = code_object.unwrap().1;
+        let t = time::SystemTime::now();
+        println!("current:{:?},", t);
         // let mut vm = VirtualMachine::new(v);
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
+        let t1 = time::SystemTime::now();
+        println!("current222:{:?},", t1);
         handle.join();
+        let t2 = time::SystemTime::now();
+        println!("current333:{:?},", t2);
         // std::thread::sleep(Duration::from_millis(10000));
         // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
         // let mut f = File::create(byte_file).unwrap();
