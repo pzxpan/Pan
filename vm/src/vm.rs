@@ -53,6 +53,20 @@ pub fn load_capture_reference(idx: usize, name: String) -> Value {
     vvvv.clone()
 }
 
+// [{"print": Fn(FnValue { name: "print", code: < code object print at ? ? ? file "", line 0 >, has_return: true }),
+// "sleep": Fn(FnValue { name: "sleep", code: < code object sleep at ? ? ? file "", line 0 >, has_return: true }),
+// "typeof": Fn(FnValue { name: "typeof", code: < code object typeof at ? ? ? file "", line 0 >, has_return: true }),
+// "format": Fn(FnValue { name: "format", code: < code object format at ? ? ? file "", line 0 >, has_return: true }),
+// "panic": Fn(FnValue { name: "panic", code: < code object panic at ? ? ? file "", line 0 >, has_return: true })},
+// {"capture$$idx": USize(2), "capture$$name": String("person"),
+// "person": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff",
+// < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older",
+// <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ),
+// ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ),
+// ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )],
+// static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }),
+// field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) }))}, {"age": I32(50), "a": I32(1000), "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older", <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ), ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ), ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )], static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }), field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) })), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")}]
+
 pub fn store_capture_reference(idx: usize, name: String, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
     scope.locals.get_mut(idx).unwrap().insert(name, value);
@@ -294,10 +308,11 @@ impl VirtualMachine {
                     Obj::InstanceObj(o) => {
                         if let InstanceObj { field_map, typ } = o {
                             if let Value::Obj(map) = field_map {
-                                let mut cc = field_map.hash_map_value();
-                                cc.insert(attr, value);
-                                let field = Value::new_map_obj(cc);
-                                update_value = Value::new_instance_obj(typ.as_ref().clone(), field);
+                                map.as_mut().insert(attr, value);
+                                // let mut cc = field_map.hash_map_value();
+                                // cc.insert(attr, value);
+                                // let field = Value::new_map_obj(cc);
+                                // update_value = Value::new_instance_obj(typ.as_ref().clone(), field);
                             }
                         }
                     }

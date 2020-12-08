@@ -1189,12 +1189,28 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(obj)?;
                 if attr.is_some() {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
-                    self.store_name(&obj.expr_name());
+                    if obj.expr_name().eq("self") {
+                        self.emit(Instruction::Duplicate);
+                        self.store_name("self");
+                        self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                        self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                        self.emit(Instruction::StoreReference);
+                    } else {
+                        self.store_name(&obj.expr_name());
+                    }
                 } else {
                     self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
                         idx.unwrap())));
                     self.emit(Instruction::StoreSubscript);
-                    self.store_name(&obj.expr_name());
+                    if obj.expr_name().eq("self") {
+                        self.emit(Instruction::Duplicate);
+                        self.store_name("self");
+                        self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                        self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                        self.emit(Instruction::StoreReference);
+                    } else {
+                        self.store_name(&obj.expr_name());
+                    }
                 }
             }
             ast::Expression::List(_, elements) => {}
@@ -2247,6 +2263,10 @@ impl<O: OutputStream> Compiler<O> {
                         //     self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
                         // }
                         capture_name = name.0.clone();
+                        self.emit(Instruction::LoadConst(Constant::USize(self.symbol_table_stack.len())));
+                        self.emit(Instruction::StoreName("capture$$idx".to_string(),NameScope::Local));
+                        self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                        self.emit(Instruction::StoreName("capture$$name".to_string(),NameScope::Local));
                         instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));

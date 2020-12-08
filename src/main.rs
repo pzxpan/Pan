@@ -57,7 +57,7 @@ fn main() {
     //     }
     // }
 
-    test_one_file(&env::current_dir().unwrap().join("demo").join("multi_thread_update.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
 
     //test_all_demo_file();
 }

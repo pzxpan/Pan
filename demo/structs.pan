@@ -4,7 +4,7 @@ pub struct House {
     pub size: f64,
     pub price: f64,
     fun idea(): bool {
-        return price / size > 10000;
+        return price / size > 10000.0;
     }
     fun ::static() :bool {
         return true;
@@ -26,6 +26,9 @@ pub struct Person {
     pub fun is_older(): bool {
         let c =  self.fff();
         return c;
+    }
+    pub fun change_age(a:i32) {
+        self.age = a;
     }
     pub fun older_than(a: i32): bool {
         //money = 100;
@@ -51,20 +54,11 @@ pub struct Person {
 
 fun main() {
    let person = Person!{age:50,name:"pan",house: House!{size:111.0,price:1_000_000.0}};
-   let cc = person.older_than(40);
+   person.change_age(1000);
+   print("age111:{}",person.age);
+   //let cc = person.older_than(40);
  //  person.name = "ddddd";
-   print(cc);
-   print(person.age);
-   let {age,name,ceshi,house:{size,price,static}} = person;
-   print(size);
-   let a = age + 1000;
-   print(a);
-   name = name + "coweqasdflkja";
-   print(name);
-   let c = ceshi(1);
-   print(size);
-   print(c);
-   print(static());
+
    return;
 }
 

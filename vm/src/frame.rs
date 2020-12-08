@@ -349,7 +349,7 @@ impl Frame {
                 let name = self.pop_value();
                 let idx = self.pop_value();
                 let value = self.pop_value();
-                vm.store_capture_reference(idx.int_value() as usize, name.name(), value);
+                vm.store_capture_reference(1, name.name(), value);
                 None
             }
             bytecode::Instruction::Print => {
@@ -535,13 +535,13 @@ impl Frame {
                     }
                     if code.is_mut {
                         //struct
-                        hash_map.insert("capture$$idx".to_string(), Value::USize(len() - 2));
-                        // println!("self.nth_value(1):{:?}", self.nth_value(1));
-                        if self.stack.borrow().len() > 1 {
-                            hash_map.insert("capture$$name".to_string(), self.nth_value(1));
-                        } else {
-                            hash_map.insert("capture$$name".to_string(), self.nth_value(0));
-                        }
+                        // hash_map.insert("capture$$idx".to_string(), Value::USize(len() - 2));
+                        // // println!("self.nth_value(1):{:?}", self.nth_value(1));
+                        // if self.stack.borrow().len() > 1 {
+                        //     hash_map.insert("capture$$name".to_string(), self.nth_value(1));
+                        // } else {
+                        //     hash_map.insert("capture$$name".to_string(), self.nth_value(0));
+                        // }
                     }
                     hash_map.insert("self".to_string(), last_value);
                     self.pop_value();
