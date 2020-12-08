@@ -943,10 +943,7 @@ impl<'input> Lexer<'input> {
                     if ch.is_ascii_digit() && self.maybe_sign {
                         self.chars.next();
                         self.column += 1;
-                        self.maybe_sign = false;
                         return self.parse_number(start, start, ch, true);
-                    } else {
-                        self.maybe_sign = false;
                     }
                     return match self.chars.peek() {
                         Some((_, '=')) => {
@@ -966,10 +963,7 @@ impl<'input> Lexer<'input> {
                     if ch.is_ascii_digit() && self.maybe_sign {
                         self.chars.next();
                         self.column += 1;
-                        self.maybe_sign = false;
                         return self.parse_number(start, start, ch, true);
-                    } else {
-                        self.maybe_sign = false;
                     }
 
                     if let Some((_, '>')) = self.chars.peek() {
@@ -1159,6 +1153,8 @@ impl<'input> Iterator for Lexer<'input> {
         if let Some(Ok((a, Token::Assign, b))) = token {
             self.maybe_sign = true;
             self.need_broken = false;
+        } else {
+            self.maybe_sign = false;
         }
         self.last_tokens = [
             self.last_tokens[1],

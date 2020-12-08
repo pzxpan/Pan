@@ -1624,12 +1624,24 @@ impl SymbolTableBuilder {
             NotEqual(loc, a, b) |
             And(loc, a, b) |
             Or(loc, a, b) => {
-                let ty = expression.get_type(&self.tables)?;
-                if ty == CType::Unknown {
-                    return Err(SymbolTableError {
-                        error: format!("重新赋值,类型有问题,左边为:{:?},右边为:{:?}", a.get_type(&self.tables), b.get_type(&self.tables)),
+                let l_ty = a.get_type(&self.tables)?;
+                let r_ty = b.get_type(&self.tables)?;
+                if l_ty != CType::Unknown && l_ty != r_ty {
+                    let err = SymbolTableError {
+                        error: format!("比较运算,类型不相同，无法进行比较,左边为:{:?},右边为:{:?}", l_ty, r_ty),
                         location: loc.clone(),
-                    });
+                    };
+                    if let CType::Enum(_) = l_ty {
+                        if r_ty != CType::I32 {
+                            return Err(err);
+                        }
+                    } else if let CType::Enum(_) = r_ty {
+                        if l_ty != CType::I32 {
+                            return Err(err);
+                        }
+                    } else {
+                        return Err(err);
+                    }
                 }
                 self.scan_expression(a, context)?;
                 self.scan_expression(b, context)?;
