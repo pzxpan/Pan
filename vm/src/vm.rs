@@ -326,7 +326,6 @@ impl VirtualMachine {
     }
 
     pub fn _eq(&self, a: Value, b: Value) -> Value {
-        println!("a:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::Bool(a == b)
@@ -376,6 +375,15 @@ impl VirtualMachine {
             }
             (Value::Enum(a), Value::Enum(b)) => {
                 Value::Bool(a == b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() == b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(a.to_i32() == b)
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() == b.to_i32())
             }
             (Value::Nil, Value::Nil) => {
                 Value::Bool(true)
@@ -430,6 +438,15 @@ impl VirtualMachine {
             }
             (Value::String(a), Value::String(b)) => {
                 Value::Bool(a.ne(&b))
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() != b.to_i32())
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() != b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(a.to_i32() != b)
             }
             _ => unreachable!()
         }
@@ -614,6 +631,15 @@ impl VirtualMachine {
             (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a <= b)
             }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() <= b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b <= a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() <= b.to_i32())
+            }
             _ => unreachable!()
         }
     }
@@ -662,12 +688,20 @@ impl VirtualMachine {
             (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a >= b)
             }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() >= b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b >= a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() >= b.to_i32())
+            }
             _ => unreachable!()
         }
     }
 
     pub fn _gt(&self, a: Value, b: Value) -> Value {
-        println!("a:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::Bool(a > b)
@@ -710,6 +744,15 @@ impl VirtualMachine {
             }
             (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a > b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() > b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b > a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() > b.to_i32())
             }
             _ => unreachable!()
         }
@@ -758,6 +801,15 @@ impl VirtualMachine {
             }
             (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a < b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() < b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b < a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() < b.to_i32())
             }
             _ => unreachable!()
         }

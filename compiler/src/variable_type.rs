@@ -10,6 +10,7 @@ use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
 use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type};
 use std::borrow::Borrow;
+use std::collections::HashSet;
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError>;
@@ -293,7 +294,9 @@ impl HasType for EnumDefinition {
 
         let mut methods: Vec<(String, CType)> = Vec::new();
         let mut static_methods: Vec<(String, CType)> = Vec::new();
-        let mut variants: Vec<(String, CType)> = Vec::new();
+        let mut variants: Vec<(String, CType, i32)> = Vec::new();
+        let mut idx = 0;
+        let mut hash_set = HashSet::new();
         for field in &self.parts {
             match field {
                 EnumPart::FunctionDefinition(f) => {
@@ -311,7 +314,21 @@ impl HasType for EnumDefinition {
                             ref_type.push(tt);
                         }
                     }
-                    variants.push((v.name.name.clone(), CType::Reference(v.name.name.clone(), ref_type)));
+                    if v.default != idx {
+                        idx = v.default;
+                    } else {
+                        idx += 1;
+                    }
+                    if hash_set.contains(&idx) {
+                        return Err(SymbolTableError {
+                            error: format!("enum值有重复{:?},index为:{:?}", v.name.name, idx),
+                            location: v.loc.clone(),
+                        });
+                    }
+                    hash_set.insert(idx);
+
+
+                    variants.push((v.name.name.clone(), CType::Reference(v.name.name.clone(), ref_type), idx));
                 }
             }
         }

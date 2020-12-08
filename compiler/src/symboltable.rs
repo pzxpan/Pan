@@ -1264,7 +1264,7 @@ impl SymbolTableBuilder {
             if let Expression::Attribute(_, name, Some(ident), _) = name.as_ref() {
                 if let Enum(enum_type) = item_ty {
                     let mut found = false;
-                    for (c, item_ty) in enum_type.items.iter() {
+                    for (c, item_ty, idx) in enum_type.items.iter() {
                         if ident.name.eq(c) {
                             found = true;
                             items.remove(c);
@@ -1300,7 +1300,7 @@ impl SymbolTableBuilder {
             let item_ty = self.get_register_type(name.expr_name())?;
             if let Enum(enum_type) = item_ty {
                 let mut found = false;
-                for (c, item_ty) in enum_type.items.iter() {
+                for (c, item_ty, idx) in enum_type.items.iter() {
                     if ident.name.eq(c) {
                         items.remove(&*ident.name);
                         found = true;
@@ -2077,7 +2077,7 @@ impl SymbolTableBuilder {
                     }
                 }
 
-                for (method_name, ftype) in ty.items.iter() {
+                for (method_name, ftype, idx) in ty.items.iter() {
                     if method_name.eq(&method) {
                         return Ok(());
                     }
@@ -2127,7 +2127,7 @@ impl SymbolTableBuilder {
                 });
             }
             CType::Enum(ty) => {
-                for (method_name, _) in ty.items.iter() {
+                for (method_name, _, idx) in ty.items.iter() {
                     if method_name.eq(&method) {
                         return Ok(());
                     }
@@ -2167,7 +2167,7 @@ impl SymbolTableBuilder {
 
     pub fn is_enum_variant(&self, ty: &CType, variant: String) -> bool {
         if let CType::Enum(cty) = ty {
-            for (field_name, _, ) in cty.items.iter() {
+            for (field_name, _, idx) in cty.items.iter() {
                 if variant.eq(field_name) {
                     return true;
                 }

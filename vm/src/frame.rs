@@ -623,7 +623,8 @@ impl Frame {
     }
 
     fn excute_make_enum_instance(&self, vm: &VirtualMachine, count: usize) -> FrameResult {
-        let mut args = self.pop_multiple(count - 2);
+        let mut args = self.pop_multiple(count - 3);
+        let idx = self.pop_value();
         let item_name = self.pop_value();
         let typ = self.pop_value();
         let mut fields: Option<Vec<Value>> = None;
@@ -633,7 +634,7 @@ impl Frame {
             fields = Some(args);
         }
 
-        let v = Value::new_enum_obj(typ, fields, item_name);
+        let v = Value::new_enum_obj(typ, fields, item_name,idx.int_value());
         self.push_value(v);
         None
     }

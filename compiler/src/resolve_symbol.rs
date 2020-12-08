@@ -198,7 +198,7 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
     if st.generics.is_some() {
         let mut generics = st.generics.clone().unwrap();
         let mut hash_map: HashMap<String, CType> = HashMap::new();
-        let mut items: Vec<(String, CType)> = Vec::new();
+        let mut items: Vec<(String, CType, i32)> = Vec::new();
         let mut methods: Vec<(String, CType)> = Vec::new();
         let mut static_fields: Vec<(String, CType)> = Vec::new();
         for ge in generics.iter() {
@@ -224,7 +224,7 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
             result_ty.generics = Some(generics_copy);
         }
 
-        for (name, ty) in st.items.iter() {
+        for (name, ty, idx) in st.items.iter() {
             if let CType::Reference(ref_name, tys) = ty.clone() {
                 let mut tys_copy = Vec::new();
                 for tty in tys {
@@ -237,9 +237,9 @@ pub fn resolve_enum_generic_fn(st: EnumType, args: HashMap<String, CType>) -> En
                     }
                     tys_copy.push(tty.clone());
                 }
-                items.push((name.clone(), CType::Reference(ref_name, tys_copy.clone())));
+                items.push((name.clone(), CType::Reference(ref_name, tys_copy.clone()), *idx));
             } else {
-                items.push((name.clone(), ty.clone()));
+                items.push((name.clone(), ty.clone(), *idx));
             }
         }
         result_ty.items = items;
@@ -335,7 +335,7 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
     if st.generics.is_some() {
         let mut generics = st.generics.clone().unwrap();
         let mut hash_map: HashMap<String, CType> = HashMap::new();
-        let mut items: Vec<(String, CType)> = Vec::new();
+        let mut items: Vec<(String, CType, i32)> = Vec::new();
         let mut methods: Vec<(String, CType)> = Vec::new();
         let mut static_fields: Vec<(String, CType)> = Vec::new();
         for arg in args.iter().enumerate() {
@@ -360,7 +360,7 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
             result_ty.generics = Some(generics_copy);
         }
 
-        for (name, ty) in st.items.iter() {
+        for (name, ty, idx) in st.items.iter() {
             if let CType::Reference(ref_name, tys) = ty.clone() {
                 let mut tys_copy = Vec::new();
                 for tty in tys {
@@ -373,9 +373,9 @@ pub fn resolve_enum_generic(st: EnumType, args: Vec<CType>) -> EnumType {
                     }
                     tys_copy.push(tty.clone());
                 }
-                items.push((name.clone(), CType::Reference(ref_name, tys_copy.clone())));
+                items.push((name.clone(), CType::Reference(ref_name, tys_copy.clone()), *idx));
             } else {
-                items.push((name.clone(), ty.clone()));
+                items.push((name.clone(), ty.clone(), *idx));
             }
         }
         result_ty.items = items;

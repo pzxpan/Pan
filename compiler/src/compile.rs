@@ -1804,7 +1804,7 @@ impl<O: OutputStream> Compiler<O> {
         }
 
         if is_enum_item {
-            self.emit(Instruction::LoadBuildEnum(count + 2));
+            self.emit(Instruction::LoadBuildEnum(count + 3));
         } else if is_thread_start {
             self.emit(Instruction::StartThread);
         } else {
@@ -2271,7 +2271,9 @@ impl<O: OutputStream> Compiler<O> {
                         instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(attri_name.0.clone())));
-                        instructions.push(Instruction::LoadBuildEnum(2));
+
+                        instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
+                        instructions.push(Instruction::LoadBuildEnum(3));
                         //如果为无参属性，则直接调用构造函数，如果为有参，则有FunctionCall处理;如果是其他属性，则LoadAttr处理
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadConst(
@@ -2281,6 +2283,7 @@ impl<O: OutputStream> Compiler<O> {
                         instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(attri_name.0.clone())));
+                        instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
                     }

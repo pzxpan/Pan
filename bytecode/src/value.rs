@@ -74,6 +74,7 @@ pub struct TypeValue {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct EnumValue {
     pub name: String,
+    pub idx: i32,
     pub methods: Vec<(String, CodeObject)>,
     pub static_fields: Vec<(String, CodeObject)>,
 }
@@ -270,8 +271,8 @@ impl Value {
         //  Value::Obj(Box::new(inst))
     }
 
-    pub fn new_enum_obj(typ: Value, fields: Option<Vec<Value>>, item_name: Value) -> Value {
-        let inst = Obj::EnumObj(EnumObj { typ: Box::new(typ), field_map: fields, item_name });
+    pub fn new_enum_obj(typ: Value, fields: Option<Vec<Value>>, item_name: Value, idx: i32) -> Value {
+        let inst = Obj::EnumObj(EnumObj { typ: Box::new(typ), field_map: fields, item_name, idx });
         Value::Obj(Box::new(inst))
     }
 }
@@ -324,6 +325,7 @@ pub struct EnumObj {
     pub typ: Box<Value>,
     pub field_map: Option<Vec<Value>>,
     pub item_name: Value,
+    pub idx: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -362,6 +364,14 @@ impl Obj {
                 }
             }
         }
+    }
+    pub fn to_i32(&self) -> i32 {
+        return match self {
+            Obj::EnumObj(inst) => {
+                inst.idx
+            }
+            _ => { 0 }
+        };
     }
 }
 
