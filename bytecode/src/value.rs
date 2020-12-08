@@ -110,7 +110,7 @@ impl Value {
     }
 
     pub fn int_value(&self) -> i32 {
-        println!("ddd:{:?},", self);
+       // println!("ddd:{:?},", self);
         match *self {
             Value::I8(v) => { v as i32 }
             Value::U8(v) => { v as i32 }

@@ -29,6 +29,28 @@ pub const NSIG: usize = 64;
 
 lazy_static! {
     static ref SCOPE: Arc<Mutex<Scope>> = Arc::new(Mutex::new(Scope::with_builtins(vec![HashMap::new()],HashMap::new())));
+    static ref CONSTANT: Arc<Mutex<HashMap<String,Constant>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref TYPE: Arc<Mutex<HashMap<String,TypeValue>>> = Arc::new(Mutex::new(HashMap::new()));
+}
+
+pub fn add_constant_value(name: String, value: Constant) {
+    let ref mut map = CONSTANT.lock().unwrap();
+    map.insert(name, value);
+}
+
+pub fn get_constant_value(name: String) -> Constant {
+    let ref mut map = CONSTANT.lock().unwrap();
+    return map.get(&name).unwrap().clone();
+}
+
+pub fn add_type_value(name: String, value: TypeValue) {
+    let ref mut map = TYPE.lock().unwrap();
+    map.insert(name, value);
+}
+
+pub fn get_type_value(name: String) -> TypeValue {
+    let ref mut map = TYPE.lock().unwrap();
+    return map.get(&name).unwrap().clone();
 }
 
 pub fn add_local_value(hash_map: HashMap<String, Value>) {
@@ -36,12 +58,12 @@ pub fn add_local_value(hash_map: HashMap<String, Value>) {
     map.locals.push(hash_map);
 }
 
-pub fn len() -> usize {
+pub fn scope_len() -> usize {
     let ref mut map = SCOPE.lock().unwrap();
     return map.locals.len();
 }
 
-pub fn remove() {
+pub fn scope_remove() {
     let ref mut map = SCOPE.lock().unwrap();
     map.locals.pop();
 }
@@ -158,7 +180,7 @@ impl VirtualMachine {
     }
 
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
-        let mut frame = Frame::new(code, len());
+        let mut frame = Frame::new(code, scope_len());
         add_local_value(hash_map);
         let r = self.run_frame(&mut frame);
         r
@@ -1377,7 +1399,7 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
-        let mut frame = Frame::new(code, len() - 1);
+        let mut frame = Frame::new(code, scope_len() - 1);
 
         // vm.frame_count += 1;
 
@@ -1402,7 +1424,7 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, 
         //  let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
         add_local_value(locals);
-        let mut frame = Frame::new(code, len() - 1);
+        let mut frame = Frame::new(code, scope_len() - 1);
 
 
         //vm.frame_count += 1;

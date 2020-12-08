@@ -1615,7 +1615,10 @@ impl SymbolTableBuilder {
             ShiftRight(loc, a, b) |
             BitwiseAnd(loc, a, b) |
             BitwiseXor(loc, a, b) |
-            BitwiseOr(loc, a, b) |
+            BitwiseOr(loc, a, b) => {
+                self.scan_expression(a, context)?;
+                self.scan_expression(b, context)?;
+            }
             Less(loc, a, b) |
             More(loc, a, b) |
             LessEqual(loc, a, b) |
@@ -1895,7 +1898,7 @@ impl SymbolTableBuilder {
             table.symbols.insert(name.to_owned(), symbol.clone());
         } else {
             return Err(SymbolTableError {
-                error: format!("找不到变量{:?}的定义",name),
+                error: format!("找不到变量{:?}的定义", name),
                 location: Loc::default(),
             });
         }

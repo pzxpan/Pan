@@ -10,8 +10,8 @@ use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::CodeObject;
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::{VirtualMachine, len};
-use crate::vm::{add_local_value, remove};
+use crate::vm::{VirtualMachine, scope_len};
+use crate::vm::{add_local_value, scope_remove};
 use crate::scope::{Scope, NameProtocol};
 
 use crate::util::change_to_primitive_type;
@@ -102,7 +102,7 @@ impl Frame {
         //println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
         match instruction {
             bytecode::Instruction::OutBlock => {
-                remove();
+                scope_remove();
                 self.idx -= 1;
                 self.inner_scope -= 1;
                 None
@@ -196,7 +196,7 @@ impl Frame {
                 let value = self.pop_value();
                 for a in 0..self.inner_scope {
                     self.idx -= 1;
-                    remove();
+                    scope_remove();
                 }
                 self.inner_scope = 0;
                 Some(ExecutionResult::Return(value))
@@ -204,7 +204,7 @@ impl Frame {
             bytecode::Instruction::Ignore => {
                 for a in 0..self.inner_scope {
                     self.idx -= 1;
-                    remove();
+                    scope_remove();
                 }
                 self.inner_scope = 0;
                 Some(ExecutionResult::Ignore)

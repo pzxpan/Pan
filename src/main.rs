@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use pan_bytecode::value;
 use std::sync::Mutex;
 use std::sync::Arc;
+use std::time;
 
 struct aaa<A, B> {
     pub a: A,
@@ -56,9 +57,19 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
+    let mut v = HashMap::new();
+    let t = time::SystemTime::now();
+    for i in 0..1_000_000 {
+        v.insert(i, "pan".to_string());
+    }
+    let t2 = time::SystemTime::now();
+    println!("dd0:{:?},", t);
 
+    print!("over");
+    println!("dd1:{:?},", t2);
     test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
-
+    let t2 = time::SystemTime::now();
+    println!("dd1:{:?},", t2);
     //test_all_demo_file();
 }
 
@@ -91,7 +102,7 @@ fn test_one_file(home_path: &Path) {
         // let mut vm = VirtualMachine::new(v);
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
         handle.join();
-        std::thread::sleep(Duration::from_millis(10000));
+        // std::thread::sleep(Duration::from_millis(10000));
         // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
         // let mut f = File::create(byte_file).unwrap();
         // f.write(&code.clone().to_bytes()).unwrap();
