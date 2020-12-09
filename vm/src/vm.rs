@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 use std::rc::Rc;
 use std::ops::Add;
 
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, AsPrimitive};
 
 use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::*;
@@ -90,14 +90,26 @@ pub fn load_capture_reference(idx: usize, name: String) -> Value {
 // static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }),
 // field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) }))}, {"age": I32(50), "a": I32(1000), "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older", <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ), ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ), ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )], static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }), field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) })), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")}]
 
-pub fn store_capture_reference(idx: usize, name: String, value: Value) {
-    println!("ddddname:{:?},value:{:?}",name,value);
+
+pub fn store_primitive_reference(idx: usize, name: String, value: Value) {
+    println!("store_primitive_reference:{:?},value:{:?}", name, value);
     let ref mut scope = SCOPE.lock().unwrap();
     let map = scope.locals.get_mut(idx).unwrap();
-   // println!("value_len:{:?}", std::mem::size_of_val(&value));
+    println!("value_len:{:?}", std::mem::size_of_val(&value));
     let start = Instant::now();
     map.insert(name, value);
     println!("插入耗时:{:?},", start.elapsed().as_nanos());
+}
+
+pub fn store_obj_reference(idx: usize, name: String, obj_idx_name: Value, value: Value) {
+    //  println!("store_obj_reference:{:?},value:{:?}:idx:{:?}", name, value, obj_idx_name);
+    println!("value_len:{:?}", std::mem::size_of_val(&value));
+    let ref mut scope = SCOPE.lock().unwrap();
+    let map = scope.locals.get_mut(idx).unwrap();
+    let obj = map.get_mut(&name).unwrap();
+    //  let start = Instant::now();
+    VirtualMachine::update_item(obj, obj_idx_name, value);
+    //  println!("2222插入耗时:{:?},", start.elapsed().as_nanos());
 }
 
 
@@ -115,12 +127,21 @@ fn store_global(name: String, value: Value) {
 }
 
 fn load_name(name: String, idx: usize) -> Option<Value> {
+    let start = Instant::now();
     let ref mut scope = SCOPE.lock().unwrap();
     for index in (0..=idx).rev() {
         let dict = scope.locals.get(index).unwrap();
         let v = dict.get(&name);
         if let Some(value) = v {
-            return Some(value.clone());
+            if let Value::Obj(_) = value {
+                let v = Some(Value::Reference(Box::new((index, name))));
+                println!("load + create_reference 耗时:{:?},", start.elapsed().as_nanos());
+                return v;
+            }
+            println!("dddddload_name 耗时:{:?},", start.elapsed().as_nanos());
+            let v = Some(value.clone());
+            println!("clone() + load_name 耗时:{:?},", start.elapsed().as_nanos());
+            return v;
         }
     }
     // for dict in scope.locals.iter() {
@@ -134,6 +155,7 @@ fn load_name(name: String, idx: usize) -> Option<Value> {
     //     }
     // }
     if let Some(v) = scope.load_global(name.clone()) {
+        println!("load_name 耗时:{:?},", start.elapsed().as_nanos());
         return Some(v.clone());
     }
     None
@@ -205,6 +227,7 @@ impl VirtualMachine {
         name_scope: &bytecode::NameScope,
         idx: usize,
     ) -> Value {
+        let tt = Instant::now();
         let optional_value = match name_scope {
             bytecode::NameScope::Global => load_global(name.to_string()),
             bytecode::NameScope::Local => {
@@ -213,10 +236,14 @@ impl VirtualMachine {
                 // } else {
                 //     load_name(name.to_string(), idx)
                 // }
-                load_name(name.to_string(), idx)
+                let tt = Instant::now();
+                let v = load_name(name.to_string(), idx);
+                println!("vm innnnin load_name  耗时:{:?},", tt.elapsed().as_nanos());
+                v
             }
             bytecode::NameScope::Const => load_global(name.to_string()),
         };
+        println!("vm load_name  耗时:{:?},", tt.elapsed().as_nanos());
         //println!("load_name:{:?},value:{:?}", name, optional_value);
         match optional_value {
             Some(value) => value,
@@ -240,7 +267,7 @@ impl VirtualMachine {
         name: String,
         value: Value,
     ) {
-        store_capture_reference(idx, name, value);
+        store_primitive_reference(idx, name, value);
     }
 
     pub fn store_name(
@@ -573,8 +600,8 @@ impl VirtualMachine {
         unreachable!()
     }
 
-    pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) {
-        println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
+    pub fn update_item(obj: &mut Value, idx: Value, value: Value) {
+        // println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
         // let mut update_value = Value::Nil;
         match (obj, idx) {
             (Value::Obj(ref mut e), Value::I32(sub)) => {
@@ -959,10 +986,10 @@ impl VirtualMachine {
                 Value::U64(a - b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a - b)
+                Value::I128(Box::new(a.as_ref().clone() - b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a - b)
+                Value::U128(Box::new(a.as_ref().clone() - b.as_ref().clone()))
             }
             (Value::ISize(a), Value::ISize(b)) => {
                 Value::ISize(a - b)
@@ -1003,10 +1030,10 @@ impl VirtualMachine {
                 Value::U64(a + b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a + b)
+                Value::I128(Box::new(a.as_ref().clone() + b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a + b)
+                Value::U128(Box::new(a.as_ref().clone() + b.as_ref().clone()))
             }
             (Value::ISize(a), Value::ISize(b)) => {
                 Value::ISize(a + b)
@@ -1050,10 +1077,10 @@ impl VirtualMachine {
                 Value::U64(a * b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a * b)
+                Value::I128(Box::new(a.as_ref().clone() * b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a * b)
+                Value::U128(Box::new(a.as_ref().clone() * b.as_ref().clone()))
             }
             (Value::Float(a), Value::Float(b)) => {
                 Value::Float(a * b)
@@ -1088,10 +1115,10 @@ impl VirtualMachine {
                 Value::U64(a / b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a / b)
+                Value::I128(Box::new(a.as_ref().clone() / b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a / b)
+                Value::U128(Box::new(a.as_ref().clone() / b.as_ref().clone()))
             }
             (Value::Float(a), Value::Float(b)) => {
                 Value::Float(a / b)
@@ -1126,10 +1153,10 @@ impl VirtualMachine {
                 Value::U64(a % b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a % b)
+                Value::I128(Box::new(a.as_ref().clone() % b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a % b)
+                Value::U128(Box::new(a.as_ref().clone() % b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -1161,10 +1188,10 @@ impl VirtualMachine {
                 Value::U64(a | b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a | b)
+                Value::I128(Box::new(a.as_ref().clone() | b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a | b)
+                Value::U128(Box::new(a.as_ref().clone() | b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -1196,10 +1223,10 @@ impl VirtualMachine {
                 Value::U64(a ^ b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a ^ b)
+                Value::I128(Box::new(a.as_ref().clone() ^ b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a ^ b)
+                Value::U128(Box::new(a.as_ref().clone() ^ b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -1231,10 +1258,10 @@ impl VirtualMachine {
                 Value::U64(a & b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a & b)
+                Value::I128(Box::new(a.as_ref().clone() & b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a & b)
+                Value::U128(Box::new(a.as_ref().clone() & b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -1265,11 +1292,11 @@ impl VirtualMachine {
             (Value::U64(a), Value::U64(b)) => {
                 Value::U64(a << b)
             }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a << b)
+            (Value::I128(a), Value::I32(b)) => {
+                Value::I128(Box::new(a.as_ref().clone() << b))
             }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a << b)
+            (Value::U128(a), Value::I32(b)) => {
+                Value::U128(Box::new(a.as_ref().clone() << b))
             }
             _ => unreachable!()
         }
@@ -1300,11 +1327,11 @@ impl VirtualMachine {
             (Value::U64(a), Value::U64(b)) => {
                 Value::U64(a >> b)
             }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a >> b)
+            (Value::I128(a), Value::I32(b)) => {
+                Value::I128(Box::new(a.as_ref().clone() >> b))
             }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a >> b)
+            (Value::U128(a), Value::I32(b)) => {
+                Value::U128(Box::new(a.as_ref().clone() >> b))
             }
             _ => unreachable!()
         }
@@ -1317,7 +1344,7 @@ impl VirtualMachine {
             Value::I16(i) => Value::I16(-i),
             Value::I32(i) => Value::I32(-i),
             Value::I64(i) => Value::I64(-i),
-            Value::I128(i) => Value::I128(-i),
+            Value::I128(i) => Value::I128(Box::new(-i.as_ref().clone())),
             Value::ISize(i) => Value::ISize(-i),
             Value::Float(i) => Value::Float(-i),
             _ => { return value; }
@@ -1329,7 +1356,7 @@ impl VirtualMachine {
             Value::I16(i) => if i < 0 { Value::I16(-i) } else { value },
             Value::I32(i) => if i < 0 { Value::I32(-i) } else { value },
             Value::I64(i) => if i < 0 { Value::I64(-i) } else { value },
-            Value::I128(i) => if i < 0 { Value::I128(-i) } else { value },
+            Value::I128(i) => if i.as_ref().is_negative() { Value::I128(Box::new(-i.as_ref().clone())) } else { Value::I128(Box::new(i.as_ref().clone())) },
             Value::ISize(i) => if i < 0 { Value::ISize(-i) } else { value },
             _ => { return value; }
         }
@@ -1341,13 +1368,13 @@ impl VirtualMachine {
             Value::I16(i) => Value::I16(!i),
             Value::I32(i) => Value::I32(!i),
             Value::I64(i) => Value::I64(!i),
-            Value::I128(i) => Value::I128(!i),
+            Value::I128(i) => Value::I128(Box::new(!i.as_ref().clone())),
             Value::ISize(i) => Value::ISize(!i),
             Value::U8(i) => Value::U8(!i),
             Value::U16(i) => Value::U16(!i),
             Value::U32(i) => Value::U32(!i),
             Value::U64(i) => Value::U64(!i),
-            Value::U128(i) => Value::U128(!i),
+            Value::U128(i) => Value::U128(Box::new(!i.as_ref().clone())),
             Value::USize(i) => Value::USize(!i),
             _ => { return value; }
         }
@@ -1361,13 +1388,13 @@ impl VirtualMachine {
             I16(ref value) => Value::I16(*value),
             I32(ref value) => Value::I32(*value),
             I64(ref value) => Value::I64(*value),
-            I128(ref value) => Value::I128(*value),
+            I128(ref value) => Value::I128(Box::new(*value)),
             ISize(ref value) => Value::ISize(*value),
             U8(ref value) => Value::U8(*value),
             U16(ref value) => Value::U16(*value),
             U32(ref value) => Value::U32(*value),
             U64(ref value) => Value::U64(*value),
-            U128(ref value) => Value::U128(*value),
+            U128(ref value) => Value::U128(Box::new(*value)),
             USize(ref value) => Value::USize(*value),
             Integer(ref value) => Value::I32(value.to_i32().unwrap()),
             Float(ref value) => Value::Float(*value),

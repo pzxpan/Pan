@@ -229,13 +229,13 @@ fn emit_const_value(buf: &mut impl OptimizationBuffer, meta: InstructionMetadata
         Value::I16(value) => { emitconst!(buf, [meta], I16, value); }
         Value::I32(value) => { emitconst!(buf, [meta], I32, value); }
         Value::I64(value) => { emitconst!(buf, [meta], I64, value); }
-        Value::I128(value) => { emitconst!(buf, [meta], I128, value); }
+        Value::I128(value) => { emitconst!(buf, [meta], I128, *value); }
         Value::ISize(value) => { emitconst!(buf, [meta], ISize, value); }
         Value::U8(value) => { emitconst!(buf, [meta], U8, value); }
         Value::U16(value) => { emitconst!(buf, [meta], U16, value); }
         Value::U32(value) => { emitconst!(buf, [meta], U32, value); }
         Value::U64(value) => { emitconst!(buf, [meta], U64, value); }
-        Value::U128(value) => { emitconst!(buf, [meta], U128, value); }
+        Value::U128(value) => { emitconst!(buf, [meta], U128, *value); }
         Value::USize(value) => { emitconst!(buf, [meta], USize, value); }
         Value::Bool(value) => { emitconst!(buf, [meta], Boolean, value); }
         Value::Char(value) => { emitconst!(buf, [meta], Char, value); }

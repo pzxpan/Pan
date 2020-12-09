@@ -43,8 +43,8 @@ pub enum Value {
     USize(usize),
     I64(i64),
     U64(u64),
-    I128(i128),
-    U128(u128),
+    I128(Box<i128>),
+    U128(Box<u128>),
     Float(f64),
 
     /// Represents a compile-time string constant (ie. the name of a function, or the key of a map).
@@ -59,7 +59,7 @@ pub enum Value {
     Type(Box<TypeValue>),
     Enum(Box<EnumValue>),
     Code(Box<CodeObject>),
-    Reference(usize, String),
+    Reference(Box<(usize, String)>),
     Nil,
 }
 
@@ -110,7 +110,7 @@ impl Value {
     }
 
     pub fn int_value(&self) -> i32 {
-        // println!("ddd:{:?},", self);
+// println!("ddd:{:?},", self);
         match *self {
             Value::I8(v) => { v as i32 }
             Value::U8(v) => { v as i32 }
@@ -168,7 +168,7 @@ impl Value {
             Value::Thread(_) => { "Thread".to_string() }
             Value::Closure(_) => { "Closure".to_string() }
             Value::Bool(_) => { "bool".to_string() }
-            Value::Reference(_, _) => { "Ref".to_string() }
+            Value::Reference(_) => { "Ref".to_string() }
         }
     }
 
@@ -177,11 +177,11 @@ impl Value {
             Value::Obj(v) => {
                 match v.as_ref() {
                     Obj::InstanceObj(_) => {
-                        //1为struct
+//1为struct
                         1
                     }
                     Obj::EnumObj(_) => {
-                        //2为enum
+//2为enum
                         2
                     }
                     _ => { 0 }
@@ -219,9 +219,9 @@ impl Value {
             Value::Code(v) => {
                 v.as_ref().clone()
             }
-            // Value::Type(ty) => {
-            //
-            // }
+// Value::Type(ty) => {
+//
+// }
             _ => unreachable!()
         }
     }
@@ -238,7 +238,6 @@ impl Value {
             Value::I64(val) => format!("{}", val),
             Value::I128(val) => format!("{}", val),
             Value::ISize(val) => format!("{}", val),
-
             Value::U8(val) => format!("{}", val),
             Value::U16(val) => format!("{}", val),
             Value::U32(val) => format!("{}", val),
@@ -257,7 +256,7 @@ impl Value {
             Value::Nil => format!("None"),
             Value::Code(code) => format!("<code {}>", code.as_ref()),
             Value::Enum(n) => format!("<enum {}>", &n.name),
-            Value::Reference(idx, name) => format!("<ref {} {}>", idx, name)
+            Value::Reference(n) => format!("<ref {} {}>", &n.as_ref().0, &n.as_ref().1)
         }
     }
 
@@ -288,7 +287,7 @@ impl Value {
     pub fn new_thread_obj(typ: Value, fields: Value) -> Value {
         let inst = ThreadValue { typ: Box::new(typ), field_map: fields };
         Value::Thread(Box::new(inst))
-        //  Value::Obj(Box::new(inst))
+//  Value::Obj(Box::new(inst))
     }
 
     pub fn new_enum_obj(typ: Value, fields: Option<Vec<Value>>, item_name: Value, idx: i32) -> Value {
@@ -307,14 +306,12 @@ impl Display for Value {
             Value::I64(val) => write!(f, "{}", val),
             Value::I128(val) => write!(f, "{}", val),
             Value::ISize(val) => write!(f, "{}", val),
-
             Value::U8(val) => write!(f, "{}", val),
             Value::U16(val) => write!(f, "{}", val),
             Value::U32(val) => write!(f, "{}", val),
             Value::U64(val) => write!(f, "{}", val),
             Value::U128(val) => write!(f, "{}", val),
             Value::USize(val) => write!(f, "{}", val),
-
             Value::Float(v) => write!(f, "{}", v),
             Value::Bool(v) => write!(f, "{}", v),
             Value::String(val) => write!(f, "{}", val),
@@ -329,7 +326,7 @@ impl Display for Value {
             Value::Nil => write!(f, "None"),
             Value::Code(code) => write!(f, "<code {}>", code),
             Value::Enum(n) => write!(f, "<enum {}>", n.name),
-            Value::Reference(idx, name) => write!(f, "<ref {} {}>", idx, name)
+            Value::Reference(n) => write!(f, "<ref {} {}>", &n.as_ref().0, &n.as_ref().1)
         }
     }
 }
@@ -477,13 +474,13 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         I16(ref value) => Value::I16(*value),
         I32(ref value) => Value::I32(*value),
         I64(ref value) => Value::I64(*value),
-        I128(ref value) => Value::I128(*value),
+        I128(ref value) => Value::I128(Box::new(*value)),
         ISize(ref value) => Value::ISize(*value),
         U8(ref value) => Value::U8(*value),
         U16(ref value) => Value::U16(*value),
         U32(ref value) => Value::U32(*value),
         U64(ref value) => Value::U64(*value),
-        U128(ref value) => Value::U128(*value),
+        U128(ref value) => Value::U128(Box::new(*value)),
         USize(ref value) => Value::USize(*value),
         Integer(ref value) => Value::I32(*value),
         Float(ref value) => Value::Float(*value),

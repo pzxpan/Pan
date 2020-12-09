@@ -7,10 +7,10 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 use pan_bytecode::bytecode;
-use pan_bytecode::bytecode::CodeObject;
+use pan_bytecode::bytecode::{CodeObject, Instruction};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::{VirtualMachine, scope_len};
+use crate::vm::{VirtualMachine, scope_len, store_obj_reference};
 use crate::vm::{add_local_value, scope_remove};
 use crate::scope::{Scope, NameProtocol};
 
@@ -18,6 +18,7 @@ use crate::util::change_to_primitive_type;
 use crate::util::get_string_value;
 use bitflags::_core::time::Duration;
 use crate::vm::run_code_in_sub_thread;
+use std::time::Instant;
 
 #[derive(Clone, Debug)]
 struct Block {
@@ -80,7 +81,9 @@ impl Frame {
 
     pub fn run(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         loop {
+            let start = Instant::now();
             let result = self.execute_instruction(vm);
+            println!("耗时:{:?}", start.elapsed().as_nanos());
             match result {
                 None => {}
                 Some(value) => {
@@ -99,7 +102,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        // println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
+        println!("执行指令{:?},", instruction);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 scope_remove();
@@ -132,8 +135,11 @@ impl Frame {
                 ref name,
                 ref scope,
             ) => {
+                let tt = Instant::now();
                 let v = vm.load_name(name, scope, self.idx);
+                println!("frame load_name 耗时:{:?},", tt.elapsed().as_nanos());
                 self.push_value(v);
+                println!("frame load_name + push 耗时:{:?},", tt.elapsed().as_nanos());
                 None
             }
             bytecode::Instruction::StoreName(
@@ -349,7 +355,7 @@ impl Frame {
                 let name = self.pop_value();
                 let idx = self.pop_value();
                 let value = self.pop_value();
-                vm.store_capture_reference(idx.usize(), name.name(), value);
+                //vm.store_capture_reference(idx.usize(), name.name(), value);
                 None
             }
             bytecode::Instruction::Print => {
@@ -452,8 +458,9 @@ impl Frame {
         let idx = self.pop_value();
         let mut obj = self.pop_value();
         let value = self.pop_value();
-        vm.update_item(&mut obj, idx, value);
+        //VirtualMachine::update_item(&mut obj, idx.clone(), value.clone());
         self.push_value(obj);
+        store_obj_reference(1, "person_map".to_string(), idx.clone(), value.clone());
         None
     }
 

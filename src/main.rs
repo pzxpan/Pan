@@ -5,13 +5,13 @@ use std::path::Path;
 use std::collections::HashMap;
 
 use walkdir::WalkDir;
-use pan_bytecode::value::Value;
+use pan_bytecode::value::{Value, Obj, FnValue, ClosureValue, ThreadValue, TypeValue, EnumValue};
 
 
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
 
-use pan_vm::vm::VirtualMachine;
+use pan_vm::vm::{VirtualMachine, store_obj_reference};
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::Duration;
@@ -22,6 +22,7 @@ use pan_bytecode::value;
 use std::sync::Mutex;
 use std::sync::Arc;
 use std::time;
+use pan_bytecode::bytecode::CodeObject;
 
 struct aaa<A, B> {
     pub a: A,
@@ -42,6 +43,22 @@ fn test() -> i32 {
     }
 }
 
+enum TestValue {
+    F64(u128),
+    String(Box<String>),
+   // Obj(Box<Obj>),
+   // Fn(Box<FnValue>),
+   // Closure(Box<ClosureValue>),
+    //Thread(Box<ThreadValue>),
+    // NativeFn(NativeFn),
+    //Type(Box<TypeValue>),
+   // Enum(Box<EnumValue>),
+    Code(Box<CodeObject>),
+    Nil,
+
+    // NativeFn(NativeFn),
+}
+
 fn main() {
     // let num = 1000;
     // let num55 = 100000;
@@ -57,9 +74,13 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
+    // for i in 0..100_000_000 {
+    //     store_obj_reference(0,"person_map".to_string(),Value::String(Box::new("pan".to_string())),Value::String(Box::new("pan222".to_string())))
+    // }
 
+    let start = std::time::Instant::now();
     test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
-
+    println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     //test_all_demo_file();
 }
 
@@ -92,8 +113,11 @@ fn test_one_file(home_path: &Path) {
         let t = time::SystemTime::now();
 
         // let mut vm = VirtualMachine::new(v);
+        let start = std::time::Instant::now();
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
+
         handle.join();
+        println!("执行 cost:{:?}", start.elapsed().as_secs());
         let t2 = time::SystemTime::now();
         // std::thread::sleep(Duration::from_millis(10000));
         // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
