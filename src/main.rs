@@ -11,7 +11,7 @@ use pan_bytecode::value::{Value, Obj, FnValue, ClosureValue, ThreadValue, TypeVa
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
 
-use pan_vm::vm::{VirtualMachine, store_obj_reference};
+use pan_vm::vm::{VirtualMachine, store_obj_reference, store_primitive_name};
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::Duration;
@@ -46,13 +46,13 @@ fn test() -> i32 {
 enum TestValue {
     F64(Box<u128>),
     String(Box<String>),
-   // Obj(Box<Obj>),
-   // Fn(Box<FnValue>),
-   // Closure(Box<ClosureValue>),
+    // Obj(Box<Obj>),
+    // Fn(Box<FnValue>),
+    // Closure(Box<ClosureValue>),
     //Thread(Box<ThreadValue>),
     // NativeFn(NativeFn),
     //Type(Box<TypeValue>),
-   // Enum(Box<EnumValue>),
+    // Enum(Box<EnumValue>),
     Code(Box<CodeObject>),
     Nil,
 
@@ -77,8 +77,12 @@ fn main() {
     // for i in 0..100_000_000 {
     //     store_obj_reference(0,"person_map".to_string(),Value::String(Box::new("pan".to_string())),Value::String(Box::new("pan222".to_string())))
     // }
-    let c = TestValue::Nil;
-    println!("ddd:{:?},",std::mem::size_of_val(&c));
+  //  let c = pan_bytecode::bytecode::Constant::Reference(Box::new((100, "panddd".to_string())));
+    //
+    // let d = VirtualMachine::unwrap_constant(&c);
+    // let dd = std::time::Instant::now();
+    // store_primitive_name("pan".to_string(), d, 0);
+    // println!("insert:{:?}", dd.elapsed().as_nanos());
     let start = std::time::Instant::now();
     test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
     println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());

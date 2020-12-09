@@ -72,7 +72,7 @@ pub fn scope_remove() {
 pub fn load_capture_reference(idx: usize, name: String) -> Value {
     let ref mut scope = SCOPE.lock().unwrap();
     let vv = scope.locals.get(idx);
-    println!("idx::{:?},name:{:?}", idx, name);
+    //println!("idx::{:?},name:{:?}", idx, name);
     let vvvv = vv.unwrap().get(&name).unwrap();
     vvvv.clone()
 }
@@ -98,10 +98,10 @@ pub fn store_primitive_value(idx: usize, name: String, value: Value) {
     map.insert(name, value);
 }
 
-pub fn store_obj_reference(idx: usize, name: String, obj_idx_name: Value, value: Value) {
+pub fn store_obj_reference(n: Box<(usize, String)>, obj_idx_name: Value, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
-    let map = scope.locals.get_mut(idx).unwrap();
-    let obj = map.get_mut(&name).unwrap();
+    let map = scope.locals.get_mut(n.as_ref().0).unwrap();
+    let obj = map.get_mut(&n.as_ref().1).unwrap();
     VirtualMachine::update_item(obj, obj_idx_name, value);
 }
 
@@ -135,15 +135,71 @@ fn load_primitive_name(name: String, idx: usize) -> Option<Value> {
         let dict = scope.locals.get(index).unwrap();
         let v = dict.get(&name);
         if let Some(value) = v {
-            println!("value_is::{:?},name:{:?}", value, name);
-            if let Value::Obj(_) = value {
-                return Some(Value::Reference(Box::new((index, name))));
-            }
+            //println!("value_is::{:?},name:{:?}", value, name);
+            // if let Value::Obj(_) = value {
+            //     return Some(Value::Reference(Box::new((index, name))));
+            // }
             return Some(value.clone());
         }
     }
     if let Some(v) = scope.load_global(name.clone()) {
         return Some(v.clone());
+    }
+    None
+}
+
+fn get_attribute_inner(a: &Value, b: &Value) -> Option<Value> {
+    match (a, b) {
+        (Value::Obj(e), Value::I32(sub)) => {
+            match e.as_ref() {
+                Obj::ArrayObj(arr) => {
+                    arr.get(*sub as usize).cloned()
+                }
+                Obj::MapObj(map) => {
+                    map.get(&sub.to_string()).cloned()
+                }
+                _ => unreachable!()
+            }
+        }
+
+        (Value::Obj(e), Value::String(sub)) => {
+            match e.as_ref() {
+                Obj::MapObj(map) => {
+                    map.get(sub.as_str()).cloned()
+                }
+                _ => unreachable!()
+            }
+        }
+        _ => unreachable!()
+    }
+}
+
+fn get_attribute(obj: Value, attri: Value) -> Option<Value> {
+    let ref mut scope = SCOPE.lock().unwrap();
+    let mut idx = 0;
+    let mut ref_name = "".to_string();
+    if let Value::Reference(n) = obj {
+        idx = n.as_ref().0;
+        ref_name = n.as_ref().1.clone();
+    }
+    for index in (0..=idx).rev() {
+        let dict = scope.locals.get(index).unwrap();
+        let v = dict.get(&ref_name);
+        if let Some(value) = v {
+            //println!("value_is::{:?},name:{:?}", value, name);
+            if let Value::Reference(_) = value {
+                return Some(value.clone());
+            } else {
+                return get_attribute_inner(value, &attri);
+            }
+        }
+    }
+    if let Some(v) = scope.load_global(ref_name.clone()) {
+        if let Value::Reference(_) = v {
+            return Some(v.clone());
+        } else {
+            return get_attribute_inner(&v, &attri);
+        }
     }
     None
 }
@@ -163,10 +219,18 @@ fn load_reference_name(name: String, idx: usize) -> Option<Value> {
     None
 }
 
-fn store_primitive_name(key: String, value: Value, idx: usize) {
+pub fn store_primitive_name(key: String, value: Value, idx: usize) {
+    let cc = Instant::now();
     let ref mut scope = SCOPE.lock().unwrap();
+    println!("获取锁:{:?},", cc.elapsed().as_nanos());
     // println!("store_name index:{:?},value:{:?}", idx, value);
-    scope.locals.get_mut(idx).unwrap().insert(key.to_string(), value);
+    let a = scope.locals.get_mut(idx).unwrap();
+    println!("获取map:{:?},", cc.elapsed().as_nanos());
+    println!("value_is:{:?}", value);
+    println!("获取2222map:{:?},", cc.elapsed().as_nanos());
+    a.insert(key, value);
+    println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
+
 }
 
 
@@ -292,6 +356,7 @@ impl VirtualMachine {
         name_scope: &bytecode::NameScope,
         idx: usize,
     ) -> FrameResult {
+        let a = Instant::now();
         match name_scope {
             bytecode::NameScope::Global => {
                 store_primitive_global(name.to_string(), obj);
@@ -303,6 +368,7 @@ impl VirtualMachine {
                 store_primitive_global(name.to_string(), obj);
             }
         }
+        println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
         None
     }
 
@@ -541,29 +607,35 @@ impl VirtualMachine {
     }
 
     pub fn get_item(&self, a: Value, b: Value) -> Option<Value> {
-        match (a, b) {
-            (Value::Obj(e), Value::I32(sub)) => {
-                match e.as_ref() {
-                    Obj::ArrayObj(arr) => {
-                        arr.get(sub as usize).cloned()
-                    }
-                    Obj::MapObj(map) => {
-                        map.get(&sub.to_string()).cloned()
-                    }
-                    _ => unreachable!()
-                }
-            }
-
-            (Value::Obj(e), Value::String(sub)) => {
-                match e.as_ref() {
-                    Obj::MapObj(map) => {
-                        map.get(sub.as_str()).cloned()
-                    }
-                    _ => unreachable!()
-                }
-            }
-            _ => unreachable!()
-        }
+        return get_attribute(a, b);
+        // let mut v = Value::Nil;
+        // if let Value::Reference(n) = a {
+        //     v = load_primitive_name(n.as_ref().1.clone(), n.as_ref().0).unwrap();
+        // }
+        // println!("vvvv:{:?},b:{:?}", v, b);
+        // match (v, b) {
+        //     (Value::Obj(e), Value::I32(sub)) => {
+        //         match e.as_ref() {
+        //             Obj::ArrayObj(arr) => {
+        //                 arr.get(sub as usize).cloned()
+        //             }
+        //             Obj::MapObj(map) => {
+        //                 map.get(&sub.to_string()).cloned()
+        //             }
+        //             _ => unreachable!()
+        //         }
+        //     }
+        //
+        //     (Value::Obj(e), Value::String(sub)) => {
+        //         match e.as_ref() {
+        //             Obj::MapObj(map) => {
+        //                 map.get(sub.as_str()).cloned()
+        //             }
+        //             _ => unreachable!()
+        //         }
+        //     }
+        //     _ => unreachable!()
+        // }
     }
 
     pub fn get_slice(&self, arr: Value, start: Value, end: Value, include: Value) -> Value {
@@ -1396,7 +1468,7 @@ impl VirtualMachine {
     }
 
 
-    pub fn unwrap_constant(&mut self, constant: &bytecode::Constant) -> Value {
+    pub fn unwrap_constant(constant: &bytecode::Constant) -> Value {
         use bytecode::Constant::*;
         match constant {
             I8(ref value) => Value::I8(*value),
