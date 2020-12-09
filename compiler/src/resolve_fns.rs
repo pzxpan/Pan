@@ -175,7 +175,7 @@ pub fn resolve_builtin_fun<O: OutputStream>(compiler: &mut Compiler<O>) {
     let fns = get_builtin_fun();
     for f in fns.iter() {
         compiler.emit(Instruction::LoadConst(Constant::Code(Box::new(f.1.clone()))));
-        compiler.emit(Instruction::LoadConst(Constant::String(f.0.clone())));
+        compiler.emit(Instruction::LoadConst(Constant::String(Box::new(f.0.clone()))));
         compiler.emit(Instruction::MakeFunction);
         compiler.store_name(f.0.as_ref());
     }

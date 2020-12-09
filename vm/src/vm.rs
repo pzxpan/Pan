@@ -91,7 +91,7 @@ pub fn load_capture_reference(idx: usize, name: String) -> Value {
 // field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) }))}, {"age": I32(50), "a": I32(1000), "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older", <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ), ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ), ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )], static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }), field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) })), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")}]
 
 
-pub fn store_primitive_reference(idx: usize, name: String, value: Value) {
+pub fn store_primitive_value(idx: usize, name: String, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
     let map = scope.locals.get_mut(idx).unwrap();
     map.insert(name, value);
@@ -105,7 +105,7 @@ pub fn store_obj_reference(idx: usize, name: String, obj_idx_name: Value, value:
 }
 
 
-fn load_global(name: String) -> Option<Value> {
+fn load_primitive_global(name: String) -> Option<Value> {
     let ref mut scope = SCOPE.lock().unwrap();
     if let Some(v) = scope.globals.get(&name) {
         return Some(v.clone());
@@ -113,12 +113,12 @@ fn load_global(name: String) -> Option<Value> {
     None
 }
 
-fn store_global(name: String, value: Value) {
+fn store_primitive_global(name: String, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
     scope.globals.insert(name, value);
 }
 
-fn load_name(name: String, idx: usize) -> Option<Value> {
+fn load_primitive_name(name: String, idx: usize) -> Option<Value> {
     let ref mut scope = SCOPE.lock().unwrap();
     for index in (0..=idx).rev() {
         let dict = scope.locals.get(index).unwrap();
@@ -136,7 +136,25 @@ fn load_name(name: String, idx: usize) -> Option<Value> {
     None
 }
 
-fn store_name(key: String, value: Value, idx: usize) {
+fn load_reference_name(name: String, idx: usize) -> Option<Value> {
+    let ref mut scope = SCOPE.lock().unwrap();
+    for index in (0..=idx).rev() {
+        let dict = scope.locals.get(index).unwrap();
+        let v = dict.get(&name);
+        if let Some(value) = v {
+            if let Value::Obj(_) = value {
+                return Some(Value::Reference(Box::new((index, name))));
+            }
+            return Some(value.clone());
+        }
+    }
+    if let Some(v) = scope.load_global(name.clone()) {
+        return Some(v.clone());
+    }
+    None
+}
+
+fn store_primitive_name(key: String, value: Value, idx: usize) {
     let ref mut scope = SCOPE.lock().unwrap();
     // println!("store_name index:{:?},value:{:?}", idx, value);
     scope.locals.get_mut(idx).unwrap().insert(key.to_string(), value);
@@ -203,11 +221,11 @@ impl VirtualMachine {
         idx: usize,
     ) -> Value {
         let optional_value = match name_scope {
-            bytecode::NameScope::Global => load_global(name.to_string()),
+            bytecode::NameScope::Global => load_primitive_global(name.to_string()),
             bytecode::NameScope::Local => {
-                load_name(name.to_string(), idx)
+                load_primitive_name(name.to_string(), idx)
             }
-            bytecode::NameScope::Const => load_global(name.to_string()),
+            bytecode::NameScope::Const => load_primitive_global(name.to_string()),
         };
         //println!("load_name:{:?},value:{:?}", name, optional_value);
         match optional_value {
@@ -232,7 +250,7 @@ impl VirtualMachine {
         name: String,
         value: Value,
     ) {
-        store_primitive_reference(idx, name, value);
+        store_primitive_value(idx, name, value);
     }
 
     pub fn store_name(
@@ -244,13 +262,13 @@ impl VirtualMachine {
     ) -> FrameResult {
         match name_scope {
             bytecode::NameScope::Global => {
-                store_global(name.to_string(), obj);
+                store_primitive_global(name.to_string(), obj);
             }
             bytecode::NameScope::Local => {
-                store_name(name.to_string(), obj, idx);
+                store_primitive_name(name.to_string(), obj, idx);
             }
             bytecode::NameScope::Const => {
-                store_global(name.to_string(), obj);
+                store_primitive_global(name.to_string(), obj);
             }
         }
         None
@@ -1346,38 +1364,38 @@ impl VirtualMachine {
     }
 
 
-    pub fn unwrap_constant(&mut self, value: &bytecode::Constant) -> Value {
+    pub fn unwrap_constant(&mut self, constant: &bytecode::Constant) -> Value {
         use bytecode::Constant::*;
-        match *value {
+        match constant {
             I8(ref value) => Value::I8(*value),
             I16(ref value) => Value::I16(*value),
             I32(ref value) => Value::I32(*value),
             I64(ref value) => Value::I64(*value),
-            I128(ref value) => Value::I128(Box::new(*value)),
+            I128(ref value) => Value::I128(Box::new(**value)),
             ISize(ref value) => Value::ISize(*value),
             U8(ref value) => Value::U8(*value),
             U16(ref value) => Value::U16(*value),
             U32(ref value) => Value::U32(*value),
             U64(ref value) => Value::U64(*value),
-            U128(ref value) => Value::U128(Box::new(*value)),
+            U128(ref value) => Value::U128(Box::new(**value)),
             USize(ref value) => Value::USize(*value),
             Integer(ref value) => Value::I32(value.to_i32().unwrap()),
             Float(ref value) => Value::Float(*value),
             Complex(ref value) => Value::Nil,
-            String(ref value) => Value::String(Box::new(value.clone())),
+            String(ref value) => Value::String(Box::new(value.as_ref().clone())),
             Bytes(ref value) => Value::Nil,
             Char(ref value) => Value::Char(*value),
             Boolean(ref value) => Value::Bool(value.clone()),
-            Code(ref code) => {
+            Code(code) => {
                 Value::Code(code.to_owned())
             }
             Tuple(ref elements) => {
                 Value::Nil
             }
             None => Value::Nil,
-            Ellipsis => Value::Nil,
-            Struct(ref ty) => Value::Type(Box::new(ty.clone())),
-            Enum(ref ty) => Value::Enum(Box::new(ty.clone())),
+            Struct(ref ty) => Value::Type(Box::new(ty.as_ref().to_owned())),
+            Enum(ref ty) => Value::Enum(Box::new(ty.as_ref().to_owned())),
+            Reference(n) => Value::Reference(Box::new((n.as_ref().0,n.as_ref().1.clone()))),
             Map(ref ty) => { Value::Nil }
         }
     }

@@ -44,7 +44,7 @@ fn test() -> i32 {
 }
 
 enum TestValue {
-    F64(u128),
+    F64(Box<u128>),
     String(Box<String>),
    // Obj(Box<Obj>),
    // Fn(Box<FnValue>),
@@ -77,7 +77,8 @@ fn main() {
     // for i in 0..100_000_000 {
     //     store_obj_reference(0,"person_map".to_string(),Value::String(Box::new("pan".to_string())),Value::String(Box::new("pan222".to_string())))
     // }
-
+    let c = TestValue::Nil;
+    println!("ddd:{:?},",std::mem::size_of_val(&c));
     let start = std::time::Instant::now();
     test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
     println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());

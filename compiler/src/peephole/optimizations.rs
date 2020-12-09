@@ -89,7 +89,7 @@ pub fn calculate_const(instructions: &mut Vec<(Instruction, InstructionMetadata)
 
             Instruction::BuildTuple(size, _) | Instruction::BuildList(size, _) => {
                 if values.len() == *size {
-                    return Some(Constant::Tuple(values.clone()));
+                    return Some(Constant::Tuple(Box::new(values.clone())));
                 } else {
                     return None;
                 }
@@ -102,7 +102,7 @@ pub fn calculate_const(instructions: &mut Vec<(Instruction, InstructionMetadata)
                     let value = values.pop().unwrap();
                     const_vec.push((key, value));
                 }
-                return Some(Constant::Map(const_vec));
+                return Some(Constant::Map(Box::new(const_vec)));
             }
             _ => { return None; }
         }
@@ -229,21 +229,21 @@ fn emit_const_value(buf: &mut impl OptimizationBuffer, meta: InstructionMetadata
         Value::I16(value) => { emitconst!(buf, [meta], I16, value); }
         Value::I32(value) => { emitconst!(buf, [meta], I32, value); }
         Value::I64(value) => { emitconst!(buf, [meta], I64, value); }
-        Value::I128(value) => { emitconst!(buf, [meta], I128, *value); }
+        Value::I128(value) => { emitconst!(buf, [meta], I128, Box::new(value.as_ref().clone())); }
         Value::ISize(value) => { emitconst!(buf, [meta], ISize, value); }
         Value::U8(value) => { emitconst!(buf, [meta], U8, value); }
         Value::U16(value) => { emitconst!(buf, [meta], U16, value); }
         Value::U32(value) => { emitconst!(buf, [meta], U32, value); }
         Value::U64(value) => { emitconst!(buf, [meta], U64, value); }
-        Value::U128(value) => { emitconst!(buf, [meta], U128, *value); }
+        Value::U128(value) => { emitconst!(buf, [meta], U128,  Box::new(value.as_ref().clone())); }
         Value::USize(value) => { emitconst!(buf, [meta], USize, value); }
         Value::Bool(value) => { emitconst!(buf, [meta], Boolean, value); }
         Value::Char(value) => { emitconst!(buf, [meta], Char, value); }
         Value::Closure(value) => { emitconst!(buf, [meta], Code, Box::new(value.code)); }
         Value::Fn(value) => { emitconst!(buf, [meta], Code, Box::new(value.code)); }
         Value::Code(value) => { emitconst!(buf, [meta], Code, value); }
-        Value::Enum(value) => { emitconst!(buf, [meta], Enum, value.as_ref().clone()); }
-        Value::String(s) => { emitconst!(buf, [meta], String, s.to_string()); }
+        Value::Enum(value) => { emitconst!(buf, [meta], Enum, Box::new(value.as_ref().clone())); }
+        Value::String(s) => { emitconst!(buf, [meta], String, Box::new(s.to_string())); }
         Value::Float(s) => { emitconst!(buf, [meta], Float, s); }
         _ => {}
     }

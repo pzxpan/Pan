@@ -54,7 +54,7 @@ pub struct Person {
 
 fun main() {
    let person_map = {0:"a"};
-   for i in 0..1000000 {
+   for i in 0..10 {
      person_map[i] = "pan"+i;
    }
 

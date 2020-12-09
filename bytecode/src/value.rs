@@ -456,9 +456,9 @@ pub fn get_item(a: Value, b: Value) -> Option<Value> {
 pub fn get_map_item(a: Constant, b: Value) -> Option<Constant> {
     match (a, b) {
         (Constant::Map(elements), Value::String(sub)) => {
-            for e in elements {
+            for e in elements.as_ref() {
                 if sub.to_string().eq(&e.0.to_string()) {
-                    return Some(e.1);
+                    return Some(e.1.clone());
                 }
             }
             return None;
@@ -474,18 +474,18 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         I16(ref value) => Value::I16(*value),
         I32(ref value) => Value::I32(*value),
         I64(ref value) => Value::I64(*value),
-        I128(ref value) => Value::I128(Box::new(*value)),
+        I128(ref value) => Value::I128(Box::new(*value.as_ref())),
         ISize(ref value) => Value::ISize(*value),
         U8(ref value) => Value::U8(*value),
         U16(ref value) => Value::U16(*value),
         U32(ref value) => Value::U32(*value),
         U64(ref value) => Value::U64(*value),
-        U128(ref value) => Value::U128(Box::new(*value)),
+        U128(ref value) => Value::U128(Box::new(*value.as_ref())),
         USize(ref value) => Value::USize(*value),
         Integer(ref value) => Value::I32(*value),
         Float(ref value) => Value::Float(*value),
         Complex(ref value) => Value::Nil,
-        String(ref value) => Value::String(Box::new(value.clone())),
+        String(ref value) => Value::String(Box::new(value.as_ref().clone())),
         Bytes(ref value) => Value::Nil,
         Boolean(ref value) => Value::Bool(value.clone()),
         Char(ref value) => Value::Char(value.clone()),
@@ -494,15 +494,15 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         }
         Tuple(ref elements) => {
             let mut v = Vec::new();
-            for e in elements {
+            for e in elements.as_ref() {
                 v.push(unwrap_constant(e));
             }
             Value::new_array_obj(v)
         }
         None => Value::Nil,
-        Ellipsis => Value::Nil,
-        Struct(ref ty) => Value::Type(Box::new(ty.clone())),
-        Enum(ref ty) => Value::Enum(Box::new(ty.clone())),
+        Struct(ty) => Value::Type(Box::new(*ty.to_owned())),
+        Enum(ty) => Value::Enum(Box::new(*ty.to_owned())),
+        Reference(ref_value) => Value::Reference(Box::new((ref_value.as_ref().0, ref_value.as_ref().1.clone()))),
         Map(ref elements) => { Value::Nil }
     }
 }

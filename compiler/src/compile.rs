@@ -573,9 +573,9 @@ impl<O: OutputStream> Compiler<O> {
     fn get_exhaust_ty(&mut self, name: String, ty: &CType, end: Label) {
         if let CType::Enum(ety) = ty.clone() {
             if ty.name().eq("Option") {
-                self.emit(Instruction::LoadConst(bytecode::Constant::String(("Some").to_string())));
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(("Some").to_string()))));
             } else if ty.name().eq("Result") {
-                self.emit(Instruction::LoadConst(bytecode::Constant::String(("Ok").to_string())));
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(("Ok").to_string()))));
             }
             self.emit(Instruction::Match);
             self.emit(Instruction::JumpIfFalse(end));
@@ -591,12 +591,12 @@ impl<O: OutputStream> Compiler<O> {
     fn compile_match_item(&mut self, expression: &Expression) -> Result<(), CompileError> {
         if let Expression::FunctionCall(_, name, _) = expression {
             if let Expression::Attribute(_, _, Some(ident), _) = name.as_ref() {
-                self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(ident.name.clone()))));
             } else if let Expression::Variable(ident) = name.as_ref() {
-                self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(ident.name.clone()))));
             }
         } else if let Expression::Attribute(_, _, Some(ident), _) = expression {
-            self.emit(Instruction::LoadConst(bytecode::Constant::String(ident.name.clone())));
+            self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(ident.name.clone()))));
         } else {
             self.compile_expression(expression)?;
         }
@@ -709,7 +709,7 @@ impl<O: OutputStream> Compiler<O> {
         let code = self.pop_code_object();
         self.leave_scope();
         self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code))));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name)));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name))));
 
 
         self.emit(Instruction::MakeFunction);
@@ -776,7 +776,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadConst(
             bytecode::Constant::Code(Box::new(code))));
         self.emit(Instruction::LoadConst(
-            bytecode::Constant::String(qualified_name)));
+            bytecode::Constant::String(Box::new(qualified_name))));
 
         self.emit(Instruction::MakeFunction);
         self.store_name(name);
@@ -830,7 +830,7 @@ impl<O: OutputStream> Compiler<O> {
         if let Some(annotation) = returns {
             // key:
             self.emit(Instruction::LoadConst(
-                bytecode::Constant::String("return".to_string())));
+                bytecode::Constant::String(Box::new("return".to_string()))));
             // value:
             //  self.compile_expression(annotation)?;
             num_annotations += 1;
@@ -838,7 +838,7 @@ impl<O: OutputStream> Compiler<O> {
 
         for arg in args.iter() {
             self.emit(Instruction::LoadConst(
-                bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
+                bytecode::Constant::String(Box::new(arg.name.as_ref().unwrap().name.clone()))));
             //  self.compile_expression(&arg.ty)?;
             num_annotations += 1;
         }
@@ -849,7 +849,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code.clone()))));
         methods.push((name.to_string(), code.clone()));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name)));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name))));
 
         self.emit(Instruction::MakeFunction);
 
@@ -890,7 +890,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
         self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
@@ -928,7 +928,7 @@ impl<O: OutputStream> Compiler<O> {
         let mut code = self.pop_code_object();
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
-        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
+        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
         self.store_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
@@ -965,7 +965,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
         self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
@@ -997,7 +997,7 @@ impl<O: OutputStream> Compiler<O> {
         let mut code = self.pop_code_object();
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
-        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
+        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
         self.store_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
@@ -1035,7 +1035,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(qualified_name.clone())));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
         self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
         self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
@@ -1067,7 +1067,7 @@ impl<O: OutputStream> Compiler<O> {
         let mut code = self.pop_code_object();
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
-        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(ty)));
+        self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
 
         self.store_name(name);
         self.current_qualified_path = old_qualified_path;
@@ -1080,7 +1080,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::LoadConst(
             match doc_str {
-                Some(doc) => bytecode::Constant::String(doc),
+                Some(doc) => bytecode::Constant::String(Box::new(doc)),
                 None => bytecode::Constant::None,
             },
         ));
@@ -1181,7 +1181,7 @@ impl<O: OutputStream> Compiler<O> {
                 } else {
                     let idx = self.variable_scope_index(a.expr_name().as_str());
                     self.emit(Instruction::LoadConst(Constant::I32(idx)));
-                    self.emit(Instruction::LoadConst(Constant::String(a.expr_name())));
+                    self.emit(Instruction::LoadConst(Constant::String(Box::new(a.expr_name()))));
                     self.emit(Instruction::StoreReference);
                 }
             }
@@ -1537,7 +1537,7 @@ impl<O: OutputStream> Compiler<O> {
                     s.push_str(&x.string);
                     s
                 });
-                self.emit(Instruction::LoadConst(bytecode::Constant::String(value)))
+                self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(value))))
             }
             ArrayLiteral(_, elements) => {
                 let size = elements.len();
@@ -1646,7 +1646,7 @@ impl<O: OutputStream> Compiler<O> {
             }
             I128(value) => {
                 self.emit(Instruction::LoadConst(
-                    bytecode::Constant::I128(value)));
+                    bytecode::Constant::I128(Box::new(value))));
             }
             ISize(value) => {
                 self.emit(Instruction::LoadConst(
@@ -1671,7 +1671,7 @@ impl<O: OutputStream> Compiler<O> {
             }
             U128(value) => {
                 self.emit(Instruction::LoadConst(
-                    bytecode::Constant::U128(value)));
+                    bytecode::Constant::U128(Box::new(value))));
             }
             USize(value) => {
                 self.emit(Instruction::LoadConst(
@@ -1855,7 +1855,7 @@ impl<O: OutputStream> Compiler<O> {
         }
 
         for keyword in args {
-            self.emit(Instruction::LoadConst(bytecode::Constant::String(keyword.name.name.clone())));
+            self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(keyword.name.name.clone()))));
             self.compile_expression(&keyword.expr)?;
         }
         self.emit(Instruction::BuildMap(args.len(), false, false));
@@ -1983,7 +1983,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::LoadConst(bytecode::Constant::Code(Box::new(code))));
 
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(name)));
+        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(name))));
 
         self.emit(Instruction::MakeFunction);
 
@@ -2266,7 +2266,7 @@ impl<O: OutputStream> Compiler<O> {
                         if capture_name.ne("self") {
                             self.emit(Instruction::LoadConst(Constant::USize(self.symbol_table_stack.len() - 1)));
                             self.emit(Instruction::StoreName("capture$$idx".to_string(), NameScope::Local));
-                            self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
+                            self.emit(Instruction::LoadConst(Constant::String(Box::new(name.0.clone()))));
                             self.emit(Instruction::StoreName("capture$$name".to_string(), NameScope::Local));
                         }
 
@@ -2310,7 +2310,7 @@ impl<O: OutputStream> Compiler<O> {
                     if tmp.0 == 1 {
                         instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         instructions.push(Instruction::LoadConst(
-                            bytecode::Constant::String(attri_name.0.clone())));
+                            bytecode::Constant::String(Box::new(attri_name.0.clone()))));
 
                         instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
                         instructions.push(Instruction::LoadBuildEnum(3));
@@ -2322,7 +2322,7 @@ impl<O: OutputStream> Compiler<O> {
                     } else if tmp.0 == 2 {
                         instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         instructions.push(Instruction::LoadConst(
-                            bytecode::Constant::String(attri_name.0.clone())));
+                            bytecode::Constant::String(Box::new(attri_name.0.clone()))));
                         instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
@@ -2338,7 +2338,7 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         if !capture_name.is_empty() && cty.is_mut_fun() {
-            self.emit(Instruction::LoadConst(Constant::String(capture_name)));
+            self.emit(Instruction::LoadConst(Constant::String(Box::new(capture_name))));
         }
         for i in instructions {
             self.emit(i);
