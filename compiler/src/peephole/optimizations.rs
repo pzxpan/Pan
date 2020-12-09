@@ -241,9 +241,9 @@ fn emit_const_value(buf: &mut impl OptimizationBuffer, meta: InstructionMetadata
         Value::Char(value) => { emitconst!(buf, [meta], Char, value); }
         Value::Closure(value) => { emitconst!(buf, [meta], Code, Box::new(value.code)); }
         Value::Fn(value) => { emitconst!(buf, [meta], Code, Box::new(value.code)); }
-        Value::Code(value) => { emitconst!(buf, [meta], Code, Box::new(value)); }
-        Value::Enum(value) => { emitconst!(buf, [meta], Enum, value); }
-        Value::String(s) => { emitconst!(buf, [meta], String, s); }
+        Value::Code(value) => { emitconst!(buf, [meta], Code, value); }
+        Value::Enum(value) => { emitconst!(buf, [meta], Enum, value.as_ref().clone()); }
+        Value::String(s) => { emitconst!(buf, [meta], String, s.to_string()); }
         Value::Float(s) => { emitconst!(buf, [meta], Float, s); }
         _ => {}
     }

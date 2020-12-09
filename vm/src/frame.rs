@@ -99,7 +99,7 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-       // println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
+        // println!("instruction is:{:?},idx:{:?}", instruction, self.idx);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 scope_remove();
@@ -358,7 +358,7 @@ impl Frame {
             }
             bytecode::Instruction::TypeOf => {
                 let v = self.pop_value();
-                self.push_value(Value::String(v.ty_name()));
+                self.push_value(Value::String(Box::new(v.ty_name())));
                 None
             }
             bytecode::Instruction::PrimitiveTypeChange(idx) => {
@@ -440,10 +440,9 @@ impl Frame {
     }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
-
         let subscript = self.pop_value();
         let arr = self.pop_value();
-       // println!("subscript:{:?},arr{:?}",subscript,arr);
+        // println!("subscript:{:?},arr{:?}",subscript,arr);
         let value = vm.get_item(arr, subscript).unwrap();
         self.push_value(value);
         None
@@ -599,7 +598,7 @@ impl Frame {
         let qualified_name = self.pop_value();
         let code_obj = self.pop_value();
         let func = FnValue { name: qualified_name.name(), code: code_obj.code(), has_return: true };
-        self.push_value(Value::Fn(func));
+        self.push_value(Value::Fn(Box::new(func)));
         None
     }
 
@@ -608,7 +607,7 @@ impl Frame {
         let capture_value = self.pop_multiple(count);
         let code_obj = self.pop_value();
         let func = ClosureValue { name: qualified_name.name(), code: code_obj.code(), capture_values: Box::new(capture_value), has_return: true };
-        self.push_value(Value::Closure(func));
+        self.push_value(Value::Closure(Box::new(func)));
         None
     }
 

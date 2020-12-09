@@ -55,8 +55,8 @@ pub struct Person {
 fun main() {
    let person = Person!{age:50,name:"pan",house: House!{size:111.0,price:1_000_000.0}};
    let person_map = {0:"a"};
-   for i in 0..1_000_000 {
-     person_map[i] = "pan";
+   for i in 0..1_0 {
+     person_map[i] = "pan"+i;
    }
   // let c = sizeof(person_map);
    print("len:{}",10);

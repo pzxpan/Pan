@@ -19,6 +19,7 @@ use std::cell::RefCell;
 use crate::scope::NameProtocol;
 use std::sync::Mutex;
 use std::sync::Arc;
+use std::time::Instant;
 
 pub struct VirtualMachine {
     pub frame_count: usize,
@@ -90,19 +91,15 @@ pub fn load_capture_reference(idx: usize, name: String) -> Value {
 // field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) }))}, {"age": I32(50), "a": I32(1000), "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older", <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ), ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ), ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )], static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }), field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) })), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")}]
 
 pub fn store_capture_reference(idx: usize, name: String, value: Value) {
+    println!("ddddname:{:?},value:{:?}",name,value);
     let ref mut scope = SCOPE.lock().unwrap();
-    scope.locals.get_mut(idx).unwrap().insert(name, value);
+    let map = scope.locals.get_mut(idx).unwrap();
+   // println!("value_len:{:?}", std::mem::size_of_val(&value));
+    let start = Instant::now();
+    map.insert(name, value);
+    println!("插入耗时:{:?},", start.elapsed().as_nanos());
 }
-// ddddvalue:Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", <code objec
-// t fff at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15>), ("is_older", <code o
-// bject is_older at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24>), ("change_a\
-// ge", <code object change_age at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28>)
-// , ("older_than", <code object older_than at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31>)],
-// static_fields: [("ceshi", <code object ceshi at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46>)] }),
-// field_map: Obj(MapObj({"age": I32(1000), "name": String("pan"), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue
-// { name: "House", methods: [("idea", <code object idea at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2>)], s
-// tatic_fields: [("static", <code object static at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7>)] }), fiel
-// d_map: Obj(MapObj({"size": Float(111.0), "price": Float(1000000.0)})) }))})) })),idx:"person",string:1
+
 
 fn load_global(name: String) -> Option<Value> {
     let ref mut scope = SCOPE.lock().unwrap();
@@ -276,15 +273,15 @@ impl VirtualMachine {
             Value::Obj(mut e) => {
                 match e.as_mut() {
                     Obj::InstanceObj(InstanceObj { typ, field_map }) => {
-                        if let Value::Type(TypeValue { methods, static_fields, .. }) = typ.as_ref() {
-                            for method in methods {
+                        if let Value::Type(n) = typ.as_ref() {
+                            for method in &n.as_ref().methods {
                                 if method.0.eq(&attr.to_string()) {
-                                    return (true, Value::Code(method.1.clone()));
+                                    return (true, Value::Code(Box::new(method.1.clone())));
                                 }
                             }
-                            for (k, v) in static_fields.iter() {
+                            for (k, v) in n.as_ref().static_fields.iter() {
                                 if k.eq(&attr.to_string()) {
-                                    return (true, Value::Code(v.clone()));
+                                    return (true, Value::Code(Box::new(v.clone())));
                                 }
                             }
                         }
@@ -297,16 +294,16 @@ impl VirtualMachine {
                             }
                         }
                     }
-                    Obj::EnumObj(EnumObj { typ, .. }) => {
-                        if let Value::Type(TypeValue { methods, static_fields, .. }) = typ.as_ref() {
-                            for method in methods {
+                    Obj::EnumObj(ety) => {
+                        if let Value::Type(n) = ety.typ.as_ref() {
+                            for method in &n.as_ref().methods {
                                 if method.0.eq(&attr.to_string()) {
-                                    return (true, Value::Code(method.1.clone()));
+                                    return (true, Value::Code(Box::new(method.1.clone())));
                                 }
                             }
-                            for (k, v) in static_fields.iter() {
+                            for (k, v) in n.as_ref().static_fields.iter() {
                                 if k.eq(&attr.to_string()) {
-                                    return (true, Value::Code(v.clone()));
+                                    return (true, Value::Code(Box::new(v.clone())));
                                 }
                             }
                         }
@@ -315,14 +312,14 @@ impl VirtualMachine {
                 }
             }
             Value::Type(ty) => {
-                for (k, v) in ty.static_fields.iter() {
+                for (k, v) in ty.as_ref().static_fields.iter() {
                     if k.eq(&attr.to_string()) {
-                        return (true, Value::Code(v.clone()));
+                        return (true, Value::Code(Box::new(v.clone())));
                     }
                 }
-                for (k, v) in ty.methods.iter() {
+                for (k, v) in ty.as_ref().methods.iter() {
                     if k.eq(&attr.to_string()) {
-                        return (true, Value::Code(v.clone()));
+                        return (true, Value::Code(Box::new(v.clone())));
                     }
                 }
             }
@@ -555,7 +552,7 @@ impl VirtualMachine {
             let mut start = start.int_value();
             let mut end = end.int_value();
             if end < start || start >= s.len() as i32 {
-                return Value::String("".to_string());
+                return Value::String(Box::new("".to_string()));
             }
             if start < 0 {
                 start = 0;
@@ -567,17 +564,17 @@ impl VirtualMachine {
             }
             if include.bool_value() {
                 let a = &s[start..=end];
-                return Value::String(String::from(a));
+                return Value::String(Box::new(String::from(a)));
             } else {
                 let a = &s[start..end];
-                return Value::String(String::from(a));
+                return Value::String(Box::new(String::from(a)));
             }
         }
         unreachable!()
     }
 
     pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) {
-        //println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
+        println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
         // let mut update_value = Value::Nil;
         match (obj, idx) {
             (Value::Obj(ref mut e), Value::I32(sub)) => {
@@ -916,7 +913,7 @@ impl VirtualMachine {
                                 let idx = end.int_value() as usize;
                                 if idx < map.len() {
                                     let t = map.iter().nth(idx).unwrap();
-                                    ret = Value::new_array_obj(vec![Value::String(t.0.clone()), t.1.clone()]);
+                                    ret = Value::new_array_obj(vec![Value::String(Box::new(t.0.clone())), t.1.clone()]);
                                     *end = Value::I32(idx as i32 + 1);
                                 }
                             }
@@ -1021,7 +1018,7 @@ impl VirtualMachine {
                 Value::Float(a + b)
             }
             (Value::String(s1), Value::String(s2)) => {
-                Value::String(s1.add(s2.as_str()))
+                Value::String(Box::new(s1.add(s2.as_str())))
             }
             _ => unreachable!()
         }
@@ -1375,20 +1372,20 @@ impl VirtualMachine {
             Integer(ref value) => Value::I32(value.to_i32().unwrap()),
             Float(ref value) => Value::Float(*value),
             Complex(ref value) => Value::Nil,
-            String(ref value) => Value::String(value.clone()),
+            String(ref value) => Value::String(Box::new(value.clone())),
             Bytes(ref value) => Value::Nil,
             Char(ref value) => Value::Char(*value),
             Boolean(ref value) => Value::Bool(value.clone()),
             Code(ref code) => {
-                Value::Code(*code.to_owned())
+                Value::Code(code.to_owned())
             }
             Tuple(ref elements) => {
                 Value::Nil
             }
             None => Value::Nil,
             Ellipsis => Value::Nil,
-            Struct(ref ty) => Value::Type(ty.clone()),
-            Enum(ref ty) => Value::Enum(ty.clone()),
+            Struct(ref ty) => Value::Type(Box::new(ty.clone())),
+            Enum(ref ty) => Value::Enum(Box::new(ty.clone())),
             Map(ref ty) => { Value::Nil }
         }
     }

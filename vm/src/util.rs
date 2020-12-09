@@ -18,7 +18,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -36,7 +36,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -53,7 +53,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -70,7 +70,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -87,7 +87,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -104,7 +104,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -121,7 +121,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -138,7 +138,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -155,7 +155,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -172,7 +172,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 // 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -189,7 +189,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -206,7 +206,7 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 -128 => Value::I128(*v as i128),
                 128 => Value::U128(*v as u128),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -272,7 +272,7 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
                 fmt.str(&vv.to_string())
             }
 
-            Value::Reference(idx,name) => {
+            Value::Reference(idx, name) => {
                 fmt.str(&name)
             }
             Value::Nil => { fmt.str(&"None".to_string()) }
@@ -281,7 +281,7 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
     if let Value::String(s) = format_str {
         let a = strfmt_map(s.as_ref(), &f);
         if a.is_ok() {
-            return Value::String(a.unwrap());
+            return Value::String(Box::new(a.unwrap()));
         }
     }
     Value::Nil

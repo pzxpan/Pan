@@ -50,15 +50,15 @@ pub enum Value {
     /// Represents a compile-time string constant (ie. the name of a function, or the key of a map).
     /// These are only transient values and should not remain on the stack. Compare to an actual,
     /// heap-allocated, run-time Value::Obj(Obj::StringObj) value.
-    String(String),
+    String(Box<String>),
     Obj(Box<Obj>),
-    Fn(FnValue),
-    Closure(ClosureValue),
+    Fn(Box<FnValue>),
+    Closure(Box<ClosureValue>),
     Thread(Box<ThreadValue>),
     // NativeFn(NativeFn),
-    Type(TypeValue),
-    Enum(EnumValue),
-    Code(CodeObject),
+    Type(Box<TypeValue>),
+    Enum(Box<EnumValue>),
+    Code(Box<CodeObject>),
     Reference(usize, String),
     Nil,
 }
@@ -110,7 +110,7 @@ impl Value {
     }
 
     pub fn int_value(&self) -> i32 {
-       // println!("ddd:{:?},", self);
+        // println!("ddd:{:?},", self);
         match *self {
             Value::I8(v) => { v as i32 }
             Value::U8(v) => { v as i32 }
@@ -214,10 +214,10 @@ impl Value {
     pub fn code(&self) -> CodeObject {
         match self {
             Value::Fn(v) => {
-                v.code.clone()
+                v.as_ref().code.clone()
             }
             Value::Code(v) => {
-                v.clone()
+                v.as_ref().clone()
             }
             // Value::Type(ty) => {
             //
@@ -247,16 +247,16 @@ impl Value {
             Value::USize(val) => format!("{}", val),
             Value::Float(val) => format!("{}", val),
             Value::Bool(val) => format!("{}", val),
-            Value::String(val) => val.clone(),
+            Value::String(val) => val.to_string(),
             Value::Obj(obj) => format!("{}", &obj.to_string()),
-            Value::Fn(FnValue { name, .. }) |
-            Value::Closure(ClosureValue { name, .. }) => format!("<func {}>", name),
-            Value::Thread(t) => format!("<thread {}>", t.field_map.to_string()),
+            Value::Fn(n) => format!("{}", &n.name),
+            Value::Closure(n) => format!("<func {}>", &n.name),
+            Value::Thread(t) => format!("<thread {}>", &t.field_map.to_string()),
 // Value::NativeFn(NativeFn { name, .. }) => format!("<func {}>", name),
-            Value::Type(TypeValue { name, .. }) => format!("<type {}>", name),
+            Value::Type(n) => format!("<type {}>", &n.name),
             Value::Nil => format!("None"),
-            Value::Code(code) => format!("<code {}>", code),
-            Value::Enum(EnumValue { name, .. }) => format!("<enum {}>", name),
+            Value::Code(code) => format!("<code {}>", code.as_ref()),
+            Value::Enum(n) => format!("<enum {}>", &n.name),
             Value::Reference(idx, name) => format!("<ref {} {}>", idx, name)
         }
     }
@@ -322,13 +322,13 @@ impl Display for Value {
                 Obj::StringObj(value) => write!(f, "\"{}\"", value),
                 o @ _ => write!(f, "{}", o.to_string()),
             }
-            Value::Thread(n) => write!(f, "<thread {}>", n.field_map.to_string()),
-            Value::Fn(FnValue { name, .. }) => write!(f, "<func {}>", name),
-            Value::Closure(ClosureValue { name, .. }) => write!(f, "<closure {}>", name),
-            Value::Type(TypeValue { name, .. }) => write!(f, "<type {}>", name),
+            Value::Thread(n) => write!(f, "<thread {}>", &n.field_map.to_string()),
+            Value::Fn(n) => write!(f, "<func {}>", &n.name),
+            Value::Closure(n) => write!(f, "<closure {}>", &n.name),
+            Value::Type(n) => write!(f, "<type {}>", &n.name),
             Value::Nil => write!(f, "None"),
             Value::Code(code) => write!(f, "<code {}>", code),
-            Value::Enum(EnumValue { name, .. }) => write!(f, "<enum {}>", name),
+            Value::Enum(n) => write!(f, "<enum {}>", n.name),
             Value::Reference(idx, name) => write!(f, "<ref {} {}>", idx, name)
         }
     }
@@ -373,13 +373,13 @@ impl Obj {
             Obj::MapObj(_) => "<map>".to_string(),
             Obj::InstanceObj(inst) => {
                 match &*inst.typ {
-                    Value::Type(TypeValue { name, .. }) => format!("<instance {}>", name),
+                    Value::Type(n) => format!("<instance {}>", n.name),
                     _ => unreachable!("Shouldn't have instances of non-struct types")
                 }
             }
             Obj::EnumObj(inst) => {
                 match &*inst.typ {
-                    Value::Type(TypeValue { name, .. }) => format!("<enum instance {}>", name),
+                    Value::Type(n) => format!("<enum instance {}>", n.name),
                     _ => unreachable!("Shouldn't have instances of enum types")
                 }
             }
@@ -460,7 +460,7 @@ pub fn get_map_item(a: Constant, b: Value) -> Option<Constant> {
     match (a, b) {
         (Constant::Map(elements), Value::String(sub)) => {
             for e in elements {
-                if sub.eq(&e.0.to_string()) {
+                if sub.to_string().eq(&e.0.to_string()) {
                     return Some(e.1);
                 }
             }
@@ -488,12 +488,12 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         Integer(ref value) => Value::I32(*value),
         Float(ref value) => Value::Float(*value),
         Complex(ref value) => Value::Nil,
-        String(ref value) => Value::String(value.clone()),
+        String(ref value) => Value::String(Box::new(value.clone())),
         Bytes(ref value) => Value::Nil,
         Boolean(ref value) => Value::Bool(value.clone()),
         Char(ref value) => Value::Char(value.clone()),
         Code(ref code) => {
-            Value::Code(*code.to_owned())
+            Value::Code(Box::new(*code.to_owned()))
         }
         Tuple(ref elements) => {
             let mut v = Vec::new();
@@ -504,8 +504,8 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         }
         None => Value::Nil,
         Ellipsis => Value::Nil,
-        Struct(ref ty) => Value::Type(ty.clone()),
-        Enum(ref ty) => Value::Enum(ty.clone()),
+        Struct(ref ty) => Value::Type(Box::new(ty.clone())),
+        Enum(ref ty) => Value::Enum(Box::new(ty.clone())),
         Map(ref elements) => { Value::Nil }
     }
 }
