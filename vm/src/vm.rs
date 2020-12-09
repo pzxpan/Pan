@@ -92,24 +92,16 @@ pub fn load_capture_reference(idx: usize, name: String) -> Value {
 
 
 pub fn store_primitive_reference(idx: usize, name: String, value: Value) {
-    println!("store_primitive_reference:{:?},value:{:?}", name, value);
     let ref mut scope = SCOPE.lock().unwrap();
     let map = scope.locals.get_mut(idx).unwrap();
-    println!("value_len:{:?}", std::mem::size_of_val(&value));
-    let start = Instant::now();
     map.insert(name, value);
-    println!("插入耗时:{:?},", start.elapsed().as_nanos());
 }
 
 pub fn store_obj_reference(idx: usize, name: String, obj_idx_name: Value, value: Value) {
-    //  println!("store_obj_reference:{:?},value:{:?}:idx:{:?}", name, value, obj_idx_name);
-    println!("value_len:{:?}", std::mem::size_of_val(&value));
     let ref mut scope = SCOPE.lock().unwrap();
     let map = scope.locals.get_mut(idx).unwrap();
     let obj = map.get_mut(&name).unwrap();
-    //  let start = Instant::now();
     VirtualMachine::update_item(obj, obj_idx_name, value);
-    //  println!("2222插入耗时:{:?},", start.elapsed().as_nanos());
 }
 
 
@@ -127,35 +119,18 @@ fn store_global(name: String, value: Value) {
 }
 
 fn load_name(name: String, idx: usize) -> Option<Value> {
-    let start = Instant::now();
     let ref mut scope = SCOPE.lock().unwrap();
     for index in (0..=idx).rev() {
         let dict = scope.locals.get(index).unwrap();
         let v = dict.get(&name);
         if let Some(value) = v {
             if let Value::Obj(_) = value {
-                let v = Some(Value::Reference(Box::new((index, name))));
-                println!("load + create_reference 耗时:{:?},", start.elapsed().as_nanos());
-                return v;
+                return Some(Value::Reference(Box::new((index, name))));
             }
-            println!("dddddload_name 耗时:{:?},", start.elapsed().as_nanos());
-            let v = Some(value.clone());
-            println!("clone() + load_name 耗时:{:?},", start.elapsed().as_nanos());
-            return v;
+            return Some(value.clone());
         }
     }
-    // for dict in scope.locals.iter() {
-    //     // println!("index:{:?}", index);
-    //     // if index > idx {
-    //     //     break;
-    //     // }
-    //     let v = dict.get(&name);
-    //     if let Some(value) = v {
-    //         return Some(value.clone());
-    //     }
-    // }
     if let Some(v) = scope.load_global(name.clone()) {
-        println!("load_name 耗时:{:?},", start.elapsed().as_nanos());
         return Some(v.clone());
     }
     None
@@ -227,23 +202,13 @@ impl VirtualMachine {
         name_scope: &bytecode::NameScope,
         idx: usize,
     ) -> Value {
-        let tt = Instant::now();
         let optional_value = match name_scope {
             bytecode::NameScope::Global => load_global(name.to_string()),
             bytecode::NameScope::Local => {
-                // if name.eq("arr") {
-                //     load_name(name.to_string(), 1)
-                // } else {
-                //     load_name(name.to_string(), idx)
-                // }
-                let tt = Instant::now();
-                let v = load_name(name.to_string(), idx);
-                println!("vm innnnin load_name  耗时:{:?},", tt.elapsed().as_nanos());
-                v
+                load_name(name.to_string(), idx)
             }
             bytecode::NameScope::Const => load_global(name.to_string()),
         };
-        println!("vm load_name  耗时:{:?},", tt.elapsed().as_nanos());
         //println!("load_name:{:?},value:{:?}", name, optional_value);
         match optional_value {
             Some(value) => value,

@@ -137,9 +137,7 @@ impl Frame {
             ) => {
                 let tt = Instant::now();
                 let v = vm.load_name(name, scope, self.idx);
-                println!("frame load_name 耗时:{:?},", tt.elapsed().as_nanos());
                 self.push_value(v);
-                println!("frame load_name + push 耗时:{:?},", tt.elapsed().as_nanos());
                 None
             }
             bytecode::Instruction::StoreName(
