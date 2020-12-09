@@ -320,7 +320,7 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(i.clone());
         }
         if found_main {
-            self.emit(Instruction::LoadName("main".to_string(), NameScope::Local));
+            self.emit(Instruction::LoadReference("main".to_string(), NameScope::Local));
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
         }
@@ -334,9 +334,9 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::DefineConstStart);
         self.compile_expression(&const_def.initializer)?;
         if in_import {
-            self.store_name(&get_full_name(&self.package, &const_def.name.name));
+            self.store_ref_name(&get_full_name(&self.package, &const_def.name.name));
         } else {
-            self.store_name(&const_def.name.name);
+            self.store_ref_name(&const_def.name.name);
         }
         self.emit(Instruction::DefineConstEnd);
         Ok(())
@@ -357,8 +357,9 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn load_name(&mut self, name: &str) {
-        let scope = self.scope_for_name(name);
-        self.emit(Instruction::LoadName(name.to_owned(), scope));
+        self.load_ref_name(name);
+        // let scope = self.scope_for_name(name);
+        // self.emit(Instruction::LoadName(name.to_owned(), scope));
     }
 
     pub fn store_name(&mut self, name: &str) {
@@ -366,6 +367,37 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::StoreName(name.to_owned(), scope));
     }
 
+    pub fn need_ref(&self, name: &str) -> bool {
+        let ty = &self.lookup_name(name).ty;
+        return if ty <= &CType::U64 || ty == &CType::Float {
+            false
+        } else {
+            true
+        };
+    }
+
+    pub fn load_ref_name(&mut self, name: &str) {
+        if self.need_ref(name) {
+            let scope = self.scope_for_name(name);
+            self.emit(Instruction::LoadReference(name.to_owned(), scope));
+        } else {
+            let scope = self.scope_for_name(name);
+            self.emit(Instruction::LoadName(name.to_owned(), scope));
+        }
+    }
+    pub fn store_ref_name(&mut self, name: &str) {
+        if self.need_ref(name) {
+            let mut ref_name = String::from(name);
+            ref_name.push_str("$$");
+            let scope = self.scope_for_name(name);
+            self.emit(Instruction::StoreName(ref_name.clone(), scope));
+            let idx = self.variable_scope_index(name);
+            self.emit(Instruction::LoadConst(Constant::Reference(Box::new((idx as usize, ref_name.clone())))));
+            self.emit(Instruction::StoreName(name.to_owned(), NameScope::Local));
+        } else {
+            self.store_name(name);
+        }
+    }
     fn compile_statement(&mut self, statement: &ast::Statement) -> Result<(), CompileError> {
         trace!("正在编译 {:?}", statement);
         self.set_source_location(statement.loc().borrow());
@@ -460,7 +492,7 @@ impl<O: OutputStream> Compiler<O> {
                     }
                     self.compile_expression(e)?;
                 }
-                self.store_name(&decl.name.name);
+                self.store_ref_name(&decl.name.name);
             }
 
             For(_, target, iter, body) => {
@@ -631,17 +663,17 @@ impl<O: OutputStream> Compiler<O> {
                         self.emit(Instruction::LoadConst(
                             bytecode::Constant::Integer(index as i32)));
                         self.emit(Instruction::Subscript);
-                        self.store_name(ident.name.clone().as_ref());
+                        self.store_ref_name(ident.name.clone().as_ref());
                     }
                     DestructType::Tuple => {
                         self.emit(Instruction::LoadConst(
                             bytecode::Constant::Integer(index as i32)));
                         self.emit(Instruction::Subscript);
-                        self.store_name(ident.name.clone().as_ref());
+                        self.store_ref_name(ident.name.clone().as_ref());
                     }
                     DestructType::Struct => {
                         self.emit(Instruction::LoadAttr(ident.name.clone()));
-                        self.store_name(ident.name.clone().as_ref());
+                        self.store_ref_name(ident.name.clone().as_ref());
                     }
                 }
             }
@@ -654,7 +686,7 @@ impl<O: OutputStream> Compiler<O> {
 
             MultiDeclarationPart::Struct(ident, decl) => {
                 self.emit(Instruction::LoadAttr(ident.name.clone()));
-                self.store_name(ident.name.clone().as_ref());
+                self.store_ref_name(ident.name.clone().as_ref());
                 self.load_name(ident.name.clone().as_ref());
                 self.compile_store_multi_value_def(decl)?;
             }
@@ -682,7 +714,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::ShallowOperation(bytecode::ComparisonOperator::Equal));
                 self.emit(Instruction::JumpIfFalse(end_label));
                 self.compile_expression(&arg.default.as_ref().unwrap())?;
-                self.store_name(&arg.name.as_ref().unwrap().name);
+                self.store_ref_name(&arg.name.as_ref().unwrap().name);
                 self.set_label(end_label);
             }
         }
@@ -713,7 +745,7 @@ impl<O: OutputStream> Compiler<O> {
 
 
         self.emit(Instruction::MakeFunction);
-        self.store_name(name);
+        self.store_ref_name(name);
         self.ctx = prev_ctx;
         Ok(())
     }
@@ -779,7 +811,7 @@ impl<O: OutputStream> Compiler<O> {
             bytecode::Constant::String(Box::new(qualified_name))));
 
         self.emit(Instruction::MakeFunction);
-        self.store_name(name);
+        self.store_ref_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
         Ok(())
@@ -853,7 +885,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.emit(Instruction::MakeFunction);
 
-        self.store_name(name);
+        self.store_ref_name(name);
 
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
@@ -929,7 +961,7 @@ impl<O: OutputStream> Compiler<O> {
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
-        self.store_name(name);
+        self.store_ref_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
         Ok(())
@@ -998,7 +1030,7 @@ impl<O: OutputStream> Compiler<O> {
         self.leave_scope();
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
-        self.store_name(name);
+        self.store_ref_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
         Ok(())
@@ -1069,7 +1101,7 @@ impl<O: OutputStream> Compiler<O> {
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
 
-        self.store_name(name);
+        self.store_ref_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
         Ok(())
@@ -1157,18 +1189,18 @@ impl<O: OutputStream> Compiler<O> {
                 // let s = self.lookup_name(name);
                 if let FunctionContext::StructFunction(..) = self.ctx.func {
                     if self.is_current_scope(name.as_str()) {
-                        self.store_name(name);
+                        self.store_ref_name(name);
                     } else {
                         self.load_name("self");
                         self.emit(Instruction::StoreAttr(name.clone()));
                         self.emit(Instruction::Duplicate);
-                        self.store_name("self");
+                        self.store_ref_name("self");
                         self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
                         self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
                         self.emit(Instruction::StoreReference);
                     }
                 } else {
-                    self.store_name(name);
+                    self.store_ref_name(name);
                 }
             }
             ast::Expression::Subscript(_, a, b) => {
@@ -1177,7 +1209,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(Instruction::StoreSubscript);
                 //TODO这里需要修改，struct中的subscript数据怎么办;
                 if self.is_current_scope(a.expr_name().as_str()) {
-                    self.store_name(&a.expr_name());
+                    self.store_ref_name(&a.expr_name());
                 } else {
                     let idx = self.variable_scope_index(a.expr_name().as_str());
                     self.emit(Instruction::LoadConst(Constant::I32(idx)));
@@ -1191,12 +1223,12 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
                     if obj.expr_name().eq("self") {
                         self.emit(Instruction::Duplicate);
-                        self.store_name("self");
+                        self.store_ref_name("self");
                         self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
                         self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
                         self.emit(Instruction::StoreReference);
                     } else {
-                        self.store_name(&obj.expr_name());
+                        self.store_ref_name(&obj.expr_name());
                     }
                 } else {
                     self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
@@ -1204,12 +1236,12 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::StoreSubscript);
                     if obj.expr_name().eq("self") {
                         self.emit(Instruction::Duplicate);
-                        self.store_name("self");
+                        self.store_ref_name("self");
                         self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
                         self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
                         self.emit(Instruction::StoreReference);
                     } else {
-                        self.store_name(&obj.expr_name());
+                        self.store_ref_name(&obj.expr_name());
                     }
                 }
             }

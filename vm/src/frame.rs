@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 use pan_bytecode::bytecode;
-use pan_bytecode::bytecode::{CodeObject, Instruction};
+use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
 use crate::vm::{VirtualMachine, scope_len, store_obj_reference};
@@ -105,7 +105,7 @@ impl Frame {
         let instruction = self.fetch_instruction();
         let name = format!("{:?}", instruction);
         let start = Instant::now();
-        //println!("instruction是:{:?},", instruction);
+        println!("instruction是:{:?},", instruction);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 scope_remove();
@@ -315,9 +315,9 @@ impl Frame {
                 // vm.run_code_obj(value.code(), self.scope.clone());
             }
 
-            bytecode::Instruction::LoadReference(idx, name, ref_name) => {
-                let v = vm.load_capture_reference(*idx, name.clone());
-                // println!("load_value:{:?}", v);
+            bytecode::Instruction::LoadReference(name, scope) => {
+                let v = vm.load_ref_name(&name.clone(), scope, self.idx);
+                println!("load_value:{:?}", v);
                 self.push_value(v);
             }
 
@@ -430,9 +430,15 @@ impl Frame {
         let idx = self.pop_value();
         let mut obj = self.pop_value();
         let value = self.pop_value();
+        println!("idx:{:?},obj:{:?},value:{:?}", idx, obj, value);
+
         //VirtualMachine::update_item(&mut obj, idx.clone(), value.clone());
-        self.push_value(obj);
-        store_obj_reference(1, "person_map".to_string(), idx.clone(), value.clone());
+
+        if let Value::Reference(n) = obj.clone() {
+            store_obj_reference(n.as_ref().0, n.as_ref().1.clone(), idx.clone(), value.clone());
+        }
+        self.push_value(obj.clone());
+        // store_obj_reference(1, "person_map".to_string(), idx.clone(), value.clone());
         None
     }
 
@@ -500,7 +506,14 @@ impl Frame {
             }
             _ => { vec![Value::Nil] }
         };
-        let func_ref = self.pop_value();
+        let mut func_ref = self.pop_value();
+        println!("func_ref::{:?},", func_ref);
+        if let Value::Reference(n) = func_ref {
+            println!("dddd");
+            func_ref = vm.load_name(&n.as_ref().1, &NameScope::Local, n.as_ref().0.clone());
+            println!("func_ref::{:?},", func_ref);
+        }
+
         let code = func_ref.code();
 
         // self.scope.new_child_scope_with_locals();

@@ -212,6 +212,7 @@ impl Value {
     }
 
     pub fn code(&self) -> CodeObject {
+        println!("code is :{:?}", self);
         match self {
             Value::Fn(v) => {
                 v.as_ref().code.clone()

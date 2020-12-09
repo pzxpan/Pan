@@ -72,6 +72,7 @@ pub fn scope_remove() {
 pub fn load_capture_reference(idx: usize, name: String) -> Value {
     let ref mut scope = SCOPE.lock().unwrap();
     let vv = scope.locals.get(idx);
+    println!("idx::{:?},name:{:?}", idx, name);
     let vvvv = vv.unwrap().get(&name).unwrap();
     vvvv.clone()
 }
@@ -113,6 +114,16 @@ fn load_primitive_global(name: String) -> Option<Value> {
     None
 }
 
+fn load_reference_global(name: String) -> Option<Value> {
+    let ref mut scope = SCOPE.lock().unwrap();
+    if let Some(v) = scope.globals.get(&name) {
+        if let Value::Reference(n) = v {
+            return load_primitive_global(n.as_ref().1.clone());
+        }
+    }
+    None
+}
+
 fn store_primitive_global(name: String, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
     scope.globals.insert(name, value);
@@ -124,6 +135,7 @@ fn load_primitive_name(name: String, idx: usize) -> Option<Value> {
         let dict = scope.locals.get(index).unwrap();
         let v = dict.get(&name);
         if let Some(value) = v {
+            println!("value_is::{:?},name:{:?}", value, name);
             if let Value::Obj(_) = value {
                 return Some(Value::Reference(Box::new((index, name))));
             }
@@ -142,9 +154,6 @@ fn load_reference_name(name: String, idx: usize) -> Option<Value> {
         let dict = scope.locals.get(index).unwrap();
         let v = dict.get(&name);
         if let Some(value) = v {
-            if let Value::Obj(_) = value {
-                return Some(Value::Reference(Box::new((index, name))));
-            }
             return Some(value.clone());
         }
     }
@@ -226,6 +235,29 @@ impl VirtualMachine {
                 load_primitive_name(name.to_string(), idx)
             }
             bytecode::NameScope::Const => load_primitive_global(name.to_string()),
+        };
+        //println!("load_name:{:?},value:{:?}", name, optional_value);
+        match optional_value {
+            Some(value) => value,
+            None => {
+                Value::Nil
+            }
+        }
+    }
+
+    #[cfg_attr(feature = "flame-it", flame("Frame"))]
+    pub fn load_ref_name(
+        &self,
+        name: &str,
+        name_scope: &bytecode::NameScope,
+        idx: usize,
+    ) -> Value {
+        let optional_value = match name_scope {
+            bytecode::NameScope::Global => load_reference_global(name.to_string()),
+            bytecode::NameScope::Local => {
+                load_reference_name(name.to_string(), idx)
+            }
+            bytecode::NameScope::Const => load_reference_global(name.to_string()),
         };
         //println!("load_name:{:?},value:{:?}", name, optional_value);
         match optional_value {
@@ -1395,7 +1427,7 @@ impl VirtualMachine {
             None => Value::Nil,
             Struct(ref ty) => Value::Type(Box::new(ty.as_ref().to_owned())),
             Enum(ref ty) => Value::Enum(Box::new(ty.as_ref().to_owned())),
-            Reference(n) => Value::Reference(Box::new((n.as_ref().0,n.as_ref().1.clone()))),
+            Reference(n) => Value::Reference(Box::new((n.as_ref().0, n.as_ref().1.clone()))),
             Map(ref ty) => { Value::Nil }
         }
     }

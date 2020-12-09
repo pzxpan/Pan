@@ -58,7 +58,7 @@ fun main() {
      person_map[i] = "pan"+i;
    }
 
-   //print(person_map[2000]);
+   print(person_map[2]);
   // let c = sizeof(person_map);
    print("len:{}",10);
    return;
