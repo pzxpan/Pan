@@ -59,7 +59,7 @@ pub enum Value {
     Type(Box<TypeValue>),
     Enum(Box<EnumValue>),
     Code(Box<CodeObject>),
-    Reference(Box<(usize, String)>),
+    Reference(Box<(usize, usize)>),
     Nil,
 }
 
@@ -502,7 +502,7 @@ pub fn unwrap_constant(value: &Constant) -> Value {
         None => Value::Nil,
         Struct(ty) => Value::Type(Box::new(*ty.to_owned())),
         Enum(ty) => Value::Enum(Box::new(*ty.to_owned())),
-        Reference(ref_value) => Value::Reference(Box::new((ref_value.as_ref().0, ref_value.as_ref().1.clone()))),
+        Reference(ref_value) => Value::Reference(Box::new((ref_value.as_ref().0, ref_value.as_ref().1))),
         Map(ref elements) => { Value::Nil }
     }
 }

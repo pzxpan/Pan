@@ -380,17 +380,21 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     pub fn load_ref_name(&mut self, name: &str) {
-        let scope = self.scope_for_name(name);
-        let position = self.variable_position(name).unwrap();
-        println!("name:{:?},position::{:?}", name, position);
-        self.emit(Instruction::LoadReference(position.0, position.1, scope));
-        // if self.need_ref(name) {
-        //
-        // } else {
-        //     let scope = self.scope_for_name(name);
-        //     let position = self.variable_position(name).unwrap();
-        //     self.emit(Instruction::LoadName(position.1, scope));
-        // }
+        // let scope = self.scope_for_name(name);
+        // let position = self.variable_position(name).unwrap();
+        // println!("name:{:?},position::{:?}", name, position);
+        // self.emit(Instruction::LoadReference(position.0, position.1, scope));
+        if self.need_ref(name) {
+            let scope = self.scope_for_name(name);
+            let position = self.variable_position(name).unwrap();
+            println!("name:{:?},position::{:?}", name, position);
+            self.emit(Instruction::LoadConst(Constant::Reference(Box::new((position.0, position.1)))));
+        } else {
+            let scope = self.scope_for_name(name);
+            let position = self.variable_position(name).unwrap();
+            println!("name:{:?},position::{:?}", name, position);
+            self.emit(Instruction::LoadReference(position.0, position.1, scope));
+        }
     }
     pub fn store_ref_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);

@@ -10,7 +10,7 @@ use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::{VirtualMachine, scope_len, store_primitive_value};
+use crate::vm::{VirtualMachine, scope_len, store_primitive_value, set_attribute};
 use crate::vm::{add_local_value, scope_remove};
 use crate::scope::{Scope, NameProtocol};
 
@@ -330,6 +330,7 @@ impl Frame {
 
             bytecode::Instruction::LoadReference(scope_idx, variable_idx, n) => {
                 let v = vm.load_name(*scope_idx, *variable_idx, n);
+                //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
                 println!("load_value:{:?}", v);
                 self.push_value(v);
             }
@@ -442,13 +443,14 @@ impl Frame {
 
     fn execute_store_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let idx = self.pop_value();
-        let mut obj = self.pop_value();
+        let obj = self.pop_value();
         let value = self.pop_value();
-        let v = vm.load_capture_reference(self.idx, idx.usize());
+        //println!("idx:{:?},obj:{:?},value:{:?}", idx.clone(), obj.clone(), value.clone());
+        let v = set_attribute(obj, idx.clone(), value.clone());
         println!("vvv::{:?},", v);
-        println!("idx:{:?},obj:{:?},value:{:?}", idx, obj, value);
 
-        VirtualMachine::update_item(&mut obj, idx.clone(), value.clone());
+
+       // VirtualMachine::update_item(&mut obj, idx.clone(), value.clone());
         // store_primitive_value(n.as_ref().0, idx.usize(), value.clone());
         // if let Value::Reference(n) = obj.clone() {
         //     store_primitive_value(n.as_ref().0, idx.usize(), value.clone());

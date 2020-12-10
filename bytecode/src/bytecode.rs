@@ -186,7 +186,7 @@ pub enum Constant {
     Map(Box<Vec<(Constant, Constant)>>),
     Struct(Box<TypeValue>),
     Enum(Box<EnumValue>),
-    Reference(Box<(usize, String)>),
+    Reference(Box<(usize, usize)>),
     None,
 }
 

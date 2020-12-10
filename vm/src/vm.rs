@@ -155,31 +155,23 @@ fn get_attribute_inner(a: &Value, b: &Value) -> Option<Value> {
     }
 }
 
-fn get_attribute(obj: Value, attri: Value) -> Option<Value> {
-    return get_attribute_inner(&obj, &attri);
-    // let ref mut scope = SCOPE.lock().unwrap();
-    // let mut idx = 0;
-    // let mut ref_name = "".to_string();
-    // for index in (0..=idx).rev() {
-    //     let dict = scope.locals.get(index).unwrap();
-    //     let v = dict.get(&ref_name);
-    //     if let Some(value) = v {
-    //         //println!("value_is::{:?},name:{:?}", value, name);
-    //         if let Value::Reference(_) = value {
-    //             return Some(value.clone());
-    //         } else {
-    //             return get_attribute_inner(value, &attri);
-    //         }
-    //     }
-    // }
-    // if let Some(v) = scope.load_global(ref_name.clone()) {
-    //     if let Value::Reference(_) = v {
-    //         return Some(v.clone());
-    //     } else {
-    //         return get_attribute_inner(&v, &attri);
-    //     }
-    // }
+pub fn get_attribute(ref_position: Value, attri: Value) -> Option<Value> {
+    if let Value::Reference(n) = ref_position {
+        let ref mut scope = SCOPE.lock().unwrap();
+        let v = scope.locals.get(n.as_ref().0).unwrap();
+        let vv = v.get(n.as_ref().1).unwrap();
+        return get_attribute_inner(vv, &attri);
+    }
     None
+}
+
+pub fn set_attribute(ref_position: Value, attri: Value, value: Value) {
+    if let Value::Reference(n) = ref_position {
+        let ref mut scope = SCOPE.lock().unwrap();
+        let v = scope.locals.get_mut(n.as_ref().0).unwrap();
+        let vv = v.get_mut(n.as_ref().1).unwrap();
+        VirtualMachine::update_item(vv, attri, value);
+    }
 }
 
 fn load_reference_name(scope_idx: usize, idx: usize) -> Value {
