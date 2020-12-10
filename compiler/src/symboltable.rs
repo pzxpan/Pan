@@ -157,6 +157,9 @@ impl SymbolTable {
     pub fn lookup(&self, name: &str) -> Option<&Symbol> {
         self.symbols.get(name)
     }
+    pub fn lookup_index(&self, name: &str) -> Option<usize> {
+        self.symbols.get_index_of(name)
+    }
 }
 
 impl std::fmt::Debug for SymbolTable {
@@ -2281,6 +2284,9 @@ impl SymbolTableBuilder {
                 symbol.scope = SymbolScope::Const;
             }
             SymbolUsage::Import => {
+                symbol.scope = SymbolScope::Global;
+            }
+            SymbolUsage::Builtin => {
                 symbol.scope = SymbolScope::Global;
             }
             SymbolUsage::Mut => {

@@ -14,6 +14,7 @@ use crate::compile::*;
 use crate::util;
 use pan_bytecode::bytecode::NameScope::Global;
 use crate::util::{get_last_name, get_full_name};
+use crate::builtin::builtin_type::get_builtin_type;
 
 pub fn resolve_import_compile<O: OutputStream>(compiler: &mut Compiler<O>, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> Result<(), CompileError> {
     //顺序为系统目录，工作目录，当前子目录;
@@ -109,50 +110,50 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
         if *is_all {
             for i in code_object.instructions.iter() {
                 if let Instruction::StoreName(name, ns) = i {
-                    let n = util::get_last_name(name);
-                    compiler.import_instructions.push(Instruction::Duplicate);
-                    compiler.import_instructions.push(i.clone());
-                    compiler.import_instructions.push(Instruction::StoreName(n, ns.clone()));
+                    // let n = util::get_last_name(name);
+                    // compiler.import_instructions.push(Instruction::Duplicate);
+                    // compiler.import_instructions.push(i.clone());
+                    // compiler.import_instructions.push(Instruction::StoreName(n, ns.clone()));
                 } else {
                     compiler.import_instructions.push(i.clone());
                 }
             }
         } else {
             if as_name.clone().is_some() {
-                let mut rev_instruction = Vec::new();
-                for i in code_object.instructions.iter().rev() {
-                    if let Instruction::StoreName(name, ns) = i {
-                        if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
-                            rev_instruction.push(Instruction::StoreName(as_name.clone().unwrap(), Global));
-                            rev_instruction.push(i.clone());
-                            rev_instruction.push(Instruction::Duplicate);
-                        } else {
-                            rev_instruction.push(i.clone());
-                        }
-                    } else {
-                        rev_instruction.push(i.clone());
-                    }
-                }
-                rev_instruction.reverse();
-                compiler.import_instructions.extend(rev_instruction);
+                // let mut rev_instruction = Vec::new();
+                // for i in code_object.instructions.iter().rev() {
+                //     if let Instruction::StoreName(name, ns) = i {
+                //         if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
+                //             // rev_instruction.push(Instruction::StoreName(as_name.clone().unwrap(), Global));
+                //             // rev_instruction.push(i.clone());
+                //             // rev_instruction.push(Instruction::Duplicate);
+                //         } else {
+                //             rev_instruction.push(i.clone());
+                //         }
+                //     } else {
+                //         rev_instruction.push(i.clone());
+                //     }
+                // }
+                // rev_instruction.reverse();
+                //compiler.import_instructions.extend(rev_instruction);
             } else {
                 let mut rev_instruction = Vec::new();
                 for i in code_object.instructions.iter().rev() {
                     if let Instruction::StoreName(name, ns) = i {
                         if item_name.clone().is_some() {
-                            if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
-                                rev_instruction.push(Instruction::StoreName(item_name.clone().unwrap(), NameScope::Global));
-                                rev_instruction.push(i.clone());
-                                rev_instruction.push(Instruction::Duplicate);
-                            } else {
-                                rev_instruction.push(i.clone());
-                            }
+                            // if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
+                            //     // rev_instruction.push(Instruction::StoreName(item_name.clone().unwrap(), NameScope::Global));
+                            //     // rev_instruction.push(i.clone());
+                            //     // rev_instruction.push(Instruction::Duplicate);
+                            // } else {
+                            //     rev_instruction.push(i.clone());
+                            // }
                         } else {
-                            let s: Vec<&str> = name.split_terminator("$").collect();
-                            let tmp = get_full_name(&String::from(s[s.len() - 2]), s[s.len() - 1]);
-                            rev_instruction.push(Instruction::StoreName(tmp, NameScope::Global));
-                            rev_instruction.push(i.clone());
-                            rev_instruction.push(Instruction::Duplicate);
+                            // let s: Vec<&str> = name.split_terminator("$").collect();
+                            // let tmp = get_full_name(&String::from(s[s.len() - 2]), s[s.len() - 1]);
+                            // rev_instruction.push(Instruction::StoreName(tmp, NameScope::Global));
+                            // rev_instruction.push(i.clone());
+                            // rev_instruction.push(Instruction::Duplicate);
                         }
                     } else {
                         rev_instruction.push(i.clone());
@@ -172,12 +173,20 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
 }
 
 pub fn resolve_builtin_fun<O: OutputStream>(compiler: &mut Compiler<O>) {
+    let built_ty = get_builtin_type();
+    for ty in built_ty.iter().enumerate() {
+        compiler.emit(Instruction::LoadConst(Constant::String(Box::new(ty.1.0.clone()))));
+        // self.emit(Instruction::StoreName(p.1, scope));
+        compiler.emit(Instruction::StoreNewVariable(NameScope::Global));
+    }
     let fns = get_builtin_fun();
     for f in fns.iter() {
         compiler.emit(Instruction::LoadConst(Constant::Code(Box::new(f.1.clone()))));
         compiler.emit(Instruction::LoadConst(Constant::String(Box::new(f.0.clone()))));
         compiler.emit(Instruction::MakeFunction);
-        compiler.store_name(f.0.as_ref());
+        //  compiler.emit(Instruction::StoreName(ty.0, NameScope::Global));
+        compiler.emit(Instruction::StoreNewVariable(NameScope::Global));
+        // compiler.store_name(f.0.as_ref());
     }
 }
 

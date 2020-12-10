@@ -16,8 +16,8 @@ use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
 use std::cell::RefCell;
-use crate::scope::NameProtocol;
 use std::sync::Mutex;
+use crate::scope_vec::{ScopeVec, NameProtocol};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -29,7 +29,7 @@ pub struct VirtualMachine {
 pub const NSIG: usize = 64;
 
 lazy_static! {
-    static ref SCOPE: Arc<Mutex<Scope>> = Arc::new(Mutex::new(Scope::with_builtins(vec![HashMap::new()],HashMap::new())));
+    static ref SCOPE: Arc<Mutex<ScopeVec>> = Arc::new(Mutex::new(ScopeVec::with_builtins(vec![vec![]],vec![])));
     static ref CONSTANT: Arc<Mutex<HashMap<String,Constant>>> = Arc::new(Mutex::new(HashMap::new()));
     static ref TYPE: Arc<Mutex<HashMap<String,TypeValue>>> = Arc::new(Mutex::new(HashMap::new()));
 }
@@ -54,9 +54,9 @@ pub fn get_type_value(name: String) -> TypeValue {
     return map.get(&name).unwrap().clone();
 }
 
-pub fn add_local_value(hash_map: HashMap<String, Value>) {
+pub fn add_local_value(vec_value: Vec<Value>) {
     let ref mut map = SCOPE.lock().unwrap();
-    map.locals.push(hash_map);
+    map.locals.push(vec_value);
 }
 
 pub fn scope_len() -> usize {
@@ -69,12 +69,13 @@ pub fn scope_remove() {
     map.locals.pop();
 }
 
-pub fn load_capture_reference(idx: usize, name: String) -> Value {
+pub fn load_capture_reference(scope_idx: usize, variable_idx: usize) -> Value {
     let ref mut scope = SCOPE.lock().unwrap();
-    let vv = scope.locals.get(idx);
-    //println!("idx::{:?},name:{:?}", idx, name);
-    let vvvv = vv.unwrap().get(&name).unwrap();
-    vvvv.clone()
+    println!("scope_idx:{:?},value::{:?}", scope_idx, variable_idx);
+    return scope.load_local(scope_idx, variable_idx);
+    // //println!("idx::{:?},name:{:?}", idx, name);
+    // let vvvv = vv.unwrap().get(&name).unwrap();
+    // vvvv.clone()
 }
 
 // [{"print": Fn(FnValue { name: "print", code: < code object print at ? ? ? file "", line 0 >, has_return: true }),
@@ -92,60 +93,40 @@ pub fn load_capture_reference(idx: usize, name: String) -> Value {
 // field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) }))}, {"age": I32(50), "a": I32(1000), "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older", <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ), ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ), ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )], static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }), field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) })), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")}]
 
 
-pub fn store_primitive_value(idx: usize, name: String, value: Value) {
+pub fn store_primitive_value(scope_idx: usize, variable_idx: usize, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
-    let map = scope.locals.get_mut(idx).unwrap();
-    map.insert(name, value);
-}
-
-pub fn store_obj_reference(n: Box<(usize, String)>, obj_idx_name: Value, value: Value) {
-    let ref mut scope = SCOPE.lock().unwrap();
-    let map = scope.locals.get_mut(n.as_ref().0).unwrap();
-    let obj = map.get_mut(&n.as_ref().1).unwrap();
-    VirtualMachine::update_item(obj, obj_idx_name, value);
+    scope.store_local(scope_idx, variable_idx, value);
 }
 
 
-fn load_primitive_global(name: String) -> Option<Value> {
+fn load_primitive_global(idx: usize) -> Value {
     let ref mut scope = SCOPE.lock().unwrap();
-    if let Some(v) = scope.globals.get(&name) {
-        return Some(v.clone());
-    }
-    None
+    scope.load_global(idx)
 }
 
-fn load_reference_global(name: String) -> Option<Value> {
+// fn load_reference_global(idx: usize) -> Option<Value> {
+//     let ref mut scope = SCOPE.lock().unwrap();
+//     return scope.sto();
+// }
+
+fn store_primitive_global(v_idx: usize, value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
-    if let Some(v) = scope.globals.get(&name) {
-        if let Value::Reference(n) = v {
-            return load_primitive_global(n.as_ref().1.clone());
-        }
-    }
-    None
+    scope.store_global(v_idx, value);
 }
 
-fn store_primitive_global(name: String, value: Value) {
+fn store_global_new(value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
-    scope.globals.insert(name, value);
+    scope.store_global_new(value);
 }
 
-fn load_primitive_name(name: String, idx: usize) -> Option<Value> {
+fn store_local_new(value: Value) {
     let ref mut scope = SCOPE.lock().unwrap();
-    for index in (0..=idx).rev() {
-        let dict = scope.locals.get(index).unwrap();
-        let v = dict.get(&name);
-        if let Some(value) = v {
-            //println!("value_is::{:?},name:{:?}", value, name);
-            // if let Value::Obj(_) = value {
-            //     return Some(Value::Reference(Box::new((index, name))));
-            // }
-            return Some(value.clone());
-        }
-    }
-    if let Some(v) = scope.load_global(name.clone()) {
-        return Some(v.clone());
-    }
-    None
+    scope.store_local_new(value);
+}
+
+fn load_primitive_name(scope_idx: usize, idx: usize) -> Value {
+    let ref mut scope = SCOPE.lock().unwrap();
+    return scope.load_local(scope_idx, idx);
 }
 
 fn get_attribute_inner(a: &Value, b: &Value) -> Option<Value> {
@@ -175,62 +156,57 @@ fn get_attribute_inner(a: &Value, b: &Value) -> Option<Value> {
 }
 
 fn get_attribute(obj: Value, attri: Value) -> Option<Value> {
-    let ref mut scope = SCOPE.lock().unwrap();
-    let mut idx = 0;
-    let mut ref_name = "".to_string();
-    if let Value::Reference(n) = obj {
-        idx = n.as_ref().0;
-        ref_name = n.as_ref().1.clone();
-    }
-    for index in (0..=idx).rev() {
-        let dict = scope.locals.get(index).unwrap();
-        let v = dict.get(&ref_name);
-        if let Some(value) = v {
-            //println!("value_is::{:?},name:{:?}", value, name);
-            if let Value::Reference(_) = value {
-                return Some(value.clone());
-            } else {
-                return get_attribute_inner(value, &attri);
-            }
-        }
-    }
-    if let Some(v) = scope.load_global(ref_name.clone()) {
-        if let Value::Reference(_) = v {
-            return Some(v.clone());
-        } else {
-            return get_attribute_inner(&v, &attri);
-        }
-    }
+    return get_attribute_inner(&obj, &attri);
+    // let ref mut scope = SCOPE.lock().unwrap();
+    // let mut idx = 0;
+    // let mut ref_name = "".to_string();
+    // for index in (0..=idx).rev() {
+    //     let dict = scope.locals.get(index).unwrap();
+    //     let v = dict.get(&ref_name);
+    //     if let Some(value) = v {
+    //         //println!("value_is::{:?},name:{:?}", value, name);
+    //         if let Value::Reference(_) = value {
+    //             return Some(value.clone());
+    //         } else {
+    //             return get_attribute_inner(value, &attri);
+    //         }
+    //     }
+    // }
+    // if let Some(v) = scope.load_global(ref_name.clone()) {
+    //     if let Value::Reference(_) = v {
+    //         return Some(v.clone());
+    //     } else {
+    //         return get_attribute_inner(&v, &attri);
+    //     }
+    // }
     None
 }
 
-fn load_reference_name(name: String, idx: usize) -> Option<Value> {
+fn load_reference_name(scope_idx: usize, idx: usize) -> Value {
     let ref mut scope = SCOPE.lock().unwrap();
-    for index in (0..=idx).rev() {
-        let dict = scope.locals.get(index).unwrap();
-        let v = dict.get(&name);
-        if let Some(value) = v {
-            return Some(value.clone());
-        }
-    }
-    if let Some(v) = scope.load_global(name.clone()) {
-        return Some(v.clone());
-    }
-    None
+    scope.load_local(scope_idx, idx)
+    // None
 }
 
-pub fn store_primitive_name(key: String, value: Value, idx: usize) {
+pub fn store_primitive_local(scope_idx: usize, idx: usize, value: Value) {
+    //  println!("ddddscope:{:?},idx:{:?},value:{:?},", scope_idx, idx, value);
     let cc = Instant::now();
     let ref mut scope = SCOPE.lock().unwrap();
-    println!("获取锁:{:?},", cc.elapsed().as_nanos());
+    // println!("获取锁:{:?},", cc.elapsed().as_nanos());
     // println!("store_name index:{:?},value:{:?}", idx, value);
-    let a = scope.locals.get_mut(idx).unwrap();
-    println!("获取map:{:?},", cc.elapsed().as_nanos());
-    println!("value_is:{:?}", value);
-    println!("获取2222map:{:?},", cc.elapsed().as_nanos());
-    a.insert(key, value);
-    println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
+    let a = scope.locals.get_mut(scope_idx).unwrap();
+    //  println!("获取map:{:?},", cc.elapsed().as_nanos());
+    //  println!("value_is:{:?}", value);
+    //   println!("获取2222map:{:?},", cc.elapsed().as_nanos());
+    let v = a.get_mut(idx);
+    if v.is_some() {
+        let v = v.unwrap();
+        *v = value;
+    } else {
+        a.push(value);
+    }
 
+    //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
 }
 
 
@@ -264,7 +240,7 @@ impl VirtualMachine {
         }
     }
 
-    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
+    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: Vec<Value>) -> FrameResult {
         let mut frame = Frame::new(code, scope_len());
         add_local_value(hash_map);
         let r = self.run_frame(&mut frame);
@@ -289,83 +265,94 @@ impl VirtualMachine {
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     pub fn load_name(
         &self,
-        name: &str,
-        name_scope: &bytecode::NameScope,
+        scope_idx: usize,
         idx: usize,
+        name_scope: &bytecode::NameScope,
     ) -> Value {
         let optional_value = match name_scope {
-            bytecode::NameScope::Global => load_primitive_global(name.to_string()),
+            bytecode::NameScope::Global => load_primitive_global(idx),
             bytecode::NameScope::Local => {
-                load_primitive_name(name.to_string(), idx)
+                load_primitive_name(scope_idx, idx)
             }
-            bytecode::NameScope::Const => load_primitive_global(name.to_string()),
+            bytecode::NameScope::Const => load_primitive_global(idx),
         };
         //println!("load_name:{:?},value:{:?}", name, optional_value);
-        match optional_value {
-            Some(value) => value,
-            None => {
-                Value::Nil
-            }
-        }
+        optional_value
     }
 
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     pub fn load_ref_name(
         &self,
-        name: &str,
+        scope_idx: usize,
         name_scope: &bytecode::NameScope,
         idx: usize,
     ) -> Value {
         let optional_value = match name_scope {
-            bytecode::NameScope::Global => load_reference_global(name.to_string()),
+            bytecode::NameScope::Global => load_primitive_global(idx),
             bytecode::NameScope::Local => {
-                load_reference_name(name.to_string(), idx)
+                load_reference_name(scope_idx, idx)
             }
-            bytecode::NameScope::Const => load_reference_global(name.to_string()),
+            bytecode::NameScope::Const => load_primitive_global(idx),
         };
         //println!("load_name:{:?},value:{:?}", name, optional_value);
-        match optional_value {
-            Some(value) => value,
-            None => {
-                Value::Nil
-            }
-        }
+        optional_value
     }
 
     pub fn load_capture_reference(
         &self,
-        idx: usize,
-        name: String,
+        scope_idx: usize,
+        v_idx: usize,
     ) -> Value {
-        return load_capture_reference(idx, name);
+        return load_capture_reference(scope_idx, v_idx);
     }
 
     pub fn store_capture_reference(
         &mut self,
-        idx: usize,
-        name: String,
+        scope_idx: usize,
+        v_idx: usize,
         value: Value,
     ) {
-        store_primitive_value(idx, name, value);
+        store_primitive_value(scope_idx, v_idx, value);
     }
 
     pub fn store_name(
         &mut self,
-        name: &str,
+        scope_idx: usize,
+        idx: usize,
         obj: Value,
         name_scope: &bytecode::NameScope,
-        idx: usize,
     ) -> FrameResult {
         let a = Instant::now();
         match name_scope {
             bytecode::NameScope::Global => {
-                store_primitive_global(name.to_string(), obj);
+                store_primitive_global(idx, obj);
             }
             bytecode::NameScope::Local => {
-                store_primitive_name(name.to_string(), obj, idx);
+                store_primitive_local(scope_idx, idx, obj);
             }
             bytecode::NameScope::Const => {
-                store_primitive_global(name.to_string(), obj);
+                store_primitive_global(idx, obj);
+            }
+        }
+        println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
+        None
+    }
+
+    pub fn store_new_variable(
+        &mut self,
+        value: Value,
+        name_scope: &bytecode::NameScope,
+    ) -> FrameResult {
+        let a = Instant::now();
+        match name_scope {
+            bytecode::NameScope::Global => {
+                store_global_new(value);
+            }
+            bytecode::NameScope::Local => {
+                store_local_new(value);
+            }
+            bytecode::NameScope::Const => {
+                store_global_new(value);
             }
         }
         println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
@@ -1528,7 +1515,7 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
 // field_map: Obj(MapObj({"f": Fn(FnValue { name: "main.<locals>.lambda_35_13", code: <code object lambda_35_13 at ??? file
 // "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }), "state": I32(0)})) })), "state": I32(0)}
 
-pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) {
+pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<Value>) {
     thread::spawn(|| {
         // println!("local_hash_map:{:?},", locals);
         // println!("global_:{:?},", global);

@@ -11,7 +11,7 @@ use pan_bytecode::value::{Value, Obj, FnValue, ClosureValue, ThreadValue, TypeVa
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
 
-use pan_vm::vm::{VirtualMachine, store_obj_reference, store_primitive_name};
+use pan_vm::vm::{VirtualMachine, store_primitive_local};
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::Duration;
@@ -77,7 +77,7 @@ fn main() {
     // for i in 0..100_000_000 {
     //     store_obj_reference(0,"person_map".to_string(),Value::String(Box::new("pan".to_string())),Value::String(Box::new("pan222".to_string())))
     // }
-  //  let c = pan_bytecode::bytecode::Constant::Reference(Box::new((100, "panddd".to_string())));
+    //  let c = pan_bytecode::bytecode::Constant::Reference(Box::new((100, "panddd".to_string())));
     //
     // let d = VirtualMachine::unwrap_constant(&c);
     // let dd = std::time::Instant::now();

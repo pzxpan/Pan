@@ -71,8 +71,9 @@ pub enum Instruction {
     DefineConstStart,
     DefineConstEnd,
 
-    LoadName(String, NameScope),
-    StoreName(String, NameScope),
+    LoadName(usize, NameScope),
+    StoreName(usize, NameScope),
+    StoreNewVariable(NameScope),
     Subscript,
     StoreSubscript,
     DeleteSubscript,
@@ -139,8 +140,8 @@ pub enum Instruction {
     LoadBuildModule,
     BuildThread,
     StartThread,
-    LoadReference(String, NameScope),
-    StoreReference,
+    LoadReference(usize, usize, NameScope),
+    StoreReference(usize, usize, NameScope),
     UnpackSequence(usize),
     UnpackEx(usize, usize),
     Reverse(usize),
@@ -349,34 +350,28 @@ impl Instruction {
         level: usize,
     ) -> fmt::Result {
         macro_rules! w {
-( $ variant: ident) => {
-write ! (f, "{:20}\n", stringify ! ($ variant))
-};
-( $ variant: ident, $ var:expr) => {
-write ! (f, "{:20} ({})\n", stringify ! ($ variant), $ var)
-};
-( $ variant: ident, $ var1:expr, $ var2: expr) => {
-write ! (f, "{:20} ({}, {})\n", stringify ! ($ variant), $ var1, $ var2)
-};
-( $ variant: ident, $ var1:expr, $ var2: expr, $ var3:expr) => {
-write ! (
-f,
-"{:20} ({}, {}, {})\n",
-stringify ! ($ variant),
-$ var1,
-$ var2,
-$ var3
-)
-};
-}
+            ($variant: ident) => {
+                write!(f, "{:20}\n", stringify!($variant))
+            };
+            ($variant: ident, $var:expr) => {
+                write!(f, "{:20} ({})\n", stringify!($variant), $var)
+            };
+            ($variant: ident, $var1:expr, $var2: expr) => {
+                write!(f, "{:20} ({}, {})\n", stringify!($variant), $var1, $var2)
+             };
+            ($variant: ident, $var1:expr, $var2: expr, $var3:expr) => {
+                write! (f,"{:20} ({}, {}, {})\n",stringify!($variant),$var1,$var2,$var3)
+             };
+       }
 
         match self {
             ConstStart => w!(ConstStart),
             ConstEnd => w!(ConstEnd),
             DefineConstEnd => w!(DefineConstEnd),
             DefineConstStart => w!(DefineConstStart),
-            LoadName(name, scope) => w!(LoadName, name, format ! ("{:?}", scope)),
-            StoreName(name, scope) => w!(StoreName, name, format! ("{:?}", scope)),
+            LoadName(v_idx, scope) => w!(LoadName, v_idx, format ! ("{:?}", scope)),
+            StoreName(v_idx, scope) => w!(StoreName, v_idx, format! ("{:?}", scope)),
+            StoreNewVariable(scope) => w!(StoreName, format! ("{:?}", scope)),
             Subscript => w!(Subscript),
             StoreSubscript => w!(StoreSubscript),
             DeleteSubscript => w!(DeleteSubscript),
@@ -437,8 +432,8 @@ $ var3
                 for_call,
             ) => w!(BuildMap, size, unpack, for_call),
             Slice => w!(BuildSlice),
-            LoadReference(name, scope) => w!(LoadReference, name, format!("{:?}",scope)),
-            StoreReference => w!(StoreReference),
+            LoadReference(scope_idx, variable_idx, n) => w!(LoadReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreReference(scope_idx, variable_idx, n) => w!(StoreReference,scope_idx,variable_idx,format!("{:?}", n)),
             ListAppend(i) => w!(ListAppend, i),
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),

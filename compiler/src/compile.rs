@@ -320,7 +320,8 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(i.clone());
         }
         if found_main {
-            self.emit(Instruction::LoadReference("main".to_string(), NameScope::Local));
+            let p = self.variable_position("main").unwrap();
+            self.emit(Instruction::LoadReference(p.0, p.1, NameScope::Global));
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
         }
@@ -347,6 +348,7 @@ impl<O: OutputStream> Compiler<O> {
 
     fn scope_for_name(&self, name: &str) -> bytecode::NameScope {
         let symbol = self.lookup_name(name);
+        println!("symbol:{:?}", symbol);
         match symbol.scope {
             SymbolScope::Global => bytecode::NameScope::Global,
             SymbolScope::Local => bytecode::NameScope::Local,
@@ -364,7 +366,8 @@ impl<O: OutputStream> Compiler<O> {
 
     pub fn store_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);
-        self.emit(Instruction::StoreName(name.to_owned(), scope));
+        let p = self.variable_position(name).unwrap();
+        self.emit(Instruction::StoreName(p.1, scope));
     }
 
     pub fn need_ref(&self, name: &str) -> bool {
@@ -377,29 +380,45 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     pub fn load_ref_name(&mut self, name: &str) {
-        if self.need_ref(name) {
-            let scope = self.scope_for_name(name);
-            self.emit(Instruction::LoadReference(name.to_owned(), scope));
-        } else {
-            let scope = self.scope_for_name(name);
-            self.emit(Instruction::LoadName(name.to_owned(), scope));
-        }
+        let scope = self.scope_for_name(name);
+        let position = self.variable_position(name).unwrap();
+        println!("name:{:?},position::{:?}", name, position);
+        self.emit(Instruction::LoadReference(position.0, position.1, scope));
+        // if self.need_ref(name) {
+        //
+        // } else {
+        //     let scope = self.scope_for_name(name);
+        //     let position = self.variable_position(name).unwrap();
+        //     self.emit(Instruction::LoadName(position.1, scope));
+        // }
     }
     pub fn store_ref_name(&mut self, name: &str) {
-        if self.need_ref(name) {
-            let mut ref_name = String::from(name);
-            ref_name.push_str("$$");
-            let scope = self.scope_for_name(name);
-            self.emit(Instruction::StoreName(ref_name.clone(), scope));
-            let idx = self.variable_scope_index(name);
-            self.emit(Instruction::LoadConst(Constant::Reference(Box::new((idx as usize, ref_name.clone())))));
-            self.emit(Instruction::StoreName(name.to_owned(), NameScope::Local));
-        } else {
-            self.store_name(name);
-        }
+        let scope = self.scope_for_name(name);
+        // self.emit(Instruction::StoreName(ref_name.clone(), scope));
+        // let idx = self.variable_scope_index(name);
+        // self.emit(Instruction::LoadConst(Constant::Reference(Box::new((idx as usize, ref_name.clone())))));
+        // self.emit(Instruction::StoreName(name.to_owned(), NameScope::Local));
+        let position = self.variable_position(name).unwrap();
+        self.emit(Instruction::StoreReference(position.0, position.1, scope));
+        // if self.need_ref(name) {
+        //     // let mut ref_name = String::from(name);
+        //     // ref_name.push_str("$$");
+        //     let scope = self.scope_for_name(name);
+        //     // self.emit(Instruction::StoreName(ref_name.clone(), scope));
+        //     // let idx = self.variable_scope_index(name);
+        //     // self.emit(Instruction::LoadConst(Constant::Reference(Box::new((idx as usize, ref_name.clone())))));
+        //     // self.emit(Instruction::StoreName(name.to_owned(), NameScope::Local));
+        //     let position = self.variable_position(name).unwrap();
+        //     self.emit(Instruction::StoreReference(position.0, position.1, scope));
+        // } else {
+        //     let scope = self.scope_for_name(name);
+        //     let position = self.variable_position(name).unwrap();
+        //     self.emit(Instruction::StoreName(position.1, scope));
+        //     // self.store_name(name);
+        // }
     }
     fn compile_statement(&mut self, statement: &ast::Statement) -> Result<(), CompileError> {
-        trace!("正在编译 {:?}", statement);
+        println!("正在编译 {:?}", statement);
         self.set_source_location(statement.loc().borrow());
         use ast::Statement::*;
         match &statement {
@@ -492,7 +511,8 @@ impl<O: OutputStream> Compiler<O> {
                     }
                     self.compile_expression(e)?;
                 }
-                self.store_ref_name(&decl.name.name);
+                self.emit(Instruction::StoreNewVariable(NameScope::Local));
+                // self.store_ref_name(&decl.name.name);
             }
 
             For(_, target, iter, body) => {
@@ -591,9 +611,10 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_scope();
         self.emit(Instruction::IntoBlock);
         for (ty, name) in out_side_tys.iter().zip(names.iter().map(|s| s.name.clone())) {
-            self.emit(Instruction::LoadName(name.clone(), NameScope::Local));
+            let p = self.variable_position(name.as_str()).unwrap();
+            self.emit(Instruction::LoadName(p.1, NameScope::Local));
             self.get_exhaust_ty(name.clone(), ty, end_label);
-            self.emit(Instruction::StoreName(name.clone(), NameScope::Local));
+            self.emit(Instruction::StoreName(p.1, NameScope::Local));
         }
         self.compile_statement(body)?;
         self.leave_scope();
@@ -638,7 +659,8 @@ impl<O: OutputStream> Compiler<O> {
     fn store_match_content(&mut self, expression: &Expression) -> Result<(), CompileError> {
         if let Expression::FunctionCall(_, _, args) = expression {
             for arg in args.iter() {
-                self.emit(Instruction::StoreName(arg.expr_name(), NameScope::Local));
+                let p = self.variable_position(arg.expr_name().as_str()).unwrap();
+                self.emit(Instruction::StoreName(p.1, NameScope::Local));
             }
         }
         Ok(())
@@ -836,7 +858,8 @@ impl<O: OutputStream> Compiler<O> {
         let qualified_name = self.create_qualified_name(name, "");
         let old_qualified_path = self.current_qualified_path.take();
         self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
-
+        // self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
+        // self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
         self.enter_function(name, args, is_mut)?;
         self.compile_statements(body)?;
         match body {
@@ -920,11 +943,11 @@ impl<O: OutputStream> Compiler<O> {
         ));
         self.enter_scope();
 
-        self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
-        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
+        // self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
+        // self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
@@ -995,11 +1018,11 @@ impl<O: OutputStream> Compiler<O> {
         ));
         self.enter_scope();
 
-        self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
-        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
+        // self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
+        // self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
@@ -1065,11 +1088,11 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_scope();
 
 
-        self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
-        self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
-        self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
+        // self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
+        // self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
+        // self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
 
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
@@ -1194,10 +1217,10 @@ impl<O: OutputStream> Compiler<O> {
                         self.load_name("self");
                         self.emit(Instruction::StoreAttr(name.clone()));
                         self.emit(Instruction::Duplicate);
-                        self.store_ref_name("self");
-                        self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
-                        self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
-                        self.emit(Instruction::StoreReference);
+                        // self.store_ref_name("self");
+                        // self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                        // self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                        // self.emit(Instruction::StoreReference);
                     }
                 } else {
                     self.store_ref_name(name);
@@ -1208,14 +1231,15 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(b)?;
                 self.emit(Instruction::StoreSubscript);
                 //TODO这里需要修改，struct中的subscript数据怎么办;
-                if self.is_current_scope(a.expr_name().as_str()) {
-                    self.store_ref_name(&a.expr_name());
-                } else {
-                    let idx = self.variable_scope_index(a.expr_name().as_str());
-                    self.emit(Instruction::LoadConst(Constant::I32(idx)));
-                    self.emit(Instruction::LoadConst(Constant::String(Box::new(a.expr_name()))));
-                    self.emit(Instruction::StoreReference);
-                }
+                // self.store_ref_name(&a.expr_name());
+                // if self.is_current_scope(a.expr_name().as_str()) {
+                //     self.store_ref_name(&a.expr_name());
+                // } else {
+                //     let idx = self.variable_scope_index(a.expr_name().as_str());
+                //     self.emit(Instruction::LoadConst(Constant::I32(idx)));
+                //     self.emit(Instruction::LoadConst(Constant::String(Box::new(a.expr_name()))));
+                //     self.emit(Instruction::StoreReference);
+                // }
             }
             ast::Expression::Attribute(_, obj, attr, idx) => {
                 self.compile_expression(obj)?;
@@ -1224,9 +1248,9 @@ impl<O: OutputStream> Compiler<O> {
                     if obj.expr_name().eq("self") {
                         self.emit(Instruction::Duplicate);
                         self.store_ref_name("self");
-                        self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
-                        self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
-                        self.emit(Instruction::StoreReference);
+                        // self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                        // self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                        // self.emit(Instruction::StoreReference);
                     } else {
                         self.store_ref_name(&obj.expr_name());
                     }
@@ -1237,9 +1261,9 @@ impl<O: OutputStream> Compiler<O> {
                     if obj.expr_name().eq("self") {
                         self.emit(Instruction::Duplicate);
                         self.store_ref_name("self");
-                        self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
-                        self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
-                        self.emit(Instruction::StoreReference);
+                        // self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                        // self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                        // self.emit(Instruction::StoreReference);
                     } else {
                         self.store_ref_name(&obj.expr_name());
                     }
@@ -1413,9 +1437,8 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        //println!("Compiling {:?}", expression);
+        println!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
-
         use ast::Expression::*;
         match &expression {
             Subscript(_, a, b) => {
@@ -1807,15 +1830,16 @@ impl<O: OutputStream> Compiler<O> {
         if let FunctionContext::StructFunction(_) = self.ctx.func {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
                 if self.variable_local_scope(name.as_str()) {
-                    self.emit(LoadName(name.clone(), NameScope::Local));
+                    let p = self.variable_position(name.as_str()).unwrap();
+                    self.emit(LoadName(p.1, NameScope::Local));
                 } else if self.is_struct_item_def("self".to_string(), name.clone()) {
-                    self.emit(Instruction::LoadName(
-                        "self".to_string(),
-                        bytecode::NameScope::Local,
-                    ));
+                    let p = self.variable_position(name.as_str()).unwrap();
+                    let scope = self.scope_for_name(name.as_str());
+                    self.emit(Instruction::LoadReference(p.0, p.1, scope));
                     self.emit(Instruction::LoadAttr(name.clone()));
                 } else {
-                    self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+                    let p = self.variable_position(get_full_name(&self.package, &name.clone()).as_str()).unwrap();
+                    self.emit(LoadName(p.1, NameScope::Local));
                     // self.emit(LoadName(name.clone(), NameScope::Local));
                 }
             } else if let ast::Expression::Attribute(_, expr, name, _) = function {
@@ -1823,7 +1847,8 @@ impl<O: OutputStream> Compiler<O> {
             }
         } else {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                self.emit(LoadName(name.clone(), NameScope::Local));
+                let p = self.variable_position(name.as_str()).unwrap();
+                self.emit(LoadName(p.1, NameScope::Local));
             } else {
                 self.compile_expression(function)?;
             }
@@ -1877,10 +1902,12 @@ impl<O: OutputStream> Compiler<O> {
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
             is_constructor = self.is_constructor(name);
             if self.variable_local_scope(name.as_str()) {
-                self.emit(LoadName(get_full_name(&self.package, &name.clone()), NameScope::Local));
+                let p = self.variable_position(get_full_name(&self.package, &name.clone()).as_str()).unwrap();
+                self.emit(LoadName(p.1, NameScope::Local));
                 // self.emit(LoadName(name.clone(), NameScope::Local));
             } else {
-                self.emit(LoadName(name.clone(), NameScope::Global));
+                let p = self.variable_position(name.as_str()).unwrap();
+                self.emit(LoadName(p.1, NameScope::Global));
             }
         } else {
             self.compile_expression(function)?;
@@ -1909,7 +1936,8 @@ impl<O: OutputStream> Compiler<O> {
         for element in elements {
             self.compile_expression(element)?;
             if let Expression::Lambda(_, lambda) = element {
-                self.emit(Instruction::LoadName(get_pos_lambda_name(lambda.loc), NameScope::Local));
+                let p = self.variable_position(get_pos_lambda_name(lambda.loc).as_str()).unwrap();
+                self.emit(Instruction::LoadName(p.1, NameScope::Local));
             }
         }
         Ok(false)
@@ -1961,7 +1989,8 @@ impl<O: OutputStream> Compiler<O> {
             }
 
             if loop_labels.is_empty() {
-                self.emit(Instruction::LoadName(String::from(".0"), bytecode::NameScope::Local));
+                let p = self.variable_position(".0").unwrap();
+                self.emit(Instruction::LoadName(p.1, bytecode::NameScope::Local));
             } else {
                 self.compile_expression(&generator.iter)?;
                 self.emit(Instruction::GetIter);
@@ -2197,6 +2226,7 @@ impl<O: OutputStream> Compiler<O> {
         }
         return false;
     }
+
     fn variable_scope_index(&self, name: &str) -> i32 {
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
@@ -2206,6 +2236,19 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         return 0;
+    }
+
+    fn variable_position(&self, name: &str) -> Option<(usize, usize)> {
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let table = &self.symbol_table_stack[i];
+            let symbol = table.lookup(name);
+            if symbol.is_some() {
+                let v_index = table.lookup_index(name);
+                return Some((i, v_index.unwrap()));
+            }
+        }
+        return None;
     }
 
 
@@ -2296,13 +2339,13 @@ impl<O: OutputStream> Compiler<O> {
                         // }
                         capture_name = name.0.clone();
                         if capture_name.ne("self") {
-                            self.emit(Instruction::LoadConst(Constant::USize(self.symbol_table_stack.len() - 1)));
-                            self.emit(Instruction::StoreName("capture$$idx".to_string(), NameScope::Local));
-                            self.emit(Instruction::LoadConst(Constant::String(Box::new(name.0.clone()))));
-                            self.emit(Instruction::StoreName("capture$$name".to_string(), NameScope::Local));
+                            // self.emit(Instruction::LoadConst(Constant::USize(self.symbol_table_stack.len() - 1)));
+                            // self.emit(Instruction::StoreName("capture$$idx".to_string(), NameScope::Local));
+                            // self.emit(Instruction::LoadConst(Constant::String(Box::new(name.0.clone()))));
+                            // self.emit(Instruction::StoreName("capture$$name".to_string(), NameScope::Local));
                         }
-
-                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        let p = self.variable_position(&name.0).unwrap();
+                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
                         instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
@@ -2317,7 +2360,8 @@ impl<O: OutputStream> Compiler<O> {
                     cty = tmp.clone();
                     if idx == 0 {
                         //  capture_name = name.0.clone();
-                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        let p = self.variable_position(&name.0).unwrap();
+                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::Integer(index)));
                         instructions.push(Instruction::Subscript);
@@ -2340,7 +2384,8 @@ impl<O: OutputStream> Compiler<O> {
                     // attri_type = tmp.0;
 
                     if tmp.0 == 1 {
-                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        let p = self.variable_position(&name.0).unwrap();
+                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(Box::new(attri_name.0.clone()))));
 
@@ -2352,7 +2397,8 @@ impl<O: OutputStream> Compiler<O> {
                         //     bytecode::Constant::String(attri_name.0.clone())));
                         // self.emit(Instruction::LoadBuildEnum(2));
                     } else if tmp.0 == 2 {
-                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        let p = self.variable_position(&name.0).unwrap();
+                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(Box::new(attri_name.0.clone()))));
                         instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
@@ -2360,7 +2406,8 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
                     }
                     if tmp.0 > 2 {
-                        instructions.push(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        let p = self.variable_position(&name.0).unwrap();
+                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
                         instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
@@ -2377,39 +2424,6 @@ impl<O: OutputStream> Compiler<O> {
         }
         Ok(())
     }
-
-    // let is_enum_item = self.is_enum_variant_def(value, name);
-    // if is_enum_item.0 {
-    //     self.compile_expression(value)?;
-    //     self.emit(Instruction::LoadConst(
-    //         bytecode::Constant::String(name.as_ref().unwrap().name.clone())));
-    //     self.emit(Instruction::LoadBuildEnum(2));
-    // } else if is_enum_item.1 {
-    //     self.compile_expression(value)?;
-    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-    // } else {
-    //     let v = get_attribute_vec(expression);
-    //     for (idx, name) in v.iter().enumerate() {
-    //         if idx == 0 {
-    //             self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
-    //         } else {
-    //             self.emit(Instruction::LoadAttr(name.0.clone()));
-    //         }
-    //     }
-    // bound另外判断，放到这里没有symbol，无法进行
-    // println!("cc::{:?}",v);
-    // let attr_name = v.get(0).unwrap().clone();
-    // let obj_name = v.get(1).unwrap().clone();
-    //
-    // let (def_current, base_name) = self.is_struct_item_def(obj_name, attr_name);
-    // if def_current {
-    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-    // } else {
-    //     self.emit(Instruction::LoadName(base_name, NameScope::Local));
-    //     self.emit(Instruction::LoadAttr(name.as_ref().unwrap().name.clone()));
-    // }
-
-
     fn mark_generator(&mut self) {
         self.current_output().mark_generator();
     }

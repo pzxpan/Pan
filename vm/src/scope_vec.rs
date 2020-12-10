@@ -1,3 +1,5 @@
+use pan_bytecode::value::Value;
+
 #[derive(Clone)]
 pub struct ScopeVec {
     pub locals: Vec<Vec<Value>>,
@@ -24,29 +26,50 @@ impl ScopeVec {
 }
 
 pub trait NameProtocol {
-    fn load_name(&self, scope_idx: usize, variable_idx: usize) -> Option<&Value>;
-    fn store_name(&mut self, scope_idx: usize, variable_idx: usize, value: Value);
-    fn load_global(&self, variable_idx: usize) -> Option<&Value>;
+    fn load_local(&self, scope_idx: usize, variable_idx: usize) -> Value;
+    fn store_local(&mut self, scope_idx: usize, variable_idx: usize, value: Value);
+    fn load_current(&self, variable_idx: usize) -> Value;
+    fn store_current(&mut self, variable_idx: usize, value: Value);
+    fn load_global(&self, variable_idx: usize) -> Value;
     fn store_global(&mut self, variable_idx: usize, value: Value);
+    fn store_local_new(&mut self, value: Value);
+    fn store_global_new(&mut self, value: Value);
 }
 
 impl NameProtocol for ScopeVec {
-    fn load_name(&self, scope_idx: usize, variable_idx: usize) -> Option<&Value> {
-        return self.locals.get(scope_idx).unwrap().get(variable_idx);
+    fn load_local(&self, scope_idx: usize, variable_idx: usize) -> Value {
+        return self.locals.get(scope_idx).unwrap().get(variable_idx).unwrap().clone();
     }
 
-    fn store_name(&mut self, scope_idx: usize, variable_idx: usize, value: Value) {
+    fn store_local(&mut self, scope_idx: usize, variable_idx: usize, value: Value) {
         let c = self.locals.get_mut(scope_idx).unwrap();
         let cc = c.get_mut(variable_idx).unwrap();
         *cc = value;
     }
 
-    fn load_global(&self, variable_idx: usize) -> Option<&Value> {
-        return self.globals.get(variable_idx);
+    fn store_local_new(&mut self, value: Value) {
+        let c = self.locals.last_mut().unwrap();
+        c.push(value);
+    }
+
+    fn load_current(&self, variable_idx: usize) -> Value {
+        return self.locals.last().unwrap().get(variable_idx).unwrap().clone();
+    }
+    fn store_current(&mut self, variable_idx: usize, value: Value) {
+        let c = self.locals.last_mut().unwrap();
+        let cc = c.get_mut(variable_idx).unwrap();
+        *cc = value;
+    }
+
+    fn load_global(&self, variable_idx: usize) -> Value {
+        return self.globals.get(variable_idx).unwrap().clone();
     }
 
     fn store_global(&mut self, variable_idx: usize, value: Value) {
         let c = self.globals.get_mut(variable_idx).unwrap();
         *c = value;
+    }
+    fn store_global_new(&mut self, value: Value) {
+        self.globals.push(value);
     }
 }
