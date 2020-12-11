@@ -58,7 +58,9 @@ pub fn get_type_value(name: String) -> TypeValue {
 
 pub fn add_local_value(vec_value: Vec<Value>) {
     let ref mut map = SCOPE.lock().unwrap();
+    println!("before:size:{:?},", map.locals.len());
     map.locals.push(vec_value);
+    println!("after:size:{:?},", map.locals.len());
 }
 
 pub fn scope_len() -> usize {
@@ -209,6 +211,15 @@ pub fn store_primitive_local(scope_idx: usize, idx: usize, value: Value) {
     //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
 }
 
+pub fn store_default_arg(scope_idx: usize, idx: usize, value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    let a = scope.locals.get_mut(scope_idx).unwrap();
+    let v = a.get_mut(idx);
+    if v.is_none() {
+        a.push(value);
+    }
+}
+
 
 #[derive(Copy, Clone)]
 pub enum InitParameter {
@@ -243,6 +254,7 @@ impl VirtualMachine {
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: Vec<Value>) -> FrameResult {
         let mut frame = Frame::new(code, scope_len());
         add_local_value(hash_map);
+
         let r = self.run_frame(&mut frame);
         r
     }
@@ -306,6 +318,17 @@ impl VirtualMachine {
         return load_capture_reference(scope_idx, v_idx);
     }
 
+    pub fn load_global_reference(
+        &self,
+        v_idx: usize,
+    ) -> Value {
+        return load_primitive_global(v_idx);
+    }
+
+    pub fn store_global_reference(&self, v_idx: usize, value: Value) {
+        store_primitive_global(v_idx, value);
+    }
+
     pub fn store_capture_reference(
         &mut self,
         scope_idx: usize,
@@ -338,6 +361,17 @@ impl VirtualMachine {
         None
     }
 
+    pub fn store_default_args(
+        &mut self,
+        scope_idx: usize,
+        idx: usize,
+        obj: Value,
+    ) -> FrameResult {
+        store_default_arg(scope_idx, idx, obj);
+        // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
+        None
+    }
+
     pub fn store_new_variable(
         &mut self,
         value: Value,
@@ -355,7 +389,7 @@ impl VirtualMachine {
                 store_global_new(value);
             }
         }
-        // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
+        println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
         None
     }
 
@@ -525,6 +559,17 @@ impl VirtualMachine {
             }
             (Value::Obj(a), Value::Obj(b)) => {
                 Value::Bool(a.to_i32() == b.to_i32())
+            }
+            (Value::String(a), Value::String(b)) => {
+                Value::Bool(a.as_str().eq(b.as_str()))
+            }
+            (Value::String(a), Value::Reference(b)) => {
+                let v = load_capture_reference(b.as_ref().0, b.as_ref().1);
+                if let Value::String(ss) = v {
+                    Value::Bool(a.as_str().eq(ss.as_str()))
+                } else {
+                    Value::Bool(false)
+                }
             }
             (Value::Nil, Value::Nil) => {
                 Value::Bool(true)
@@ -1028,7 +1073,7 @@ impl VirtualMachine {
                 _ => {}
             }
         }
-       // println!("获取item耗时:{:?}",now.elapsed().as_nanos());
+        // println!("获取item耗时:{:?}",now.elapsed().as_nanos());
         ret
     }
     pub fn print(&self, value: Value) {
@@ -1080,7 +1125,7 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
-    pub fn add(&self, a: Value, b: Value) -> Value {
+    pub fn add(&self, a: &Value, b: &Value) -> Value {
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)
@@ -1121,9 +1166,27 @@ impl VirtualMachine {
             (Value::Float(a), Value::Float(b)) => {
                 Value::Float(a + b)
             }
-            (Value::String(s1), Value::String(s2)) => {
-                Value::String(Box::new(s1.add(s2.as_str())))
+            (Value::Reference(n1), Value::Reference(n2)) => {
+                let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
+                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
+                self.add(&v1, &v2)
             }
+            (Value::String(n1), Value::Reference(n2)) => {
+                //  let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
+                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
+                self.add(a, &v2)
+            }
+            (Value::Reference(n2), Value::String(n1)) => {
+                //  let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
+                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
+                self.add(&v2, b)
+            }
+            (Value::String(s1), Value::String(s2)) => {
+                let mut s = s1.as_ref().clone();
+                s.push_str(s2.as_str());
+                Value::String(Box::new(s))
+            }
+
             _ => unreachable!()
         }
     }
@@ -1531,7 +1594,7 @@ pub fn unwrap_constant(constant: &bytecode::Constant) -> Value {
         None => Value::Nil,
         Struct(ref ty) => Value::Type(Box::new(ty.as_ref().to_owned())),
         Enum(ref ty) => Value::Enum(Box::new(ty.as_ref().to_owned())),
-        Reference(n) => Value::Reference(Box::new((n.as_ref().0, n.as_ref().1.clone()))),
+        Reference(ref n) => Value::Reference(Box::new((n.as_ref().0, n.as_ref().1.clone(), n.as_ref().2.clone()))),
         Map(ref ty) => { Value::Nil }
     }
 }

@@ -348,7 +348,7 @@ impl<O: OutputStream> Compiler<O> {
 
     fn scope_for_name(&self, name: &str) -> bytecode::NameScope {
         let symbol = self.lookup_name(name);
-        println!("symbol:{:?}", symbol);
+        //println!("symbol:{:?}", symbol);
         match symbol.scope {
             SymbolScope::Global => bytecode::NameScope::Global,
             SymbolScope::Local => bytecode::NameScope::Local,
@@ -388,13 +388,19 @@ impl<O: OutputStream> Compiler<O> {
             let scope = self.scope_for_name(name);
             let position = self.variable_position(name).unwrap();
             println!("name:{:?},position::{:?}", name, position);
-            self.emit(Instruction::LoadConst(Constant::Reference(Box::new((position.0, position.1)))));
+            self.emit(Instruction::LoadConst(Constant::Reference(Box::new((position.0, position.1, scope)))));
         } else {
             let scope = self.scope_for_name(name);
             let position = self.variable_position(name).unwrap();
             println!("name:{:?},position::{:?}", name, position);
             self.emit(Instruction::LoadReference(position.0, position.1, scope));
         }
+    }
+
+    pub fn store_default_args(&mut self, name: &str) {
+        // let scope = self.scope_for_name(name);
+        let position = self.variable_position(name).unwrap();
+        self.emit(Instruction::StoreDefaultArg(position.0,position.1));
     }
     pub fn store_ref_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);
@@ -422,7 +428,7 @@ impl<O: OutputStream> Compiler<O> {
         // }
     }
     fn compile_statement(&mut self, statement: &ast::Statement) -> Result<(), CompileError> {
-        println!("正在编译 {:?}", statement);
+        //println!("正在编译 {:?}", statement);
         self.set_source_location(statement.loc().borrow());
         use ast::Statement::*;
         match &statement {
@@ -545,6 +551,7 @@ impl<O: OutputStream> Compiler<O> {
                     self.set_label(labels[index]);
                     self.emit(Instruction::Duplicate);
                     self.enter_scope();
+                    self.emit(Instruction::IntoBlock);
                     if let ast::Expression::Hole(_) = expr.0.as_ref() {} else {
                         if let ast::Expression::Range(_, start, end, include) = expr.0.as_ref() {
                             self.emit(Instruction::Duplicate);
@@ -590,8 +597,9 @@ impl<O: OutputStream> Compiler<O> {
                         }
                     }
                     self.compile_statements(expr.1.as_ref())?;
-                    self.emit(Instruction::Jump(end_label));
                     self.leave_scope();
+                    self.emit(Instruction::OutBlock);
+                    self.emit(Instruction::Jump(end_label));
                 }
                 self.set_label(end_label);
                 //弹出被比较的数据
@@ -734,14 +742,17 @@ impl<O: OutputStream> Compiler<O> {
         for arg in args.iter() {
             if arg.default.is_some() {
                 //这里应该需要修改，跳转指令感觉不爽
-                let end_label = self.new_label();
-                self.load_name(&arg.name.as_ref().unwrap().name);
-                self.emit(Instruction::LoadConst(bytecode::Constant::None));
-                self.emit(Instruction::ShallowOperation(bytecode::ComparisonOperator::Equal));
-                self.emit(Instruction::JumpIfFalse(end_label));
+                // let end_label = self.new_label();
+                // self.load_name(&arg.name.as_ref().unwrap().name);
+                // self.emit(Instruction::LoadConst(bytecode::Constant::None));
+                // self.emit(Instruction::ShallowOperation(bytecode::ComparisonOperator::Equal));
+                // self.emit(Instruction::JumpIfFalse(end_label));
+                // self.compile_expression(&arg.default.as_ref().unwrap())?;
+                // self.store_ref_name(&arg.name.as_ref().unwrap().name);
+                // self.set_label(end_label);
                 self.compile_expression(&arg.default.as_ref().unwrap())?;
-                self.store_ref_name(&arg.name.as_ref().unwrap().name);
-                self.set_label(end_label);
+                self.store_default_args(&arg.name.as_ref().unwrap().name);
+
             }
         }
         Ok(())
@@ -1160,6 +1171,7 @@ impl<O: OutputStream> Compiler<O> {
             start_label,
             end_label,
         ));
+        self.emit(Instruction::IntoBlock);
         self.set_label(start_label);
         self.compile_jump_if(test, false, else_label)?;
         let was_in_loop = self.ctx.in_loop;
@@ -1169,6 +1181,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::Jump(start_label));
         self.set_label(else_label);
         self.emit(Instruction::PopBlock);
+        self.emit(Instruction::OutBlock);
         self.set_label(end_label);
         Ok(())
     }
@@ -1185,7 +1198,7 @@ impl<O: OutputStream> Compiler<O> {
         let end_label = self.new_label();
 
         self.emit(Instruction::SetupLoop(start_label, end_label));
-
+        self.emit(Instruction::IntoBlock);
         self.compile_expression(iter)?;
         if let Expression::Range(..) = iter {
             self.emit(Instruction::BuildRange);
@@ -1206,6 +1219,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::Jump(start_label));
         self.set_label(else_label);
         self.emit(Instruction::PopBlock);
+        self.emit(Instruction::OutBlock);
         self.set_label(end_label);
         Ok(())
     }
@@ -1441,7 +1455,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn compile_expression(&mut self, expression: &ast::Expression) -> Result<(), CompileError> {
-        println!("Compiling {:?}", expression);
+        //println!("Compiling {:?}", expression);
         self.set_source_location(expression.loc().borrow());
         use ast::Expression::*;
         match &expression {
@@ -1834,16 +1848,18 @@ impl<O: OutputStream> Compiler<O> {
         if let FunctionContext::StructFunction(_) = self.ctx.func {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
                 if self.variable_local_scope(name.as_str()) {
+                    let scope = self.scope_for_name(name.as_str());
                     let p = self.variable_position(name.as_str()).unwrap();
-                    self.emit(LoadName(p.1, NameScope::Local));
+                    self.emit(LoadName(p.1, scope));
                 } else if self.is_struct_item_def("self".to_string(), name.clone()) {
                     let p = self.variable_position(name.as_str()).unwrap();
                     let scope = self.scope_for_name(name.as_str());
                     self.emit(Instruction::LoadReference(p.0, p.1, scope));
                     self.emit(Instruction::LoadAttr(name.clone()));
                 } else {
+                    let scope = self.scope_for_name(name.as_str());
                     let p = self.variable_position(get_full_name(&self.package, &name.clone()).as_str()).unwrap();
-                    self.emit(LoadName(p.1, NameScope::Local));
+                    self.emit(LoadName(p.1, scope));
                     // self.emit(LoadName(name.clone(), NameScope::Local));
                 }
             } else if let ast::Expression::Attribute(_, expr, name, _) = function {
@@ -1851,8 +1867,9 @@ impl<O: OutputStream> Compiler<O> {
             }
         } else {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
+                let scope = self.scope_for_name(name.as_str());
                 let p = self.variable_position(name.as_str()).unwrap();
-                self.emit(LoadName(p.1, NameScope::Local));
+                self.emit(LoadName(p.1, scope));
             } else {
                 self.compile_expression(function)?;
             }

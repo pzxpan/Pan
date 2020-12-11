@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use super::{InstructionMetadata, OptimizationBuffer};
 use crate::compile::{insert, get};
 use pan_bytecode::value::{Value, get_map_item};
-use pan_bytecode::value::{get_item, unwrap_constant};
+use pan_bytecode::value::{get_item};
 use log::Metadata;
 
 macro_rules! metas {

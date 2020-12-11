@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 
-use crate::bytecode::{CodeObject, Constant};
+use crate::bytecode::{CodeObject, Constant, NameScope};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FnValue {
@@ -60,7 +60,7 @@ pub enum Value {
     Type(Box<TypeValue>),
     Enum(Box<EnumValue>),
     Code(Box<CodeObject>),
-    Reference(Box<(usize, usize)>),
+    Reference(Box<(usize, usize, NameScope)>),
     Nil,
 }
 
@@ -520,42 +520,42 @@ pub fn get_map_item(a: Constant, b: Value) -> Option<Constant> {
     }
 }
 
-pub fn unwrap_constant(value: &Constant) -> Value {
-    use Constant::*;
-    match value {
-        I8(ref value) => Value::I8(*value),
-        I16(ref value) => Value::I16(*value),
-        I32(ref value) => Value::I32(*value),
-        I64(ref value) => Value::I64(*value),
-        I128(ref value) => Value::I128(Box::new(*value.as_ref())),
-        ISize(ref value) => Value::ISize(*value),
-        U8(ref value) => Value::U8(*value),
-        U16(ref value) => Value::U16(*value),
-        U32(ref value) => Value::U32(*value),
-        U64(ref value) => Value::U64(*value),
-        U128(ref value) => Value::U128(Box::new(*value.as_ref())),
-        USize(ref value) => Value::USize(*value),
-        Integer(ref value) => Value::I32(*value),
-        Float(ref value) => Value::Float(*value),
-        Complex(ref value) => Value::Nil,
-        String(ref value) => Value::String(Box::new(value.as_ref().clone())),
-        Bytes(ref value) => Value::Nil,
-        Boolean(ref value) => Value::Bool(value.clone()),
-        Char(ref value) => Value::Char(value.clone()),
-        Code(ref code) => {
-            Value::Code(Box::new(*code.to_owned()))
-        }
-        Tuple(ref elements) => {
-            let mut v = Vec::new();
-            for e in elements.as_ref() {
-                v.push(unwrap_constant(e));
-            }
-            Value::new_array_obj(v)
-        }
-        None => Value::Nil,
-        Struct(ty) => Value::Type(Box::new(*ty.to_owned())),
-        Enum(ty) => Value::Enum(Box::new(*ty.to_owned())),
-        Reference(ref_value) => Value::Reference(Box::new((ref_value.as_ref().0, ref_value.as_ref().1))),
-        Map(ref elements) => { Value::Nil }
-    }
-}
+// pub fn unwrap_constant(value: &Constant) -> Value {
+//     use Constant::*;
+//     match value {
+//         I8(ref value) => Value::I8(*value),
+//         I16(ref value) => Value::I16(*value),
+//         I32(ref value) => Value::I32(*value),
+//         I64(ref value) => Value::I64(*value),
+//         I128(ref value) => Value::I128(Box::new(*value.as_ref())),
+//         ISize(ref value) => Value::ISize(*value),
+//         U8(ref value) => Value::U8(*value),
+//         U16(ref value) => Value::U16(*value),
+//         U32(ref value) => Value::U32(*value),
+//         U64(ref value) => Value::U64(*value),
+//         U128(ref value) => Value::U128(Box::new(*value.as_ref())),
+//         USize(ref value) => Value::USize(*value),
+//         Integer(ref value) => Value::I32(*value),
+//         Float(ref value) => Value::Float(*value),
+//         Complex(ref value) => Value::Nil,
+//         String(ref value) => Value::String(Box::new(value.as_ref().clone())),
+//         Bytes(ref value) => Value::Nil,
+//         Boolean(ref value) => Value::Bool(value.clone()),
+//         Char(ref value) => Value::Char(value.clone()),
+//         Code(ref code) => {
+//             Value::Code(Box::new(*code.to_owned()))
+//         }
+//         Tuple(ref elements) => {
+//             let mut v = Vec::new();
+//             for e in elements.as_ref() {
+//                 v.push(unwrap_constant(e));
+//             }
+//             Value::new_array_obj(v)
+//         }
+//         None => Value::Nil,
+//         Struct(ty) => Value::Type(Box::new(*ty.to_owned())),
+//         Enum(ty) => Value::Enum(Box::new(*ty.to_owned())),
+//         Reference(ref_value) => Value::Reference(Box::new((ref_value.as_ref().0, ref_value.as_ref().1))),
+//         Map(ref elements) => { Value::Nil }
+//     }
+// }

@@ -55,7 +55,7 @@ impl Label {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum NameScope {
     Local,
     Global,
@@ -142,6 +142,7 @@ pub enum Instruction {
     StartThread,
     LoadReference(usize, usize, NameScope),
     StoreReference(usize, usize, NameScope),
+    StoreDefaultArg(usize, usize),
     UnpackSequence(usize),
     UnpackEx(usize, usize),
     Reverse(usize),
@@ -186,7 +187,7 @@ pub enum Constant {
     Map(Box<Vec<(Constant, Constant)>>),
     Struct(Box<TypeValue>),
     Enum(Box<EnumValue>),
-    Reference(Box<(usize, usize)>),
+    Reference(Box<(usize, usize, NameScope)>),
     None,
 }
 
@@ -434,6 +435,7 @@ impl Instruction {
             Slice => w!(BuildSlice),
             LoadReference(scope_idx, variable_idx, n) => w!(LoadReference, scope_idx, variable_idx,format!("{:?}", n)),
             StoreReference(scope_idx, variable_idx, n) => w!(StoreReference,scope_idx,variable_idx,format!("{:?}", n)),
+            StoreDefaultArg(scope_idx, variable_idx) => w!(StoreDefaultArg,scope_idx,variable_idx),
             ListAppend(i) => w!(ListAppend, i),
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),

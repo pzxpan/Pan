@@ -160,7 +160,7 @@ StructVariableDefinition: Box<StructVariableDefinition> = {
 
 EnumVariableDefinition: Box<EnumVariableDefinition> = {
     <doc:DocComments> <l:@L>  <name:Identifier> <tys : ("(" <Comma<Expression>>  ")" )?> <e:("=" <Number>)?> <r:@R> ","? => {
-     let default = if e.is_some() { e.unwrap().to_i32()} else {0};
+     let default = if e.is_some() { Some(e.unwrap().to_i32())} else {None};
      Box::new(EnumVariableDefinition {
          doc, loc: Loc(file_no, l, r), tys, name,default,
         })

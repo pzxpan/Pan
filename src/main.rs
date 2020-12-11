@@ -94,10 +94,10 @@ fn main() {
 
    // println!("size:{:?},", std::mem::size_of_val(&v));
 
-    let start = std::time::Instant::now();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
-    println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
-    //test_all_demo_file();
+    // let start = std::time::Instant::now();
+    test_one_file(&env::current_dir().unwrap().join("demo").join("default.pan"));
+    // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
+   // test_all_demo_file();
 }
 
 fn test_all_demo_file() {

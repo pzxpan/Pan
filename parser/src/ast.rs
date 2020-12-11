@@ -242,7 +242,7 @@ pub struct EnumVariableDefinition {
     pub loc: Loc,
     pub tys: Option<Vec<Expression>>,
     pub name: Identifier,
-    pub default: i32,
+    pub default: Option<i32>,
 }
 
 #[derive(Debug, PartialEq)]

@@ -314,8 +314,8 @@ impl HasType for EnumDefinition {
                             ref_type.push(tt);
                         }
                     }
-                    if v.default != idx {
-                        idx = v.default;
+                    if v.default.is_some() {
+                        idx = v.default.unwrap();
                     } else {
                         idx += 1;
                     }

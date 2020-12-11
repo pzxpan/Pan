@@ -108,7 +108,7 @@ impl Frame {
         let instruction = self.fetch_instruction();
         // let name = format!("{:?}", instruction);
         // let start = Instant::now();
-        //println!("instruction是:{:?},", instruction);
+        println!("instruction是:{:?},", instruction);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 scope_remove();
@@ -158,7 +158,7 @@ impl Frame {
             bytecode::Instruction::Subscript => { self.execute_subscript(vm); }
             bytecode::Instruction::Slice => { self.execute_slice(vm); }
             bytecode::Instruction::StoreSubscript => {
-                  self.execute_store_subscript();
+                self.execute_store_subscript();
             }
             bytecode::Instruction::DeleteSubscript => { self.execute_delete_subscript(vm); }
             bytecode::Instruction::Pop => {
@@ -210,6 +210,7 @@ impl Frame {
                     scope_remove();
                 }
                 self.inner_scope = 0;
+                scope_remove();
                 return Some(ExecutionResult::Return(value));
             }
             bytecode::Instruction::Ignore => {
@@ -225,7 +226,6 @@ impl Frame {
                     start: *start,
                     end: *end,
                 });
-                add_local_value(vec![]);
             }
             bytecode::Instruction::Continue => {
                 self.continue_break(UnwindReason::Continue);
@@ -304,7 +304,7 @@ impl Frame {
             }
 
             bytecode::Instruction::Match => {
-                let a = self.pop_value();
+                let mut a = self.pop_value();
                 let b = self.last_value();
                 if let Value::Obj(_) = b {
                     let (matched, values) = vm._match(b, a);
@@ -333,16 +333,33 @@ impl Frame {
             }
 
             bytecode::Instruction::LoadReference(scope_idx, variable_idx, n) => {
-                let v = vm.load_name(*scope_idx, *variable_idx, n);
-                //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
-                //println!("load_value:{:?}", v);
-                self.push_value(v);
+                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, scope_len());
+                if n == &NameScope::Local {
+                    let v = vm.load_name(*scope_idx + self.idx - 1, *variable_idx, n);
+                    self.push_value(v);
+                } else {
+                    let v = vm.load_name(*scope_idx, *variable_idx, n);
+                    //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
+                    //println!("load_value:{:?}", v);
+                    self.push_value(v);
+                }
             }
             //
             bytecode::Instruction::StoreReference(scope_idx, variable_idx, n) => {
+                if n == &NameScope::Local {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx + self.idx - 1, *variable_idx, value, n);
+                } else {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx, *variable_idx, value, n);
+                }
+            }
+            bytecode::Instruction::StoreDefaultArg(scope_idx, variable_idx) => {
                 let value = self.pop_value();
                 //println!("222store_value:{:?}", value);
-                vm.store_name(*scope_idx, *variable_idx, value, n);
+                vm.store_default_args(*scope_idx + self.idx - 1, *variable_idx, value);
             }
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());
@@ -431,8 +448,17 @@ impl Frame {
         let end = self.pop_value();
         let start = self.pop_value();
         let arr = self.pop_value();
-        let value = vm.get_slice(arr, start, end, include);
-        self.push_value(value);
+        if let Value::Reference(n) = arr {
+            let v = if n.as_ref().2 == NameScope::Local {
+                vm.load_capture_reference(n.as_ref().0, n.as_ref().1)
+            } else {
+                vm.load_global_reference(n.as_ref().1)
+            };
+            let value = vm.get_slice(v, start, end, include);
+            self.push_value(value);
+        } else {
+            unreachable!()
+        }
         None
     }
 
@@ -446,15 +472,15 @@ impl Frame {
     }
 
     fn execute_store_subscript(&self) -> FrameResult {
-       // let now = Instant::now();
+        // let now = Instant::now();
         let idx = self.pop_value();
         let obj = self.pop_value();
         let value = self.pop_value();
-       // println!("pop 耗时:{:?}", now.elapsed().as_nanos());
+        // println!("pop 耗时:{:?}", now.elapsed().as_nanos());
         //println!("idx:{:?},obj:{:?},value:{:?}", idx.clone(), obj.clone(), value.clone());
         //let now = Instant::now();
         set_attribute(obj, idx, value);
-     //   println!("set_attribute 耗时:{:?}", now.elapsed().as_nanos());
+        //   println!("set_attribute 耗时:{:?}", now.elapsed().as_nanos());
         // println!("vvv::{:?},", v);
 
 
@@ -536,7 +562,7 @@ impl Frame {
         let mut func_ref = self.pop_value();
         //println!("func_ref::{:?},", func_ref);
         if let Value::Reference(n) = func_ref {
-            func_ref = vm.load_name(n.as_ref().0, n.as_ref().0.clone(), &NameScope::Local);
+            func_ref = vm.load_name(n.as_ref().0, n.as_ref().1, &n.as_ref().2);
             // println!("func_ref::{:?},", func_ref);
         }
 
@@ -586,7 +612,7 @@ impl Frame {
                 }
             }
         }
-        // println!("hash_map is:{:?}", hash_map);
+        println!("hash_map is:{:?}", hash_map);
 
         vm.run_code_obj(func_ref.code().to_owned(), hash_map)
     }
@@ -676,7 +702,7 @@ impl Frame {
         let value = if inplace {
             match *op {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => vm.add(&a_ref, &b_ref),
                 bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
                 bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
                 bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
@@ -690,7 +716,7 @@ impl Frame {
         } else {
             match *op {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => vm.add(&a_ref, &b_ref),
                 bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
                 bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
                 bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
