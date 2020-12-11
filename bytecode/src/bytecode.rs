@@ -142,6 +142,8 @@ pub enum Instruction {
     StartThread,
     LoadReference(usize, usize, NameScope),
     StoreReference(usize, usize, NameScope),
+    LoadCaptureReference(usize, usize, NameScope),
+    StoreCaptureReference(usize, usize, NameScope),
     StoreDefaultArg(usize, usize),
     UnpackSequence(usize),
     UnpackEx(usize, usize),
@@ -435,6 +437,9 @@ impl Instruction {
             Slice => w!(BuildSlice),
             LoadReference(scope_idx, variable_idx, n) => w!(LoadReference, scope_idx, variable_idx,format!("{:?}", n)),
             StoreReference(scope_idx, variable_idx, n) => w!(StoreReference,scope_idx,variable_idx,format!("{:?}", n)),
+            LoadCaptureReference(scope_idx, variable_idx, n) => w!(LoadCaptureReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreCaptureReference(scope_idx, variable_idx, n) => w!(StoreCaptureReference,scope_idx,variable_idx,format!("{:?}", n)),
+
             StoreDefaultArg(scope_idx, variable_idx) => w!(StoreDefaultArg,scope_idx,variable_idx),
             ListAppend(i) => w!(ListAppend, i),
             SetAdd(i) => w!(SetAdd, i),

@@ -393,23 +393,29 @@ impl<O: OutputStream> Compiler<O> {
             let scope = self.scope_for_name(name);
             let position = self.variable_position(name).unwrap();
             println!("name:{:?},position::{:?}", name, position);
-            self.emit(Instruction::LoadReference(position.0, position.1, scope));
+            if self.ctx.in_lambda {
+                self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+            } else {
+                self.emit(Instruction::LoadReference(position.0, position.1, scope.clone()));
+            }
         }
     }
 
     pub fn store_default_args(&mut self, name: &str) {
         // let scope = self.scope_for_name(name);
         let position = self.variable_position(name).unwrap();
-        self.emit(Instruction::StoreDefaultArg(position.0,position.1));
+        self.emit(Instruction::StoreDefaultArg(position.0, position.1));
     }
     pub fn store_ref_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);
-        // self.emit(Instruction::StoreName(ref_name.clone(), scope));
-        // let idx = self.variable_scope_index(name);
-        // self.emit(Instruction::LoadConst(Constant::Reference(Box::new((idx as usize, ref_name.clone())))));
-        // self.emit(Instruction::StoreName(name.to_owned(), NameScope::Local));
         let position = self.variable_position(name).unwrap();
-        self.emit(Instruction::StoreReference(position.0, position.1, scope));
+        if self.ctx.in_lambda {
+            self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
+        } else {
+            self.emit(Instruction::StoreReference(position.0, position.1, scope));
+        }
+
+
         // if self.need_ref(name) {
         //     // let mut ref_name = String::from(name);
         //     // ref_name.push_str("$$");
@@ -752,7 +758,6 @@ impl<O: OutputStream> Compiler<O> {
                 // self.set_label(end_label);
                 self.compile_expression(&arg.default.as_ref().unwrap())?;
                 self.store_default_args(&arg.name.as_ref().unwrap().name);
-
             }
         }
         Ok(())

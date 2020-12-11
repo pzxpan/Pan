@@ -356,6 +356,31 @@ impl Frame {
                     vm.store_name(*scope_idx, *variable_idx, value, n);
                 }
             }
+
+            bytecode::Instruction::LoadCaptureReference(scope_idx, variable_idx, n) => {
+                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, scope_len());
+                if n == &NameScope::Local {
+                    let v = vm.load_name(*scope_idx, *variable_idx, n);
+                    self.push_value(v);
+                } else {
+                    let v = vm.load_name(*scope_idx, *variable_idx, n);
+                    //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
+                    //println!("load_value:{:?}", v);
+                    self.push_value(v);
+                }
+            }
+            //
+            bytecode::Instruction::StoreCaptureReference(scope_idx, variable_idx, n) => {
+                if n == &NameScope::Local {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx, *variable_idx, value, n);
+                } else {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx, *variable_idx, value, n);
+                }
+            }
             bytecode::Instruction::StoreDefaultArg(scope_idx, variable_idx) => {
                 let value = self.pop_value();
                 //println!("222store_value:{:?}", value);
