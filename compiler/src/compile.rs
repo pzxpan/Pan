@@ -393,7 +393,7 @@ impl<O: OutputStream> Compiler<O> {
             let scope = self.scope_for_name(name);
             let position = self.variable_position(name).unwrap();
             println!("name:{:?},position::{:?}", name, position);
-            if self.ctx.in_lambda {
+            if self.ctx.in_lambda || self.ctx.in_loop {
                 self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
             } else {
                 self.emit(Instruction::LoadReference(position.0, position.1, scope.clone()));
@@ -409,7 +409,7 @@ impl<O: OutputStream> Compiler<O> {
     pub fn store_ref_name(&mut self, name: &str) {
         let scope = self.scope_for_name(name);
         let position = self.variable_position(name).unwrap();
-        if self.ctx.in_lambda {
+        if self.ctx.in_lambda || self.ctx.in_loop {
             self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
         } else {
             self.emit(Instruction::StoreReference(position.0, position.1, scope));
@@ -1178,9 +1178,9 @@ impl<O: OutputStream> Compiler<O> {
         ));
         self.emit(Instruction::IntoBlock);
         self.set_label(start_label);
-        self.compile_jump_if(test, false, else_label)?;
         let was_in_loop = self.ctx.in_loop;
         self.ctx.in_loop = true;
+        self.compile_jump_if(test, false, else_label)?;
         self.compile_statements(body)?;
         self.ctx.in_loop = was_in_loop;
         self.emit(Instruction::Jump(start_label));
@@ -1214,7 +1214,7 @@ impl<O: OutputStream> Compiler<O> {
         self.set_label(start_label);
         self.emit(Instruction::ForIter(else_label));
 
-        self.compile_store(target)?;
+        self.compile_insert_value(target)?;
 
         let was_in_loop = self.ctx.in_loop;
         self.ctx.in_loop = true;
@@ -1307,6 +1307,19 @@ impl<O: OutputStream> Compiler<O> {
                     source_path: self.source_path.clone(),
                 });
             }
+        }
+
+        Ok(())
+    }
+
+    fn compile_insert_value(&mut self, target: &ast::Expression) -> Result<(), CompileError> {
+        match &target {
+            ast::Expression::Variable(ast::Identifier { name, .. }) => {
+                let scope = self.scope_for_name(name.as_str());
+                self.emit(Instruction::StoreNewVariable(scope));
+                // let s = self.lookup_name(name);
+            }
+            _ => {}
         }
 
         Ok(())

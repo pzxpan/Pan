@@ -54,6 +54,7 @@ impl NameProtocol for ScopeVec {
         println!("value:{:?},self.locals.len:{:?}", value, &self.locals.len());
         println!("ddd:lenof1:{:?}", self.locals[1].len());
         if self.locals.len()>2 {
+            println!("222ddd");
             for i in &self.locals[2] {
                 println!("mathch:{:?}", i);
             }
