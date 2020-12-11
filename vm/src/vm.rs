@@ -1,5 +1,7 @@
 //! 执行指令的虚拟机
 //!
+use cached::proc_macro::cached;
+
 use std::borrow::Borrow;
 use std::rc::Rc;
 use std::ops::Add;
@@ -165,13 +167,19 @@ pub fn get_attribute(ref_position: Value, attri: Value) -> Option<Value> {
     None
 }
 
-pub fn set_attribute(ref_position: Value, attri: Value, value: Value) {
+pub fn set_attribute(ref_position: Value, attr: Value, value: Value) {
+    // let now = Instant::now();
     if let Value::Reference(n) = ref_position {
         let ref mut scope = SCOPE.lock().unwrap();
-        let v = scope.locals.get_mut(n.as_ref().0).unwrap();
-        let vv = v.get_mut(n.as_ref().1).unwrap();
-        VirtualMachine::update_item(vv, attri, value);
+        // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
+        // let v = scope.locals.get_mut(1).unwrap();
+        // println!("获取ddv:{:?}", now.elapsed().as_nanos());
+        // let vv = v.get_mut(0).unwrap();
+        // println!("获取222:{:?}", now.elapsed().as_nanos());
+        VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
+        //  println!("获取333:{:?}", now.elapsed().as_nanos());
     }
+    //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
 }
 
 fn load_reference_name(scope_idx: usize, idx: usize) -> Value {
@@ -326,7 +334,7 @@ impl VirtualMachine {
                 store_primitive_global(idx, obj);
             }
         }
-        println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
+        // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
         None
     }
 
@@ -347,7 +355,7 @@ impl VirtualMachine {
                 store_global_new(value);
             }
         }
-        println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
+        // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
         None
     }
 
@@ -669,6 +677,7 @@ impl VirtualMachine {
     pub fn update_item(obj: &mut Value, idx: Value, value: Value) {
         // println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
         // let mut update_value = Value::Nil;
+
         match (obj, idx) {
             (Value::Obj(ref mut e), Value::I32(sub)) => {
                 match e.as_mut() {
@@ -956,6 +965,7 @@ impl VirtualMachine {
         }
     }
     pub fn get_next_iter(&self, v: &mut Value) -> Value {
+        //let now = Instant::now();
         let mut ret = Value::Nil;
         if let Value::Obj(ref mut e) = v {
             match e.as_mut() {
@@ -1018,6 +1028,7 @@ impl VirtualMachine {
                 _ => {}
             }
         }
+       // println!("获取item耗时:{:?}",now.elapsed().as_nanos());
         ret
     }
     pub fn print(&self, value: Value) {
@@ -1445,43 +1456,6 @@ impl VirtualMachine {
             _ => { return value; }
         }
     }
-
-
-    pub fn unwrap_constant(constant: &bytecode::Constant) -> Value {
-        use bytecode::Constant::*;
-        match constant {
-            I8(ref value) => Value::I8(*value),
-            I16(ref value) => Value::I16(*value),
-            I32(ref value) => Value::I32(*value),
-            I64(ref value) => Value::I64(*value),
-            I128(ref value) => Value::I128(Box::new(**value)),
-            ISize(ref value) => Value::ISize(*value),
-            U8(ref value) => Value::U8(*value),
-            U16(ref value) => Value::U16(*value),
-            U32(ref value) => Value::U32(*value),
-            U64(ref value) => Value::U64(*value),
-            U128(ref value) => Value::U128(Box::new(**value)),
-            USize(ref value) => Value::USize(*value),
-            Integer(ref value) => Value::I32(value.to_i32().unwrap()),
-            Float(ref value) => Value::Float(*value),
-            Complex(ref value) => Value::Nil,
-            String(ref value) => Value::String(Box::new(value.as_ref().clone())),
-            Bytes(ref value) => Value::Nil,
-            Char(ref value) => Value::Char(*value),
-            Boolean(ref value) => Value::Bool(value.clone()),
-            Code(code) => {
-                Value::Code(code.to_owned())
-            }
-            Tuple(ref elements) => {
-                Value::Nil
-            }
-            None => Value::Nil,
-            Struct(ref ty) => Value::Type(Box::new(ty.as_ref().to_owned())),
-            Enum(ref ty) => Value::Enum(Box::new(ty.as_ref().to_owned())),
-            Reference(n) => Value::Reference(Box::new((n.as_ref().0, n.as_ref().1.clone()))),
-            Map(ref ty) => { Value::Nil }
-        }
-    }
 }
 
 
@@ -1524,4 +1498,40 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<
     });
 
     // println!("handler:{:?}",thread::current());
+}
+
+pub fn unwrap_constant(constant: &bytecode::Constant) -> Value {
+    use bytecode::Constant::*;
+    match constant {
+        I8(ref value) => Value::I8(*value),
+        I16(ref value) => Value::I16(*value),
+        I32(ref value) => Value::I32(*value),
+        I64(ref value) => Value::I64(*value),
+        I128(ref value) => Value::I128(Box::new(**value)),
+        ISize(ref value) => Value::ISize(*value),
+        U8(ref value) => Value::U8(*value),
+        U16(ref value) => Value::U16(*value),
+        U32(ref value) => Value::U32(*value),
+        U64(ref value) => Value::U64(*value),
+        U128(ref value) => Value::U128(Box::new(**value)),
+        USize(ref value) => Value::USize(*value),
+        Integer(ref value) => Value::I32(value.to_i32().unwrap()),
+        Float(ref value) => Value::Float(*value),
+        Complex(ref value) => Value::Nil,
+        String(ref value) => Value::String(Box::new(value.as_ref().clone())),
+        Bytes(ref value) => Value::Nil,
+        Char(ref value) => Value::Char(*value),
+        Boolean(ref value) => Value::Bool(value.clone()),
+        Code(code) => {
+            Value::Code(code.to_owned())
+        }
+        Tuple(ref elements) => {
+            Value::Nil
+        }
+        None => Value::Nil,
+        Struct(ref ty) => Value::Type(Box::new(ty.as_ref().to_owned())),
+        Enum(ref ty) => Value::Enum(Box::new(ty.as_ref().to_owned())),
+        Reference(n) => Value::Reference(Box::new((n.as_ref().0, n.as_ref().1.clone()))),
+        Map(ref ty) => { Value::Nil }
+    }
 }

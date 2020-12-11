@@ -175,7 +175,7 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
 pub fn resolve_builtin_fun<O: OutputStream>(compiler: &mut Compiler<O>) {
     let built_ty = get_builtin_type();
     for ty in built_ty.iter().enumerate() {
-        compiler.emit(Instruction::LoadConst(Constant::String(Box::new(ty.1.0.clone()))));
+        compiler.emit(Instruction::LoadConst(Constant::String(Box::new((ty.1).0.clone()))));
         // self.emit(Instruction::StoreName(p.1, scope));
         compiler.emit(Instruction::StoreNewVariable(NameScope::Global));
     }

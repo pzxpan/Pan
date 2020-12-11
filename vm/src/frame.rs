@@ -10,7 +10,7 @@ use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::{VirtualMachine, scope_len, store_primitive_value, set_attribute};
+use crate::vm::{VirtualMachine, scope_len, store_primitive_value, set_attribute, unwrap_constant};
 use crate::vm::{add_local_value, scope_remove};
 use crate::scope::{Scope, NameProtocol};
 
@@ -20,7 +20,9 @@ use bitflags::_core::time::Duration;
 use crate::vm::run_code_in_sub_thread;
 use std::time::Instant;
 use pan_bytecode::value::Obj::InstanceObj;
-
+lazy_static! {
+    static ref STORE_COUNT:i32 = 0;
+}
 #[derive(Clone, Debug)]
 struct Block {
     typ: BlockType,
@@ -104,9 +106,9 @@ impl Frame {
     /// 中间指令处理
     fn execute_instruction(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        let name = format!("{:?}", instruction);
-        let start = Instant::now();
-        println!("instruction是:{:?},", instruction);
+        // let name = format!("{:?}", instruction);
+        // let start = Instant::now();
+        //println!("instruction是:{:?},", instruction);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 scope_remove();
@@ -127,7 +129,7 @@ impl Frame {
                 panic!(v.to_string());
             }
             bytecode::Instruction::LoadConst(ref value) => {
-                let obj = VirtualMachine::unwrap_constant(value);
+                let obj = unwrap_constant(value);
                 self.push_value(obj);
             }
             bytecode::Instruction::LoadName(
@@ -144,18 +146,20 @@ impl Frame {
             ) => {
                 let cc = Instant::now();
                 let value = self.pop_value();
-                println!("pop_cost:{:?},", cc.elapsed().as_nanos());
+                // println!("pop_cost:{:?},", cc.elapsed().as_nanos());
                 vm.store_name(self.idx, *v_idx, value, scope);
             }
 
             bytecode::Instruction::StoreNewVariable(n) => {
                 let v = self.pop_value();
-                println!("store_value:{:?},", v);
+                // println!("store_value:{:?},", v);
                 vm.store_new_variable(v, n);
             }
             bytecode::Instruction::Subscript => { self.execute_subscript(vm); }
             bytecode::Instruction::Slice => { self.execute_slice(vm); }
-            bytecode::Instruction::StoreSubscript => { self.execute_store_subscript(vm); }
+            bytecode::Instruction::StoreSubscript => {
+                  self.execute_store_subscript();
+            }
             bytecode::Instruction::DeleteSubscript => { self.execute_delete_subscript(vm); }
             bytecode::Instruction::Pop => {
                 self.pop_value();
@@ -331,13 +335,13 @@ impl Frame {
             bytecode::Instruction::LoadReference(scope_idx, variable_idx, n) => {
                 let v = vm.load_name(*scope_idx, *variable_idx, n);
                 //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
-                println!("load_value:{:?}", v);
+                //println!("load_value:{:?}", v);
                 self.push_value(v);
             }
             //
             bytecode::Instruction::StoreReference(scope_idx, variable_idx, n) => {
                 let value = self.pop_value();
-                println!("222store_value:{:?}", value);
+                //println!("222store_value:{:?}", value);
                 vm.store_name(*scope_idx, *variable_idx, value, n);
             }
             bytecode::Instruction::Print => {
@@ -353,11 +357,11 @@ impl Frame {
             }
             _ => {}
         }
-        let a = start.elapsed().as_nanos();
-        // if a > 1000 {
-        //     println!("执行:{:?},耗时为:{:?},", name, a);
+        // let a = start.elapsed().as_nanos();
+        // if a > 5000 {
+        //     println!("执行:{:?},耗时为:{:?}", name, a);
         // } else {
-        //     println!("Ok:{:?},耗时为:{:?},", name, a);
+        //     //println!("Ok:{:?},耗时为:{:?},", name, a);
         // }
         None
     }
@@ -435,22 +439,26 @@ impl Frame {
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let subscript = self.pop_value();
         let arr = self.pop_value();
-        println!("subscript:{:?},arr {:?}", subscript, arr);
+        //println!("subscript:{:?},arr {:?}", subscript, arr);
         let value = vm.get_item(arr, subscript).unwrap();
         self.push_value(value);
         None
     }
 
-    fn execute_store_subscript(&self, vm: &VirtualMachine) -> FrameResult {
+    fn execute_store_subscript(&self) -> FrameResult {
+       // let now = Instant::now();
         let idx = self.pop_value();
         let obj = self.pop_value();
         let value = self.pop_value();
+       // println!("pop 耗时:{:?}", now.elapsed().as_nanos());
         //println!("idx:{:?},obj:{:?},value:{:?}", idx.clone(), obj.clone(), value.clone());
-        let v = set_attribute(obj, idx.clone(), value.clone());
-        println!("vvv::{:?},", v);
+        //let now = Instant::now();
+        set_attribute(obj, idx, value);
+     //   println!("set_attribute 耗时:{:?}", now.elapsed().as_nanos());
+        // println!("vvv::{:?},", v);
 
 
-       // VirtualMachine::update_item(&mut obj, idx.clone(), value.clone());
+        // VirtualMachine::update_item(&mut obj, idx.clone(), value.clone());
         // store_primitive_value(n.as_ref().0, idx.usize(), value.clone());
         // if let Value::Reference(n) = obj.clone() {
         //     store_primitive_value(n.as_ref().0, idx.usize(), value.clone());
@@ -592,9 +600,9 @@ impl Frame {
         //不能用clone语义
         let mut last_mut = self.stack.borrow_mut();
         let top_of_stack = last_mut.last_mut().unwrap();
-        println!("top_of_stack1111:{:?},", top_of_stack);
+        // println!("top_of_stack1111:{:?},", top_of_stack);
         let next_obj = vm.get_next_iter(top_of_stack);
-        println!("top_of_stack:{:?},next_obj:{:?},idx:{:?}", top_of_stack, next_obj, self.idx);
+        // println!("top_of_stack:{:?},next_obj:{:?},idx:{:?}", top_of_stack, next_obj, self.idx);
         if Value::Nil != next_obj {
             last_mut.push(next_obj);
             None
@@ -607,10 +615,10 @@ impl Frame {
 
     fn execute_make_function(&self) -> FrameResult {
         let qualified_name = self.pop_value();
-        println!("make_function:{:?}", qualified_name);
+        // println!("make_function:{:?}", qualified_name);
 
         let code_obj = self.pop_value();
-        println!("code:{:?}", code_obj);
+        // println!("code:{:?}", code_obj);
 
         let func = FnValue { name: qualified_name.to_string(), code: code_obj.code(), has_return: true };
         self.push_value(Value::Fn(Box::new(func)));

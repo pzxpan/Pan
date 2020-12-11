@@ -14,7 +14,7 @@ use pan_compiler::error::CompileErrorType;
 use pan_vm::vm::{VirtualMachine, store_primitive_local};
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::borrow::Borrow;
 use std::cell::{Ref, RefCell};
 use std::collections::HashSet;
@@ -23,6 +23,7 @@ use std::sync::Mutex;
 use std::sync::Arc;
 use std::time;
 use pan_bytecode::bytecode::CodeObject;
+use std::ops::Range;
 
 struct aaa<A, B> {
     pub a: A,
@@ -53,6 +54,7 @@ enum TestValue {
     // NativeFn(NativeFn),
     //Type(Box<TypeValue>),
     // Enum(Box<EnumValue>),
+    Iter(Range<i32>),
     Code(Box<CodeObject>),
     Nil,
 
@@ -74,15 +76,24 @@ fn main() {
     //         test_one_file(&env::current_dir().unwrap().join(arg));
     //     }
     // }
-    // for i in 0..100_000_000 {
-    //     store_obj_reference(0,"person_map".to_string(),Value::String(Box::new("pan".to_string())),Value::String(Box::new("pan222".to_string())))
+    // let mut hash = Vec::new();
+    // let n = Instant::now();
+    //
+    // for i in 0..1_000_000 {
+    //     hash.push( (i,"pan".to_string()));
     // }
+    // println!("insert last:{:?},", n.elapsed().as_nanos());
     //  let c = pan_bytecode::bytecode::Constant::Reference(Box::new((100, "panddd".to_string())));
     //
     // let d = VirtualMachine::unwrap_constant(&c);
     // let dd = std::time::Instant::now();
     // store_primitive_name("pan".to_string(), d, 0);
     // println!("insert:{:?}", dd.elapsed().as_nanos());
+
+    //  let v = TestValue::Iter(vv);
+
+   // println!("size:{:?},", std::mem::size_of_val(&v));
+
     let start = std::time::Instant::now();
     test_one_file(&env::current_dir().unwrap().join("demo").join("structs.pan"));
     println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());

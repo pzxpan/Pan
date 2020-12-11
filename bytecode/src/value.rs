@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
+
 use crate::bytecode::{CodeObject, Constant};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -355,6 +356,58 @@ pub enum Obj {
     InstanceObj(InstanceObj),
     EnumObj(EnumObj),
 }
+
+pub struct Range {
+    pub start: i32,
+    pub end: i32,
+    pub step: i32,
+    pub skip: i32,
+    pub up: bool,
+    pub include: bool,
+}
+
+impl Iterator for Range {
+    // we will be counting with usize
+    type Item = i32;
+
+    // next() is the only required method
+    fn next(&mut self) -> Option<Self::Item> {
+        // Increment our count. This is why we started at zero.
+        if self.up {
+            self.start += self.step;
+            if self.include {
+                if self.start <= self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            } else {
+                if self.start < self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            }
+        } else {
+            self.start -= self.step;
+            if self.include {
+                if self.start >= self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            } else {
+                if self.start > self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            }
+        }
+        // Check to see if we've finished counting or not.
+    }
+}
+
 
 impl Obj {
     // TODO: Proper toString impl
