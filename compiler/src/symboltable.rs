@@ -298,8 +298,7 @@ impl SymbolTableBuilder {
         let mut r_ty = CType::Any;
         let loc = expression.loc();
         if expression.expr_name().eq("self") {
-            let ty = self.get_register_type("self".to_string()).unwrap();
-
+            let ty = self.get_self_type().unwrap();
             return if self.ret_ty.name().eq(&ty.name()) {
                 Ok(())
             } else {
@@ -474,6 +473,7 @@ impl SymbolTableBuilder {
                             EnumPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables)?;
+                                    let self_symbol = !tt.is_static();
                                     self.ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
                                     self.register_name(&name.name, tt, SymbolUsage::Mut, def.loc)?;
@@ -482,8 +482,9 @@ impl SymbolTableBuilder {
                                         // self.scan_expression(expression, &ExpressionContext::Load)?;
                                         return_name = tys.name();
                                     }
-                                    self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
-                                    self.register_name(&"self".to_string(), enum_ty.clone(), SymbolUsage::Used, Loc::default())?;
+
+                                    self.enter_function(&name.name, self_symbol, &def.as_ref().params, def.loc.1)?;
+
                                     for generic in &def.generics {
                                         if let Some(ident) = &generic.bounds {
                                             let bound_type = ident.get_type(&self.tables).unwrap();
@@ -555,6 +556,7 @@ impl SymbolTableBuilder {
                             StructPart::FunctionDefinition(def) => {
                                 if let Some(name) = &def.name {
                                     let tt = def.get_type(&self.tables)?;
+                                    let self_symbol = !tt.is_static();
                                     self.ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
                                     self.register_name(&name.name, tt, SymbolUsage::Attribute, def.loc)?;
@@ -562,7 +564,7 @@ impl SymbolTableBuilder {
                                         let tty = expression.get_type(&self.tables);
                                         return_name = expression.name();
                                     }
-                                    self.enter_function(&name.name, &def.as_ref().params, def.loc.1)?;
+                                    self.enter_function(&name.name, self_symbol, &def.as_ref().params, def.loc.1)?;
                                     self.in_struct_func = true;
                                     self.is_const_fun = !def.is_mut;
                                     if def.body.is_some() {
@@ -610,7 +612,7 @@ impl SymbolTableBuilder {
                             // self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
                         self.ret_ty = tt.ret_type().clone();
-                        self.enter_function(&get_full_name(&program.package, &name.name), &def.as_ref().params, def.loc.1)?;
+                        self.enter_function(&get_full_name(&program.package, &name.name), false, &def.as_ref().params, def.loc.1)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                             // if def.generics.is_empty() {
@@ -651,7 +653,7 @@ impl SymbolTableBuilder {
                             //self.scan_expression(expression, &ExpressionContext::Load)?;
                             return_name = expression.name();
                         }
-                        self.enter_function(&func_name, &part.as_ref().params, part.loc.1)?;
+                        self.enter_function(&func_name, true, &part.as_ref().params, part.loc.1)?;
                         self.in_struct_func = true;
                         self.is_const_fun = !part.is_mut;
                         self.ret_ty = r_ty;
@@ -676,7 +678,7 @@ impl SymbolTableBuilder {
     }
 
     fn scan_lambda(&mut self, name: String, lambda: LambdaDefinition) -> SymbolTableResult {
-        self.enter_function(&name, &lambda.params, lambda.loc.1)?;
+        self.enter_function(&name, false, &lambda.params, lambda.loc.1)?;
         self.in_lambda = true;
         self.scan_statement(&lambda.body)?;
         self.in_lambda = false;
@@ -706,7 +708,7 @@ impl SymbolTableBuilder {
                     //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                     if !in_import {
                         self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
-                        self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                        // self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
                         continue;
                     }
 
@@ -739,7 +741,7 @@ impl SymbolTableBuilder {
                     }
                     if !in_import {
                         self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
-                        self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                        // self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
                         continue;
                     }
 
@@ -792,7 +794,7 @@ impl SymbolTableBuilder {
                     //  self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Const, def.loc)?;
                     if !in_import {
                         self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Import, def.loc)?;
-                        self.register_name(&get_full_name(&program.package, &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
+                        // self.register_name(&get_full_name(&program.package, &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
                         continue;
                     }
                     if !is_all {
@@ -818,7 +820,7 @@ impl SymbolTableBuilder {
                     // self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
                     if !in_import {
                         self.register_name(name, ty.clone(), SymbolUsage::Import, def.loc)?;
-                        self.register_name(&get_full_name(&program.package, name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                        //   self.register_name(&get_full_name(&program.package, name), ty.clone(), SymbolUsage::Mut, def.loc)?;
                         continue;
                     }
                     if !is_all {
@@ -842,8 +844,8 @@ impl SymbolTableBuilder {
                     let ty = def.get_type(&self.tables)?;
                     //self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
                     if !in_import {
-                        self.register_name(&get_full_name(&program.package, &def.as_ref().name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
-                        self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&get_full_name(&program.package, &def.as_ref().name.name), ty.clone(), SymbolUsage::Import, def.loc)?;
+                        // self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
                         continue;
                     }
                     if !is_all {
@@ -874,6 +876,18 @@ impl SymbolTableBuilder {
             let a = self.tables.get(i).unwrap().lookup(name.as_str());
             if a.is_some() {
                 return Ok(a.unwrap().ty.clone());
+            }
+        }
+        Ok(CType::Unknown)
+    }
+    fn get_self_type(&self) -> Result<CType, SymbolTableError> {
+        let len = self.tables.len();
+        for i in (0..len - 1).rev() {
+            let a = self.tables.get(i).unwrap().lookup("self");
+            if a.is_some() {
+                if a.unwrap().ty != CType::TSelf {
+                    return Ok(a.unwrap().ty.clone());
+                }
             }
         }
         Ok(CType::Unknown)
@@ -989,7 +1003,7 @@ impl SymbolTableBuilder {
                 if let Some(ast::Expression::Lambda(_, lambda)) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
-                        self.enter_function(name, params, loc.1)?;
+                        self.enter_function(name, false, params, loc.1)?;
                         self.in_lambda = true;
                         self.scan_statement(body.as_ref())?;
 
@@ -2020,10 +2034,14 @@ impl SymbolTableBuilder {
     fn enter_function(
         &mut self,
         name: &String,
+        self_symbol: bool,
         args: &Vec<(Loc, Option<Parameter>)>,
         line_number: usize,
     ) -> SymbolTableResult {
         self.enter_scope(name, SymbolTableType::Function, line_number);
+        if self_symbol {
+            self.register_name(&"self".to_string(), CType::TSelf, SymbolUsage::Used, Loc::default())?;
+        }
         let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
             self.register_name(&s.0.to_owned(), s.1.to_owned(), SymbolUsage::Parameter, Loc::default());

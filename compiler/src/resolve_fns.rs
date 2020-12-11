@@ -180,14 +180,17 @@ pub fn resolve_builtin_fun<O: OutputStream>(compiler: &mut Compiler<O>) {
         compiler.emit(Instruction::StoreNewVariable(NameScope::Global));
     }
     let fns = get_builtin_fun();
-    for f in fns.iter() {
-        compiler.emit(Instruction::LoadConst(Constant::Code(Box::new(f.1.clone()))));
-        compiler.emit(Instruction::LoadConst(Constant::String(Box::new(f.0.clone()))));
+    let fun_start = built_ty.len() - fns.len();
+    for f in fns.iter().enumerate() {
+        compiler.emit(Instruction::LoadConst(Constant::Code(Box::new((f.1).1.clone()))));
+        compiler.emit(Instruction::LoadConst(Constant::String(Box::new((f.1).0.clone()))));
         compiler.emit(Instruction::MakeFunction);
         //  compiler.emit(Instruction::StoreName(ty.0, NameScope::Global));
-        compiler.emit(Instruction::StoreNewVariable(NameScope::Global));
+        compiler.emit(Instruction::StoreReference(0, fun_start + f.0, NameScope::Global));
         // compiler.store_name(f.0.as_ref());
     }
+
+    println!("builtin_len:{:?},", built_ty.len() + fns.len());
 }
 
 

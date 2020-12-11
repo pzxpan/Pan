@@ -326,8 +326,6 @@ impl HasType for EnumDefinition {
                         });
                     }
                     hash_set.insert(idx);
-
-
                     variants.push((v.name.name.clone(), CType::Reference(v.name.name.clone(), ref_type), idx));
                 }
             }

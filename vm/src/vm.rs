@@ -184,6 +184,24 @@ pub fn set_attribute(ref_position: Value, attr: Value, value: Value) {
     //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
 }
 
+pub fn is_ref_value(scope_idx: usize, variable_idx: usize) -> (bool, Option<Value>) {
+    // let now = Instant::now();
+    let ref mut scope = SCOPE.lock().unwrap();
+    // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
+    // let v = scope.locals.get_mut(1).unwrap();
+    // println!("获取ddv:{:?}", now.elapsed().as_nanos());
+    // let vv = v.get_mut(0).unwrap();
+    // println!("获取222:{:?}", now.elapsed().as_nanos());
+    // VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
+    let ref_value = &scope.locals[scope_idx][variable_idx];
+    if let Value::Reference(n) = &ref_value {
+        return (true, Some(Value::Reference(n.clone())));
+    }
+    return (false, None);
+    //  println!("获取333:{:?}", now.elapsed().as_nanos());
+    //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
+}
+
 fn load_reference_name(scope_idx: usize, idx: usize) -> Value {
     let ref mut scope = SCOPE.lock().unwrap();
     scope.load_local(scope_idx, idx)
@@ -396,8 +414,8 @@ impl VirtualMachine {
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
         None
     }
-    pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
-        // println!("obj:{:?},attri:{:?}", obj, attr);
+    fn get_attribute_inner(&self, obj: Value, attr: String) -> (bool, Value) {
+        println!("obj:{:?},attri:{:?}", obj, attr);
         match obj {
             Value::Obj(mut e) => {
                 match e.as_mut() {
@@ -454,6 +472,22 @@ impl VirtualMachine {
             }
             _ => unreachable!()
         }
+        unreachable!()
+    }
+    pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
+        println!("obj:{:?},attri:{:?}", obj, attr);
+        if let Value::Reference(n) = obj {
+            if n.as_ref().2 == NameScope::Global {
+                let v = load_primitive_global(n.as_ref().1);
+                return self.get_attribute_inner(v, attr);
+            } else {
+                let v = load_reference_name(n.as_ref().0, n.as_ref().1);
+                return self.get_attribute_inner(v, attr);
+            }
+        } else {
+            return self.get_attribute_inner(obj, attr);
+        }
+        // self.get_attribute_inner(obj, attr);
         unreachable!()
     }
 
@@ -720,9 +754,8 @@ impl VirtualMachine {
     }
 
     pub fn update_item(obj: &mut Value, idx: Value, value: Value) {
-        // println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
+        println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
         // let mut update_value = Value::Nil;
-
         match (obj, idx) {
             (Value::Obj(ref mut e), Value::I32(sub)) => {
                 match e.as_mut() {
@@ -746,12 +779,21 @@ impl VirtualMachine {
                         map.insert(sub.to_string(), value);
                         //    update_value = Value::new_map_obj(map.clone());
                     }
+                    Obj::InstanceObj(o) => {
+                        if let InstanceObj { field_map, typ } = o {
+                            if let Value::Obj(map) = field_map {
+                                map.as_mut().insert(sub.to_string(), value);
+                            }
+                        }
+                    }
                     _ => unreachable!()
                 }
             }
 
             _ => unreachable!()
         }
+
+
         return;
     }
     pub fn set_item(&self, obj: &mut Value, idx: Value, value: Value) {
@@ -1126,6 +1168,7 @@ impl VirtualMachine {
         }
     }
     pub fn add(&self, a: &Value, b: &Value) -> Value {
+        println!("hhhha:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)

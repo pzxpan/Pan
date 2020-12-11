@@ -10,7 +10,7 @@ use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::{VirtualMachine, scope_len, store_primitive_value, set_attribute, unwrap_constant};
+use crate::vm::{VirtualMachine, scope_len, store_primitive_value, set_attribute, unwrap_constant, is_ref_value};
 use crate::vm::{add_local_value, scope_remove};
 use crate::scope::{Scope, NameProtocol};
 
@@ -205,6 +205,7 @@ impl Frame {
             bytecode::Instruction::ShallowOperation(ref op) => { self.execute_compare_shallow(op); }
             bytecode::Instruction::ReturnValue => {
                 let value = self.pop_value();
+                println!("return_value:{:?}", value);
                 for a in 0..self.inner_scope {
                     self.idx -= 1;
                     scope_remove();
@@ -599,11 +600,11 @@ impl Frame {
             let last_value = self.last_value();
             match last_value.is_obj_instant() {
                 1 => {
-                    let map = last_value.hash_map_value();
-                    hash_map.push(last_value);
-                    for (k, v) in map {
-                        hash_map.push(v);
-                    }
+                    // let map = last_value.hash_map_value();
+                    // hash_map.push(last_value);
+                    // for (k, v) in map {
+                    //     hash_map.push(v);
+                    // }
                     if code.is_mut {
                         //struct
                         // hash_map.insert("capture$$idx".to_string(), Value::USize(len() - 2));
@@ -624,6 +625,7 @@ impl Frame {
                 _ => {}
             }
         }
+        println!("pan:{:?},", args);
 
         // let s = self.scope.new_child_scope_with_locals();
         if named_call {
@@ -631,6 +633,9 @@ impl Frame {
                 hash_map.push(value.clone());
             }
         } else {
+            // if func_ref.code().obj_name.ne("main") {
+            //     hash_map.push(Value::Reference(Box::new((1, 0, NameScope::Local))));
+            // }
             for (i, name) in code.arg_names.iter().enumerate() {
                 if i < args.len() {
                     hash_map.push(args.get(i).unwrap().to_owned());
@@ -815,8 +820,26 @@ impl Frame {
     }
 
     fn load_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
-        let parent = self.last_value();
-        let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
+        let mut parent = self.last_value();
+        let mut obj = (false, Value::Nil);
+        println!("obj:parent:{:?}", parent);
+        if let Value::Reference(n) = parent {
+            parent = if n.as_ref().2 == NameScope::Local {
+                vm.load_name(n.as_ref().0, n.as_ref().1, &n.as_ref().2)
+            } else {
+                vm.load_global_reference(n.as_ref().1)
+            };
+        }
+        // loop  {
+        //      else {
+        //         break;
+        //     }
+        // }
+        println!("vvvvobj:parent:{:?}", parent);
+        obj = vm.get_attribute(parent, attr_name.to_string());
+
+        // }
+
 
         //true 是struct方法， false 为字段
         if !obj.0 {
@@ -829,8 +852,35 @@ impl Frame {
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let mut parent = self.pop_value();
         let value = self.pop_value();
-        vm.set_attribute(&mut parent, attr_name.to_owned(), value);
-        self.push_value(parent);
+        println!("parent:{:?},value:{:?},", parent, value);
+        loop {
+            if let Value::Reference(n) = parent.clone() {
+                let r = is_ref_value(n.as_ref().0, n.as_ref().1);
+                if r.0 {
+                    parent = r.1.unwrap();
+                } else {
+                    set_attribute(parent.clone(), Value::String(Box::new(String::from(attr_name))), value);
+                    break;
+                }
+            } else {
+                set_attribute(parent.clone(), Value::String(Box::new(String::from(attr_name))), value);
+                break;
+            }
+        }
+
+
+        // if let Value::Reference(n) = parent {
+        //     let v = if n.as_ref().2 == NameScope::Local {
+        //         set_attribute(&mut parent, attr_name.to_owned(), value);
+        //         vm.load_name(n.as_ref().0 + self.idx - 1, n.as_ref().1, &n.as_ref().2)
+        //     } else {
+        //         vm.load_global_reference(n.as_ref().1)
+        //     };
+        //     obj = vm.get_attribute(v, attr_name.to_string());
+        // } else {
+        //     obj = vm.get_attribute(parent.clone(), attr_name.to_string());
+        // }
+        //vm.set_attribute(&mut parent, attr_name.to_owned(), value);
         None
     }
 

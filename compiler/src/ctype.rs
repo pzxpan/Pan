@@ -407,6 +407,13 @@ impl CType {
             false
         };
     }
+    pub fn is_static(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_static
+        } else {
+            false
+        };
+    }
     pub fn is_fun(&self) -> bool {
         return if let CType::Fn(..) = self {
             true
