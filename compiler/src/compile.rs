@@ -402,14 +402,13 @@ impl<O: OutputStream> Compiler<O> {
         // let position = self.variable_position(name).unwrap();
         // println!("name:{:?},position::{:?}", name, position);
         // self.emit(Instruction::LoadReference(position.0, position.1, scope));
+        let scope = self.scope_for_name(name);
+        let mut position = self.variable_position(name).unwrap();
         if self.need_ref(name) && name.ne("self") {
-            let scope = self.scope_for_name(name);
-            let position = self.variable_position(name).unwrap();
+
             println!("name:{:?},position::{:?}", name, position);
             self.emit(Instruction::LoadConst(Constant::Reference(Box::new((position.0, position.1, scope)))));
         } else {
-            let scope = self.scope_for_name(name);
-            let mut position = self.variable_position(name).unwrap();
             ////struct 没有单独的作用域，因此需要减去struct那一层
             if let FunctionContext::StructFunction(..) = self.ctx.func {
                 position.0 = position.0 - 1;
@@ -1302,28 +1301,28 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(obj)?;
                 if attr.is_some() {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
-                    if obj.expr_name().eq("self") {
-                        self.emit(Instruction::Duplicate);
-                        self.store_ref_name("self");
-                        // self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
-                        // self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
-                        // self.emit(Instruction::StoreReference);
-                    } else {
-                        self.store_ref_name(&obj.expr_name());
-                    }
+                    // if obj.expr_name().eq("self") {
+                    //     self.emit(Instruction::Duplicate);
+                    //     self.store_ref_name("self");
+                    //     // self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                    //     // self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                    //     // self.emit(Instruction::StoreReference);
+                    // } else {
+                    //     self.store_ref_name(&obj.expr_name());
+                    // }
                 } else {
                     self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
                         idx.unwrap())));
                     self.emit(Instruction::StoreSubscript);
-                    if obj.expr_name().eq("self") {
-                        self.emit(Instruction::Duplicate);
-                        self.store_ref_name("self");
-                        // self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
-                        // self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
-                        // self.emit(Instruction::StoreReference);
-                    } else {
-                        self.store_ref_name(&obj.expr_name());
-                    }
+                    // if obj.expr_name().eq("self") {
+                    //     self.emit(Instruction::Duplicate);
+                    //     self.store_ref_name("self");
+                    //     // self.emit(Instruction::LoadName("capture$$idx".to_string(), NameScope::Local));
+                    //     // self.emit(Instruction::LoadName("capture$$name".to_string(), NameScope::Local));
+                    //     // self.emit(Instruction::StoreReference);
+                    // } else {
+                    //     self.store_ref_name(&obj.expr_name());
+                    // }
                 }
             }
             ast::Expression::List(_, elements) => {}
@@ -2452,8 +2451,13 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     } else {
-                        instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
-                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                        if idx == len - 2 && tmp.0 == 2{
+                            instructions.push(Instruction::Duplicate);
+                            instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                            instructions.push(Instruction::Reverse(2));
+                        } else {
+                            instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        }
                     }
                 } else if let CType::Tuple(n) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();

@@ -1588,11 +1588,11 @@ impl SymbolTableBuilder {
                             location: loc.clone(),
                         });
                     }
-                    if let Attribute(_, n, Some(ident), _) = name.as_ref() {
-                        self.resovle_method(name, &ty)?;
-                    } else {
-                        self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
-                    }
+                    // if let Attribute(_, n, Some(ident), _) = name.as_ref() {
+                    //     self.resovle_method(name, &ty)?;
+                    // } else {
+                    //     self.scan_expression(name.as_ref(), &ExpressionContext::Load)?;
+                    // }
                     self.resolve_fn(expression, &ty)?;
                     if !name.is_a_variable() { self.scan_expressions(args, &ExpressionContext::Load)?; }
                 }
@@ -2380,6 +2380,8 @@ impl SymbolTableBuilder {
 
     fn resovle_method(&mut self, expr: &Expression, ty: &CType) -> Result<CType, SymbolTableError> {
         let v = get_attribute_vec(expr);
+        println!("aaaa:{:?}", v);
+        println!("resolve_method:{:?}", ty);
         let mut cty = ty.clone();
         let mut attri_type = 0;
         let len = v.len();

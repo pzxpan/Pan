@@ -170,7 +170,7 @@ impl Frame {
                 self.push_value(value);
             }
             bytecode::Instruction::FormatString(size) => {
-                self.execute_format_string(size);
+                self.execute_format_string(vm, size);
             }
             bytecode::Instruction::BuildList(size, unpack) => {
                 let list_value = self.get_elements(vm, *size, *unpack);
@@ -398,6 +398,11 @@ impl Frame {
                 let value = self.pop_value();
                 self.push_value(change_to_primitive_type(&value, *idx));
             }
+            bytecode::Instruction::Reverse(amount) => {
+                let stack_len = self.stack.borrow().len();
+                println!("stack is :{:?},", self.stack.borrow());
+                self.stack.borrow_mut()[stack_len - *amount..stack_len].reverse();
+            }
             _ => {}
         }
         // let a = start.elapsed().as_nanos();
@@ -460,10 +465,23 @@ impl Frame {
     //     }
     //     None
     // }
-    fn execute_format_string(&self, size: &usize) -> FrameResult {
+    fn execute_format_string(&self, vm: &VirtualMachine, size: &usize) -> FrameResult {
         let v = self.pop_multiple(*size);
+        let mut vv = Vec::new();
+        for value in &v {
+            if let Value::Reference(n) = value {
+                let real_value = if n.as_ref().2 == NameScope::Local {
+                    vm.load_capture_reference(n.as_ref().0, n.as_ref().1)
+                } else {
+                    vm.load_global_reference(n.as_ref().1)
+                };
+                vv.push(real_value);
+            }
+            vv.push(value.clone());
+        }
+
         let format_str = self.pop_value();
-        let value = get_string_value(format_str, v);
+        let value = get_string_value(format_str, vv);
         self.push_value(value);
         None
     }
@@ -585,6 +603,7 @@ impl Frame {
             }
             _ => { vec![Value::Nil] }
         };
+        println!("pan:{:?},", args);
         let mut func_ref = self.pop_value();
         //println!("func_ref::{:?},", func_ref);
         if let Value::Reference(n) = func_ref {
@@ -636,9 +655,15 @@ impl Frame {
             // if func_ref.code().obj_name.ne("main") {
             //     hash_map.push(Value::Reference(Box::new((1, 0, NameScope::Local))));
             // }
-            for (i, name) in code.arg_names.iter().enumerate() {
-                if i < args.len() {
-                    hash_map.push(args.get(i).unwrap().to_owned());
+            if args.len() > 0 {
+                if args.get(0).unwrap() != &Value::Nil {
+                    hash_map.extend_from_slice(&args);
+                } else {
+                    for (i, name) in code.arg_names.iter().enumerate() {
+                        if i < args.len() {
+                            hash_map.push(args.get(i).unwrap().to_owned());
+                        }
+                    }
                 }
             }
         }

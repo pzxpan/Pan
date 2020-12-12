@@ -58,15 +58,6 @@ impl NameProtocol for ScopeVec {
 
     fn store_local_new(&mut self, value: Value) {
         // println!("value:{:?}", value);
-
-        println!("value:{:?},self.locals.len:{:?}", value, &self.locals.len());
-        println!("ddd:lenof1:{:?}", self.locals[1].len());
-        if self.locals.len() > 2 {
-            println!("222ddd");
-            for i in &self.locals[2] {
-                println!("mathch:{:?}", i);
-            }
-        }
         let c = self.locals.last_mut().unwrap();
         c.push(value);
     }

@@ -1119,7 +1119,12 @@ impl VirtualMachine {
         ret
     }
     pub fn print(&self, value: Value) {
-        println! {"{}", value.to_string()};
+        if let Value::Reference(n) = value {
+            let v = self.load_ref_name(n.as_ref().0, &n.as_ref().2, n.as_ref().1);
+            println!("{}", v.to_string());
+        } else {
+            println! {"{}", value.to_string()};
+        }
     }
 
     pub fn sub(&self, a: Value, b: Value) -> Value {
