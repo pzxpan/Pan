@@ -730,6 +730,20 @@ pub fn get_register_type(tables: &Vec<SymbolTable>, name: String) -> CType {
     CType::Unknown
 }
 
+pub fn get_self_type(tables: &Vec<SymbolTable>) -> CType {
+    let len = tables.len();
+    for i in 0..len {
+        let t = tables.get(len - i - 1);
+        let a = t.unwrap().lookup("self");
+        if a.is_some() {
+            if a.unwrap().ty != CType::TSelf {
+                return a.unwrap().ty.clone();
+            }
+        }
+    }
+    CType::Unknown
+}
+
 
 
 

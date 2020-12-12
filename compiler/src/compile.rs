@@ -1942,7 +1942,9 @@ impl<O: OutputStream> Compiler<O> {
                 self.emit(LoadName(p.1, scope));
             } else {
                 self.compile_expression(function)?;
-                self_args = 1;
+                if !is_enum_item && !!is_thread_start {
+                    self_args = 1;
+                }
             }
         }
 
@@ -2437,6 +2439,7 @@ impl<O: OutputStream> Compiler<O> {
                         capture_name = name.0.clone();
 
                         let p = self.variable_position(&name.0).unwrap();
+                        let scope = self.scope_for_name(&name.0);
                         let tab = self.symbol_table_stack.last_mut();
                         if tmp.0 == 2 {
                             self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, NameScope::Local)))));
@@ -2502,6 +2505,7 @@ impl<O: OutputStream> Compiler<O> {
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     // attri_type = tmp.0;
                     let p = self.variable_position(&name.0).unwrap();
+                    let scope = self.scope_for_name(&name.0);
                     let tab = self.symbol_table_stack.last_mut();
                     if tmp.0 == 3 {
                         self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, NameScope::Local)))));

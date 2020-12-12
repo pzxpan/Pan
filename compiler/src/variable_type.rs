@@ -8,7 +8,7 @@ use crate::util::get_attribute_vec;
 use crate::util::get_full_name;
 use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
-use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type};
+use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type, get_self_type};
 use std::borrow::Borrow;
 use std::collections::HashSet;
 

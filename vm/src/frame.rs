@@ -576,26 +576,27 @@ impl Frame {
         None
     }
     fn start_thread(&self, vm: &VirtualMachine) -> FrameResult {
+        let self_ref = self.pop_value();
         let func_ref = self.pop_value();
         let code = func_ref.code();
-        let mut hash_map = Vec::new();
-
-        if self.stack.borrow_mut().len() > 0
-        {
-            let last_value = self.last_value();
-            hash_map.push(last_value.clone());
-            let map = last_value.hash_map_value();
-            for (k, v) in map {
-                hash_map.push(v);
-            }
-
-            self.pop_value();
-        }
+        // let mut args = Vec::new();
+        // args.push(self_ref);
+        // if self.stack.borrow_mut().len() > 0
+        // {
+        //     let last_value = self.last_value();
+        //     hash_map.push(last_value.clone());
+        //     let map = last_value.hash_map_value();
+        //     for (k, v) in map {
+        //         hash_map.push(v);
+        //     }
+        //
+        //     self.pop_value();
+        // }
         // let mut global = HashMap::new();
         // global.extend(self.scope.globals.borrow().iter().to_owned());
         // let s = self.scope.new_child_scope_with_locals();
         // self.scope.add_local_value(hash_map);
-        Frame::create_new_thread(code, hash_map, Vec::new());
+        Frame::create_new_thread(code, vec![self_ref], Vec::new());
         None
     }
     fn create_new_thread(code: CodeObject, hash_map: Vec<Value>, global: Vec<Value>) -> FrameResult {

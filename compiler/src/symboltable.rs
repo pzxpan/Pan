@@ -2049,7 +2049,8 @@ impl SymbolTableBuilder {
     ) -> SymbolTableResult {
         self.enter_scope(name, SymbolTableType::Function, line_number);
         if self_symbol {
-            self.register_name(&"self".to_string(), CType::TSelf, SymbolUsage::Used, Loc::default())?;
+            let self_ty = self.get_self_type()?;
+            self.register_name(&"self".to_string(), self_ty, SymbolUsage::Used, Loc::default())?;
         }
         let arg_types: Vec<(String, CType, bool, bool, SymbolMutability)> = args.iter().map(|s| transfer(s, &self.tables)).collect();
         for s in arg_types.iter() {
