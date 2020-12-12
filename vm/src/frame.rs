@@ -173,8 +173,9 @@ impl Frame {
                 self.execute_format_string(vm, size);
             }
             bytecode::Instruction::BuildList(size, unpack) => {
-                let list_value = self.get_elements(vm, *size, *unpack);
-                self.push_value(list_value);
+                //let list_value = self.get_elements(vm, *size, *unpack);
+                let elements = self.pop_multiple(*size);
+                self.push_value(Value::new_array_obj(elements));
             }
             bytecode::Instruction::BuildSet(size, unpack) => {
                 let hash_map: HashMap<String, Value> = HashMap::new();
@@ -185,8 +186,9 @@ impl Frame {
                 self.push_value(map_obj);
             }
             bytecode::Instruction::BuildTuple(size, unpack) => {
-                let array_value = self.get_elements(vm, *size, *unpack);
-                self.push_value(array_value);
+                //Value的宽度相同，用数组表示Tuple
+                let elements = self.pop_multiple(*size);
+                self.push_value(Value::new_array_obj(elements));
             }
             bytecode::Instruction::BuildMap(
                 size,
@@ -448,15 +450,15 @@ impl Frame {
         None
     }
 
-    fn get_elements(
-        &self,
-        vm: &VirtualMachine,
-        size: usize,
-        unpack: bool,
-    ) -> Value {
-        let elements = self.pop_multiple(size);
-        Value::new_array_obj(elements)
-    }
+    // fn get_elements(
+    //     &self,
+    //     vm: &VirtualMachine,
+    //     size: usize,
+    //     unpack: bool,
+    // ) -> Value {
+    //
+    //     Value::new_array_obj(elements)
+    // }
 
     // fn store_name(
     //     &self,
@@ -523,7 +525,7 @@ impl Frame {
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let subscript = self.pop_value();
         let arr = self.pop_value();
-        //println!("subscript:{:?},arr {:?}", subscript, arr);
+        println!("subscript:{:?},arr {:?}", subscript, arr);
         let value = vm.get_item(arr, subscript).unwrap();
         self.push_value(value);
         None
@@ -532,12 +534,12 @@ impl Frame {
     fn execute_store_subscript(&self) -> FrameResult {
         // let now = Instant::now();
         let idx = self.pop_value();
-        let obj = self.pop_value();
+        let mut obj = self.pop_value();
         let value = self.pop_value();
         // println!("pop 耗时:{:?}", now.elapsed().as_nanos());
         //println!("idx:{:?},obj:{:?},value:{:?}", idx.clone(), obj.clone(), value.clone());
         //let now = Instant::now();
-        set_attribute(obj, idx, value);
+        set_attribute(&mut obj, idx, value);
         //   println!("set_attribute 耗时:{:?}", now.elapsed().as_nanos());
         // println!("vvv::{:?},", v);
 
@@ -898,11 +900,11 @@ impl Frame {
                 if r.0 {
                     parent = r.1.unwrap();
                 } else {
-                    set_attribute(parent.clone(), Value::String(Box::new(String::from(attr_name))), value);
+                    set_attribute(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
                     break;
                 }
             } else {
-                set_attribute(parent.clone(), Value::String(Box::new(String::from(attr_name))), value);
+                set_attribute(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
                 break;
             }
         }

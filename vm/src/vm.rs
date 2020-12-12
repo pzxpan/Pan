@@ -73,6 +73,12 @@ pub fn scope_remove() {
     map.locals.pop();
 }
 
+pub fn scope_clear() {
+    let ref mut map = SCOPE.lock().unwrap();
+    map.locals.clear();
+    map.globals.clear();
+}
+
 pub fn load_capture_reference(scope_idx: usize, variable_idx: usize) -> Value {
     let ref mut scope = SCOPE.lock().unwrap();
     println!("scope_idx:{:?},value::{:?}", scope_idx, variable_idx);
@@ -159,19 +165,26 @@ fn get_attribute_inner(a: &Value, b: &Value) -> Option<Value> {
     }
 }
 
-pub fn get_attribute(ref_position: Value, attri: Value) -> Option<Value> {
-    if let Value::Reference(n) = ref_position {
+pub fn get_attribute(obj: Value, attr: Value) -> Option<Value> {
+    if let Value::Reference(n) = obj {
         let ref mut scope = SCOPE.lock().unwrap();
-        let v = scope.locals.get(n.as_ref().0).unwrap();
-        let vv = v.get(n.as_ref().1).unwrap();
-        return get_attribute_inner(vv, &attri);
+        if n.as_ref().2 == NameScope::Local {
+            let v = scope.locals.get(n.as_ref().0).unwrap();
+            let vv = v.get(n.as_ref().1).unwrap();
+            return get_attribute_inner(vv, &attr);
+        } else {
+            let v = scope.globals.get(n.as_ref().1).unwrap();
+            return get_attribute_inner(v, &attr);
+        }
+    } else {
+        return get_attribute_inner(&obj, &attr);
     }
     None
 }
 
-pub fn set_attribute(ref_position: Value, attr: Value, value: Value) {
+pub fn set_attribute(obj: &mut Value, attr: Value, value: Value) {
     // let now = Instant::now();
-    if let Value::Reference(n) = ref_position {
+    if let Value::Reference(n) = obj {
         let ref mut scope = SCOPE.lock().unwrap();
         // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
         // let v = scope.locals.get_mut(1).unwrap();
@@ -180,6 +193,8 @@ pub fn set_attribute(ref_position: Value, attr: Value, value: Value) {
         // println!("获取222:{:?}", now.elapsed().as_nanos());
         VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
         //  println!("获取333:{:?}", now.elapsed().as_nanos());
+    } else {
+        VirtualMachine::update_item(obj, attr, value);
     }
     //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
 }

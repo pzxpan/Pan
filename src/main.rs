@@ -11,7 +11,7 @@ use pan_bytecode::value::{Value, Obj, FnValue, ClosureValue, ThreadValue, TypeVa
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
 
-use pan_vm::vm::{VirtualMachine, store_primitive_local};
+use pan_vm::vm::{VirtualMachine, store_primitive_local, scope_remove, scope_clear};
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::{Duration, Instant};
@@ -92,12 +92,12 @@ fn main() {
 
     //  let v = TestValue::Iter(vv);
 
-   // println!("size:{:?},", std::mem::size_of_val(&v));
+    // println!("size:{:?},", std::mem::size_of_val(&v));
 
     // let start = std::time::Instant::now();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("funtype.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("while.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
-   // test_all_demo_file();
+    //test_all_demo_file();
 }
 
 fn test_all_demo_file() {
@@ -133,6 +133,7 @@ fn test_one_file(home_path: &Path) {
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
 
         handle.join();
+        scope_clear();
         println!("执行 cost:{:?}", start.elapsed().as_secs());
         let t2 = time::SystemTime::now();
         // std::thread::sleep(Duration::from_millis(10000));

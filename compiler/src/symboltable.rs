@@ -1150,6 +1150,9 @@ impl SymbolTableBuilder {
             Match(loc, test, items) => {
                 self.scan_expression(test, &ExpressionContext::Load)?;
                 let mut ty = self.get_register_type(test.expr_name())?;
+                if test.expr_name().eq("self") {
+                    ty = self.get_self_type()?;
+                }
                 if let CType::Enum(enum_type) = ty {
                     let mut hash_set = self.get_test_item(&enum_type);
                     for (expr, item) in items.iter() {

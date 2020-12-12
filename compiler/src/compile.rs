@@ -354,10 +354,12 @@ impl<O: OutputStream> Compiler<O> {
     fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition, in_import: bool) -> Result<(), CompileError> {
         self.emit(Instruction::DefineConstStart);
         self.compile_expression(&const_def.initializer)?;
+        let scope = self.scope_for_name(&const_def.name.name);
+        self.emit(Instruction::StoreNewVariable(scope));
         if in_import {
-            self.store_ref_name(&get_full_name(&self.package, &const_def.name.name));
+            //self.store_ref_name(&get_full_name(&self.package, &const_def.name.name));
         } else {
-            self.store_ref_name(&const_def.name.name);
+            //self.store_ref_name(&const_def.name.name);
         }
         self.emit(Instruction::DefineConstEnd);
         Ok(())
@@ -1029,9 +1031,9 @@ impl<O: OutputStream> Compiler<O> {
                         }
                     }
                 }
-                ast::StructPart::ConstDefinition(def) => {
-                    self.calculate_const(def, false)?;
-                }
+                // ast::StructPart::ConstDefinition(def) => {
+                //     self.calculate_const(def, false)?;
+                // }
                 _ => {}
             }
         }
