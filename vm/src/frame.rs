@@ -304,9 +304,23 @@ impl Frame {
                 }
             }
 
+            bytecode::Instruction::JumpIfFalsePopBlock(target) => {
+                let obj = self.last_value();
+                let value = obj.bool_value();
+                if !value {
+                    self.jump(*target);
+                } else {
+                    scope_remove();
+                }
+            }
+
             bytecode::Instruction::Match => {
                 let mut a = self.pop_value();
-                let b = self.last_value();
+                let mut b = self.last_value();
+                if let Value::Reference(n) = &b {
+                    println!("matchref");
+                    b = vm.load_ref_name(n.as_ref().0, &n.as_ref().2, n.as_ref().1);
+                }
                 if let Value::Obj(_) = b {
                     let (matched, values) = vm._match(b, a);
                     for value in values {

@@ -77,6 +77,7 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
 #[derive(Clone, Copy)]
 struct CompileContext {
     in_loop: bool,
+    in_match: bool,
     in_lambda: bool,
     func: FunctionContext,
 }
@@ -182,6 +183,7 @@ impl<O: OutputStream> Compiler<O> {
             ctx: CompileContext {
                 in_lambda: false,
                 in_loop: false,
+                in_match: false,
                 func: FunctionContext::NoFunction,
             },
             package,
@@ -405,7 +407,6 @@ impl<O: OutputStream> Compiler<O> {
         let scope = self.scope_for_name(name);
         let mut position = self.variable_position(name).unwrap();
         if self.need_ref(name) && name.ne("self") {
-
             println!("name:{:?},position::{:?}", name, position);
             self.emit(Instruction::LoadConst(Constant::Reference(Box::new((position.0, position.1, scope)))));
         } else {
@@ -415,7 +416,7 @@ impl<O: OutputStream> Compiler<O> {
             }
 
             println!("name:{:?},position::{:?}", name, position);
-            if self.ctx.in_lambda || self.ctx.in_loop {
+            if self.ctx.in_lambda || self.ctx.in_loop || self.ctx.in_match {
                 self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
             } else {
                 self.emit(Instruction::LoadReference(position.0, position.1, scope.clone()));
@@ -435,7 +436,7 @@ impl<O: OutputStream> Compiler<O> {
         if let FunctionContext::StructFunction(..) = self.ctx.func {
             position.0 = position.0 - 1;
         }
-        if self.ctx.in_lambda || self.ctx.in_loop {
+        if self.ctx.in_lambda || self.ctx.in_loop || self.ctx.in_match {
             self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
         } else {
             self.emit(Instruction::StoreReference(position.0, position.1, scope));
@@ -572,6 +573,8 @@ impl<O: OutputStream> Compiler<O> {
                 self.leave_scope();
             }
             Match(_, test, bodies) => {
+                let in_match = self.ctx.in_match;
+                self.ctx.in_match = true;
                 self.compile_expression(test)?;
                 let end_label = self.new_label();
                 let mut labels = Vec::new();
@@ -579,11 +582,11 @@ impl<O: OutputStream> Compiler<O> {
                 for _ in 0..len {
                     labels.push(self.new_label());
                 }
+                self.emit(Instruction::IntoBlock);
                 for (index, expr) in bodies.iter().enumerate() {
                     self.set_label(labels[index]);
                     self.emit(Instruction::Duplicate);
                     self.enter_scope();
-                    self.emit(Instruction::IntoBlock);
                     if let ast::Expression::Hole(_) = expr.0.as_ref() {} else {
                         if let ast::Expression::Range(_, start, end, include) = expr.0.as_ref() {
                             self.emit(Instruction::Duplicate);
@@ -636,6 +639,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.set_label(end_label);
                 //弹出被比较的数据
                 self.emit(Instruction::Pop);
+                self.ctx.in_match = in_match;
             }
             Destruct(loc, names, body) => {
                 self.compile_exaust_unwrap(names, body.as_ref());
@@ -796,6 +800,7 @@ impl<O: OutputStream> Compiler<O> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
             in_lambda: false,
+            in_match: false,
             in_loop: false,
             func: FunctionContext::Function,
         };
@@ -832,12 +837,14 @@ impl<O: OutputStream> Compiler<O> {
             self.ctx = CompileContext {
                 in_lambda,
                 in_loop: false,
+                in_match: false,
                 func: prev_ctx.func,
             };
         } else {
             self.ctx = CompileContext {
                 in_lambda,
                 in_loop: false,
+                in_match: false,
                 func: FunctionContext::Function,
             };
         }
@@ -902,6 +909,7 @@ impl<O: OutputStream> Compiler<O> {
         self.ctx = CompileContext {
             in_lambda,
             in_loop: false,
+            in_match: false,
             func: FunctionContext::StructFunction(is_mut),
         };
         let qualified_name = self.create_qualified_name(name, "");
@@ -975,6 +983,7 @@ impl<O: OutputStream> Compiler<O> {
             func: FunctionContext::NoFunction,
             in_loop: false,
             in_lambda: false,
+            in_match: false,
         };
 
         let qualified_name = self.create_qualified_name(name, "");
@@ -1052,6 +1061,7 @@ impl<O: OutputStream> Compiler<O> {
             func: FunctionContext::NoFunction,
             in_loop: false,
             in_lambda: false,
+            in_match: false,
         };
 
         let qualified_name = self.create_qualified_name(name, "");
@@ -1123,6 +1133,7 @@ impl<O: OutputStream> Compiler<O> {
             func: FunctionContext::NoFunction,
             in_loop: false,
             in_lambda: false,
+            in_match: false,
         };
 
         let qualified_name = self.create_qualified_name(name, "");
@@ -2451,7 +2462,7 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
                     } else {
-                        if idx == len - 2 && tmp.0 == 2{
+                        if idx == len - 2 && tmp.0 == 2 {
                             instructions.push(Instruction::Duplicate);
                             instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                             instructions.push(Instruction::Reverse(2));
@@ -2488,10 +2499,17 @@ impl<O: OutputStream> Compiler<O> {
                     //println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     // attri_type = tmp.0;
+                    let p = self.variable_position(&name.0).unwrap();
+                    let tab = self.symbol_table_stack.last_mut();
+                    if tmp.0 == 3 {
+                        self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, NameScope::Local)))));
+                        //instructions.push();
+                    }
 
                     if tmp.0 == 1 {
                         let p = self.variable_position(&name.0).unwrap();
-                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
+                        let scope = self.scope_for_name(&name.0);
+                        instructions.push(Instruction::LoadName(p.1, scope));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(Box::new(attri_name.0.clone()))));
 
@@ -2503,8 +2521,9 @@ impl<O: OutputStream> Compiler<O> {
                         //     bytecode::Constant::String(attri_name.0.clone())));
                         // self.emit(Instruction::LoadBuildEnum(2));
                     } else if tmp.0 == 2 {
+                        let scope = self.scope_for_name(&name.0);
                         let p = self.variable_position(&name.0).unwrap();
-                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
+                        instructions.push(Instruction::LoadName(p.1, scope));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(Box::new(attri_name.0.clone()))));
                         instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
@@ -2512,8 +2531,9 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
                     }
                     if tmp.0 > 2 {
+                        let scope = self.scope_for_name(&name.0);
                         let p = self.variable_position(&name.0).unwrap();
-                        instructions.push(Instruction::LoadName(p.1, NameScope::Local));
+                        instructions.push(Instruction::LoadName(p.1, scope));
                         instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadAttr(attri_name.0.clone()));

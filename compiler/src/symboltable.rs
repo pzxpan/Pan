@@ -1644,8 +1644,14 @@ impl SymbolTableBuilder {
             NotEqual(loc, a, b) |
             And(loc, a, b) |
             Or(loc, a, b) => {
-                let l_ty = a.get_type(&self.tables)?;
-                let r_ty = b.get_type(&self.tables)?;
+                let mut l_ty = a.get_type(&self.tables)?;
+                let mut r_ty = b.get_type(&self.tables)?;
+                if a.expr_name().eq("self") {
+                    l_ty = self.get_self_type()?;
+                }
+                if b.expr_name().eq("self") {
+                    r_ty = self.get_self_type()?;
+                }
                 if l_ty != CType::Unknown && l_ty != r_ty {
                     let err = SymbolTableError {
                         error: format!("比较运算,类型不相同，无法进行比较,左边为:{:?},右边为:{:?}", l_ty, r_ty),

@@ -102,6 +102,8 @@ pub enum Instruction {
     JumpIfTrue(Label),
     ///假跳
     JumpIfFalse(Label),
+    //match需要弹出比较项中的内容;
+    JumpIfFalsePopBlock(Label),
     /// 真跳假弹
     JumpIfTrueOrPop(Label),
     /// 假跳真弹
@@ -405,6 +407,7 @@ impl Instruction {
             JumpIfTrue(target) => w!(JumpIfTrue, label_map[target]),
             JumpIfFalse(target) => w!(JumpIfFalse, label_map[target]),
             JumpIfTrueOrPop(target) => w!(JumpIfTrueOrPop, label_map[target]),
+            JumpIfFalsePopBlock(target) => w!(JumpIfFalsePopBlock,label_map[target]),
             JumpIfFalseOrPop(target) => w!(JumpIfFalseOrPop, label_map[target]),
             MakeFunction => w!(MakeFunction),
             MakeLambda(usize) => w!(MakeLambda, usize),
