@@ -109,7 +109,7 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
         let code_object = result.1;
         if *is_all {
             for i in code_object.instructions.iter() {
-                if let Instruction::StoreName(name, ns) = i {
+                if let Instruction::StoreLocalName(name, ns) = i {
                     // let n = util::get_last_name(name);
                     // compiler.import_instructions.push(Instruction::Duplicate);
                     // compiler.import_instructions.push(i.clone());
@@ -139,7 +139,7 @@ fn resovle_file_compile<O: OutputStream>(compiler: &mut Compiler<O>, path: &Path
             } else {
                 let mut rev_instruction = Vec::new();
                 for i in code_object.instructions.iter().rev() {
-                    if let Instruction::StoreName(name, ns) = i {
+                    if let Instruction::StoreLocalName(name, ns) = i {
                         if item_name.clone().is_some() {
                             // if name.eq(&util::get_full_name(&package_name, &item_name.clone().unwrap())) {
                             //     // rev_instruction.push(Instruction::StoreName(item_name.clone().unwrap(), NameScope::Global));

@@ -132,7 +132,7 @@ impl Frame {
                 let obj = unwrap_constant(value);
                 self.push_value(obj);
             }
-            bytecode::Instruction::LoadName(
+            bytecode::Instruction::LoadLocalName(
                 ref v_idx,
                 ref scope,
             ) => {
@@ -140,7 +140,7 @@ impl Frame {
                 let v = vm.load_name(self.idx, *v_idx, scope);
                 self.push_value(v);
             }
-            bytecode::Instruction::StoreName(
+            bytecode::Instruction::StoreLocalName(
                 ref v_idx,
                 ref scope,
             ) => {
