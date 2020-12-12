@@ -1608,7 +1608,7 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
 // "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }), "state": I32(0)})) })), "state": I32(0)}
 
 pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<Value>) {
-    thread::spawn(|| {
+    let hander = thread::spawn(|| {
         // println!("local_hash_map:{:?},", locals);
         // println!("global_:{:?},", global);
         //  let scope = Scope::new(vec![locals], global);
@@ -1622,7 +1622,7 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<
         //vm.frame_count -= 1;
         let handle = thread::current();
     });
-
+    hander.join();
     // println!("handler:{:?}",thread::current());
 }
 
