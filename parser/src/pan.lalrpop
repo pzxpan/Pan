@@ -7,25 +7,25 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'input,'err>(input: &'input str, file_no: usize,errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, LexicalError>>);
 
-pub TopModule: Module = {
-   "package" <p:Dot<Identifier>> ";" <s:ModulePart+> => Module{package:p,content:s}
+pub TopPackage: Package = {
+   "package" <p:Dot<Identifier>> ";" <s:PackagePart+> => Package{package_name:p,content:s}
 }
 
-ModulePart: ModulePart = {
-    StructDefinition => ModulePart::StructDefinition(<>),
-    ImportDirective => ModulePart::ImportDirective(<>),
-    EnumDefinition => ModulePart::EnumDefinition(<>),
-    DataDefinition => ModulePart::DataDefinition(<>),
-    FunctionDefinition => ModulePart::FunctionDefinition(<>),
-    BoundDefinition => ModulePart::BoundDefinition(<>),
-    ConstVariableDefinition => ModulePart::ConstDefinition(<>),
-    ModuleDefinition => ModulePart::ModuleDefinition(Box::new(<>)),
-    <err: !>  => { errors.push(err); ModulePart::Error},
+PackagePart: PackagePart = {
+    StructDefinition => PackagePart::StructDefinition(<>),
+    ImportDirective => PackagePart::ImportDirective(<>),
+    EnumDefinition => PackagePart::EnumDefinition(<>),
+    DataDefinition => PackagePart::DataDefinition(<>),
+    FunctionDefinition => PackagePart::FunctionDefinition(<>),
+    BoundDefinition => PackagePart::BoundDefinition(<>),
+    ConstVariableDefinition => PackagePart::ConstDefinition(<>),
+    PackageDefinition => PackagePart::PackageDefinition(Box::new(<>)),
+    <err: !>  => { errors.push(err); PackagePart::Error},
 }
 
-pub ModuleDefinition: ModuleDefinition = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:ModulePart+> "}" <R:@L> => {
-        ModuleDefinition{module_parts:parts,name,is_pub:is_pub.is_some(),package:"".to_string()}
+pub PackageDefinition: PackageDefinition = {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:PackagePart+> "}" <R:@L> => {
+        PackageDefinition{package_parts:parts,name,is_pub:is_pub.is_some(),package:"".to_string()}
     }
 }
 

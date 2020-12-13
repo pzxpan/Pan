@@ -110,7 +110,7 @@ pub fn compile(
     if ast.is_ok() {
         let module_name = get_mod_name(source_path.clone());
         let module = ast.unwrap();
-        let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(&module.package) };
+        let md = ast::PackageDefinition { package_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(&module.package_name) };
         compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
                 err.source_path = Some(source_path);
@@ -145,7 +145,7 @@ fn with_compiler(
 }
 
 pub fn compile_program(
-    ast: ast::ModuleDefinition,
+    ast: ast::PackageDefinition,
     source_path: String,
     optimize: u8,
     is_import: bool,
@@ -223,7 +223,7 @@ impl<O: OutputStream> Compiler<O> {
     }
     pub fn compile_program(
         &mut self,
-        program: &ast::ModuleDefinition,
+        program: &ast::PackageDefinition,
         symbol_table: SymbolTable,
         in_import: bool,
     ) -> Result<(), CompileError> {
@@ -234,10 +234,10 @@ impl<O: OutputStream> Compiler<O> {
         if !in_import {
             resolve_builtin_fun(self);
         }
-        for part in &program.module_parts {
+        for part in &program.package_parts {
             match part {
-                ast::ModulePart::DataDefinition(_) => {}
-                ast::ModulePart::EnumDefinition(def) => {
+                ast::PackagePart::DataDefinition(_) => {}
+                ast::PackagePart::EnumDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
@@ -252,7 +252,7 @@ impl<O: OutputStream> Compiler<O> {
                         self.compile_enum_def(name.as_str(), &body, &generics)?;
                     }
                 }
-                ast::ModulePart::StructDefinition(def) => {
+                ast::PackagePart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
@@ -266,7 +266,7 @@ impl<O: OutputStream> Compiler<O> {
                         self.compile_class_def(name.as_str(), &body, &generics)?;
                     }
                 }
-                ast::ModulePart::ImportDirective(def) => {
+                ast::PackagePart::ImportDirective(def) => {
                     if !in_import {
                         match def {
                             Import::Plain(mod_path, all) => {
@@ -290,10 +290,10 @@ impl<O: OutputStream> Compiler<O> {
                         }
                     }
                 }
-                ast::ModulePart::ConstDefinition(def) => {
+                ast::PackagePart::ConstDefinition(def) => {
                     self.calculate_const(def, in_import);
                 }
-                ast::ModulePart::FunctionDefinition(def) => {
+                ast::PackagePart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
                     if name.eq("main") {
                         if !in_import {
@@ -318,7 +318,7 @@ impl<O: OutputStream> Compiler<O> {
                         self.compile_function_def(name, args.as_slice(), body, returns, is_async, false)?;
                     }
                 }
-                ast::ModulePart::BoundDefinition(def) => {
+                ast::PackagePart::BoundDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;

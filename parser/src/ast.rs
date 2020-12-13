@@ -23,9 +23,9 @@ pub struct DocComment {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Module {
-    pub content: Vec<ModulePart>,
-    pub package: Vec<Identifier>,
+pub struct Package {
+    pub content: Vec<PackagePart>,
+    pub package_name: Vec<Identifier>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -69,15 +69,15 @@ impl Type {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ModuleDefinition {
-    pub module_parts: Vec<ModulePart>,
+pub struct PackageDefinition {
+    pub package_parts: Vec<PackagePart>,
     pub name: Identifier,
     pub package: String,
     pub is_pub: bool,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ModulePart {
+pub enum PackagePart {
     StructDefinition(Box<StructDefinition>),
     BoundDefinition(Box<BoundDefinition>),
     ImportDirective(Import),
@@ -85,7 +85,7 @@ pub enum ModulePart {
     DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
-    ModuleDefinition(Box<ModuleDefinition>),
+    PackageDefinition(Box<PackageDefinition>),
     Error,
 }
 

@@ -835,11 +835,11 @@ fn in_current_scope(tables: &Vec<SymbolTable>, name: String) -> bool {
     return false;
 }
 
-impl HasType for ModulePart {
+impl HasType for PackagePart {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
         match &self {
-            ModulePart::FunctionDefinition(s) => { Ok(s.get_type(tables)?) }
-            ModulePart::StructDefinition(s) => { Ok(s.get_type(tables)?) }
+            PackagePart::FunctionDefinition(s) => { Ok(s.get_type(tables)?) }
+            PackagePart::StructDefinition(s) => { Ok(s.get_type(tables)?) }
             _ => { Ok(CType::Unknown) }
         }
     }
