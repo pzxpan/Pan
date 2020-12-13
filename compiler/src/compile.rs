@@ -68,6 +68,7 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
     current_source_location: ast::Loc,
     current_qualified_path: Option<String>,
     ctx: CompileContext,
+    scope_level: usize,
     optimize: u8,
     lambda_name: String,
     package: String,
@@ -186,6 +187,7 @@ impl<O: OutputStream> Compiler<O> {
                 in_match: false,
                 func: FunctionContext::NoFunction,
             },
+            scope_level: 0,
             package,
             optimize,
             lambda_name: "".to_string(),
@@ -393,10 +395,18 @@ impl<O: OutputStream> Compiler<O> {
         if is_local {
             self.emit(Instruction::LoadLocalName(position.1, NameScope::Local));
         } else {
-            if self.ctx.in_loop || self.ctx.in_match {
-                self.emit(Instruction::LoadFrameReference(position.0, position.1, scope.clone()));
+            if self.ctx.in_lambda {
+                if self.scope_level > position.0 {
+                    self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+                } else {
+                    self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
+                }
             } else {
-                self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+                if self.ctx.in_loop || self.ctx.in_match {
+                    self.emit(Instruction::LoadFrameReference(position.0, position.1, scope.clone()));
+                } else {
+                    self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+                }
             }
         }
         // if self.need_ref(name) && name.ne("self") {
@@ -455,10 +465,18 @@ impl<O: OutputStream> Compiler<O> {
         if is_local {
             self.emit(Instruction::StoreLocalName(position.1, scope));
         } else {
-            if self.ctx.in_loop || self.ctx.in_match {
-                self.emit(Instruction::StoreFrameReference(position.0, position.1, scope.clone()));
+            if self.ctx.in_lambda && self.scope_level > position.0 {
+                if self.scope_level > position.0 {
+                    self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope.clone()));
+                } else {
+                    self.emit(Instruction::StoreFrameReference(position.0 - 1, position.1, scope.clone()));
+                }
             } else {
-                self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
+                if self.ctx.in_loop || self.ctx.in_match {
+                    self.emit(Instruction::StoreFrameReference(position.0, position.1, scope.clone()));
+                } else {
+                    self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
+                }
             }
         }
 
@@ -862,6 +880,7 @@ impl<O: OutputStream> Compiler<O> {
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         if in_lambda {
+            self.scope_level = self.symbol_table_stack.len();
             self.ctx = CompileContext {
                 in_lambda,
                 in_loop: false,

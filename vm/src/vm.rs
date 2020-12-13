@@ -1622,7 +1622,7 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<
         //vm.frame_count -= 1;
         let handle = thread::current();
     });
-    hander.join();
+    //hander.join();
     // println!("handler:{:?}",thread::current());
 }
 
