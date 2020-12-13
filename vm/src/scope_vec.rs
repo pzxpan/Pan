@@ -1,6 +1,6 @@
 use pan_bytecode::value::Value;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct ScopeVec {
     pub locals: Vec<Vec<Value>>,
     pub globals: Vec<Value>,
@@ -46,7 +46,8 @@ pub trait NameProtocol {
 
 impl NameProtocol for ScopeVec {
     fn load_local(&self, scope_idx: usize, variable_idx: usize) -> Value {
-        println!("locals:{:?},", self);
+        println!("locals:{:#?},scope_idx:{:?},variable:{:?}", self.locals, scope_idx, variable_idx);
+
         return self.locals.get(scope_idx).unwrap().get(variable_idx).unwrap().clone();
     }
 

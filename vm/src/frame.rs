@@ -398,10 +398,33 @@ impl Frame {
                     vm.store_name(*scope_idx, *variable_idx, value, n);
                 }
             }
+
+            bytecode::Instruction::LoadFrameReference(scope_idx, variable_idx, n) => {
+                println!("当前栈号:{:?},当前scope.local长度:{:?},inner_scope:{:?},scope_idx:{:?}", self.idx, scope_len(), self.inner_scope, scope_idx);
+                if n == &NameScope::Local {
+                    let v = vm.load_name(self.idx - (self.inner_scope + 1) + *scope_idx, *variable_idx, n);
+                    self.push_value(v);
+                } else {
+                    let v = vm.load_name(0, *variable_idx, n);
+                    //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
+                    //println!("load_value:{:?}", v);
+                    self.push_value(v);
+                }
+            }
+            //
+            bytecode::Instruction::StoreFrameReference(scope_idx, variable_idx, n) => {
+                if n == &NameScope::Local {
+                    let value = self.pop_value();
+                    vm.store_name(self.idx - (self.inner_scope + 1) + *scope_idx, *variable_idx, value, n);
+                } else {
+                    let value = self.pop_value();
+                    vm.store_name(0, *variable_idx, value, n);
+                }
+            }
             bytecode::Instruction::StoreDefaultArg(scope_idx, variable_idx) => {
                 let value = self.pop_value();
                 //println!("222store_value:{:?}", value);
-                vm.store_default_args(*scope_idx + self.idx - 1, *variable_idx, value);
+                vm.store_default_args(*scope_idx - self.idx - 1, *variable_idx, value);
             }
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());
@@ -416,7 +439,7 @@ impl Frame {
             }
             bytecode::Instruction::Reverse(amount) => {
                 let stack_len = self.stack.borrow().len();
-                println!("stack is :{:?},", self.stack.borrow());
+                println!("stack is :{:#?},", self.stack.borrow());
                 self.stack.borrow_mut()[stack_len - *amount..stack_len].reverse();
             }
             _ => {}
@@ -508,6 +531,7 @@ impl Frame {
         let end = self.pop_value();
         let start = self.pop_value();
         let arr = self.pop_value();
+        println!("arr:{:?}", arr);
         if let Value::Reference(n) = arr {
             let v = if n.as_ref().2 == NameScope::Local {
                 vm.load_capture_reference(n.as_ref().0, n.as_ref().1)
@@ -517,7 +541,8 @@ impl Frame {
             let value = vm.get_slice(v, start, end, include);
             self.push_value(value);
         } else {
-            unreachable!()
+            let value = vm.get_slice(arr, start, end, include);
+            self.push_value(value);
         }
         None
     }
@@ -621,8 +646,9 @@ impl Frame {
             _ => { vec![Value::Nil] }
         };
         println!("pan:{:?},", args);
+        println!("self_stack:{:#?}", self.stack.borrow());
         let mut func_ref = self.pop_value();
-        //println!("func_ref::{:?},", func_ref);
+        println!("func_ref::{:?},", func_ref);
         if let Value::Reference(n) = func_ref {
             func_ref = vm.load_name(n.as_ref().0, n.as_ref().1, &n.as_ref().2);
             // println!("func_ref::{:?},", func_ref);
@@ -698,9 +724,9 @@ impl Frame {
         //不能用clone语义
         let mut last_mut = self.stack.borrow_mut();
         let top_of_stack = last_mut.last_mut().unwrap();
-        // println!("top_of_stack1111:{:?},", top_of_stack);
+        println!("top_of_stack1111:{:?},", top_of_stack);
         let next_obj = vm.get_next_iter(top_of_stack);
-        // println!("top_of_stack:{:?},next_obj:{:?},idx:{:?}", top_of_stack, next_obj, self.idx);
+        println!("top_of_stack:{:?},next_obj:{:?},idx:{:?}", top_of_stack, next_obj, self.idx);
         if Value::Nil != next_obj {
             last_mut.push(next_obj);
             None

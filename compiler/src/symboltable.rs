@@ -2455,6 +2455,7 @@ impl SymbolTableBuilder {
     fn resolve_fn(&mut self, expr: &Expression, ty: &CType) -> SymbolTableResult {
         if let Expression::FunctionCall(_, name, args) = expr {
             let args_type = ty.param_type();
+            let len = args_type.len();
             // println!("real_ty:{:?},expected_ty:{:?},", args, args_type);
             for (i, (ety, is_default, is_varargs, ref_mut)) in args_type.iter().enumerate() {
                 if let Some(e) = args.get(i) {
@@ -2499,7 +2500,7 @@ impl SymbolTableBuilder {
                     }
                 } else {
                     if !*is_default {
-                        if !ety.is_unit() {
+                        if !ety.is_varargs() && i != len - 1 {
                             return Err(SymbolTableError {
                                 error: format!("缺少第{:?}个参数，参数类型为{:?}", i + 1, ety),
                                 location: expr.loc().clone(),

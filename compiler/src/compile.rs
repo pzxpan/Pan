@@ -389,11 +389,15 @@ impl<O: OutputStream> Compiler<O> {
         let scope = self.scope_for_name(name);
         let mut position = self.variable_position(name).unwrap();
         let is_local = self.variable_local_scope(name);
-
+        println!("dddname:{:?},in_loop:{:?}", name, self.ctx.in_loop || self.ctx.in_match);
         if is_local {
             self.emit(Instruction::LoadLocalName(position.1, NameScope::Local));
         } else {
-            self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+            if self.ctx.in_loop || self.ctx.in_match {
+                self.emit(Instruction::LoadFrameReference(position.0, position.1, scope.clone()));
+            } else {
+                self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+            }
         }
         // if self.need_ref(name) && name.ne("self") {
         //     println!("name:{:?},position::{:?}", name, position);
@@ -451,7 +455,11 @@ impl<O: OutputStream> Compiler<O> {
         if is_local {
             self.emit(Instruction::StoreLocalName(position.1, scope));
         } else {
-            self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
+            if self.ctx.in_loop || self.ctx.in_match {
+                self.emit(Instruction::StoreFrameReference(position.0, position.1, scope.clone()));
+            } else {
+                self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
+            }
         }
 
 
@@ -1265,7 +1273,8 @@ impl<O: OutputStream> Compiler<O> {
         let start_label = self.new_label();
         let else_label = self.new_label();
         let end_label = self.new_label();
-
+        let was_in_loop = self.ctx.in_loop;
+        self.ctx.in_loop = true;
         self.emit(Instruction::SetupLoop(start_label, end_label));
         self.emit(Instruction::IntoBlock);
         self.compile_expression(iter)?;
@@ -1280,8 +1289,7 @@ impl<O: OutputStream> Compiler<O> {
 
         self.compile_insert_value(target)?;
 
-        let was_in_loop = self.ctx.in_loop;
-        self.ctx.in_loop = true;
+
         self.compile_statement(body)?;
         self.ctx.in_loop = was_in_loop;
 
@@ -1380,7 +1388,8 @@ impl<O: OutputStream> Compiler<O> {
         match &target {
             ast::Expression::Variable(ast::Identifier { name, .. }) => {
                 let scope = self.scope_for_name(name.as_str());
-                self.emit(Instruction::StoreNewVariable(scope));
+                let p = self.variable_position(name.as_ref()).unwrap();
+                self.emit(Instruction::StoreLocalName(p.1, scope));
                 // let s = self.lookup_name(name);
             }
             _ => {}
@@ -1983,9 +1992,15 @@ impl<O: OutputStream> Compiler<O> {
         let mut count = 0;
         // 正常的参数:
         if must_unpack {
-            self.emit(Instruction::BuildTuple(args.len() - need_count, must_unpack));
-            //合并之后 count需要加一，把tuple加进去;
-            count = args.len() - need_count + 1;
+            if args.len() - need_count > 0 {
+                self.emit(Instruction::BuildTuple(args.len() - need_count, must_unpack));
+                //合并之后 count需要加一，把tuple加进去;
+                count = args.len() - need_count + 1;
+            } else {
+                self.emit(Instruction::LoadConst(Constant::None));
+                self.emit(Instruction::BuildTuple(1, must_unpack));
+                count = args.len() + 1;
+            }
         } else {
             count = args.len();
         }
@@ -2427,39 +2442,13 @@ impl<O: OutputStream> Compiler<O> {
                 if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
-                    // attri_type = tmp.0;
-
+                    let p = self.variable_position(&name.0).unwrap();
+                    let scope = self.scope_for_name(&name.0);
+                    if tmp.0 == 2 {
+                        self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, scope.clone())))));
+                        //instructions.push();
+                    }
                     if idx == 0 {
-                        //在这里收集可变调用的返回的信息;
-                        // println!("panpan::{:?},attri_name:{:?}", name.0, attri_name.0);
-                        //  if let FunctionContext::StructFunction(true) = self.ctx.func {
-                        //      println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
-                        //      self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
-                        //  }
-                        // if attri_name.0.eq("older_than") {
-                        //     println!("ssss::{:?},attri_name:{:?}", name.0, attri_name.0);
-                        //     self.emit(Instruction::LoadConst(Constant::String(name.0.clone())));
-                        // }
-                        capture_name = name.0.clone();
-
-                        let p = self.variable_position(&name.0).unwrap();
-                        let scope = self.scope_for_name(&name.0);
-                        println!("sccc:{:?}", scope);
-                        let tab = self.symbol_table_stack.last_mut();
-                        if tmp.0 == 2 {
-                            self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, scope.clone())))));
-                            //instructions.push();
-                        }
-                        println!("last_table:is::{:?}", tab);
-                        // if capture_name.ne("self") {
-                        //     instructions.push(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, NameScope::Local)))));
-                        //     // self.emit(Instruction::LoadConst(Constant::USize(self.symbol_table_stack.len() - 1)));
-                        //     // self.emit(Instruction::StoreName("capture$$idx".to_string(), NameScope::Local));
-                        //     // self.emit(Instruction::LoadConst(Constant::String(Box::new(name.0.clone()))));
-                        //     // self.emit(Instruction::StoreName("capture$$name".to_string(), NameScope::Local));
-                        // } else {
-                        //     instructions.push(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, NameScope::Local)))));
-                        // }
                         if name.0.eq("self") {
                             self.emit(Instruction::LoadLocalName(0, NameScope::Local));
                         } else {
@@ -2479,7 +2468,7 @@ impl<O: OutputStream> Compiler<O> {
                         if idx == len - 2 && tmp.0 == 2 {
                             instructions.push(Instruction::Duplicate);
                             instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
-                            instructions.push(Instruction::Reverse(2));
+                            //   instructions.push(Instruction::Reverse(2));
                         } else {
                             instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         }

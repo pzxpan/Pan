@@ -67,7 +67,8 @@ fun main() {
    let h = person.house.idea();
    //let cc = h.idea();
    print("{}",h);
-   print(person);
+   //person.house.size = 10.0;
+   print("{}",person.house.size);
 
    let ddd = "panddd";
    print(ddd);

@@ -414,6 +414,14 @@ impl CType {
             false
         };
     }
+
+    pub fn is_varargs(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_varargs
+        } else {
+            false
+        };
+    }
     pub fn is_fun(&self) -> bool {
         return if let CType::Fn(..) = self {
             true

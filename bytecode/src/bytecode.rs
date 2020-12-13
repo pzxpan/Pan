@@ -146,6 +146,8 @@ pub enum Instruction {
     StoreReference(usize, usize, NameScope),
     LoadCaptureReference(usize, usize, NameScope),
     StoreCaptureReference(usize, usize, NameScope),
+    LoadFrameReference(usize, usize, NameScope),
+    StoreFrameReference(usize, usize, NameScope),
     StoreDefaultArg(usize, usize),
     UnpackSequence(usize),
     UnpackEx(usize, usize),
@@ -442,6 +444,8 @@ impl Instruction {
             StoreReference(scope_idx, variable_idx, n) => w!(StoreReference,scope_idx,variable_idx,format!("{:?}", n)),
             LoadCaptureReference(scope_idx, variable_idx, n) => w!(LoadCaptureReference, scope_idx, variable_idx,format!("{:?}", n)),
             StoreCaptureReference(scope_idx, variable_idx, n) => w!(StoreCaptureReference,scope_idx,variable_idx,format!("{:?}", n)),
+            LoadFrameReference(scope_idx, variable_idx, n) => w!(LoadFrameReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreFrameReference(scope_idx, variable_idx, n) => w!(StoreFrameReference,scope_idx,variable_idx,format!("{:?}", n)),
 
             StoreDefaultArg(scope_idx, variable_idx) => w!(StoreDefaultArg,scope_idx,variable_idx),
             ListAppend(i) => w!(ListAppend, i),
