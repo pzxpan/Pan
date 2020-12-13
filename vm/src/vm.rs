@@ -321,7 +321,7 @@ impl VirtualMachine {
             }
             bytecode::NameScope::Const => load_primitive_global(idx),
         };
-        //println!("load_name:{:?},value:{:?}", name, optional_value);
+        println!("load_name:{:?},value:{:?}", idx, optional_value);
         optional_value
     }
 

@@ -152,7 +152,7 @@ pub fn compile_program(
 ) -> Result<(String, CodeObject), CompileError> {
     let r = with_compiler(source_path, optimize, ast.package.clone(), |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
-        //println!("sybmol{:?}", symbol_table);
+        println!("sybmol{:#?}", symbol_table);
         compiler.compile_program(&ast, symbol_table, is_import)
     });
     if r.is_ok() {

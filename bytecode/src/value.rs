@@ -60,10 +60,21 @@ pub enum Value {
     Type(Box<TypeValue>),
     Enum(Box<EnumValue>),
     Code(Box<CodeObject>),
+    Package(Box<PackageValue>),
     Reference(Box<(usize, usize, NameScope)>),
     Nil,
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct PackageValue {
+    pub name: String,
+    pub bounds: Vec<TypeValue>,
+    pub structs: Vec<TypeValue>,
+    pub enums: Vec<EnumValue>,
+    pub funs: Vec<FnValue>,
+    pub consts: Vec<Value>,
+    pub subpackage: Vec<Box<PackageValue>>,
+}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TypeValue {
@@ -71,6 +82,7 @@ pub struct TypeValue {
     pub methods: Vec<(String, CodeObject)>,
     pub static_fields: Vec<(String, CodeObject)>,
 }
+
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct EnumValue {
@@ -170,6 +182,7 @@ impl Value {
             Value::Closure(_) => { "Closure".to_string() }
             Value::Bool(_) => { "bool".to_string() }
             Value::Reference(_) => { "Ref".to_string() }
+            Value::Package(_) => { "Package".to_string() }
         }
     }
 
@@ -257,7 +270,8 @@ impl Value {
             Value::Nil => format!("None"),
             Value::Code(code) => format!("<code {}>", code.as_ref()),
             Value::Enum(n) => format!("<enum {}>", &n.name),
-            Value::Reference(n) => format!("<ref {} {}>", &n.as_ref().0, &n.as_ref().1)
+            Value::Reference(n) => format!("<ref {} {}>", &n.as_ref().0, &n.as_ref().1),
+            Value::Package(n) => format!("<package {}>", &n.name)
         }
     }
 
@@ -327,7 +341,8 @@ impl Display for Value {
             Value::Nil => write!(f, "None"),
             Value::Code(code) => write!(f, "<code {}>", code),
             Value::Enum(n) => write!(f, "<enum {}>", n.name),
-            Value::Reference(n) => write!(f, "<ref {} {}>", &n.as_ref().0, &n.as_ref().1)
+            Value::Reference(n) => write!(f, "<ref {} {}>", &n.as_ref().0, &n.as_ref().1),
+            Value::Package(n) => write!(f, "<package {}>", &n.name)
         }
     }
 }

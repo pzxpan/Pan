@@ -624,7 +624,8 @@ impl SymbolTableBuilder {
                 }
                 ModulePart::BoundDefinition(def) => {
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
-                    self.register_name(&"self".to_string(), CType::TSelf, SymbolUsage::Attribute, Loc::default())?;
+                    let tt = def.get_type(&self.tables)?;
+                    self.register_name(&"self".to_string(), tt, SymbolUsage::Attribute, Loc::default())?;
                     let self_name = def.name.name.clone();
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
