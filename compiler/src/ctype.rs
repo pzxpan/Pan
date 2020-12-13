@@ -39,10 +39,9 @@ pub enum CType {
     Generic(String, Box<CType>),
     Reference(String, Vec<CType>),
     Args(String, Vec<CType>),
+    Package(PackageType),
     Any,
     TSelf,
-    //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;
-    NeedPackageName,
     Unknown,
 }
 
@@ -58,6 +57,18 @@ pub struct FnType {
     pub is_mut: bool,
     pub is_static: bool,
     pub has_body: bool,
+}
+
+#[derive(Debug, Clone, Eq, Hash)]
+pub struct PackageType {
+    pub name: String,
+    pub consts: Vec<(String, CType)>,
+    pub funs: Vec<(String, CType)>,
+    pub enums: Vec<(String, CType)>,
+    pub structs: Vec<(String, CType)>,
+    pub bounds: Vec<(String, CType)>,
+    pub imports: Vec<(String, CType)>,
+    pub submods: Vec<(String, Box<PackageType>)>,
 }
 
 impl FnType {
@@ -173,6 +184,14 @@ impl EnumType {
     }
 }
 
+impl PartialEq for PackageType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name.eq(&other.name) {
+            return true;
+        }
+        return false;
+    }
+}
 
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Generic(\"E\", Any)]))],
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Str]))],
@@ -548,6 +567,16 @@ impl FnType {
 }
 
 impl PartialOrd for FnType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
+        }
+    }
+}
+
+impl PartialOrd for PackageType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.name.eq(&other.name) {
             Some(Ordering::Equal)

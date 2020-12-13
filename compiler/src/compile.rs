@@ -110,7 +110,7 @@ pub fn compile(
     if ast.is_ok() {
         let module_name = get_mod_name(source_path.clone());
         let module = ast.unwrap();
-        let md = ast::PackageDefinition { package_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(&module.package_name) };
+        let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(&module.package_name) };
         compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
                 err.source_path = Some(source_path);
@@ -145,7 +145,7 @@ fn with_compiler(
 }
 
 pub fn compile_program(
-    ast: ast::PackageDefinition,
+    ast: ast::ModuleDefinition,
     source_path: String,
     optimize: u8,
     is_import: bool,
@@ -223,7 +223,7 @@ impl<O: OutputStream> Compiler<O> {
     }
     pub fn compile_program(
         &mut self,
-        program: &ast::PackageDefinition,
+        program: &ast::ModuleDefinition,
         symbol_table: SymbolTable,
         in_import: bool,
     ) -> Result<(), CompileError> {
@@ -234,7 +234,7 @@ impl<O: OutputStream> Compiler<O> {
         if !in_import {
             resolve_builtin_fun(self);
         }
-        for part in &program.package_parts {
+        for part in &program.module_parts {
             match part {
                 ast::PackagePart::DataDefinition(_) => {}
                 ast::PackagePart::EnumDefinition(def) => {

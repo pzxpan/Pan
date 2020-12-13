@@ -1,5 +1,5 @@
 package default;
-import std.person {Person as PPP, House};
+import std.person.*;
 //以下import都Ok
 //import std.person.Person;
 //import std.person.House;

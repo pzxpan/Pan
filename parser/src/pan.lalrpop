@@ -19,13 +19,13 @@ PackagePart: PackagePart = {
     FunctionDefinition => PackagePart::FunctionDefinition(<>),
     BoundDefinition => PackagePart::BoundDefinition(<>),
     ConstVariableDefinition => PackagePart::ConstDefinition(<>),
-    PackageDefinition => PackagePart::PackageDefinition(Box::new(<>)),
+    ModuleDefinition => PackagePart::ModuleDefinition(Box::new(<>)),
     <err: !>  => { errors.push(err); PackagePart::Error},
 }
 
-pub PackageDefinition: PackageDefinition = {
+pub ModuleDefinition: ModuleDefinition = {
     <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:PackagePart+> "}" <R:@L> => {
-        PackageDefinition{package_parts:parts,name,is_pub:is_pub.is_some(),package:"".to_string()}
+        ModuleDefinition{module_parts:parts,name,is_pub:is_pub.is_some(),package:"".to_string()}
     }
 }
 

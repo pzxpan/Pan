@@ -2,6 +2,9 @@ use crate::ctype::CType;
 use pan_parser::ast::{Loc, Identifier, MutOrOwn};
 use pan_parser::ast::Expression;
 use crate::symboltable::SymbolMutability;
+use std::path::Path;
+use std::fs::File;
+use std::io::Read;
 
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {
@@ -118,6 +121,11 @@ pub fn get_mutability(mut_or_own: Option<MutOrOwn>, ty: &CType) -> SymbolMutabil
     return if is_ref {
         if is_mut { SymbolMutability::MutRef } else { SymbolMutability::ImmRef }
     } else if is_own { SymbolMutability::Moved } else { if is_mut { SymbolMutability::Mut } else { SymbolMutability::Immutable } };
+}
+
+pub fn read_file_content(path: &Path, contents: &mut String) {
+    let mut file = File::open(path.clone()).unwrap();
+    file.read_to_string(contents).unwrap();
 }
 
 

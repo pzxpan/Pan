@@ -18,7 +18,7 @@ use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds,
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
-use crate::util::{get_pos_lambda_name, get_package_name};
+use crate::util::{get_pos_lambda_name, get_package_name, get_mod_name};
 use crate::util::get_attribute_vec;
 use std::process::{exit, id};
 use crate::util::get_full_name;
@@ -26,8 +26,9 @@ use crate::util::get_last_name;
 use crate::compile::is_builtin_name;
 use crate::error::CompileErrorType::SyntaxError;
 use crate::ctype::CType;
+use crate::file_cache_symboltable::{make_ast, resolve_file_path, resolve_file_name};
 
-pub fn make_symbol_table(program: &ast::PackageDefinition) -> Result<SymbolTable, SymbolTableError> {
+pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable, SymbolTableError> {
     let mut builder: SymbolTableBuilder = SymbolTableBuilder::new();
     builder.package = program.package.clone();
     builder.prepare(program.package.clone());
@@ -65,7 +66,7 @@ impl SymbolTable {
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum SymbolTableType {
-    Module,
+    Package,
     Struct,
     Function,
     Enum,
@@ -77,7 +78,7 @@ pub enum SymbolTableType {
 impl fmt::Display for SymbolTableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            SymbolTableType::Module => write!(f, "module"),
+            SymbolTableType::Package => write!(f, "package"),
             SymbolTableType::Struct => write!(f, "struct"),
             SymbolTableType::Function => write!(f, "function"),
             SymbolTableType::Enum => write!(f, "enum"),
@@ -274,7 +275,7 @@ impl SymbolTableBuilder {
         }
     }
     fn prepare(&mut self, name: String) {
-        self.enter_scope(&name, SymbolTableType::Module, 0);
+        self.enter_scope(&name, SymbolTableType::Package, 0);
     }
     fn finish(&mut self) -> Result<SymbolTable, SymbolTableError> {
         assert_eq!(self.tables.len(), 1);
@@ -449,8 +450,8 @@ impl SymbolTableBuilder {
         Ok(())
     }
 
-    pub fn scan_program(&mut self, program: &ast::PackageDefinition) -> SymbolTableResult {
-        for part in &program.package_parts {
+    pub fn scan_program(&mut self, program: &ast::ModuleDefinition) -> SymbolTableResult {
+        for part in &program.module_parts {
             match part {
                 PackagePart::DataDefinition(_) => {}
                 PackagePart::EnumDefinition(def) => {
@@ -694,11 +695,11 @@ impl SymbolTableBuilder {
         }
     }
     //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
-    pub fn scan_top_symbol_types(&mut self, program: &ast::PackageDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
+    pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> SymbolTableResult {
         if in_import && !is_all && item_name.is_none() {
             self.register_name(&get_last_name(&program.package), CType::Module, SymbolUsage::Import, Loc::default());
         }
-        for part in &program.package_parts {
+        for part in &program.module_parts {
             match part {
                 PackagePart::DataDefinition(_) => {
                     //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
@@ -767,28 +768,55 @@ impl SymbolTableBuilder {
                 }
                 //处理文件各项内容时，不需要处理import和从const, const、import在扫描文件顶层symbol的时候已处理;
                 PackagePart::ImportDirective(def) => {
-                    if !in_import {
-                        match def {
-                            Import::Plain(mod_path, all) => {
-                                scan_import_symbol(self, mod_path, Option::None, all)?;
+                    match def {
+                        Import::Plain(mod_path, all) => {
+                            let name = resolve_file_name(mod_path);
+                            if name.is_some() {
+                                let name = name.unwrap();
+                                self.enter_scope(&name.1, SymbolTableType::Package, mod_path.get(0).unwrap().loc.1);
+                                self.resolve_recursive_import(name.1, name.0)?;
+                                self.leave_scope();
                             }
-                            Import::Rename(mod_path, as_name, all) => {
-                                scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
-                            }
-                            Import::PartRename(mod_path, as_part) => {
-                                for (name, a_name) in as_part {
-                                    let mut path = mod_path.clone();
-                                    path.extend_from_slice(&name);
-                                    let as_name = if a_name.is_some() {
-                                        Some(a_name.as_ref().unwrap().name.clone())
-                                    } else {
-                                        Option::None
-                                    };
-                                    scan_import_symbol(self, &path, as_name, &false)?;
-                                }
+                            // scan_import_symbol(self, mod_path, Option::None, all)?;
+                        }
+                        Import::Rename(mod_path, as_name, all) => {
+                            scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
+                        }
+                        Import::PartRename(mod_path, as_part) => {
+                            for (name, a_name) in as_part {
+                                let mut path = mod_path.clone();
+                                path.extend_from_slice(&name);
+                                let as_name = if a_name.is_some() {
+                                    Some(a_name.as_ref().unwrap().name.clone())
+                                } else {
+                                    Option::None
+                                };
+                                scan_import_symbol(self, &path, as_name, &false)?;
                             }
                         }
                     }
+                    // if !in_import {
+                    //     match def {
+                    //         Import::Plain(mod_path, all) => {
+                    //             scan_import_symbol(self, mod_path, Option::None, all)?;
+                    //         }
+                    //         Import::Rename(mod_path, as_name, all) => {
+                    //             scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
+                    //         }
+                    //         Import::PartRename(mod_path, as_part) => {
+                    //             for (name, a_name) in as_part {
+                    //                 let mut path = mod_path.clone();
+                    //                 path.extend_from_slice(&name);
+                    //                 let as_name = if a_name.is_some() {
+                    //                     Some(a_name.as_ref().unwrap().name.clone())
+                    //                 } else {
+                    //                     Option::None
+                    //                 };
+                    //                 scan_import_symbol(self, &path, as_name, &false)?;
+                    //             }
+                    //         }
+                    //     }
+                    // }
                 }
                 PackagePart::ConstDefinition(def) => {
                     let ty = def.initializer.get_type(&self.tables)?;
@@ -2517,6 +2545,23 @@ impl SymbolTableBuilder {
                 } else if let Some(Expression::Attribute(..)) = args.get(i) {}
             }
             // self.scan_expressions(args, &ExpressionContext::Load)?;
+        }
+        Ok(())
+    }
+
+    pub fn resolve_recursive_import(&mut self, file_name: String, is_dir: bool) -> Result<(), SymbolTableError> {
+        if is_dir {
+            //TODO
+        } else {
+            let module = make_ast(&file_name).unwrap();
+            let md = ModuleDefinition {
+                module_parts: module.content,
+                name: Identifier { loc: Loc::default(), name: get_mod_name(file_name) },
+                is_pub: true,
+                package: get_package_name(&module.package_name),
+            };
+            self.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
+            self.scan_program(&md)?;
         }
         Ok(())
     }

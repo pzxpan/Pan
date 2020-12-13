@@ -34,7 +34,6 @@ pub enum Type {
     Array(Identifier, usize),
     Tuple(Option<Vec<Type>>),
     FunType(Option<Vec<Type>>, Option<Box<Type>>),
-
 }
 
 impl Type {
@@ -69,8 +68,8 @@ impl Type {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct PackageDefinition {
-    pub package_parts: Vec<PackagePart>,
+pub struct ModuleDefinition {
+    pub module_parts: Vec<PackagePart>,
     pub name: Identifier,
     pub package: String,
     pub is_pub: bool,
@@ -85,7 +84,7 @@ pub enum PackagePart {
     DataDefinition(Box<DataDefinition>),
     ConstDefinition(Box<ConstVariableDefinition>),
     FunctionDefinition(Box<FunctionDefinition>),
-    PackageDefinition(Box<PackageDefinition>),
+    ModuleDefinition(Box<ModuleDefinition>),
     Error,
 }
 
