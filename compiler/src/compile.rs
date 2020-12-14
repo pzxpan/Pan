@@ -391,7 +391,9 @@ impl<O: OutputStream> Compiler<O> {
             SymbolScope::Const => bytecode::NameScope::Const,
         }
     }
-
+    fn load_package_fn(&mut self, name: &str) {
+        let scope = self.scope_for_name(name);
+    }
     fn load_name(&mut self, name: &str) {
         if name.eq("self") {
             self.emit(Instruction::LoadLocalName(0, NameScope::Local));
@@ -2057,7 +2059,12 @@ impl<O: OutputStream> Compiler<O> {
             }
         } else {
             if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-                self.load_name(name);
+                if self.variable_local_scope(name.as_str()) {
+                    self.load_name(name);
+                } else {
+                    //self.load_package();
+                }
+
                 // let scope = self.scope_for_name(name.as_str());
                 // let p = self.variable_position(name.as_str()).unwrap();
                 // let tab = self.symbol_table_stack.last_mut();
@@ -2307,6 +2314,18 @@ impl<O: OutputStream> Compiler<O> {
         unreachable!()
     }
 
+    fn lookup_fn_in_package(&self, name: &str) -> &Symbol {
+        println!("Looking up {:?}", name);
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if symbol.is_some() {
+                return symbol.unwrap();
+            }
+        }
+        unreachable!()
+    }
+
     fn variable_local_scope(&self, name: &str) -> bool {
         let symbol = self.symbol_table_stack.last().unwrap().lookup(name);
         return symbol.is_some();
@@ -2469,7 +2488,6 @@ impl<O: OutputStream> Compiler<O> {
         }
         return None;
     }
-
 
     fn is_current_scope(&mut self, name: &str) -> bool {
         let table = self.symbol_table_stack.last_mut().unwrap();

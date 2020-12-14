@@ -242,7 +242,6 @@ pub enum SymbolUsage {
     ImmRef,
     Immutable,
     Own,
-
 }
 
 pub struct SymbolTableBuilder {
@@ -457,6 +456,7 @@ impl SymbolTableBuilder {
                 PackagePart::DataDefinition(_) => {}
                 PackagePart::EnumDefinition(def) => {
                     let enum_ty = hashmap.get(&def.name.name.clone()).unwrap().clone();
+                    self.register_name(&def.name.name.clone(), enum_ty.clone(), SymbolUsage::Attribute, def.loc)?;
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Enum, def.loc.1);
                     self.register_name(&"self".to_string(), enum_ty.clone(), SymbolUsage::Used, Loc::default())?;
                     if let CType::Enum(e) = enum_ty.clone() {
@@ -525,9 +525,9 @@ impl SymbolTableBuilder {
 
                 PackagePart::StructDefinition(def) => {
                     let struct_ty = hashmap.get(&def.name.name.clone()).unwrap().clone();
+                    self.register_name(&def.name.name.clone(), struct_ty.clone(), SymbolUsage::Attribute, def.loc)?;
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
                     self.register_name(&"self".to_string(), struct_ty, SymbolUsage::Attribute, def.loc)?;
-                    let self_name = def.name.name.clone();
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
                             let bound_type = ident.get_type(&self.tables).unwrap();
@@ -613,8 +613,9 @@ impl SymbolTableBuilder {
                             // self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
                         self.ret_ty = tt.ret_type().clone();
-                        self.register_name(&name.name, tt.clone(), SymbolUsage::Import, def.loc)?;
+                        self.register_name(&name.name, tt.clone(), SymbolUsage::Attribute, def.loc)?;
                         self.enter_function(&get_full_name(&program.package, &name.name), false, &def.as_ref().params, def.loc.1)?;
+                        self.register_name(&"self".to_string(), tt, SymbolUsage::Attribute, def.loc)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                             // if def.generics.is_empty() {
@@ -625,10 +626,10 @@ impl SymbolTableBuilder {
                     }
                 }
                 PackagePart::BoundDefinition(def) => {
-                    self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
                     let tt = def.get_type(&self.tables)?;
+                    self.register_name(&def.name.name.clone(), tt.clone(), SymbolUsage::Attribute, def.loc)?;
                     self.register_name(&"self".to_string(), tt, SymbolUsage::Attribute, Loc::default())?;
-                    let self_name = def.name.name.clone();
+                    self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
                     for generic in &def.generics {
                         if let Some(ident) = &generic.bounds {
                             let bound_type = ident.get_type(&self.tables).unwrap();
