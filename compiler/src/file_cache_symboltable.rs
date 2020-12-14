@@ -8,11 +8,11 @@ use walkdir::WalkDir;
 
 use pan_parser::ast::Expression;
 use pan_parser::ast::*;
-use pan_parser::parse;
+use pan_parser::{parse, ast};
 
 
 use crate::symboltable::*;
-use crate::variable_type::HasType;
+use crate::variable_type::{HasType, resovle_def_generics};
 use crate::ctype::{CType, StructType, FnType, EnumType};
 use itertools::Tuples;
 use dynformat::check;
@@ -94,6 +94,7 @@ pub fn resolve_file_path(idents: &Vec<Identifier>, path_str: String, path_buf: &
 }
 
 pub fn resolve_file_name(idents: &Vec<Identifier>) -> Option<(bool, String)> {
+    println!("idents:{:?}", idents);
     let mut path_ptr = idents.iter().fold("".to_string(), |mut ss, s| {
         ss.push_str("/");
         ss.push_str(&s.name);
@@ -112,6 +113,203 @@ pub fn resolve_file_name(idents: &Vec<Identifier>) -> Option<(bool, String)> {
 
     return None;
 }
+
+pub fn resolve_generics(generics: &Vec<Generic>, map: &mut HashMap<String, CType>) {
+    for ty in generics {
+        let mut cty = map.get(&ty.name.name);
+        if cty.is_none() {
+            let mut g_ty = CType::Generic(ty.name.name.clone(), Box::new(CType::Generic(ty.name.name.clone(), Box::new(CType::Any))));
+            map.insert(ty.name.name.clone(), g_ty);
+        }
+    }
+}
+
+pub fn resolve_top_symbol(program: &ast::ModuleDefinition) -> HashMap<String, CType> {
+    let mut hash_map: HashMap<String, CType> = HashMap::new();
+    let table: SymbolTable = SymbolTable::new(program.package.clone(), SymbolTableType::Package, 0);
+    let mut tables: Vec<SymbolTable> = vec![table];
+    for part in &program.module_parts {
+        match part {
+            PackagePart::DataDefinition(_) => {
+                //  self.register_name(&def.name.name, def.get_type(&self.tables), SymbolUsage::Assigned)?;
+            }
+            PackagePart::EnumDefinition(def) => {
+                // resovle_def_generics(&def.generics, &mut tables);
+                // resolve_generics(&def.generics, &mut hash_map);
+                // let r = def.get_type(&tables);
+                // if r.is_ok() {
+                //     hash_map.insert(def.name.name, r.unwrap());
+                // }
+            }
+
+            PackagePart::StructDefinition(def) => {
+                // resovle_def_generics(&def.generics, &mut self.tables)?;
+                // let ty = def.get_type(&self.tables)?;
+                // //   self.register_name(&def.name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                // for part in &def.parts {
+                //     if let StructPart::ConstDefinition(const_def) = part {
+                //         let ty = const_def.initializer.get_type(&self.tables)?;
+                //         self.register_name(&const_def.as_ref().name.clone().name, ty, SymbolUsage::Const, def.loc)?;
+                //     }
+                // }
+                // if !in_import {
+                //     self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //     // self.register_name(&get_full_name(&program.package, &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                //     continue;
+                // }
+                //
+                // //  self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                // if !is_all {
+                //     if item_name.is_some() {
+                //         if def.name.name.eq(&item_name.clone().unwrap()) {
+                //             if as_name.is_some() {
+                //                 // println!("1111:{:?},def.name.name:{:?}", item_name, def.name.name);
+                //                 self.register_name(&as_name.clone().unwrap(), ty.clone(), SymbolUsage::Import, def.loc)?;
+                //             } else {
+                //                 // println!("4444:{:?},def.name.name:{:?}", item_name, def.name.name);
+                //                 self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //             }
+                //         }
+                //     } else {
+                //         self.register_name(&get_full_name(&get_last_name(&program.package), &def.name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                //     }
+                // } else {
+                //     self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                // }
+            }
+            //处理文件各项内容时，不需要处理import和从const, const、import在扫描文件顶层symbol的时候已处理;
+            PackagePart::ImportDirective(def) => {
+                // match def {
+                //     Import::Plain(mod_path, all) => {
+                //         let name = resolve_file_name(mod_path);
+                //         if name.is_some() {
+                //             let name = name.unwrap();
+                //             self.enter_scope(&name.1, SymbolTableType::Package, mod_path.get(0).unwrap().loc.1);
+                //             self.resolve_recursive_import(name.1, name.0)?;
+                //             self.leave_scope();
+                //         }
+                //         // scan_import_symbol(self, mod_path, Option::None, all)?;
+                //     }
+                //     Import::Rename(mod_path, as_name, all) => {
+                //         scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
+                //     }
+                //     Import::PartRename(mod_path, as_part) => {
+                //         for (name, a_name) in as_part {
+                //             let mut path = mod_path.clone();
+                //             path.extend_from_slice(&name);
+                //             let as_name = if a_name.is_some() {
+                //                 Some(a_name.as_ref().unwrap().name.clone())
+                //             } else {
+                //                 Option::None
+                //             };
+                //             scan_import_symbol(self, &path, as_name, &false)?;
+                //         }
+                //     }
+                // }
+                // if !in_import {
+                //     match def {
+                //         Import::Plain(mod_path, all) => {
+                //             scan_import_symbol(self, mod_path, Option::None, all)?;
+                //         }
+                //         Import::Rename(mod_path, as_name, all) => {
+                //             scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
+                //         }
+                //         Import::PartRename(mod_path, as_part) => {
+                //             for (name, a_name) in as_part {
+                //                 let mut path = mod_path.clone();
+                //                 path.extend_from_slice(&name);
+                //                 let as_name = if a_name.is_some() {
+                //                     Some(a_name.as_ref().unwrap().name.clone())
+                //                 } else {
+                //                     Option::None
+                //                 };
+                //                 scan_import_symbol(self, &path, as_name, &false)?;
+                //             }
+                //         }
+                //     }
+                // }
+            }
+            PackagePart::ConstDefinition(def) => {
+                // let ty = def.initializer.get_type(&self.tables)?;
+                // //  self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Const, def.loc)?;
+                // if !in_import {
+                //     self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //     // self.register_name(&get_full_name(&program.package, &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
+                //     continue;
+                // }
+                // if !is_all {
+                //     if item_name.is_some() {
+                //         if def.as_ref().name.clone().name.eq(&item_name.clone().unwrap()) {
+                //             if as_name.clone().is_some() {
+                //                 self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                //             } else {
+                //                 self.register_name(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //             }
+                //         }
+                //     } else {
+                //         self.register_name(&get_full_name(&get_last_name(&program.package), &def.as_ref().name.clone().name), ty.clone(), SymbolUsage::Const, def.loc)?;
+                //     }
+                // } else {
+                //     self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                // }
+            }
+            PackagePart::FunctionDefinition(def) => {
+                // resovle_def_generics(&def.generics, &mut self.tables)?;
+                // let ty = def.get_type(&self.tables)?;
+                // let name = &def.as_ref().name.as_ref().unwrap().name;
+                // // self.register_name(&def.as_ref().name.as_ref().unwrap().name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                // if !in_import {
+                //     self.register_name(name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //     //   self.register_name(&get_full_name(&program.package, name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                //     continue;
+                // }
+                // if !is_all {
+                //     if item_name.is_some() {
+                //         if def.as_ref().name.as_ref().unwrap().name.clone().eq(&item_name.clone().unwrap()) {
+                //             if as_name.clone().is_some() {
+                //                 self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                //             } else {
+                //                 self.register_name(&name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //             }
+                //         }
+                //     } else {
+                //         self.register_name(&get_full_name(&get_last_name(&program.package), name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                //     }
+                // } else {
+                //     self.register_name(name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                // }
+            }
+            PackagePart::BoundDefinition(def) => {
+                // resovle_def_generics(&def.generics, &mut self.tables)?;
+                // let ty = def.get_type(&self.tables)?;
+                // //self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Assigned, def.loc)?;
+                // if !in_import {
+                //     self.register_name(&get_full_name(&program.package, &def.as_ref().name.name), ty.clone(), SymbolUsage::Import, def.loc)?;
+                //     // self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //     continue;
+                // }
+                // if !is_all {
+                //     if item_name.is_some() {
+                //         if def.as_ref().name.name.eq(&item_name.clone().unwrap()) {
+                //             if as_name.clone().is_some() {
+                //                 self.register_name(&as_name.clone().unwrap(), ty, SymbolUsage::Import, def.loc)?;
+                //             } else {
+                //                 self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                //             }
+                //         }
+                //     } else {
+                //         self.register_name(&get_full_name(&get_last_name(&program.package), &def.as_ref().name.name), ty.clone(), SymbolUsage::Mut, def.loc)?;
+                //     }
+                // } else {
+                //     self.register_name(&def.as_ref().name.name, ty.clone(), SymbolUsage::Import, def.loc)?;
+                // }
+            }
+            _ => {}
+        }
+    }
+    hash_map
+}
+
 
 
 

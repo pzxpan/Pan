@@ -68,7 +68,7 @@ pub struct PackageType {
     pub structs: Vec<(String, CType)>,
     pub bounds: Vec<(String, CType)>,
     pub imports: Vec<(String, CType)>,
-    pub submods: Vec<(String, Box<PackageType>)>,
+    pub submods: Vec<(String, CType)>,
 }
 
 impl FnType {

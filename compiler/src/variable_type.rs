@@ -4,13 +4,14 @@ use crate::symboltable::*;
 use crate::ctype::*;
 use crate::ctype::CType::{Bool, Unknown};
 use std::ops::Deref;
-use crate::util::get_attribute_vec;
+use crate::util::{get_attribute_vec, get_mod_name, get_package_name};
 use crate::util::get_full_name;
 use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
 use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type, get_self_type};
 use std::borrow::Borrow;
 use std::collections::HashSet;
+use crate::file_cache_symboltable::{resolve_file_name, make_ast};
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError>;
@@ -342,6 +343,82 @@ impl HasType for EnumDefinition {
         } else {
             Ok(CType::Enum(EnumType { name, items: variants, generics: Some(type_args), bases, static_methods, is_pub: self.is_pub, methods }))
         }
+    }
+}
+
+impl HasType for ModuleDefinition {
+    fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
+        let name = self.package.clone();
+        let mut consts = vec![];
+        let mut funs = vec![];
+        let mut enums = vec![];
+        let mut structs = vec![];
+        let mut bounds = vec![];
+        let mut imports = vec![];
+        let mut submods = vec![];
+        for part in &self.module_parts {
+            match part {
+                PackagePart::ModuleDefinition(m) => {
+                    submods.push((m.package.clone(), m.get_type(tables)?));
+                }
+                PackagePart::EnumDefinition(m) => {
+                    enums.push((m.name.name.clone(), m.get_type(tables)?));
+                }
+                PackagePart::StructDefinition(m) => {
+                    structs.push((m.name.name.clone(), m.get_type(tables)?));
+                }
+                PackagePart::FunctionDefinition(m) => {
+                    funs.push((m.name.as_ref().unwrap().name.clone(), m.get_type(tables)?));
+                }
+                PackagePart::ConstDefinition(m) => {
+                    consts.push((m.name.name.clone(), m.initializer.get_type(&tables)?));
+                }
+                PackagePart::ImportDirective(import) => {
+                    match import {
+                        Import::Plain(mod_path, all) => {
+                            let file_name = resolve_file_name(&mod_path);
+                            if file_name.is_some() {
+                                let file_name = file_name.unwrap();
+                                if !file_name.0 {
+                                    let module = make_ast(&file_name.1).unwrap();
+                                    let md = ModuleDefinition {
+                                        module_parts: module.content,
+                                        name: Identifier { loc: Loc::default(), name: get_mod_name(file_name.1) },
+                                        is_pub: true,
+                                        package: get_package_name(&module.package_name),
+                                    };
+                                    println!("mod_name{:?},", module.package_name);
+                                    imports.push((md.package.clone(), md.get_type(tables)?));
+                                }
+                            }
+                        }
+                        _ => {}
+                        // Import::Rename(mod_path, as_name, all) => {
+                        //     scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
+                        // }
+                        // Import::PartRename(mod_path, as_part) => {
+                        //     for (name, a_name) in as_part {
+                        //         let mut path = mod_path.clone();
+                        //         path.extend_from_slice(&name);
+                        //         let as_name = if a_name.is_some() {
+                        //             Some(a_name.as_ref().unwrap().name.clone())
+                        //         } else {
+                        //             Option::None
+                        //         };
+                        //         scan_import_symbol(self, &path, as_name, &false)?;
+                        //     }
+                        // }
+                    }
+                }
+
+                PackagePart::BoundDefinition(m) => {
+                    bounds.push((m.name.name.clone(), m.get_type(tables)?));
+                }
+
+                _ => {}
+            }
+        }
+        return Ok(CType::Package(PackageType { name, consts, funs, enums, structs, bounds, imports, submods }));
     }
 }
 

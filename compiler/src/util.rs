@@ -1,4 +1,4 @@
-use crate::ctype::CType;
+use crate::ctype::{CType, PackageType};
 use pan_parser::ast::{Loc, Identifier, MutOrOwn};
 use pan_parser::ast::Expression;
 use crate::symboltable::SymbolMutability;
@@ -127,6 +127,99 @@ pub fn read_file_content(path: &Path, contents: &mut String) {
     let mut file = File::open(path.clone()).unwrap();
     file.read_to_string(contents).unwrap();
 }
+
+pub fn get_item_from_package(ty: &PackageType, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> Vec<(String, CType)> {
+    let mut v = vec![];
+    v.extend_from_slice(&get_package_item(&ty.imports, is_all, &item_name, &as_name));
+    v.extend_from_slice(&get_package_item(&ty.bounds, is_all, &item_name, &as_name));
+    v.extend_from_slice(&get_package_item(&ty.structs, is_all, &item_name, &as_name));
+    v.extend_from_slice(&get_package_item(&ty.funs, is_all, &item_name, &as_name));
+    v.extend_from_slice(&get_package_item(&ty.consts, is_all, &item_name, &as_name));
+    v.extend_from_slice(&get_package_item(&ty.submods, is_all, &item_name, &as_name));
+    v.extend_from_slice(&get_package_item(&ty.enums, is_all, &item_name, &as_name));
+    // for item in &ty.imports {
+    //     if is_all {
+    //         v.push(item.clone());
+    //     } else if item_name.is_some() && item_name.unwrap().eq(item.0.as_str()) {
+    //         if as_name.is_some() {
+    //             v.push((as_name.unwrap(), item.1.clone()));
+    //         }
+    //     }
+    // }
+    // for item in &ty.consts {
+    //     if is_all {
+    //         v.push(item.clone());
+    //     } else if item_name.is_some() && item_name.unwrap().eq(item.0.as_str()) {
+    //         if as_name.is_some() {
+    //             v.push((as_name.unwrap(), item.1.clone()));
+    //         }
+    //     }
+    // }
+    // for item in &ty.bounds {
+    //     if is_all {
+    //         v.push(item.clone());
+    //     } else if item_name.is_some() && item_name.unwrap().eq(item.0.as_str()) {
+    //         if as_name.is_some() {
+    //             v.push((as_name.unwrap(), item.1.clone()));
+    //         }
+    //     }
+    // }
+    // for item in &ty.submods {
+    //     if is_all {
+    //         v.push(item.clone());
+    //     } else if item_name.is_some() && item_name.unwrap().eq(item.0.as_str()) {
+    //         if as_name.is_some() {
+    //             v.push((as_name.unwrap(), item.1.clone()));
+    //         }
+    //     }
+    // }
+    //
+    // for item in &ty.enums {
+    //     if is_all {
+    //         v.push(item.clone());
+    //     } else if item_name.is_some() && item_name.unwrap().eq(item.0.as_str()) {
+    //         if as_name.is_some() {
+    //             v.push((as_name.unwrap(), item.1.clone()));
+    //         }
+    //     }
+    // }
+    // for item in &ty.funs {
+    //     if is_all {
+    //         v.push(item.clone());
+    //     } else if item_name.is_some() && item_name.unwrap().eq(item.0.as_str()) {
+    //         if as_name.is_some() {
+    //             v.push((as_name.unwrap(), item.1.clone()));
+    //         }
+    //     }
+    // }
+    v
+}
+
+pub fn get_package_item(item_vec: &[(String, CType)], is_all: bool, item_name: &Option<String>, as_name: &Option<String>) -> Vec<(String, CType)> {
+    let mut v = vec![];
+    for item in item_vec {
+        if is_all {
+            v.push(item.clone());
+        } else if item_name.is_some() && item_name.as_ref().unwrap().eq(item.0.as_str()) {
+            if as_name.is_some() {
+                v.push((as_name.as_ref().unwrap().clone(), item.1.clone()));
+            }
+        }
+    }
+    v
+}
+
+pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
+    println!("package is {:?}", package);
+    for item in &package.imports {
+        println!("item:{:?},", item);
+        if item.0.eq(&get_package_name(idents)) {
+            return item.1.clone();
+        }
+    }
+    return CType::Unknown;
+}
+
 
 
 

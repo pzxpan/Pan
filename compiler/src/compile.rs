@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use pan_bytecode::bytecode::{self, CallType, CodeObject, Instruction, Label, Varargs, NameScope, Constant};
 use pan_bytecode::value::*;
-use pan_parser::ast::{Loc, Number, Identifier};
+use pan_parser::ast::{Loc, Number, Identifier, ModuleDefinition};
 use pan_parser::diagnostics::ErrorType;
 use pan_parser::{ast, parse};
 use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariableDeclaration, DestructType, Import};
@@ -24,6 +24,7 @@ use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
 use crate::compile::FunctionContext::{Function, StructFunction};
 use crate::symboltable::SymbolScope::Const;
+use crate::file_cache_symboltable::{make_ast, resolve_file_name};
 
 
 lazy_static! {
@@ -153,6 +154,7 @@ pub fn compile_program(
     let r = with_compiler(source_path, optimize, ast.package.clone(), |compiler| {
         let symbol_table = make_symbol_table(&ast)?;
         println!("sybmol{:#?}", symbol_table);
+        resolve_builtin_fun(compiler);
         compiler.compile_program(&ast, symbol_table, is_import)
     });
     if r.is_ok() {
@@ -230,27 +232,17 @@ impl<O: OutputStream> Compiler<O> {
         trace!("compile symboltable{:?}", symbol_table);
         let mut found_main = false;
         self.symbol_table_stack.push(symbol_table);
-        let size_before = self.output_stack.len();
-        if !in_import {
-            resolve_builtin_fun(self);
-        }
-        for part in &program.module_parts {
+        let mut size_before = self.output_stack.len();
+        self.enter_scope();
+        //for package
+        let mut main_index = 0;
+        for (size, part) in program.module_parts.iter().enumerate() {
             match part {
                 ast::PackagePart::DataDefinition(_) => {}
                 ast::PackagePart::EnumDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
-                    let generics = &def.generics;
-                    for g in generics {
-                        self.emit(Instruction::LoadConst(Constant::String(Box::new(g.name.name.clone()))));
-                        self.emit(Instruction::StoreNewVariable(NameScope::Global));
-                    }
-
-                    if in_import {
-                        self.compile_enum_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
-                    } else {
-                        self.compile_enum_def(name.as_str(), &body, &generics)?;
-                    }
+                    self.compile_enum_def(name.as_str(), &body, &def.generics)?;
                 }
                 ast::PackagePart::StructDefinition(def) => {
                     let name = &def.name.name;
@@ -270,34 +262,46 @@ impl<O: OutputStream> Compiler<O> {
                     if !in_import {
                         match def {
                             Import::Plain(mod_path, all) => {
-                                resolve_import_compile(self, mod_path, Option::None, all)?;
+                                // let file = resolve_file_name(mod_path);
+                                // if file.is_some() {
+                                //     let file_name = file.unwrap().1.clone();
+                                //     let module = make_ast(&file_name).unwrap();
+                                //     let md = ModuleDefinition {
+                                //         module_parts: module.content,
+                                //         name: Identifier { loc: Loc::default(), name: get_mod_name(file_name) },
+                                //         is_pub: true,
+                                //         package: get_package_name(&module.package_name),
+                                //     };
+                                //     self.compile_program(&md, self.symbol_table_stack.last().unwrap().clone(), true);
+                                // }
                             }
                             Import::Rename(mod_path, as_name, all) => {
-                                resolve_import_compile(self, mod_path, Some(as_name.clone().name), all)?;
+                                //   resolve_import_compile(self, &mod_path, Some(as_name.clone().name), &all)?;
                             }
                             Import::PartRename(mod_path, as_part) => {
-                                for (name, a_name) in as_part {
-                                    let mut path = mod_path.clone();
-                                    path.extend_from_slice(&name);
-                                    let as_name = if a_name.is_some() {
-                                        Some(a_name.as_ref().unwrap().name.clone())
-                                    } else {
-                                        Option::None
-                                    };
-                                    resolve_import_compile(self, &path, as_name, &false)?;
-                                }
+                                // for (name, a_name) in as_part {
+                                //     let mut path = mod_path.clone();
+                                //     path.extend_from_slice(&name);
+                                //     let as_name = if a_name.is_some() {
+                                //         Some(a_name.as_ref().unwrap().name.clone())
+                                //     } else {
+                                //         Option::None
+                                //     };
+                                //     resolve_import_compile(self, &path, as_name, &false)?;
+                                // }
                             }
                         }
                     }
                 }
                 ast::PackagePart::ConstDefinition(def) => {
-                    self.calculate_const(def, in_import);
+                    self.calculate_const(&def, in_import);
                 }
                 ast::PackagePart::FunctionDefinition(def) => {
                     let name = &def.name.as_ref().unwrap().name;
                     if name.eq("main") {
                         if !in_import {
                             found_main = true;
+                            main_index = size;
                         }
                     }
                     let mut args = vec![];
@@ -322,10 +326,6 @@ impl<O: OutputStream> Compiler<O> {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    for g in generics {
-                        self.emit(Instruction::LoadConst(Constant::String(Box::new(g.name.name.clone()))));
-                        self.emit(Instruction::StoreNewVariable(NameScope::Global));
-                    }
                     if in_import {
                         self.compile_bound_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
                     } else {
@@ -335,15 +335,24 @@ impl<O: OutputStream> Compiler<O> {
                 _ => (),
             }
         }
+        self.emit(Instruction::BuildList(program.module_parts.len(), false));
+        let scope = self.scope_for_name(&program.package);
+        self.emit(Instruction::StoreNewVariable(scope));
         assert_eq!(self.output_stack.len(), size_before);
 
         for i in self.import_instructions.clone().iter() {
             self.emit(i.clone());
         }
+
+
         if found_main {
-            let p = self.variable_position("main").unwrap();
+            let scope = self.scope_for_name(&program.package);
+            let p = self.variable_position(&program.package).unwrap();
             println!("dddddp:{:?}", p);
-            self.emit(Instruction::LoadCaptureReference(p.0, p.1, NameScope::Global));
+            self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+            self.emit(Instruction::LoadConst(
+                bytecode::Constant::Integer(main_index as i32)));
+            self.emit(Instruction::Subscript);
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
         }
@@ -351,13 +360,14 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::LoadConst(bytecode::Constant::None));
             self.emit(Instruction::ReturnValue);
         }
+        self.leave_scope();
         Ok(())
     }
     fn calculate_const(&mut self, const_def: &ast::ConstVariableDefinition, in_import: bool) -> Result<(), CompileError> {
         self.emit(Instruction::DefineConstStart);
         self.compile_expression(&const_def.initializer)?;
         let scope = self.scope_for_name(&const_def.name.name);
-        self.emit(Instruction::StoreNewVariable(scope));
+        //  self.emit(Instruction::StoreNewVariable(scope));
         if in_import {
             //self.store_ref_name(&get_full_name(&self.package, &const_def.name.name));
         } else {
@@ -935,6 +945,79 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::MakeFunction);
         let scope = self.scope_for_name(name);
         println!("ddddscope:{:?}", scope);
+        //self.emit(Instruction::StoreNewVariable(scope));
+        // self.store_ref_name(name);
+        self.current_qualified_path = old_qualified_path;
+        self.ctx = prev_ctx;
+        Ok(())
+    }
+
+    fn compile_lamba_def(
+        &mut self,
+        name: &str,
+        args: &[ast::Parameter],
+        body: &ast::Statement,
+        returns: &Option<ast::Type>,
+        is_mut: bool,
+        in_lambda: bool,
+    ) -> Result<(), CompileError> {
+        let prev_ctx = self.ctx;
+        if in_lambda {
+            self.scope_level = self.symbol_table_stack.len();
+            self.ctx = CompileContext {
+                in_lambda,
+                in_loop: false,
+                in_match: false,
+                func: prev_ctx.func,
+            };
+        } else {
+            self.ctx = CompileContext {
+                in_lambda,
+                in_loop: false,
+                in_match: false,
+                func: FunctionContext::Function,
+            };
+        }
+
+
+        let qualified_name = self.create_qualified_name(name, "");
+        let old_qualified_path = self.current_qualified_path.take();
+        self.current_qualified_path = Some(self.create_qualified_name(name, ".<locals>"));
+
+        self.enter_function(name, args, is_mut)?;
+        self.compile_statements(body)?;
+        match body {
+            ast::Statement::Block(_, statements) => {
+                let s = statements.last();
+                match s {
+                    Some(ast::Statement::Return(..)) => {}
+                    _ => {
+                        self.emit(Instruction::LoadConst(bytecode::Constant::None));
+                        self.emit(Instruction::ReturnValue);
+                    }
+                }
+            }
+
+            _ => {}
+        }
+        let mut code = self.pop_code_object();
+        self.leave_scope();
+
+
+        // for arg in args.iter() {
+        //     self.emit(Instruction::LoadConst(
+        //         bytecode::Constant::String(arg.name.as_ref().unwrap().name.clone())));
+        //     self.compile_expression(&arg.ty)?;
+        // }
+
+        self.emit(Instruction::LoadConst(
+            bytecode::Constant::Code(Box::new(code))));
+        self.emit(Instruction::LoadConst(
+            bytecode::Constant::String(Box::new(qualified_name))));
+
+        self.emit(Instruction::MakeFunction);
+        let scope = self.scope_for_name(name);
+        println!("ddddscope:{:?}", scope);
         self.emit(Instruction::StoreNewVariable(scope));
         // self.store_ref_name(name);
         self.current_qualified_path = old_qualified_path;
@@ -1091,7 +1174,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
         // self.store_ref_name(name);
         let scope = self.scope_for_name(name);
-        self.emit(Instruction::StoreNewVariable(scope));
+        // self.emit(Instruction::StoreNewVariable(scope));
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
         Ok(())
@@ -1163,7 +1246,7 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
         // self.store_ref_name(name);
         let scope = self.scope_for_name(name);
-        self.emit(Instruction::StoreNewVariable(scope));
+        // self.emit(Instruction::StoreNewVariable(scope));
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
         Ok(())
@@ -1235,7 +1318,7 @@ impl<O: OutputStream> Compiler<O> {
         let ty = TypeValue { name: qualified_name, methods, static_fields };
         self.emit(Instruction::LoadConst(bytecode::Constant::Struct(Box::new(ty))));
         let scope = self.scope_for_name(name);
-        self.emit(Instruction::StoreNewVariable(scope));
+        // self.emit(Instruction::StoreNewVariable(scope));
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;
         Ok(())
@@ -1774,7 +1857,7 @@ impl<O: OutputStream> Compiler<O> {
                 }
                 let body = &lambda.body.as_ref();
                 let is_async = false;
-                self.compile_function_def(&name, args.as_slice(), body, &None, is_async, true);
+                self.compile_lamba_def(&name, args.as_slice(), body, &None, is_async, true);
             }
             Number(_, number) => { self.compile_load_constant_number(number.clone())?; }
             IfExpression(_, test, body, orelse) => {
@@ -2213,7 +2296,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn lookup_name(&self, name: &str) -> &Symbol {
-        // println!("Looking up {:?}", name);
+        println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);

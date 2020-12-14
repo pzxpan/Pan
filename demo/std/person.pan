@@ -24,10 +24,7 @@ pub struct Person {
    // pub address: string,
   //  money: i32,
     //pub house: House,
-    pub fun older_than(a: i32): bool {
-            //money = 100;
-        return self.age > a;
-    }
+
     pub fun add_pub(a:i32) :i32 {
         return a - 10000;
     }
