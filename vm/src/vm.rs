@@ -550,6 +550,7 @@ impl VirtualMachine {
     }
 
     pub fn _eq(&self, a: Value, b: Value) -> Value {
+        println!("a:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::Bool(a == b)

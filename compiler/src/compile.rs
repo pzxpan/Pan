@@ -413,21 +413,23 @@ impl<O: OutputStream> Compiler<O> {
         let scope = self.scope_for_name(name);
         let mut position = self.variable_position(name).unwrap();
         let is_local = self.variable_local_scope(name);
+
         println!("dddname:{:?},in_loop:{:?}", name, self.ctx.in_loop || self.ctx.in_match);
         if is_local {
             self.emit(Instruction::LoadLocalName(position.1, NameScope::Local));
         } else {
+            //package那一层占坑没拉屎，nnd
             if self.ctx.in_lambda {
                 if self.scope_level > position.0 {
-                    self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+                    self.emit(Instruction::LoadCaptureReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
+                    self.emit(Instruction::LoadFrameReference(position.0 - 2, position.1, scope.clone()));
                 }
             } else {
                 if self.ctx.in_loop || self.ctx.in_match {
-                    self.emit(Instruction::LoadFrameReference(position.0, position.1, scope.clone()));
+                    self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+                    self.emit(Instruction::LoadCaptureReference(position.0 - 1, position.1, scope.clone()));
                 }
             }
         }
@@ -467,7 +469,7 @@ impl<O: OutputStream> Compiler<O> {
 
     pub fn store_default_args(&mut self, name: &str) {
         let position = self.variable_position(name).unwrap();
-        self.emit(Instruction::StoreDefaultArg(position.0, position.1));
+        self.emit(Instruction::StoreDefaultArg(position.0 - 1, position.1));
     }
 
     pub fn store_name(&mut self, name: &str) {
@@ -489,15 +491,15 @@ impl<O: OutputStream> Compiler<O> {
         } else {
             if self.ctx.in_lambda && self.scope_level > position.0 {
                 if self.scope_level > position.0 {
-                    self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope.clone()));
+                    self.emit(Instruction::StoreCaptureReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::StoreFrameReference(position.0 - 1, position.1, scope.clone()));
+                    self.emit(Instruction::StoreFrameReference(position.0 - 2, position.1, scope.clone()));
                 }
             } else {
                 if self.ctx.in_loop || self.ctx.in_match {
-                    self.emit(Instruction::StoreFrameReference(position.0, position.1, scope.clone()));
+                    self.emit(Instruction::StoreFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::StoreCaptureReference(position.0, position.1, scope));
+                    self.emit(Instruction::StoreCaptureReference(position.0 - 1, position.1, scope));
                 }
             }
         }
@@ -2073,11 +2075,8 @@ impl<O: OutputStream> Compiler<O> {
                     self.load_name(name);
                 } else {
                     //试下 单个
-                    let pacakge_name = self.get_curent_package_name()?;
-                    let scope = self.scope_for_name(pacakge_name.as_str());
-                    let p = self.variable_position(pacakge_name.as_str()).unwrap();
-                    self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope.clone()));
-                    // let pacakge_name = self.get_curent_package_name()?;
+
+                    self.resolve_package();
                     let scope = self.scope_for_name(name.as_str());
                     let p = self.variable_position(name.as_str()).unwrap();
                     self.emit(Instruction::LoadConst(
@@ -2152,15 +2151,20 @@ impl<O: OutputStream> Compiler<O> {
         let mut is_constructor = false;
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
             is_constructor = self.is_constructor(name);
-            if self.variable_local_scope(name.as_str()) {
-                let p = self.variable_position(get_full_name(&self.package, &name.clone()).as_str()).unwrap();
-                self.emit(LoadLocalName(p.1, NameScope::Local));
-                // self.emit(LoadName(name.clone(), NameScope::Local));
-            } else {
-                let scope = self.scope_for_name(name.as_str());
-                let p = self.variable_position(name.as_str()).unwrap();
-                self.emit(LoadLocalName(p.1, scope));
-            }
+            self.resolve_package();
+            let p = self.variable_position(name.as_str()).unwrap();
+            self.emit(Instruction::LoadConst(
+                bytecode::Constant::Integer(p.1 as i32)));
+            self.emit(Instruction::Subscript);
+            // if self.variable_local_scope(name.as_str()) {
+            //     let p = self.variable_position(get_full_name(&self.package, &name.clone()).as_str()).unwrap();
+            //     self.emit(LoadLocalName(p.1, NameScope::Local));
+            //     // self.emit(LoadName(name.clone(), NameScope::Local));
+            // } else {
+            //     let scope = self.scope_for_name(name.as_str());
+            //     let p = self.variable_position(name.as_str()).unwrap();
+            //     self.emit(LoadLocalName(p.1, scope));
+            // }
         } else {
             self.compile_expression(function)?;
         }
@@ -2560,6 +2564,14 @@ impl<O: OutputStream> Compiler<O> {
         }
     }
 
+    fn resolve_package(&mut self) -> Result<(), CompileError> {
+        let pacakge_name = self.get_curent_package_name()?;
+        let scope = self.scope_for_name(pacakge_name.as_str());
+        let p = self.variable_position(pacakge_name.as_str()).unwrap();
+        self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope.clone()));
+        Ok(())
+    }
+
     fn resolve_compile_attribute(&mut self, expr: &Expression) -> Result<bool, CompileError> {
         let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
 
@@ -2585,7 +2597,7 @@ impl<O: OutputStream> Compiler<O> {
                     let p = self.variable_position(&name.0).unwrap();
                     let scope = self.scope_for_name(&name.0);
                     if tmp.0 == 2 {
-                        self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, scope.clone())))));
+                        self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0 - 1, p.1, scope.clone())))));
                         //instructions.push();
                     }
                     if idx == 0 {
@@ -2595,7 +2607,7 @@ impl<O: OutputStream> Compiler<O> {
                             if let FunctionContext::StructFunction(..) = self.ctx.func {
                                 instructions.push(Instruction::LoadConst(Constant::Reference(Box::new((p.0 - 1, p.1, scope.clone())))));
                             } else {
-                                instructions.push(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, scope.clone())))));
+                                instructions.push(Instruction::LoadConst(Constant::Reference(Box::new((p.0 - 1, p.1, scope.clone())))));
                             }
                         }
 
@@ -2638,6 +2650,7 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::Subscript);
                     }
                 } else if let CType::Enum(_) = cty.clone() {
+                    self.resolve_package();
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     //println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
                     let tmp = cty.attri_name_type(attri_name.0.clone());
@@ -2647,14 +2660,16 @@ impl<O: OutputStream> Compiler<O> {
                     println!("sccc:{:?}", scope);
                     let p = self.variable_position(&name.0).unwrap();
                     if tmp.0 == 3 {
-                        self_instruction = Some(Instruction::LoadConst(Constant::Reference(Box::new((p.0, p.1, scope.clone())))));
+                        self_instruction = Some(Instruction::LoadReference(p.0 - 1, p.1, scope.clone()));
                         //instructions.push();
                     }
 
                     if tmp.0 == 1 {
                         let p = self.variable_position(&name.0).unwrap();
-
-                        instructions.push(Instruction::LoadLocalName(p.1, scope.clone()));
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::Integer(p.1 as i32)));
+                        instructions.push(Instruction::Subscript);
+                        //  instructions.push(Instruction::LoadLocalName(p.1, scope.clone()));
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(Box::new(attri_name.0.clone()))));
 
@@ -2666,7 +2681,11 @@ impl<O: OutputStream> Compiler<O> {
                         //     bytecode::Constant::String(attri_name.0.clone())));
                         // self.emit(Instruction::LoadBuildEnum(2));
                     } else if tmp.0 == 2 {
-                        instructions.push(Instruction::LoadLocalName(p.1, scope));
+                        //instructions.push(Instruction::LoadLocalName(p.1, scope));
+                        let p = self.variable_position(&name.0).unwrap();
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::Integer(p.1 as i32)));
+                        instructions.push(Instruction::Subscript);
                         instructions.push(Instruction::LoadConst(
                             bytecode::Constant::String(Box::new(attri_name.0.clone()))));
                         instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
@@ -2676,7 +2695,11 @@ impl<O: OutputStream> Compiler<O> {
                     if tmp.0 > 2 {
                         let scope = self.scope_for_name(&name.0);
                         let p = self.variable_position(&name.0).unwrap();
-                        instructions.push(Instruction::LoadLocalName(p.1, scope));
+                        let p = self.variable_position(&name.0).unwrap();
+                        instructions.push(Instruction::LoadConst(
+                            bytecode::Constant::Integer(p.1 as i32)));
+                        instructions.push(Instruction::Subscript);
+                        // instructions.push(Instruction::LoadLocalName(p.1, scope));
                         instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
                         // self.emit(Instruction::LoadAttr(attri_name.0.clone()));

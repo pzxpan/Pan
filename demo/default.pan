@@ -13,8 +13,7 @@ fun main() {
 
   let aa = add(3000);
   print(aa);
-  let dd = add!{b:400,a:4000};
-  print(dd);
+
   return;
 }
 
