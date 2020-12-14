@@ -615,7 +615,6 @@ impl SymbolTableBuilder {
                         self.ret_ty = tt.ret_type().clone();
                         self.register_name(&name.name, tt.clone(), SymbolUsage::Attribute, def.loc)?;
                         self.enter_function(&get_full_name(&program.package, &name.name), false, &def.as_ref().params, def.loc.1)?;
-                        self.register_name(&"self".to_string(), tt, SymbolUsage::Attribute, def.loc)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
                             // if def.generics.is_empty() {
@@ -808,6 +807,8 @@ impl SymbolTableBuilder {
         }
         Ok(CType::Unknown)
     }
+
+
 
     fn get_variable_mutbility(&self, name: String) -> SymbolMutability {
         let len = self.tables.len();

@@ -13,7 +13,7 @@ use pan_parser::ast::{Expression, Parameter, MultiDeclarationPart, MultiVariable
 use crate::error::{CompileError, CompileErrorType};
 use crate::output_stream::{CodeObjectStream, OutputStream};
 use crate::peephole::PeepholeOptimizer;
-use crate::symboltable::{make_symbol_table, Symbol, SymbolScope, SymbolTable};
+use crate::symboltable::{make_symbol_table, Symbol, SymbolScope, SymbolTable, SymbolTableType};
 use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
@@ -380,6 +380,16 @@ impl<O: OutputStream> Compiler<O> {
         self.compile_statement(statement)
     }
 
+    fn get_curent_package_name(&self) -> Result<String, CompileError> {
+        let len = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let table = self.symbol_table_stack.get(i).unwrap();
+            if table.typ == SymbolTableType::Package {
+                return Ok(table.name.clone());
+            }
+        }
+        unreachable!()
+    }
     fn scope_for_name(&self, name: &str) -> bytecode::NameScope {
         let symbol = self.lookup_name(name);
         //println!("symbol:{:?}", symbol);
@@ -2062,7 +2072,17 @@ impl<O: OutputStream> Compiler<O> {
                 if self.variable_local_scope(name.as_str()) {
                     self.load_name(name);
                 } else {
-                    //self.load_package();
+                    //试下 单个
+                    let pacakge_name = self.get_curent_package_name()?;
+                    let scope = self.scope_for_name(pacakge_name.as_str());
+                    let p = self.variable_position(pacakge_name.as_str()).unwrap();
+                    self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope.clone()));
+                    // let pacakge_name = self.get_curent_package_name()?;
+                    let scope = self.scope_for_name(name.as_str());
+                    let p = self.variable_position(name.as_str()).unwrap();
+                    self.emit(Instruction::LoadConst(
+                        bytecode::Constant::Integer(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
                 }
 
                 // let scope = self.scope_for_name(name.as_str());
