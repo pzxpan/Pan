@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
@@ -63,7 +63,7 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
     //将import的内容添加到当前文件
     pub import_instructions: Vec<Instruction>,
     output_stack: Vec<O>,
-    symbol_table_stack: Vec<SymbolTable>,
+    pub symbol_table_stack: Vec<SymbolTable>,
     nxt_label: usize,
     source_path: Option<String>,
     current_source_location: ast::Loc,
@@ -112,6 +112,7 @@ pub fn compile(
         let module_name = get_mod_name(source_path.clone());
         let module = ast.unwrap();
         let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: get_package_name(&module.package_name) };
+        //let symbol_table = make_symbol_table(&md)?;
         compile_program(md, source_path.clone(), optimize, is_import)
             .map_err(|mut err| {
                 err.source_path = Some(source_path);
@@ -134,9 +135,10 @@ fn with_compiler(
     source_path: String,
     optimize: u8,
     package: String,
+    symbol_table: SymbolTable,
     f: impl FnOnce(&mut Compiler) -> Result<(), CompileError>,
 ) -> Result<CodeObject, CompileError> {
-    let mut compiler = Compiler::new(optimize, package);
+    let mut compiler = Compiler::new(optimize, package, symbol_table);
     compiler.source_path = Some(source_path);
     compiler.push_new_code_object("<module>".to_owned());
     f(&mut compiler)?;
@@ -151,11 +153,11 @@ pub fn compile_program(
     optimize: u8,
     is_import: bool,
 ) -> Result<(String, CodeObject), CompileError> {
-    let r = with_compiler(source_path, optimize, ast.package.clone(), |compiler| {
-        let symbol_table = make_symbol_table(&ast)?;
-        println!("sybmol{:#?}", symbol_table);
+    let symbol_table = make_symbol_table(&ast)?;
+    let r = with_compiler(source_path, optimize, ast.package.clone(), symbol_table, |compiler| {
+        //  println!("sybmol{:#?}", symbol_table);
         resolve_builtin_fun(compiler);
-        compiler.compile_program(&ast, symbol_table, is_import)
+        compiler.compile_program(&ast, is_import)
     });
     if r.is_ok() {
         return Ok((ast.package, r.unwrap()));
@@ -164,21 +166,13 @@ pub fn compile_program(
     }
 }
 
-impl<O> Default for Compiler<O>
-    where
-        O: OutputStream,
-{
-    fn default() -> Self {
-        Compiler::new(0, "".to_string())
-    }
-}
 
 impl<O: OutputStream> Compiler<O> {
-    fn new(optimize: u8, package: String) -> Self {
+    fn new(optimize: u8, package: String, symbol_table_stack: SymbolTable) -> Self {
         Compiler {
             import_instructions: Vec::new(),
             output_stack: Vec::new(),
-            symbol_table_stack: Vec::new(),
+            symbol_table_stack: vec![symbol_table_stack],
             nxt_label: 0,
             source_path: None,
             current_source_location: ast::Loc(1, 0, 0),
@@ -226,18 +220,67 @@ impl<O: OutputStream> Compiler<O> {
     pub fn compile_program(
         &mut self,
         program: &ast::ModuleDefinition,
-        symbol_table: SymbolTable,
         in_import: bool,
     ) -> Result<(), CompileError> {
-        trace!("compile symboltable{:?}", symbol_table);
+        // trace!("compile symboltable{:?}", symbol_table);
         let mut found_main = false;
-        self.symbol_table_stack.push(symbol_table);
-        let mut size_before = self.output_stack.len();
+        // self.symbol_table_stack.push(symbol_table);
+        // let mut size_before = self.output_stack.len();
+
+        println!("tables is:{:#?}", self.symbol_table_stack);
+        let mut import_size = 0;
+        for (size, part) in program.module_parts.iter().enumerate() {
+            match part {
+                ast::PackagePart::ImportDirective(def) => {
+                    import_size += 1;
+                    match def {
+                        Import::Plain(v, all) => {
+                            let top_name = v.get(0).unwrap();
+                            let md = compile_import_symbol(self, top_name.name.clone(), top_name.loc)?;
+                            self.compile_program(&md, true)?;
+
+                            // let file = resolve_file_name(mod_path);
+                            // if file.is_some() {
+                            //     let file_name = file.unwrap().1.clone();
+                            //     let module = make_ast(&file_name).unwrap();
+                            //     let md = ModuleDefinition {
+                            //         module_parts: module.content,
+                            //         name: Identifier { loc: Loc::default(), name: get_mod_name(file_name) },
+                            //         is_pub: true,
+                            //         package: get_package_name(&module.package_name),
+                            //     };
+                            //     self.compile_program(&md, self.symbol_table_stack.last().unwrap().clone(), true);
+                            // }
+                        }
+                        Import::Rename(mod_path, as_name, all) => {
+                            //   resolve_import_compile(self, &mod_path, Some(as_name.clone().name), &all)?;
+                        }
+                        Import::PartRename(mod_path, as_part) => {
+                            // for (name, a_name) in as_part {
+                            //     let mut path = mod_path.clone();
+                            //     path.extend_from_slice(&name);
+                            //     let as_name = if a_name.is_some() {
+                            //         Some(a_name.as_ref().unwrap().name.clone())
+                            //     } else {
+                            //         Option::None
+                            //     };
+                            //     resolve_import_compile(self, &path, as_name, &false)?;
+                            // }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
         self.enter_scope();
         //for package
         let mut main_index = 0;
         for (size, part) in program.module_parts.iter().enumerate() {
             match part {
+                ast::PackagePart::ImportDirective(import) => {
+                    self.emit(Instruction::LoadConst(Constant::None));
+                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                }
                 ast::PackagePart::DataDefinition(_) => {}
                 ast::PackagePart::EnumDefinition(def) => {
                     let name = &def.name.name;
@@ -258,41 +301,7 @@ impl<O: OutputStream> Compiler<O> {
                         self.compile_class_def(name.as_str(), &body, &generics)?;
                     }
                 }
-                ast::PackagePart::ImportDirective(def) => {
-                    if !in_import {
-                        match def {
-                            Import::Plain(mod_path, all) => {
-                                // let file = resolve_file_name(mod_path);
-                                // if file.is_some() {
-                                //     let file_name = file.unwrap().1.clone();
-                                //     let module = make_ast(&file_name).unwrap();
-                                //     let md = ModuleDefinition {
-                                //         module_parts: module.content,
-                                //         name: Identifier { loc: Loc::default(), name: get_mod_name(file_name) },
-                                //         is_pub: true,
-                                //         package: get_package_name(&module.package_name),
-                                //     };
-                                //     self.compile_program(&md, self.symbol_table_stack.last().unwrap().clone(), true);
-                                // }
-                            }
-                            Import::Rename(mod_path, as_name, all) => {
-                                //   resolve_import_compile(self, &mod_path, Some(as_name.clone().name), &all)?;
-                            }
-                            Import::PartRename(mod_path, as_part) => {
-                                // for (name, a_name) in as_part {
-                                //     let mut path = mod_path.clone();
-                                //     path.extend_from_slice(&name);
-                                //     let as_name = if a_name.is_some() {
-                                //         Some(a_name.as_ref().unwrap().name.clone())
-                                //     } else {
-                                //         Option::None
-                                //     };
-                                //     resolve_import_compile(self, &path, as_name, &false)?;
-                                // }
-                            }
-                        }
-                    }
-                }
+
                 ast::PackagePart::ConstDefinition(def) => {
                     self.calculate_const(&def, in_import);
                 }
@@ -335,10 +344,12 @@ impl<O: OutputStream> Compiler<O> {
                 _ => (),
             }
         }
-        self.emit(Instruction::BuildList(program.module_parts.len(), false));
+        //TODO
+        self.emit(Instruction::BuildList(program.module_parts.len() - import_size, false));
+        //self.emit(Instruction::BuildList(program.module_parts.len(), false));
         let scope = self.scope_for_name(&program.package);
         self.emit(Instruction::StoreNewVariable(scope));
-        assert_eq!(self.output_stack.len(), size_before);
+        // assert_eq!(self.output_stack.len(), size_before);
 
         for i in self.import_instructions.clone().iter() {
             self.emit(i.clone());
@@ -350,8 +361,9 @@ impl<O: OutputStream> Compiler<O> {
             let p = self.variable_position(&program.package).unwrap();
             println!("dddddp:{:?}", p);
             self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+            //位置有问题，
             self.emit(Instruction::LoadConst(
-                bytecode::Constant::Integer(main_index as i32)));
+                bytecode::Constant::Integer(0 as i32)));
             self.emit(Instruction::Subscript);
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
@@ -2319,7 +2331,7 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
-    fn enter_scope(&mut self) {
+    pub fn enter_scope(&mut self) {
         let table = self
             .symbol_table_stack
             .last_mut()
@@ -2329,7 +2341,7 @@ impl<O: OutputStream> Compiler<O> {
         self.symbol_table_stack.push(table);
     }
 
-    fn leave_scope(&mut self) {
+    pub fn leave_scope(&mut self) {
         self.symbol_table_stack.pop().unwrap();
     }
 

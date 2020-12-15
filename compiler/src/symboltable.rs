@@ -735,7 +735,7 @@ impl SymbolTableBuilder {
                             let top_name = v.get(0).unwrap();
                             get_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
                             let ty = &self.get_register_type(top_name.name.clone())?;
-                            self.resovle_import(&v[1..], ty, *is_all, Option::None, Option::None)?;
+                            self.resovle_import(&v[1..], ty, true, Option::None, Option::None)?;
                         }
                         _ => {}
                     }
@@ -2169,7 +2169,7 @@ impl SymbolTableBuilder {
 
     #[allow(clippy::single_match)]
     fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
-        //println!("register_name:{:?},ty:{:?}", name, ty);
+        println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
             return Ok(());
@@ -2463,12 +2463,24 @@ impl SymbolTableBuilder {
         println!("cty:{:?},", cty);
         if is_all {
             if let CType::Package(ty) = cty {
-                ty.bounds.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                ty.enums.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                ty.structs.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                ty.funs.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                ty.consts.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                ty.submods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
+                for (name, ty) in ty.enums.iter() {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                }
+                for (name, ty) in ty.bounds.iter() {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                }
+                for (name, ty) in ty.structs.iter() {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                }
+                for (name, ty) in ty.funs.iter() {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                }
+                for (name, ty) in ty.consts.iter() {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                }
+                for (name, ty) in ty.submods.iter() {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                }
             } else if let CType::Struct(sty) = cty {
                 sty.methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
                 sty.static_methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));

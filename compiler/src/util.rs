@@ -7,6 +7,9 @@ use std::fs::File;
 use std::io::Read;
 use walkdir::WalkDir;
 use crate::file_cache_symboltable::{resolve_whole_dir, make_ast};
+use crate::compile::Compiler;
+use crate::error::{CompileError, CompileErrorType};
+use crate::output_stream::OutputStream;
 
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {
@@ -276,6 +279,7 @@ pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: S
             location: loc,
         });
     }
+
     //是文件，已经有.pan后缀
     let dir = dir.unwrap();
     if dir.0 {
@@ -312,6 +316,8 @@ pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: S
                 };
                 let top_hash_map = builder.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
                 builder.scan_program(&md, &top_hash_map)?;
+                let top = builder.tables.last();
+                println!("last_table:{:#?}", top);
             }
         } else {
             if in_dir {
@@ -326,6 +332,70 @@ pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: S
     println!("build.table:{:#?},", builder.tables);
 
     Ok(())
+}
+
+
+pub fn compile_import_symbol<O:OutputStream>(compiler: &mut Compiler<O>, package_name: String, loc: Loc) -> Result<ModuleDefinition, CompileError> {
+    let dir = resolve_whole_dir(package_name.clone());
+    if dir.is_none() {
+        return Err(CompileError {
+            statement: None,
+            error: CompileErrorType::ImportFileError,
+            location: loc,
+            source_path: None,
+        });
+    }
+
+    //是文件，已经有.pan后缀
+    let dir = dir.unwrap();
+    if dir.0 {
+        let module = make_ast(&dir.1).unwrap();
+        let md = ModuleDefinition {
+            module_parts: module.content,
+            name: Identifier { loc: Loc::default(), name: package_name.clone() },
+            is_pub: true,
+            package: get_package_name(&module.package_name),
+        };
+        return Ok(md);
+    }
+
+    //是路径
+    // let mut in_dir = false;
+    // for entry in WalkDir::new(dir.1) {
+    //     let director = entry.unwrap();
+    //     let path = director.path();
+    //
+    //     println!("path:{:?},is .pan:{:?}", path, path.ends_with(".pan"));
+    //
+    //     if path.is_file() {
+    //         if path.extension().unwrap().eq("pan") {
+    //             let mut s = String::new();
+    //             s.push_str(path.to_str().unwrap());
+    //             let module = make_ast(&s).unwrap();
+    //             let md = ModuleDefinition {
+    //                 module_parts: module.content,
+    //                 name: Identifier { loc: Loc::default(), name: get_package_name(&module.package_name) },
+    //                 is_pub: true,
+    //                 package: get_package_name(&module.package_name),
+    //             };
+    //             let top_hash_map = builder.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
+    //             builder.scan_program(&md, &top_hash_map)?;
+    //             let top = builder.tables.last();
+    //             println!("last_table:{:#?}", top);
+    //         }
+    //     } else {
+    //         if in_dir {
+    //             builder.leave_scope();
+    //         }
+    //         let name = get_last_name(&String::from(path.to_str().unwrap()));
+    //         builder.enter_scope(&name, SymbolTableType::Package, 0);
+    //         in_dir = true;
+    //     }
+    // }
+    // builder.leave_scope();
+    //  println!("build.table:{:#?},", builder.tables);
+
+    unreachable!()
 }
 
 

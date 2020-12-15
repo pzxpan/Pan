@@ -134,7 +134,10 @@ pub fn resolve_one_dir(path_str: String, path_buf: &PathBuf) -> Option<(bool, St
         return Some((false, String::from(path.to_str().unwrap())));
     } else {
         //至少是一个.pan文件，不然就报错
-        path.push(".pan");
+        let mut path = path_buf.clone();
+        let mut s = path_str.clone();
+        s.push_str(".pan");
+        path.push(s);
         if path.is_file() {
             return Some((true, String::from(path.to_str().unwrap())));
         }
