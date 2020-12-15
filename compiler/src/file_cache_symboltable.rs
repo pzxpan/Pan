@@ -114,6 +114,34 @@ pub fn resolve_file_name(idents: &Vec<Identifier>) -> Option<(bool, String)> {
     return None;
 }
 
+pub fn resolve_whole_dir(ident: String) -> Option<(bool, String)> {
+    let sys = resolve_one_dir(ident.clone(), &INCLUDE_DIR);
+    if sys.is_some() {
+        return Some(sys.unwrap());
+    }
+    let user = resolve_one_dir(ident.clone(), &CURRENT_DIR);
+    if user.is_some() {
+        return Some(user.unwrap());
+    }
+
+    return None;
+}
+
+pub fn resolve_one_dir(path_str: String, path_buf: &PathBuf) -> Option<(bool, String)> {
+    let mut path = path_buf.clone();
+    path.push(path_str.clone());
+    if path.is_dir() {
+        return Some((false, String::from(path.to_str().unwrap())));
+    } else {
+        //至少是一个.pan文件，不然就报错
+        path.push(".pan");
+        if path.is_file() {
+            return Some((true, String::from(path.to_str().unwrap())));
+        }
+    }
+    return None;
+}
+
 pub fn resolve_generics(generics: &Vec<Generic>, map: &mut HashMap<String, CType>) {
     for ty in generics {
         let mut cty = map.get(&ty.name.name);

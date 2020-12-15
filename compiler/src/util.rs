@@ -1,10 +1,12 @@
 use crate::ctype::{CType, PackageType};
-use pan_parser::ast::{Loc, Identifier, MutOrOwn};
+use pan_parser::ast::{Loc, Identifier, MutOrOwn, ModuleDefinition};
 use pan_parser::ast::Expression;
-use crate::symboltable::{SymbolMutability, SymbolTable};
-use std::path::Path;
+use crate::symboltable::{SymbolMutability, SymbolTable, SymbolTableResult, SymbolTableError, SymbolTableBuilder, SymbolTableType};
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::Read;
+use walkdir::WalkDir;
+use crate::file_cache_symboltable::{resolve_whole_dir, make_ast};
 
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {
@@ -106,6 +108,10 @@ pub fn get_full_name(package: &String, s: &str) -> String {
 
 pub fn get_last_name(package: &String) -> String {
     return package.split_terminator("$").last().unwrap().to_string();
+}
+
+pub fn get_dir_name(package: &String) -> String {
+    return package.split_terminator("//").last().unwrap().to_string();
 }
 
 pub fn get_mutability(mut_or_own: Option<MutOrOwn>, ty: &CType) -> SymbolMutability {
@@ -210,6 +216,46 @@ pub fn get_package_item(item_vec: &[(String, CType)], is_all: bool, item_name: &
     v
 }
 
+pub fn get_package_layer(ty: &CType, name: String) -> Option<CType> {
+    if let CType::Package(ty) = ty {
+        let r = get_package_item_by_name(&ty.enums, name.as_str());
+        if r.is_some() {
+            return r;
+        }
+        let r = get_package_item_by_name(&ty.submods, name.as_str());
+        if r.is_some() {
+            return r;
+        }
+        let r = get_package_item_by_name(&ty.structs, name.as_str());
+        if r.is_some() {
+            return r;
+        }
+        let r = get_package_item_by_name(&ty.funs, name.as_str());
+        if r.is_some() {
+            return r;
+        }
+        let r = get_package_item_by_name(&ty.bounds, name.as_str());
+        if r.is_some() {
+            return r;
+        }
+        let r = get_package_item_by_name(&ty.consts, name.as_str());
+        if r.is_some() {
+            return r;
+        }
+    }
+
+    return None;
+}
+
+pub fn get_package_item_by_name(item_vec: &[(String, CType)], name: &str) -> Option<CType> {
+    for item in item_vec {
+        if item.0.eq(name) {
+            return Some(item.1.clone());
+        }
+    }
+    return None;
+}
+
 pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
     println!("package is {:?}", package);
     for item in &package.imports {
@@ -219,6 +265,67 @@ pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
         }
     }
     return CType::Unknown;
+}
+
+//根据单个名字导出,所有目录文件的内容作为一个symboltable返回;
+pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: String, loc: Loc) -> SymbolTableResult {
+    let dir = resolve_whole_dir(package_name.clone());
+    if dir.is_none() {
+        return Err(SymbolTableError {
+            error: format!("找不到包或文件:{:?},", package_name.clone()),
+            location: loc,
+        });
+    }
+    //是文件，已经有.pan后缀
+    let dir = dir.unwrap();
+    if dir.0 {
+        let module = make_ast(&dir.1).unwrap();
+        let md = ModuleDefinition {
+            module_parts: module.content,
+            name: Identifier { loc: Loc::default(), name: package_name.clone() },
+            is_pub: true,
+            package: get_package_name(&module.package_name),
+        };
+        let top_hash_map = builder.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
+        builder.scan_program(&md, &top_hash_map)?;
+        return Ok(());
+    }
+
+    //是路径
+    let mut in_dir = false;
+    for entry in WalkDir::new(dir.1) {
+        let director = entry.unwrap();
+        let path = director.path();
+
+        println!("path:{:?},is .pan:{:?}", path, path.ends_with(".pan"));
+
+        if path.is_file() {
+            if path.extension().unwrap().eq("pan") {
+                let mut s = String::new();
+                s.push_str(path.to_str().unwrap());
+                let module = make_ast(&s).unwrap();
+                let md = ModuleDefinition {
+                    module_parts: module.content,
+                    name: Identifier { loc: Loc::default(), name: get_package_name(&module.package_name) },
+                    is_pub: true,
+                    package: get_package_name(&module.package_name),
+                };
+                let top_hash_map = builder.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
+                builder.scan_program(&md, &top_hash_map)?;
+            }
+        } else {
+            if in_dir {
+                builder.leave_scope();
+            }
+            let name = get_last_name(&String::from(path.to_str().unwrap()));
+            builder.enter_scope(&name, SymbolTableType::Package, 0);
+            in_dir = true;
+        }
+    }
+    builder.leave_scope();
+    println!("build.table:{:#?},", builder.tables);
+
+    Ok(())
 }
 
 

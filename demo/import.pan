@@ -1,10 +1,10 @@
 package default;
-import std.person {Person as PPP, House};
+import std.person.*;
 //以下import都Ok
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import std.color;
+import std.color.*;
 
 pub fun add_pub(a:i32) : i32 {
     return a - 100;

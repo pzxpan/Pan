@@ -401,6 +401,13 @@ impl CType {
                     return (4, cty, 0);
                 }
             }
+        } else if let CType::Bound(ty) = self {
+            //1为无参属性，2为有参属性，3为普通函数，4为静态函数
+            for (method_name, cty) in ty.methods.iter() {
+                if method_name.eq(&name) {
+                    return (3, cty, 0);
+                }
+            }
         }
         (0, &CType::Unknown, 0)
     }
