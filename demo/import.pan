@@ -1,32 +1,25 @@
 package default;
-pub bound Add<T:Self> {
-    pub fun swap(rhs: T) : T {
-        return rhs;
-    }
-}
+import std.person {Person as PPP, House};
+//以下import都Ok
+//import std.person.Person;
+//import std.person.House;
+//import std.person.*;
+import std.color;
 
-pub struct XPoint {
-    pub x: i32,
-    pub y: i32,
+pub fun add_pub(a:i32) : i32 {
+    return a - 100;
 }
-
-pub struct Point impl Add {
-    pub x: i32,
-    pub y: i32,
-    pub fun swap(p:Point) : Point {
-        x += p.x;
-        y += p.y;
-        return self;
-    }
-}
-
 fun main() {
-    let p1 = Point!{x:32,y:45};
-    let p2 = Point!{x:10000, y: 10000};
-    let p3 = p1.swap(p2);
-    let p4 = p3.swap(p2);
-    print(p3.x);
-    print(p3.y);
+  let person = PPP!{age:50,name:"pan"};
+  let bb = person.is_older();
+  print(bb);
+  let house = House!{size:1000.0,price:1000000.0};
+  let dd = house.idea();
+  print(dd);
+  let c = color.Color::Red(10);
+  c.is_warm();
+  let ss = add_pub(10);
+  print(ss);
 }
 
 

@@ -24,6 +24,7 @@ use std::sync::Arc;
 use std::time;
 use pan_bytecode::bytecode::CodeObject;
 use std::ops::Range;
+use std::collections;
 
 struct aaa<A, B> {
     pub a: A,
@@ -95,7 +96,7 @@ fn main() {
     // println!("size:{:?},", std::mem::size_of_val(&v));
 
     // let start = std::time::Instant::now();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("funtype.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
    // test_all_demo_file();
 }

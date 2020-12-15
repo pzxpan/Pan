@@ -113,6 +113,7 @@ pub struct Symbol {
     pub name: String,
     pub scope: SymbolScope,
     pub mutability: SymbolMutability,
+    pub prefix: Vec<String>,
     pub is_referenced: bool,
     pub is_attribute: bool,
     pub is_parameter: bool,
@@ -126,6 +127,20 @@ impl Symbol {
             name: name.to_owned(),
             scope: SymbolScope::Local,
             mutability: SymbolMutability::Mut,
+            prefix: vec![],
+            is_referenced: false,
+            is_attribute: false,
+            is_parameter: false,
+            is_const: false,
+            ty,
+        }
+    }
+    pub fn new_with_package(name: &str, ty: CType, package: Vec<String>) -> Self {
+        Symbol {
+            name: name.to_owned(),
+            scope: SymbolScope::Local,
+            mutability: SymbolMutability::Mut,
+            prefix: package,
             is_referenced: false,
             is_attribute: false,
             is_parameter: false,
@@ -455,8 +470,9 @@ impl SymbolTableBuilder {
             match part {
                 PackagePart::DataDefinition(_) => {}
                 PackagePart::EnumDefinition(def) => {
-                    let enum_ty = hashmap.get(&def.name.name.clone()).unwrap().clone();
-                    self.register_name(&def.name.name.clone(), enum_ty.clone(), SymbolUsage::Attribute, def.loc)?;
+                    let name = def.name.name.clone();
+                    let enum_ty = hashmap.get(&name).unwrap().clone();
+                    self.register_package_item(&def.name.name.clone(), enum_ty.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), name])?;
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Enum, def.loc.1);
                     self.register_name(&"self".to_string(), enum_ty.clone(), SymbolUsage::Used, Loc::default())?;
                     if let CType::Enum(e) = enum_ty.clone() {
@@ -524,8 +540,9 @@ impl SymbolTableBuilder {
                 }
 
                 PackagePart::StructDefinition(def) => {
-                    let struct_ty = hashmap.get(&def.name.name.clone()).unwrap().clone();
-                    self.register_name(&def.name.name.clone(), struct_ty.clone(), SymbolUsage::Attribute, def.loc)?;
+                    let name = &def.name.name.clone();
+                    let struct_ty = hashmap.get(name).unwrap().clone();
+                    self.register_package_item(&name, struct_ty.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), name.to_string()])?;
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
                     self.register_name(&"self".to_string(), struct_ty, SymbolUsage::Attribute, def.loc)?;
                     for generic in &def.generics {
@@ -603,7 +620,12 @@ impl SymbolTableBuilder {
                 //                                                                ret_type: Bool, is_varargs: false, is_pub: true,
                 //                                                                is_mut: false, is_static: false, has_body: true })), ("is_err", Fn(FnType { name: "is_err", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true }))], bases: [], is_pub: true }), false, false, ImmRef)], type_args: [], ret_type: Enum(EnumType { name: "Result", generics: Some([Generic("T", Any), Generic("E", Any)]), items: [("Ok", Reference("Ok", [Unknown])), ("Err", Reference("Err", [Unknown]))], static_methods: [], methods: [("is_ok", Fn(FnType { name: "is_ok", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), ("is_err", Fn(FnType { name: "is_err", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true }))], bases: [], is_pub: true }), is_varargs: false, is_pub: true, is_mut: true, is_static: false, has_body: true });
                 //
-
+                PackagePart::ConstDefinition(def) => {
+                    let ty = def.initializer.get_type(&self.tables)?;
+                    let name = def.name.name.clone();
+                    self.register_package_item(&def.name.name, ty.clone(), SymbolUsage::Import, def.loc, vec![program.package.clone(), name])?;
+                    //  self.register_name(&def.as_ref().name.clone().name, ty.clone(), SymbolUsage::Const, def.loc)?;
+                }
                 PackagePart::FunctionDefinition(def) => {
                     let tt = def.get_type(&self.tables)?;
 
@@ -613,7 +635,8 @@ impl SymbolTableBuilder {
                             // self.scan_expression(expression, &ExpressionContext::Load)?;
                         }
                         self.ret_ty = tt.ret_type().clone();
-                        self.register_name(&name.name, tt.clone(), SymbolUsage::Attribute, def.loc)?;
+                        let fun_name = name.name.clone();
+                        self.register_package_item(&name.name, tt.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), fun_name])?;
                         self.enter_function(&get_full_name(&program.package, &name.name), false, &def.as_ref().params, def.loc.1)?;
                         if def.body.is_some() {
                             self.scan_statement(&def.as_ref().body.as_ref().unwrap())?;
@@ -626,7 +649,8 @@ impl SymbolTableBuilder {
                 }
                 PackagePart::BoundDefinition(def) => {
                     let tt = def.get_type(&self.tables)?;
-                    self.register_name(&def.name.name.clone(), tt.clone(), SymbolUsage::Attribute, def.loc)?;
+                    let name = def.name.name.clone();
+                    self.register_package_item(&def.name.name.clone(), tt.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), name])?;
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
                     self.register_name(&"self".to_string(), tt, SymbolUsage::Attribute, Loc::default())?;
                     for generic in &def.generics {
@@ -697,11 +721,12 @@ impl SymbolTableBuilder {
         }
     }
 
-    //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，
+
     pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> Result<HashMap<String, CType>, SymbolTableError> {
         let package_ty = program.get_type(&self.tables)?;
         self.register_name(&program.package, package_ty.clone(), SymbolUsage::Import, Loc::default());
         let mut hash_map = HashMap::new();
+        //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，所以clone出来的symboltable只为获取它的CType类型
         let mut tables = self.tables.clone();
         for part in &program.module_parts {
             match part {
@@ -2218,6 +2243,88 @@ impl SymbolTableBuilder {
             }
         }
         let mut symbol = Symbol::new(name, ty.clone());
+        match role {
+            SymbolUsage::Attribute => {
+                symbol.is_attribute = true;
+                symbol.mutability = SymbolMutability::Mut;
+            }
+            SymbolUsage::Parameter => {
+                symbol.scope = SymbolScope::Parameter;
+            }
+            SymbolUsage::Const => {
+                symbol.scope = SymbolScope::Const;
+            }
+            SymbolUsage::Import => {
+                symbol.scope = SymbolScope::Global;
+            }
+            SymbolUsage::Builtin => {
+                symbol.scope = SymbolScope::Global;
+            }
+            SymbolUsage::Mut => {
+                symbol.mutability = SymbolMutability::Mut;
+            }
+            SymbolUsage::Immutable => {
+                symbol.mutability = SymbolMutability::Immutable;
+            }
+            SymbolUsage::ImmRef => {
+                symbol.mutability = SymbolMutability::ImmRef;
+            }
+            SymbolUsage::MutRef => {
+                symbol.mutability = SymbolMutability::MutRef;
+            }
+            SymbolUsage::Own => {
+                symbol.mutability = SymbolMutability::Moved;
+            }
+            _ => {}
+        }
+        table.symbols.insert(name.to_owned(), symbol.clone());
+        Ok(())
+    }
+
+    #[allow(clippy::single_match)]
+    fn register_package_item(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc, package: Vec<String>) -> SymbolTableResult {
+        //println!("register_name:{:?},ty:{:?}", name, ty);
+        //忽略_符号
+
+        let table = self.tables.last_mut().unwrap();
+        // for (a, b) in table.symbols.iter() {
+        //     println!("aa:{:?},bb{:?}", a, b);
+        // }
+        let containing = table.symbols.contains_key(name);
+        if containing {
+            if role <= SymbolUsage::Const {
+                match role {
+                    SymbolUsage::Attribute => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'是属性,不能重新绑定 ", name),
+                            location,
+                        });
+                    }
+                    SymbolUsage::Builtin => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'内建类型,不能重新绑定 ", name),
+                            location,
+                        });
+                    }
+                    SymbolUsage::Const => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'是常量,不能重新赋值和定义", name),
+                            location,
+                        });
+                    }
+                    SymbolUsage::Import => {
+                        //import 允许重复导入，后面一次覆盖前一次
+                    }
+                    _ => {
+                        return Err(SymbolTableError {
+                            error: format!("'{}'重复定义", name),
+                            location,
+                        });
+                    }
+                }
+            }
+        }
+        let mut symbol = Symbol::new_with_package(name, ty.clone(), package);
         match role {
             SymbolUsage::Attribute => {
                 symbol.is_attribute = true;

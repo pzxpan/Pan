@@ -1835,10 +1835,17 @@ impl<O: OutputStream> Compiler<O> {
                         self.load_name("self");
                         self.emit(LoadAttr(name.clone()));
                     } else {
-                        self.load_name(name);
+                        let resolved = self.resolve_compile_package(name.clone())?;
+                        if !resolved {
+                            self.load_name(name);
+                        }
                     }
                 } else {
-                    self.load_name(name);
+                    // let s = self.get_resolve_path(name.clone());
+                    let resolved = self.resolve_compile_package(name.clone())?;
+                    if !resolved {
+                        self.load_name(name);
+                    }
                 }
             }
             Yield(_, _) => {}
@@ -2338,16 +2345,16 @@ impl<O: OutputStream> Compiler<O> {
         unreachable!()
     }
 
-    fn lookup_fn_in_package(&self, name: &str) -> &Symbol {
+    fn lookup_in_package(&self, name: &str) -> Option<&Symbol> {
         println!("Looking up {:?}", name);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
             if symbol.is_some() {
-                return symbol.unwrap();
+                return Some(symbol.unwrap());
             }
         }
-        unreachable!()
+        None
     }
 
     fn variable_local_scope(&self, name: &str) -> bool {
@@ -2572,6 +2579,27 @@ impl<O: OutputStream> Compiler<O> {
         Ok(())
     }
 
+    fn get_resolve_path(&self, name: String) -> Vec<String> {
+        let symbol = self.lookup_name(&name);
+        return symbol.prefix.clone();
+    }
+    fn resolve_compile_package(&mut self, name: String) -> Result<bool, CompileError> {
+        let package = self.get_resolve_path(name);
+        if package.is_empty() {
+            return Ok(false);
+        }
+        let package_name = package.get(0).unwrap();
+        let scope = self.scope_for_name(&package_name);
+        let p = self.variable_position(&package_name).unwrap();
+        self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+        for item_name in package.iter().skip(1) {
+            let p = self.variable_position(&item_name).unwrap();
+            self.emit(Instruction::LoadConst(
+                bytecode::Constant::Integer(p.1 as i32)));
+            self.emit(Instruction::Subscript);
+        }
+        return Ok(true);
+    }
     fn resolve_compile_attribute(&mut self, expr: &Expression) -> Result<bool, CompileError> {
         let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
 
