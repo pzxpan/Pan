@@ -7,8 +7,9 @@ package default;
 import color;
 
 fun main() {
-  let c = Color::Red(10);
-  c.is_warm();
+    let p = Person!{age:100,name:"pdd"};
+    let c = p.older_than(40);
+    print(c);
 }
 
 

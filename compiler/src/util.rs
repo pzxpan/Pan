@@ -271,7 +271,7 @@ pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
 }
 
 //根据单个名字导出,所有目录文件的内容作为一个symboltable返回;
-pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: String, loc: Loc) -> SymbolTableResult {
+pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: String, loc: Loc) -> SymbolTableResult {
     let dir = resolve_whole_dir(package_name.clone());
     if dir.is_none() {
         return Err(SymbolTableError {
@@ -290,7 +290,7 @@ pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: S
             is_pub: true,
             package: get_package_name(&module.package_name),
         };
-        let top_hash_map = builder.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
+        let top_hash_map = builder.scan_top_symbol_types(&md)?;
         builder.scan_program(&md, &top_hash_map)?;
         return Ok(());
     }
@@ -314,7 +314,7 @@ pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: S
                     is_pub: true,
                     package: get_package_name(&module.package_name),
                 };
-                let top_hash_map = builder.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
+                let top_hash_map = builder.scan_top_symbol_types(&md)?;
                 builder.scan_program(&md, &top_hash_map)?;
                 let top = builder.tables.last();
                 println!("last_table:{:#?}", top);
@@ -335,7 +335,7 @@ pub fn get_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: S
 }
 
 
-pub fn compile_import_symbol<O:OutputStream>(compiler: &mut Compiler<O>, package_name: String, loc: Loc) -> Result<ModuleDefinition, CompileError> {
+pub fn compile_import_symbol<O: OutputStream>(compiler: &mut Compiler<O>, package_name: String, loc: Loc) -> Result<ModuleDefinition, CompileError> {
     let dir = resolve_whole_dir(package_name.clone());
     if dir.is_none() {
         return Err(CompileError {

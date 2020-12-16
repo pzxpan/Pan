@@ -18,7 +18,7 @@ use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds,
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
-use crate::util::{get_pos_lambda_name, get_package_name, get_mod_name, get_item_from_package, get_import, get_import_symbol_table, get_package_layer};
+use crate::util::{get_pos_lambda_name, get_package_name, get_mod_name, get_item_from_package, get_import, resolve_import_symbol_table, get_package_layer};
 use crate::util::get_attribute_vec;
 use std::process::{exit, id};
 use crate::util::get_full_name;
@@ -33,7 +33,7 @@ pub fn make_symbol_table(program: &ast::ModuleDefinition) -> Result<SymbolTable,
     builder.package = program.package.clone();
     builder.prepare(program.package.clone());
     builder.insert_builtin_symbol();
-    let top_hash_map = builder.scan_top_symbol_types(program, false, false, Option::None, Option::None)?;
+    let top_hash_map = builder.scan_top_symbol_types(program)?;
     builder.scan_program(program, &top_hash_map)?;
     builder.finish()
 }
@@ -469,6 +469,17 @@ impl SymbolTableBuilder {
         self.enter_scope(&program.package, SymbolTableType::Package, program.name.loc.1);
         for part in &program.module_parts {
             match part {
+                PackagePart::ImportDirective(import) => {
+                    match import {
+                        Import::Plain(v,is_all) => {
+                            let top_name = v.get(0).unwrap();
+                           // resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
+                            let ty = &self.get_register_type(top_name.name.clone())?;
+                            self.resovle_import(&v[1..], ty, true, Option::None, Option::None)?;
+                        }
+                        _=> {}
+                    }
+                }
                 PackagePart::DataDefinition(_) => {}
                 PackagePart::EnumDefinition(def) => {
                     let name = def.name.name.clone();
@@ -723,7 +734,7 @@ impl SymbolTableBuilder {
     }
 
 
-    pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition, in_import: bool, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> Result<HashMap<String, CType>, SymbolTableError> {
+    pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition) -> Result<HashMap<String, CType>, SymbolTableError> {
         let mut hash_map = HashMap::new();
         //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，所以clone出来的symboltable只为获取它的CType类型
         let mut tables = self.tables.clone();
@@ -733,9 +744,9 @@ impl SymbolTableBuilder {
                     match import {
                         Import::Plain(v, is_all) => {
                             let top_name = v.get(0).unwrap();
-                            get_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
-                            let ty = &self.get_register_type(top_name.name.clone())?;
-                            self.resovle_import(&v[1..], ty, true, Option::None, Option::None)?;
+                            resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
+                            // let ty = &self.get_register_type(top_name.name.clone())?;
+                            // self.resovle_import(&v[1..], ty, true, Option::None, Option::None)?;
                         }
                         _ => {}
                     }
@@ -2636,7 +2647,7 @@ impl SymbolTableBuilder {
                 is_pub: true,
                 package: get_package_name(&module.package_name),
             };
-            let top_hashmap = self.scan_top_symbol_types(&md, false, false, Option::None, Option::None)?;
+            let top_hashmap = self.scan_top_symbol_types(&md)?;
             self.scan_program(&md, &top_hashmap)?;
         }
         Ok(())

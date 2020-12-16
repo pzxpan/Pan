@@ -99,7 +99,7 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     let module_name = util::get_mod_name(String::from(path.to_str().unwrap()));
     let module = ast.unwrap();
     let md = ModuleDefinition { module_parts: module.content, name: Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: util::get_package_name(&module.package_name) };
-    build.scan_top_symbol_types(&md, true, *is_all, item_name, as_name)?;
+    build.scan_top_symbol_types(&md)?;
     Ok(())
 }
 

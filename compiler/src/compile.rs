@@ -212,10 +212,7 @@ impl<O: OutputStream> Compiler<O> {
     }
 
     fn get_full_name(&self, package: &String, s: &str) -> String {
-        let mut tmp = package.clone();
-        tmp.push_str("$");
-        tmp.push_str(s);
-        return tmp;
+        return String::from(s);
     }
     pub fn compile_program(
         &mut self,
@@ -278,8 +275,14 @@ impl<O: OutputStream> Compiler<O> {
         for (size, part) in program.module_parts.iter().enumerate() {
             match part {
                 ast::PackagePart::ImportDirective(import) => {
-                    self.emit(Instruction::LoadConst(Constant::None));
-                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                    match import {
+                        Import::Plain(v, is_all) => {
+                            let vv: Vec<String> = v.iter().map(|s| s.name.clone()).collect();
+                            self.resovle_import_item(vv)?;
+                           // self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                        }
+                        _ => {}
+                    }
                 }
                 ast::PackagePart::DataDefinition(_) => {}
                 ast::PackagePart::EnumDefinition(def) => {
@@ -345,7 +348,7 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         //TODO
-        self.emit(Instruction::BuildList(program.module_parts.len() - import_size, false));
+        self.emit(Instruction::BuildList(program.module_parts.len(), false));
         //self.emit(Instruction::BuildList(program.module_parts.len(), false));
         let scope = self.scope_for_name(&program.package);
         self.emit(Instruction::StoreNewVariable(scope));
@@ -363,7 +366,7 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
             //位置有问题，
             self.emit(Instruction::LoadConst(
-                bytecode::Constant::Integer(0 as i32)));
+                bytecode::Constant::Integer(main_index as i32)));
             self.emit(Instruction::Subscript);
             self.emit(Instruction::CallFunction(CallType::Positional(0)));
             self.emit(Instruction::Pop);
@@ -2611,6 +2614,23 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::Subscript);
         }
         return Ok(true);
+    }
+
+    fn resovle_import_item(&mut self, package: Vec<String>) -> Result<(), CompileError> {
+        let package_name = package.get(0).unwrap();
+        let scope = self.scope_for_name(&package_name);
+        let p = self.variable_position(&package_name).unwrap();
+        self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+        self.emit(Instruction::LoadConst(
+            bytecode::Constant::Integer(0 as i32)));
+        self.emit(Instruction::Subscript);
+        for item_name in package.iter().skip(1) {
+            let p = self.variable_position(&item_name).unwrap();
+            self.emit(Instruction::LoadConst(
+                bytecode::Constant::Integer(p.1 as i32)));
+            self.emit(Instruction::Subscript);
+        }
+        Ok(())
     }
     fn resolve_compile_attribute(&mut self, expr: &Expression) -> Result<bool, CompileError> {
         let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
