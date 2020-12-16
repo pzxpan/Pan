@@ -4,7 +4,7 @@ use crate::symboltable::*;
 use crate::ctype::*;
 use crate::ctype::CType::{Bool, Unknown};
 use std::ops::Deref;
-use crate::util::{get_attribute_vec, get_mod_name, get_package_name};
+use crate::util::{get_attribute_vec, get_mod_name, get_package_name, get_package_layer};
 use crate::util::get_full_name;
 use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
@@ -966,7 +966,10 @@ fn resolve_attribute(expr: &Expression, ty: &CType, tables: &Vec<SymbolTable>) -
     let len = v.len();
     for (idx, name) in v.iter().enumerate() {
         if idx < len - 1 {
-            if let CType::Struct(_) = cty.clone() {
+            if let CType::Package(_) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                cty = get_package_layer(&cty, attri_name.0).unwrap();
+            } else if let CType::Struct(_) = cty.clone() {
                 let attri_name = v.get(idx + 1).unwrap().clone();
                 let tmp = cty.attri_name_type(attri_name.0.clone());
                 // attri_type = tmp.0;

@@ -18,7 +18,7 @@ use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds,
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
-use crate::util::{get_pos_lambda_name, get_package_name, get_mod_name, get_item_from_package, get_import, resolve_import_symbol_table, get_package_layer};
+use crate::util::{get_pos_lambda_name, get_package_name, get_mod_name, get_item_from_package, get_import, resolve_import_symbol_table, get_package_layer, get_package_item_by_name};
 use crate::util::get_attribute_vec;
 use std::process::{exit, id};
 use crate::util::get_full_name;
@@ -471,25 +471,25 @@ impl SymbolTableBuilder {
             match part {
                 PackagePart::ImportDirective(import) => {
                     match import {
-                        Import::Plain(v,is_all) => {
+                        Import::Plain(v, is_all) => {
                             let top_name = v.get(0).unwrap();
-                           // resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
+                            // resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
                             let ty = &self.get_register_type(top_name.name.clone())?;
                             self.resovle_import(&v[1..], ty, true, Option::None, Option::None)?;
                         }
-                        _=> {}
+                        _ => {}
                     }
                 }
                 PackagePart::DataDefinition(_) => {}
                 PackagePart::EnumDefinition(def) => {
-                    let name = def.name.name.clone();
-                    let enum_ty = hashmap.get(&name).unwrap().clone();
-                    self.register_package_item(&def.name.name.clone(), enum_ty.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), name])?;
+                    let enum_name = &def.name.name;
+                    let enum_ty = hashmap.get(enum_name).unwrap().clone();
+                    self.register_package_item(&def.name.name.clone(), enum_ty.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), enum_name.clone()])?;
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Enum, def.loc.1);
                     self.register_name(&"self".to_string(), enum_ty.clone(), SymbolUsage::Used, Loc::default())?;
                     if let CType::Enum(e) = enum_ty.clone() {
                         for tys in e.items {
-                            self.register_name(&tys.0, tys.1, SymbolUsage::Attribute, Loc::default());
+                            self.register_package_item(&tys.0, tys.1, SymbolUsage::Attribute, Loc::default(), vec![enum_name.clone()]);
                         }
                         if e.generics.is_some() {
                             for generic in e.generics.unwrap().iter() {
@@ -505,7 +505,7 @@ impl SymbolTableBuilder {
                                     let self_symbol = !tt.is_static();
                                     self.ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
-                                    self.register_name(&name.name, tt, SymbolUsage::Mut, def.loc)?;
+                                    self.register_package_item(&name.name, tt, SymbolUsage::Mut, def.loc, vec![enum_name.clone()])?;
                                     if let Some(tys) = &def.as_ref().returns {
                                         let ty = tys.get_type(&self.tables);
                                         // self.scan_expression(expression, &ExpressionContext::Load)?;
@@ -552,9 +552,9 @@ impl SymbolTableBuilder {
                 }
 
                 PackagePart::StructDefinition(def) => {
-                    let name = &def.name.name.clone();
-                    let struct_ty = hashmap.get(name).unwrap().clone();
-                    self.register_package_item(&name, struct_ty.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), name.to_string()])?;
+                    let struct_name = &def.name.name.clone();
+                    let struct_ty = hashmap.get(struct_name).unwrap().clone();
+                    self.register_package_item(&struct_name, struct_ty.clone(), SymbolUsage::Attribute, def.loc, vec![program.package.clone(), struct_name.to_string()])?;
                     self.enter_scope(&get_full_name(&program.package, &def.name.name.clone()), SymbolTableType::Struct, def.loc.1);
                     self.register_name(&"self".to_string(), struct_ty, SymbolUsage::Attribute, def.loc)?;
                     for generic in &def.generics {
@@ -588,7 +588,7 @@ impl SymbolTableBuilder {
                                     let self_symbol = !tt.is_static();
                                     self.ret_ty = tt.ret_type().clone();
                                     let mut return_name = "".to_string();
-                                    self.register_name(&name.name, tt, SymbolUsage::Attribute, def.loc)?;
+                                    self.register_package_item(&name.name, tt, SymbolUsage::Attribute, def.loc, vec![struct_name.to_string()])?;
                                     if let Some(expression) = &def.as_ref().returns {
                                         let tty = expression.get_type(&self.tables);
                                         return_name = expression.name();
@@ -2363,18 +2363,33 @@ impl SymbolTableBuilder {
 
     fn resolve_attribute(&mut self, expr: &Expression, ty: &CType) -> Result<CType, SymbolTableError> {
         let v = get_attribute_vec(expr);
-        let mut cty = ty;
+        let mut cty = ty.clone();
+        let mut tt: Option<CType> = Option::None;
         let len = v.len();
         for (idx, name) in v.iter().enumerate() {
             if idx < len - 1 {
-                if let CType::Struct(_) = cty.clone() {
+                if let CType::Package(pk) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+
+                    tt = get_package_layer(&cty, attri_name.0);
+                    cty = tt.unwrap().clone();
+                    // if tmp.is_some() {
+                    //     let a = tmp.unwrap();
+                    //     cty = &a;
+                    // } else {
+                    //     return Err(SymbolTableError {
+                    //         error: format!("{:?}包中找不到:{:?}", name.0, attri_name.0),
+                    //         location: expr.loc().clone(),
+                    //     });
+                    // }
+                } else if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     if !self.in_struct_scope(attri_name.0.clone()) {
-                        self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
+                        self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
                     }
                     // attri_type = tmp.0;
-                    cty = tmp.1;
+                    cty = tmp.1.clone();
                 } else if let CType::Tuple(n) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let index = attri_name.0.parse::<i32>().unwrap();
@@ -2385,15 +2400,15 @@ impl SymbolTableBuilder {
                         });
                     }
                     let tmp = cty.attri_index(index);
-                    cty = tmp;
+                    cty = tmp.clone();
                 } else if let CType::Enum(n) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     //println!("tmp:{:?}", tmp);
                     if !self.in_struct_scope(attri_name.0.clone()) {
-                        self.verify_field_visible(cty, name.0.clone(), attri_name.0.clone())?;
+                        self.verify_field_visible(&cty, name.0.clone(), attri_name.0.clone())?;
                     }
-                    return Ok(cty.clone());
+                    return Ok(cty);
                 } else {
                     return Err(SymbolTableError {
                         error: format!("只有struct和tuple,enum类型才有属性"),
@@ -2402,7 +2417,7 @@ impl SymbolTableBuilder {
                 }
             }
         }
-        Ok(cty.clone())
+        Ok(cty)
     }
 
     fn resovle_import(&mut self, idents: &[Identifier], ty: &CType, is_all: bool, ident_name: Option<String>, as_name: Option<String>) -> Result<(), SymbolTableError> {
@@ -2516,7 +2531,10 @@ impl SymbolTableBuilder {
                 continue;
             }
             if idx < len - 1 {
-                if let CType::Struct(_) = cty.clone() {
+                if let CType::Package(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    cty = get_package_layer(&cty, attri_name.0).unwrap();
+                } else if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     attri_type = tmp.0;

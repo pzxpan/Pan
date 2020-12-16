@@ -552,7 +552,9 @@ impl Frame {
         let arr = self.pop_value();
         println!("subscript:{:?},arr {:?}", subscript, arr);
         let value = vm.get_item(arr, subscript).unwrap();
+        println!("subscript_result:{:?}", value.clone());
         self.push_value(value);
+
         None
     }
 

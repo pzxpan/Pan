@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
@@ -279,7 +279,7 @@ impl<O: OutputStream> Compiler<O> {
                         Import::Plain(v, is_all) => {
                             let vv: Vec<String> = v.iter().map(|s| s.name.clone()).collect();
                             self.resovle_import_item(vv)?;
-                           // self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                            // self.emit(Instruction::StoreNewVariable(NameScope::Global));
                         }
                         _ => {}
                     }
@@ -2171,8 +2171,10 @@ impl<O: OutputStream> Compiler<O> {
         args: &[ast::NamedArgument],
     ) -> Result<(), CompileError> {
         let mut is_constructor = false;
+        is_constructor = self.is_constructor(function);
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
-            is_constructor = self.is_constructor(name);
+            //有问题，多层没处理
+
             self.resolve_package();
             let p = self.variable_position(name.as_str()).unwrap();
             self.emit(Instruction::LoadConst(
@@ -2417,19 +2419,26 @@ impl<O: OutputStream> Compiler<O> {
     }
     fn is_enum_variant_def(&self, expr: &Expression) -> bool {
         let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
-
+        println!("enum_variant_def::{:?},", cty);
         let mut v = get_attribute_vec(expr);
-        if cty == CType::Module && v.len() > 1 {
-            let s = v.get(0).unwrap();
-            let mut s2 = v.get(1).unwrap();
-            let s3 = (get_full_name(&s.0, &s2.0), s2.1.clone());
-            cty = self.lookup_name(&get_full_name(&s.0, &s2.0)).ty.clone();
-            v.remove(0);
-            v.insert(0, s3);
-        }
         let len = v.len();
-
-        for (idx, name) in v.iter().enumerate() {
+        println!("ddd:{:?},", v);
+        let mut skip = 0;
+        if let CType::Package(pk) = cty.clone() {
+            for (idx, name) in v.iter().enumerate() {
+                if idx < len - 1 {
+                    if let CType::Package(_) = cty.clone() {
+                        let attri_name = v.get(idx + 1).unwrap().clone();
+                        cty = get_package_layer(&cty, attri_name.0.clone()).unwrap();
+                    } else {
+                        skip = idx;
+                        break;
+                    }
+                }
+            }
+        }
+        println!("aaaddd:{:?}", cty);
+        for (idx, name) in v.iter().enumerate().skip(skip) {
             if idx < len - 1 {
                 if let CType::Enum(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
@@ -2474,17 +2483,40 @@ impl<O: OutputStream> Compiler<O> {
         return false;
     }
 
-    fn is_constructor(&self, name: &str) -> bool {
-        let len: usize = self.symbol_table_stack.len();
-        for i in (0..len).rev() {
-            let symbol = self.symbol_table_stack[i].lookup(name);
-            if let Some(s) = symbol {
-                if let CType::Struct(_) = &s.ty {
-                    return true;
+    fn is_constructor(&self, expr: &Expression) -> bool {
+        let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
+
+        let mut v = get_attribute_vec(&expr);
+        let mut skip = 0;
+        let len = v.len();
+        if let CType::Package(pk) = cty.clone() {
+            for (idx, name) in v.iter().enumerate() {
+                if idx < len - 1 {
+                    if let CType::Package(_) = cty.clone() {
+                        let attri_name = v.get(idx + 1).unwrap().clone();
+                        cty = get_package_layer(&cty, attri_name.0.clone()).unwrap();
+                    } else {
+                        skip = idx;
+                        break;
+                    }
                 }
             }
         }
+        if let CType::Struct(_) = cty {
+            return true;
+        }
         return false;
+
+        // let len: usize = self.symbol_table_stack.len();
+        // for i in (0..len).rev() {
+        //     let symbol = self.symbol_table_stack[i].lookup(name);
+        //     if let Some(s) = symbol {
+        //         if let CType::Struct(_) = &s.ty {
+        //             return true;
+        //         }
+        //     }
+        // }
+        // return false;
     }
 
     fn is_lambda(&self, name: &str) -> bool {
@@ -2632,26 +2664,69 @@ impl<O: OutputStream> Compiler<O> {
         }
         Ok(())
     }
+    //从前往后找,从包名开始;
+    fn resolve_include_pakcage_attribute(&mut self, ty: &CType, v: &Vec<(String, Expression)>) -> Result<bool, CompileError> {
+        let mut cty = ty.clone();
+        let len = v.len();
+        for (idx, name) in v.iter().enumerate() {
+            if idx < len - 1 {
+                if let CType::Package(_) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    cty = get_package_layer(&cty, attri_name.0.clone()).unwrap();
+                    println!("pppp:{:?},", cty);
+                    let p = self.variable_position(&name.0).unwrap();
+                    let scope = self.scope_for_name(&name.0);
+                    self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+                    let p = self.variable_position(&attri_name.0.clone()).unwrap();
+                    let scope = self.scope_for_name(&attri_name.0.clone());
+                    self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
+                } else if let CType::Struct(n) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                    cty = tmp.1.clone();
+                } else if let CType::Enum(n) = cty.clone() {
+                    let attri_name = v.get(idx + 1).unwrap().clone();
+                    let tmp = cty.attri_name_type(attri_name.0.clone());
+                    println!("resolve_whole_path:{:?},name:{:?},attri_name:{:?}", cty, tmp, attri_name);
+                    if tmp.0 == 1 {
+                        //  instructions.push(Instruction::LoadLocalName(p.1, scope.clone()));
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::String(Box::new(attri_name.0.clone()))));
+                        self.emit(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
+                        self.emit(Instruction::LoadBuildEnum(3));
+                    } else if tmp.0 == 2 {
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::String(Box::new(attri_name.0.clone()))));
+                        self.emit(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
+                    }
+                    if tmp.0 > 2 {
+                        // instructions.push(Instruction::LoadLocalName(p.1, scope));
+                        self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                        // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));
+                        // self.emit(Instruction::LoadAttr(attri_name.0.clone()));
+                    }
+                    cty = tmp.1.clone();
+                }
+            }
+        }
+        return Ok(false);
+    }
     fn resolve_compile_attribute(&mut self, expr: &Expression) -> Result<bool, CompileError> {
         let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
 
         let mut v = get_attribute_vec(expr);
-        if cty == CType::Module && v.len() > 1 {
-            let s = v.get(0).unwrap();
-            let mut s2 = v.get(1).unwrap();
-            let s3 = (get_full_name(&s.0, &s2.0), s2.1.clone());
-            cty = self.lookup_name(&get_full_name(&s.0, &s2.0)).ty.clone();
-            v.remove(0);
-            v.remove(0);
-            v.insert(0, s3);
-        }
+
         let mut self_instruction: Option<Instruction> = None;
         let len = v.len();
         let mut capture_name = "".to_string();
         let mut instructions: Vec<Instruction> = Vec::new();
         for (idx, name) in v.iter().enumerate() {
             if idx < len - 1 {
-                if let CType::Struct(_) = cty.clone() {
+                if let CType::Package(_) = cty.clone() {
+                    return self.resolve_include_pakcage_attribute(&cty, &v);
+                } else if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
                     let p = self.variable_position(&name.0).unwrap();
