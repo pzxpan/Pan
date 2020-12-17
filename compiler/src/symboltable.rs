@@ -2277,6 +2277,9 @@ impl SymbolTableBuilder {
     fn register_package_item(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc, package: Vec<String>) -> SymbolTableResult {
         //println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
+        if name.eq("AAA") {
+            println!("fuck");
+        }
 
         let table = self.tables.last_mut().unwrap();
         // for (a, b) in table.symbols.iter() {
@@ -2487,35 +2490,35 @@ impl SymbolTableBuilder {
             }
         }
         println!("cty:{:?},", cty);
-        if is_all {
-            if let CType::Package(ty) = cty {
-                for (name, ty) in ty.enums.iter() {
-                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-                }
-                for (name, ty) in ty.bounds.iter() {
-                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-                }
-                for (name, ty) in ty.structs.iter() {
-                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-                }
-                for (name, ty) in ty.funs.iter() {
-                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-                }
-                for (name, ty) in ty.consts.iter() {
-                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-                }
-                for (name, ty) in ty.submods.iter() {
-                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-                }
-            } else if let CType::Struct(sty) = cty {
-                sty.methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                sty.static_methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-            } else if let CType::Enum(ety) = cty {
-                ety.methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                ety.static_methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-                ety.items.iter().map(|(name, ty, ..)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-            }
-        }
+        // if is_all {
+        //     if let CType::Package(ty) = cty {
+        //         for (name, ty) in ty.enums.iter() {
+        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+        //         }
+        //         for (name, ty) in ty.bounds.iter() {
+        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+        //         }
+        //         for (name, ty) in ty.structs.iter() {
+        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+        //         }
+        //         for (name, ty) in ty.funs.iter() {
+        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+        //         }
+        //         for (name, ty) in ty.consts.iter() {
+        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+        //         }
+        //         for (name, ty) in ty.submods.iter() {
+        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+        //         }
+        //     } else if let CType::Struct(sty) = cty {
+        //         sty.methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
+        //         sty.static_methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
+        //     } else if let CType::Enum(ety) = cty {
+        //         ety.methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
+        //         ety.static_methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
+        //         ety.items.iter().map(|(name, ty, ..)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
+        //     }
+        // }
         Ok(())
     }
 

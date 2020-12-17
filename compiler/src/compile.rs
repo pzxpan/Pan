@@ -29,12 +29,32 @@ use crate::file_cache_symboltable::{make_ast, resolve_file_name};
 
 lazy_static! {
     static ref CONST_MAP: Mutex<HashMap<String,Constant>> = Mutex::new(HashMap::new());
+    static ref TABLE_MAP: Mutex<HashMap<String,SymbolTable>> = Mutex::new(HashMap::new());
     static ref BUILTIN_NAME: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
 
 pub fn insert(name: String, value: Constant) {
     let ref mut map = CONST_MAP.lock().unwrap();
     map.insert(name, value);
+}
+
+pub fn insert_table(name: String, value: SymbolTable) {
+    let ref mut map = TABLE_MAP.lock().unwrap();
+    println!("insert:{:?},", name);
+    map.insert(name, value.clone());
+    println!("insert_end:{:?},", value);
+}
+
+pub fn get_table(name: String) -> Option<SymbolTable> {
+    println!("dddooo:{:?},", name);
+    let ref mut map = TABLE_MAP.lock().unwrap();
+    let dd = map.get(&name);
+    if dd.is_some() {
+        println!("valdddd:{:?},", dd);
+        Some(dd.unwrap().to_owned())
+    } else {
+        None
+    }
 }
 
 pub fn insert_builtin_name(name: String) {
@@ -154,6 +174,11 @@ pub fn compile_program(
     is_import: bool,
 ) -> Result<(String, CodeObject), CompileError> {
     let symbol_table = make_symbol_table(&ast)?;
+    for i in symbol_table.sub_tables.iter() {
+        insert_table(i.name.clone(), i.clone());
+        println!("ddddname:{:?},value:{:?}", i.name.clone(), i.clone())
+    }
+
     let r = with_compiler(source_path, optimize, ast.package.clone(), symbol_table, |compiler| {
         //  println!("sybmol{:#?}", symbol_table);
         resolve_builtin_fun(compiler);
@@ -224,12 +249,9 @@ impl<O: OutputStream> Compiler<O> {
         // self.symbol_table_stack.push(symbol_table);
         // let mut size_before = self.output_stack.len();
 
-        println!("tables is:{:#?}", self.symbol_table_stack);
-        let mut import_size = 0;
         for (size, part) in program.module_parts.iter().enumerate() {
             match part {
                 ast::PackagePart::ImportDirective(def) => {
-                    import_size += 1;
                     match def {
                         Import::Plain(v, all) => {
                             let top_name = v.get(0).unwrap();
@@ -277,6 +299,8 @@ impl<O: OutputStream> Compiler<O> {
                 ast::PackagePart::ImportDirective(import) => {
                     match import {
                         Import::Plain(v, is_all) => {
+                            //  insert_table(v.get(0).unwrap().name.clone(), self.symbol_table_stack.get(0).unwrap().clone());
+                            // println!("SymbolTable:{:?}", get_table(v.get(0).unwrap().name.clone()));
                             let vv: Vec<String> = v.iter().map(|s| s.name.clone()).collect();
                             self.resovle_import_item(vv)?;
                             // self.emit(Instruction::StoreNewVariable(NameScope::Global));
@@ -657,6 +681,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.leave_scope();
             }
             Match(_, test, bodies) => {
+                println!("match:Expression:{:?},", bodies);
                 let in_match = self.ctx.in_match;
                 self.ctx.in_match = true;
                 self.compile_expression(test)?;
@@ -2567,6 +2592,25 @@ impl<O: OutputStream> Compiler<O> {
         return None;
     }
 
+    fn variable_in_other_package_position(&self, table: &SymbolTable, name: &str) -> Option<(usize, usize)> {
+        let len: usize = table.sub_tables.len();
+        let symbol = table.lookup(name);
+        if symbol.is_some() {
+            let v_index = table.lookup_index(name);
+            return Some((0, v_index.unwrap()));
+        }
+        // for i in (0..len).rev() {
+        //     let table = &table.sub_tables[i];
+        //     let symbol = table.lookup(name);
+        //     if symbol.is_some() {
+        //         let v_index = table.lookup_index(name);
+        //         return Some((i, v_index.unwrap()));
+        //     }
+        // }
+
+        return None;
+    }
+
     fn is_current_scope(&mut self, name: &str) -> bool {
         let table = self.symbol_table_stack.last_mut().unwrap();
         // for symobl in table.symbols.iter() {
@@ -2638,13 +2682,19 @@ impl<O: OutputStream> Compiler<O> {
         let package_name = package.get(0).unwrap();
         let scope = self.scope_for_name(&package_name);
         let p = self.variable_position(&package_name).unwrap();
-        self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
-        for item_name in package.iter().skip(1) {
-            let p = self.variable_position(&item_name).unwrap();
-            self.emit(Instruction::LoadConst(
-                bytecode::Constant::Integer(p.1 as i32)));
-            self.emit(Instruction::Subscript);
+        let ty = self.lookup_name(package_name.as_str());
+        if ty.prefix.is_empty() {
+            self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+            for item_name in package.iter().skip(1) {
+                let p = self.variable_position(&item_name).unwrap();
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Integer(p.1 as i32)));
+                self.emit(Instruction::Subscript);
+            }
+        } else {
+            self.resolve_compile_package(package_name.clone())?;
         }
+
         return Ok(true);
     }
 
@@ -2653,15 +2703,15 @@ impl<O: OutputStream> Compiler<O> {
         let scope = self.scope_for_name(&package_name);
         let p = self.variable_position(&package_name).unwrap();
         self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
-        self.emit(Instruction::LoadConst(
-            bytecode::Constant::Integer(0 as i32)));
-        self.emit(Instruction::Subscript);
-        for item_name in package.iter().skip(1) {
-            let p = self.variable_position(&item_name).unwrap();
-            self.emit(Instruction::LoadConst(
-                bytecode::Constant::Integer(p.1 as i32)));
-            self.emit(Instruction::Subscript);
-        }
+        // self.emit(Instruction::LoadConst(
+        //     bytecode::Constant::Integer(0 as i32)));
+        // self.emit(Instruction::Subscript);
+        // for item_name in package.iter().skip(1) {
+        //     let p = self.variable_position(&item_name).unwrap();
+        //     self.emit(Instruction::LoadConst(
+        //         bytecode::Constant::Integer(p.1 as i32)));
+        //     self.emit(Instruction::Subscript);
+        // }
         Ok(())
     }
     //从前往后找,从包名开始;
@@ -2673,12 +2723,16 @@ impl<O: OutputStream> Compiler<O> {
                 if let CType::Package(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     cty = get_package_layer(&cty, attri_name.0.clone()).unwrap();
-                    println!("pppp:{:?},", cty);
+                    println!("pppp:{:?},name:{:?},attri:{:?}", cty, name, attri_name);
                     let p = self.variable_position(&name.0).unwrap();
                     let scope = self.scope_for_name(&name.0);
                     self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
-                    let p = self.variable_position(&attri_name.0.clone()).unwrap();
-                    let scope = self.scope_for_name(&attri_name.0.clone());
+                    println!("是不是已经被干掉了啊:{:#?},", self.symbol_table_stack);
+                    let table = get_table(name.0.clone()).unwrap();
+                    println!("real_sub_table:{:#?},", table);
+                    //println!("ddddreal_sub_table:{:#?},", subtable);
+                    let p = self.variable_in_other_package_position(&table, &attri_name.0.clone()).unwrap();
+                    //   let scope = self.scope_for_name(&attri_name.0.clone());
                     self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
                     self.emit(Instruction::Subscript);
                 } else if let CType::Struct(n) = cty.clone() {
@@ -2785,7 +2839,13 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::Subscript);
                     }
                 } else if let CType::Enum(_) = cty.clone() {
-                    self.resolve_package();
+                    if idx == 0 {
+                        if self.variable_local_scope(&name.0) {
+                            self.load_name(&name.0);
+                        } else {
+                            self.resolve_package();
+                        }
+                    }
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     //println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
                     let tmp = cty.attri_name_type(attri_name.0.clone());
@@ -2828,12 +2888,11 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::LoadConst(bytecode::Constant::String(attri_name.0.clone())));
                     }
                     if tmp.0 > 2 {
-                        let scope = self.scope_for_name(&name.0);
-                        let p = self.variable_position(&name.0).unwrap();
-                        let p = self.variable_position(&name.0).unwrap();
-                        instructions.push(Instruction::LoadConst(
-                            bytecode::Constant::Integer(p.1 as i32)));
-                        instructions.push(Instruction::Subscript);
+                        // let scope = self.scope_for_name(&name.0);
+                        // let p = self.variable_position(&name.0).unwrap();
+                        // instructions.push(Instruction::LoadConst(
+                        //     bytecode::Constant::Integer(p.1 as i32)));
+                        // instructions.push(Instruction::Subscript);
                         // instructions.push(Instruction::LoadLocalName(p.1, scope));
                         instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
                         // self.emit(Instruction::LoadName(name.0.clone(), NameScope::Local));

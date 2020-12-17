@@ -9,7 +9,8 @@ import color;
 fun main() {
     let c = color.Color::Red(10);
     let d = c.is_warm();
-    let e = color.Person!{name:"pan",age:30};
+    let dd = color.add_pub(20);
+    print(dd);
     print(d);
 }
 
