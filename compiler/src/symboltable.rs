@@ -736,7 +736,7 @@ impl SymbolTableBuilder {
 
     pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition) -> Result<HashMap<String, CType>, SymbolTableError> {
         let mut hash_map = HashMap::new();
-
+        let mut hash_set = HashSet::new();
         //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，所以clone出来的symboltable只为获取它的CType类型
         let mut tables = self.tables.clone();
         for part in &program.module_parts {
@@ -745,7 +745,10 @@ impl SymbolTableBuilder {
                     match import {
                         Import::Plain(v, is_all) => {
                             let top_name = v.get(0).unwrap();
-                            resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
+                            if !hash_set.contains(&top_name.name) {
+                                hash_set.insert(top_name.name.clone());
+                                resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
+                            }
                             let ty = &self.get_register_type(top_name.name.clone())?;
                             let last_item = v.last().unwrap();
                             let item_name = last_item.name.clone();

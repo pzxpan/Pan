@@ -248,15 +248,19 @@ impl<O: OutputStream> Compiler<O> {
         let mut found_main = false;
         // self.symbol_table_stack.push(symbol_table);
         // let mut size_before = self.output_stack.len();
-
+        let mut hash_set = HashSet::new();
         for (size, part) in program.module_parts.iter().enumerate() {
             match part {
                 ast::PackagePart::ImportDirective(def) => {
                     match def {
                         Import::Plain(v, all) => {
                             let top_name = v.get(0).unwrap();
-                            let md = compile_import_symbol(self, top_name.name.clone(), top_name.loc)?;
-                            self.compile_program(&md, true)?;
+                            if !hash_set.contains(&top_name.name) {
+                                hash_set.insert(top_name.name.clone());
+                                let md = compile_import_symbol(self, top_name.name.clone(), top_name.loc)?;
+                                self.compile_program(&md, true)?;
+                            }
+
 
                             // let file = resolve_file_name(mod_path);
                             // if file.is_some() {
