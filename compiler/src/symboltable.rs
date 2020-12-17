@@ -743,7 +743,7 @@ impl SymbolTableBuilder {
             match part {
                 PackagePart::ImportDirective(import) => {
                     match import {
-                        Import::Plain(v, is_all) => {
+                        Import::Plain(b, v, is_all) => {
                             let top_name = v.get(0).unwrap();
                             if !hash_set.contains(&top_name.name) {
                                 hash_set.insert(top_name.name.clone());

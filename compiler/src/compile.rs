@@ -253,7 +253,7 @@ impl<O: OutputStream> Compiler<O> {
             match part {
                 ast::PackagePart::ImportDirective(def) => {
                     match def {
-                        Import::Plain(v, all) => {
+                        Import::Plain(b, v, all) => {
                             let top_name = v.get(0).unwrap();
                             if !hash_set.contains(&top_name.name) {
                                 hash_set.insert(top_name.name.clone());
@@ -275,10 +275,10 @@ impl<O: OutputStream> Compiler<O> {
                             //     self.compile_program(&md, self.symbol_table_stack.last().unwrap().clone(), true);
                             // }
                         }
-                        Import::Rename(mod_path, as_name) => {
+                        Import::Rename(b, mod_path, as_name) => {
                             //   resolve_import_compile(self, &mod_path, Some(as_name.clone().name), &all)?;
                         }
-                        Import::PartRename(mod_path, as_part) => {
+                        Import::PartRename(b, mod_path, as_part) => {
                             // for (name, a_name) in as_part {
                             //     let mut path = mod_path.clone();
                             //     path.extend_from_slice(&name);
@@ -303,7 +303,7 @@ impl<O: OutputStream> Compiler<O> {
             match part {
                 ast::PackagePart::ImportDirective(import) => {
                     match import {
-                        Import::Plain(v, is_all) => {
+                        Import::Plain(b,v, is_all) => {
                             //  insert_table(v.get(0).unwrap().name.clone(), self.symbol_table_stack.get(0).unwrap().clone());
                             // println!("SymbolTable:{:?}", get_table(v.get(0).unwrap().name.clone()));
 
