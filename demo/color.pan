@@ -18,43 +18,38 @@ pub enum Color {
            }
       }
 }
-pub struct House {
-    pub size: f64,
-    pub price: f64,
-
-
-    pub fun idea(): bool {
-        return price / size > 10000.0;
-    }
-    pub fun ::static() :bool {
-        return true;
-    }
-}
-pub fun add_pub(a:i32) :i32 {
-    return a + 100111;
-}
-pub fun name_call(age:i32, name:string) : bool {
-   return age > 30;
-}
 pub struct Person {
     pub age: i32,
-    pub name: string,
-   // pub address: string,
-  //  money: i32,
-    //pub house: House,
+    pub name: mut string,
+    pub fun older_than(a: i32): bool {
+            age = age + 10000;
+            return age > a;
+    }
+    pub fun older_than2(a: i32): bool {
+         age = age + 10000;
+         return age > a;
+    }
 
-    pub fun add_pub(a:i32) :i32 {
-        return a - 10000;
+    pub fun older_than3(a: i32): bool {
+        older_than(40);
+        age = age + 10000;
+        return age > a;
     }
-    pub fun is_older(): bool {
-      let c = add_pub(self.age);
-      print(c);
-      return age > 20;
+
+
+    pub const fun is_older(): bool {
+        //let aaaaaa = older_than(30);
+        //let c = typeof(aaaaaa);
+        //print(c);
+        let ccc = 100;
+        ccc = ccc + age;
+        return age > 40;
     }
+
 }
 
-fun add(a:i32,b:i32) : i32 {
-    return a + b;
+pub fun add(a:i32) : i32 {
+    return a+ 1000;
 }
 
 

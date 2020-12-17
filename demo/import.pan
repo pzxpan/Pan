@@ -4,13 +4,16 @@ package default;
 //import std.person.Person;
 //import std.person.House;
 //import std.person.*;
-import color;
+
+import color.AAA;
+import color.Color;
 
 fun main() {
-    let c = color.Color::Red(10);
+    let a = color.AAA;
+    print(a);
+    let c = Color::Red(10);
     let d = c.is_warm();
-    let dd = color.add_pub(20);
-    print(dd);
+
     print(d);
 }
 

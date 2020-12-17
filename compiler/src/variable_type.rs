@@ -359,61 +359,22 @@ impl HasType for ModuleDefinition {
         for part in &self.module_parts {
             match part {
                 PackagePart::ModuleDefinition(m) => {
-                    submods.push((m.package.clone(), m.get_type(tables)?));
+                    submods.push((m.is_pub, m.package.clone(), m.get_type(tables)?));
                 }
                 PackagePart::EnumDefinition(m) => {
-                    enums.push((m.name.name.clone(), m.get_type(tables)?));
+                    enums.push((m.is_pub, m.name.name.clone(), m.get_type(tables)?));
                 }
                 PackagePart::StructDefinition(m) => {
-                    structs.push((m.name.name.clone(), m.get_type(tables)?));
+                    structs.push((m.is_pub, m.name.name.clone(), m.get_type(tables)?));
                 }
                 PackagePart::FunctionDefinition(m) => {
-                    funs.push((m.name.as_ref().unwrap().name.clone(), m.get_type(tables)?));
+                    funs.push((m.is_pub, m.name.as_ref().unwrap().name.clone(), m.get_type(tables)?));
                 }
                 PackagePart::ConstDefinition(m) => {
-                    consts.push((m.name.name.clone(), m.initializer.get_type(&tables)?));
+                    consts.push((m.is_pub, m.name.name.clone(), m.initializer.get_type(&tables)?));
                 }
-                // PackagePart::ImportDirective(import) => {
-                //     match import {
-                //         Import::Plain(mod_path, all) => {
-                //
-                //             let file_name = resolve_file_name(&mod_path);
-                //             if file_name.is_some() {
-                //                 let file_name = file_name.unwrap();
-                //                 if !file_name.0 {
-                //                     let module = make_ast(&file_name.1).unwrap();
-                //                     let md = ModuleDefinition {
-                //                         module_parts: module.content,
-                //                         name: Identifier { loc: Loc::default(), name: get_mod_name(file_name.1) },
-                //                         is_pub: true,
-                //                         package: get_package_name(&module.package_name),
-                //                     };
-                //                     println!("mod_name{:?},", module.package_name);
-                //                     imports.push((md.package.clone(), md.get_type(tables)?));
-                //                 }
-                //             }
-                //         }
-                //         _ => {}
-                //         // Import::Rename(mod_path, as_name, all) => {
-                //         //     scan_import_symbol(self, mod_path, Some(as_name.clone().name), all)?;
-                //         // }
-                //         // Import::PartRename(mod_path, as_part) => {
-                //         //     for (name, a_name) in as_part {
-                //         //         let mut path = mod_path.clone();
-                //         //         path.extend_from_slice(&name);
-                //         //         let as_name = if a_name.is_some() {
-                //         //             Some(a_name.as_ref().unwrap().name.clone())
-                //         //         } else {
-                //         //             Option::None
-                //         //         };
-                //         //         scan_import_symbol(self, &path, as_name, &false)?;
-                //         //     }
-                //         // }
-                //     }
-                // }
-
                 PackagePart::BoundDefinition(m) => {
-                    bounds.push((m.name.name.clone(), m.get_type(tables)?));
+                    bounds.push((m.is_pub, m.name.name.clone(), m.get_type(tables)?));
                 }
 
                 _ => {}

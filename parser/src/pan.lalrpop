@@ -31,7 +31,7 @@ pub ModuleDefinition: ModuleDefinition = {
 
 ImportDirective: Import = {
     "import" <s:Dot<Identifier>> <all:(".*")?> ";" => Import::Plain(s,all.is_some()),
-    "import" <s:Dot<Identifier>> <all:(".*")?> "as" <id:Identifier> ";" => Import::Rename(s, id,all.is_some()),
+    "import" <s:Dot<Identifier>> "as" <id:Identifier> ";" => Import::Rename(s, id),
     "import" <s:Dot<Identifier>> "{" <rename:CommaOne<ImportRename>> "}" ";" => {
         Import::PartRename(s, rename)
     }

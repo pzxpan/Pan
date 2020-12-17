@@ -271,7 +271,7 @@ impl<O: OutputStream> Compiler<O> {
                             //     self.compile_program(&md, self.symbol_table_stack.last().unwrap().clone(), true);
                             // }
                         }
-                        Import::Rename(mod_path, as_name, all) => {
+                        Import::Rename(mod_path, as_name) => {
                             //   resolve_import_compile(self, &mod_path, Some(as_name.clone().name), &all)?;
                         }
                         Import::PartRename(mod_path, as_part) => {
@@ -294,6 +294,7 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_scope();
         //for package
         let mut main_index = 0;
+        println!("table is:{:#?},", self.symbol_table_stack);
         for (size, part) in program.module_parts.iter().enumerate() {
             match part {
                 ast::PackagePart::ImportDirective(import) => {
@@ -301,8 +302,30 @@ impl<O: OutputStream> Compiler<O> {
                         Import::Plain(v, is_all) => {
                             //  insert_table(v.get(0).unwrap().name.clone(), self.symbol_table_stack.get(0).unwrap().clone());
                             // println!("SymbolTable:{:?}", get_table(v.get(0).unwrap().name.clone()));
+
                             let vv: Vec<String> = v.iter().map(|s| s.name.clone()).collect();
-                            self.resovle_import_item(vv)?;
+                            let package_name = vv[0].clone();
+                            let scope = self.scope_for_name(&package_name);
+                            let p = self.variable_position(&package_name).unwrap();
+                            self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+                            let t = get_table(vv[0].clone()).unwrap();
+                            self.resovle_import_item(vv.get(0).unwrap().clone())?;
+                            let cty = self.lookup_name(&vv[0]).ty.clone();
+                            if *is_all {
+                                if vv.len() > 1 {
+                                    self.resovle_compile_import(&t, &vv[1..], true, Option::None);
+                                } else {
+                                    self.resolve_all(&cty, &t);
+                                }
+                            } else {
+                                if vv.len() > 1 {
+                                    self.resovle_compile_import(&t, &vv[1..], false, Option::None);
+                                } else {
+                                    self.emit(Instruction::Duplicate);
+                                    self.emit(Instruction::StoreNewVariable(NameScope::Local));
+                                }
+                            }
+
                             // self.emit(Instruction::StoreNewVariable(NameScope::Global));
                         }
                         _ => {}
@@ -468,7 +491,7 @@ impl<O: OutputStream> Compiler<O> {
                 if self.ctx.in_loop || self.ctx.in_match {
                     self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::LoadCaptureReference(position.0 - 1, position.1, scope.clone()));
+                    self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
                 }
             }
         }
@@ -2122,13 +2145,16 @@ impl<O: OutputStream> Compiler<O> {
                     self.load_name(name);
                 } else {
                     //试下 单个
-
-                    self.resolve_package();
                     let scope = self.scope_for_name(name.as_str());
                     let p = self.variable_position(name.as_str()).unwrap();
-                    self.emit(Instruction::LoadConst(
-                        bytecode::Constant::Integer(p.1 as i32)));
-                    self.emit(Instruction::Subscript);
+                    if scope == NameScope::Global {
+                        self.emit(Instruction::LoadCaptureReference(p.0, p.1, NameScope::Global));
+                    } else {
+                        self.resolve_package();
+                        self.emit(Instruction::LoadConst(
+                            bytecode::Constant::Integer(p.1 as i32)));
+                        self.emit(Instruction::Subscript);
+                    }
                 }
 
                 // let scope = self.scope_for_name(name.as_str());
@@ -2199,21 +2225,18 @@ impl<O: OutputStream> Compiler<O> {
         is_constructor = self.is_constructor(function);
         if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
             //有问题，多层没处理
+            let scope = self.scope_for_name(name);
 
-            self.resolve_package();
+
             let p = self.variable_position(name.as_str()).unwrap();
-            self.emit(Instruction::LoadConst(
-                bytecode::Constant::Integer(p.1 as i32)));
-            self.emit(Instruction::Subscript);
-            // if self.variable_local_scope(name.as_str()) {
-            //     let p = self.variable_position(get_full_name(&self.package, &name.clone()).as_str()).unwrap();
-            //     self.emit(LoadLocalName(p.1, NameScope::Local));
-            //     // self.emit(LoadName(name.clone(), NameScope::Local));
-            // } else {
-            //     let scope = self.scope_for_name(name.as_str());
-            //     let p = self.variable_position(name.as_str()).unwrap();
-            //     self.emit(LoadLocalName(p.1, scope));
-            // }
+            if scope == NameScope::Global {
+                self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+            } else {
+                self.resolve_package();
+                self.emit(Instruction::LoadConst(
+                    bytecode::Constant::Integer(p.1 as i32)));
+                self.emit(Instruction::Subscript);
+            }
         } else {
             self.compile_expression(function)?;
         }
@@ -2698,8 +2721,7 @@ impl<O: OutputStream> Compiler<O> {
         return Ok(true);
     }
 
-    fn resovle_import_item(&mut self, package: Vec<String>) -> Result<(), CompileError> {
-        let package_name = package.get(0).unwrap();
+    fn resovle_import_item(&mut self, package_name: String) -> Result<(), CompileError> {
         let scope = self.scope_for_name(&package_name);
         let p = self.variable_position(&package_name).unwrap();
         self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
@@ -2714,8 +2736,145 @@ impl<O: OutputStream> Compiler<O> {
         // }
         Ok(())
     }
+    fn find_subtable(&self, table: &SymbolTable, sub_table_name: &String) -> Option<SymbolTable> {
+        for t in &table.sub_tables {
+            if sub_table_name.eq(&t.name) {
+                return Some(t.clone());
+            }
+        }
+        return Option::None;
+    }
+    fn resovle_compile_import(&mut self, table: &SymbolTable, idents: &[String], is_all: bool, as_name: Option<String>) -> Result<(), CompileError> {
+        let mut t = table.clone();
+        let mut cty = CType::None;
+        let mut item_name = String::from("");
+        if idents.len() < 1 {
+            return Ok(());
+        }
+        item_name = idents.last().unwrap().clone();
+        for name in idents {
+            cty = t.symbols.get(name).unwrap().ty.clone();
+            let p = self.variable_in_other_package_position(&t, name).unwrap();
+            self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+            self.emit(Instruction::Subscript);
+            let r = self.find_subtable(table, &name);
+            if r.is_some() {
+                t = r.unwrap();
+            }
+        }
+        if is_all {
+            self.resolve_all(&cty, &t)?;
+        } else {
+            if as_name.is_some() {
+                // self.emit(Instruction::Duplicate);
+                // let p = self.variable_in_other_package_position(&t, &item_name).unwrap();
+                // //有self
+                // self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                // self.emit(Instruction::Subscript);
+                self.emit(Instruction::StoreNewVariable(NameScope::Global));
+            } else {
+                // self.emit(Instruction::Duplicate);
+                // let p = self.variable_in_other_package_position(&t, &item_name).unwrap();
+                // //有self
+                // self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                // self.emit(Instruction::Subscript);
+                self.emit(Instruction::StoreNewVariable(NameScope::Global));
+            }
+        }
+        //弹出包的值
+
+        return Ok(());
+    }
+    fn resolve_all(&mut self, cty: &CType, t: &SymbolTable) -> Result<(), CompileError> {
+        if let CType::Package(ty) = cty {
+            for (is_pub, name, ty) in ty.enums.iter() {
+                if *is_pub {
+                    self.emit(Instruction::Duplicate);
+                    let p = self.variable_in_other_package_position(&t, name).unwrap();
+                    self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
+                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                }
+            }
+            for (is_pub, name, ty) in ty.bounds.iter() {
+                if *is_pub {
+                    self.emit(Instruction::Duplicate);
+                    let p = self.variable_in_other_package_position(&t, name).unwrap();
+                    self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
+                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                }
+            }
+            for (is_pub, name, ty) in ty.structs.iter() {
+                if *is_pub {
+                    self.emit(Instruction::Duplicate);
+                    let p = self.variable_in_other_package_position(&t, name).unwrap();
+                    self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
+                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                }
+            }
+            for (is_pub, name, ty) in ty.funs.iter() {
+                if *is_pub {
+                    self.emit(Instruction::Duplicate);
+                    let p = self.variable_in_other_package_position(&t, name).unwrap();
+                    self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
+                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                }
+            }
+            for (is_pub, name, ty) in ty.consts.iter() {
+                if *is_pub {
+                    self.emit(Instruction::Duplicate);
+                    let p = self.variable_in_other_package_position(&t, name).unwrap();
+                    self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
+                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                }
+            }
+            for (is_pub, name, ty) in ty.submods.iter() {
+                if *is_pub {
+                    self.emit(Instruction::Duplicate);
+                    let p = self.variable_in_other_package_position(&t, name).unwrap();
+                    self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                    self.emit(Instruction::Subscript);
+                    self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                }
+            }
+        } else if let CType::Struct(sty) = cty {
+            for (name, ty) in &sty.static_methods {
+                self.emit(Instruction::Duplicate);
+                let p = self.variable_in_other_package_position(&t, name).unwrap();
+                //有self
+                self.emit(Instruction::LoadConst(Constant::I32((p.1 - 1) as i32)));
+                self.emit(Instruction::Subscript);
+                self.emit(Instruction::StoreNewVariable(NameScope::Global));
+            }
+        } else if let CType::Enum(ety) = cty {
+            for (name, ty) in &ety.static_methods {
+                self.emit(Instruction::Duplicate);
+                let p = self.variable_in_other_package_position(&t, name).unwrap();
+                //有self
+                self.emit(Instruction::LoadConst(Constant::I32((p.1 - 1) as i32)));
+                self.emit(Instruction::Subscript);
+                self.emit(Instruction::StoreNewVariable(NameScope::Global));
+            }
+            for (name, ty, ..) in &ety.items {
+                self.emit(Instruction::Duplicate);
+                let p = self.variable_in_other_package_position(&t, name).unwrap();
+                //有self
+                self.emit(Instruction::LoadConst(Constant::I32((p.1 - 1) as i32)));
+                self.emit(Instruction::Subscript);
+                self.emit(Instruction::StoreNewVariable(NameScope::Global));
+            }
+        } else {
+            unreachable!();
+        }
+        self.emit(Instruction::Pop);
+        return Ok(());
+    }
     //从前往后找,从包名开始;
-    fn resolve_include_pakcage_attribute(&mut self, ty: &CType, v: &Vec<(String, Expression)>) -> Result<bool, CompileError> {
+    fn resolve_include_package_attribute(&mut self, ty: &CType, v: &Vec<(String, Expression)>) -> Result<bool, CompileError> {
         let mut cty = ty.clone();
         let len = v.len();
         for (idx, name) in v.iter().enumerate() {
@@ -2779,7 +2938,7 @@ impl<O: OutputStream> Compiler<O> {
         for (idx, name) in v.iter().enumerate() {
             if idx < len - 1 {
                 if let CType::Package(_) = cty.clone() {
-                    return self.resolve_include_pakcage_attribute(&cty, &v);
+                    return self.resolve_include_package_attribute(&cty, &v);
                 } else if let CType::Struct(_) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());
@@ -2839,13 +2998,6 @@ impl<O: OutputStream> Compiler<O> {
                         // self.emit(Instruction::Subscript);
                     }
                 } else if let CType::Enum(_) = cty.clone() {
-                    if idx == 0 {
-                        if self.variable_local_scope(&name.0) {
-                            self.load_name(&name.0);
-                        } else {
-                            self.resolve_package();
-                        }
-                    }
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     //println!("cty:{:?},name:is{:?},attri:{:?}", cty, name, attri_name);
                     let tmp = cty.attri_name_type(attri_name.0.clone());
@@ -2858,6 +3010,41 @@ impl<O: OutputStream> Compiler<O> {
                         self_instruction = Some(Instruction::LoadReference(p.0 - 1, p.1, scope.clone()));
                         //instructions.push();
                     }
+
+                    if idx == 0 {
+                        if self.variable_local_scope(&name.0) {
+                            self.load_name(&name.0);
+                        } else {
+                            let v = &self.lookup_name(&name.0).prefix;
+                            println!("name_prefix:{:?}.", v);
+                            if !v.is_empty() {
+                                self.resolve_package();
+                            } else {
+                                let scope = self.scope_for_name(&name.0);
+                                let p = self.variable_position(&name.0).unwrap();
+                                self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+                            }
+                        }
+                        let attri_name = v.get(idx + 1).unwrap().clone();
+                        let tmp = cty.attri_name_type(attri_name.0.clone());
+                        if tmp.0 == 1 {
+                            instructions.push(Instruction::LoadConst(
+                                bytecode::Constant::String(Box::new(attri_name.0.clone()))));
+
+                            instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
+                            instructions.push(Instruction::LoadBuildEnum(3));
+                        } else if tmp.0 == 2 {
+                            instructions.push(Instruction::LoadConst(
+                                bytecode::Constant::String(Box::new(attri_name.0.clone()))));
+                            instructions.push(Instruction::LoadConst(bytecode::Constant::I32(tmp.2)));
+                        }
+                        if tmp.0 > 2 {
+                            instructions.push(Instruction::LoadAttr(attri_name.0.clone()));
+                        }
+                        cty = tmp.1.clone();
+                        continue;
+                    }
+
 
                     if tmp.0 == 1 {
                         let p = self.variable_position(&name.0).unwrap();

@@ -469,17 +469,17 @@ impl SymbolTableBuilder {
         self.enter_scope(&program.package, SymbolTableType::Package, program.name.loc.1);
         for part in &program.module_parts {
             match part {
-                PackagePart::ImportDirective(import) => {
-                    match import {
-                        Import::Plain(v, is_all) => {
-                            let top_name = v.get(0).unwrap();
-                            // resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
-                            let ty = &self.get_register_type(top_name.name.clone())?;
-                            self.resovle_import(&v[1..], ty, true, Option::None, Option::None)?;
-                        }
-                        _ => {}
-                    }
-                }
+                // PackagePart::ImportDirective(import) => {
+                //     match import {
+                //         Import::Plain(v, is_all) => {
+                //             let top_name = v.get(0).unwrap();
+                //             // resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
+                //             let ty = &self.get_register_type(top_name.name.clone())?;
+                //             self.resovle_import(&v[1..], ty, true, Option::None)?;
+                //         }
+                //         _ => {}
+                //     }
+                // }
                 PackagePart::DataDefinition(_) => {}
                 PackagePart::EnumDefinition(def) => {
                     let enum_name = &def.name.name;
@@ -736,6 +736,7 @@ impl SymbolTableBuilder {
 
     pub fn scan_top_symbol_types(&mut self, program: &ast::ModuleDefinition) -> Result<HashMap<String, CType>, SymbolTableError> {
         let mut hash_map = HashMap::new();
+
         //以文件为单位，扫描顶级symbol,防止定义顺序对解析造成影响，所以clone出来的symboltable只为获取它的CType类型
         let mut tables = self.tables.clone();
         for part in &program.module_parts {
@@ -745,8 +746,10 @@ impl SymbolTableBuilder {
                         Import::Plain(v, is_all) => {
                             let top_name = v.get(0).unwrap();
                             resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
-                            // let ty = &self.get_register_type(top_name.name.clone())?;
-                            // self.resovle_import(&v[1..], ty, true, Option::None, Option::None)?;
+                            let ty = &self.get_register_type(top_name.name.clone())?;
+                            let last_item = v.last().unwrap();
+                            let item_name = last_item.name.clone();
+                            self.resovle_import(&v[1..], ty, *is_all, item_name, Option::None)?;
                         }
                         _ => {}
                     }
@@ -2423,13 +2426,28 @@ impl SymbolTableBuilder {
         Ok(cty)
     }
 
-    fn resovle_import(&mut self, idents: &[Identifier], ty: &CType, is_all: bool, ident_name: Option<String>, as_name: Option<String>) -> Result<(), SymbolTableError> {
+    fn resovle_import(&mut self, idents: &[Identifier], ty: &CType, is_all: bool, item_name: String, as_name: Option<String>) -> Result<(), SymbolTableError> {
         let mut cty = ty.clone();
         println!("cccccty:{:?},", cty);
+
         let len = idents.len();
+        if len < 1 {
+            self.resolve_import_item(&cty.clone(), is_all, item_name.clone(), as_name.clone())?;
+        }
+
         for (idx, name) in idents.iter().enumerate() {
-            if idx < len {
-                if idx == 0 {
+            if idx == 0 {
+                let r = get_package_layer(&cty, name.name.clone());
+                if r.is_some() {
+                    cty = r.unwrap().clone();
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("{:?}包中找不到{:?}的定义", cty.name(), name.name),
+                        location: name.loc.clone(),
+                    });
+                }
+            } else {
+                if let CType::Package(..) = cty.clone() {
                     let r = get_package_layer(&cty, name.name.clone());
                     if r.is_some() {
                         cty = r.unwrap().clone();
@@ -2439,86 +2457,107 @@ impl SymbolTableBuilder {
                             location: name.loc.clone(),
                         });
                     }
-                } else {
-                    if let CType::Package(..) = cty.clone() {
-                        let r = get_package_layer(&cty, name.name.clone());
-                        if r.is_some() {
-                            cty = r.unwrap().clone();
-                        } else {
-                            return Err(SymbolTableError {
-                                error: format!("{:?}包中找不到{:?}的定义", cty.name(), name.name),
-                                location: name.loc.clone(),
-                            });
-                        }
-                    } else if let CType::Enum(ety) = cty.clone() {
-                        let tmp = cty.attri_name_type(name.name.clone());
-                        if tmp.1 == &CType::Unknown {
-                            return Err(SymbolTableError {
-                                error: format!("enum{:?}中找不到{:?}的定义", cty.name(), name.name),
-                                location: name.loc.clone(),
-                            });
-                        } else {
-                            cty = tmp.1.clone();
-                        }
-                    } else if let CType::Struct(sty) = cty.clone() {
-                        let tmp = cty.attri_name_type(name.name.clone());
-                        if tmp.1 == &CType::Unknown {
-                            return Err(SymbolTableError {
-                                error: format!("struct{:?}中找不到{:?}的定义", cty.name(), name.name),
-                                location: name.loc.clone(),
-                            });
-                        } else {
-                            cty = tmp.1.clone();
-                        }
-                    } else if let CType::Bound(sty) = cty.clone() {
-                        let tmp = cty.attri_name_type(name.name.clone());
-                        if tmp.1 == &CType::Unknown {
-                            return Err(SymbolTableError {
-                                error: format!("struct{:?}中找不到{:?}的定义", cty.name(), name.name),
-                                location: name.loc.clone(),
-                            });
-                        } else {
-                            cty = tmp.1.clone();
-                        }
-                    } else {
+                } else if let CType::Enum(ety) = cty.clone() {
+                    let tmp = cty.attri_name_type(name.name.clone());
+                    if tmp.1 == &CType::Unknown {
                         return Err(SymbolTableError {
-                            error: format!("大哥，不要来这里啊，来这里的类型已经不适合import了"),
+                            error: format!("enum{:?}中找不到{:?}的定义", cty.name(), name.name),
                             location: name.loc.clone(),
                         });
+                    } else {
+                        cty = tmp.1.clone();
                     }
+                } else if let CType::Struct(sty) = cty.clone() {
+                    let tmp = cty.attri_name_type(name.name.clone());
+                    if tmp.1 == &CType::Unknown {
+                        return Err(SymbolTableError {
+                            error: format!("struct{:?}中找不到{:?}的定义", cty.name(), name.name),
+                            location: name.loc.clone(),
+                        });
+                    } else {
+                        cty = tmp.1.clone();
+                    }
+                } else if let CType::Bound(sty) = cty.clone() {
+                    let tmp = cty.attri_name_type(name.name.clone());
+                    if tmp.1 == &CType::Unknown {
+                        return Err(SymbolTableError {
+                            error: format!("struct{:?}中找不到{:?}的定义", cty.name(), name.name),
+                            location: name.loc.clone(),
+                        });
+                    } else {
+                        cty = tmp.1.clone();
+                    }
+                } else if idx == len - 1 {
+                    //最后一个不要处理子类型，上层已经处理；cty就为最后的类型;
+                } else {
+                    return Err(SymbolTableError {
+                        error: format!("大哥，不要来这里啊，来这里的类型已经不适合import了"),
+                        location: name.loc.clone(),
+                    });
                 }
             }
         }
         println!("cty:{:?},", cty);
-        // if is_all {
-        //     if let CType::Package(ty) = cty {
-        //         for (name, ty) in ty.enums.iter() {
-        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-        //         }
-        //         for (name, ty) in ty.bounds.iter() {
-        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-        //         }
-        //         for (name, ty) in ty.structs.iter() {
-        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-        //         }
-        //         for (name, ty) in ty.funs.iter() {
-        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-        //         }
-        //         for (name, ty) in ty.consts.iter() {
-        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-        //         }
-        //         for (name, ty) in ty.submods.iter() {
-        //             self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
-        //         }
-        //     } else if let CType::Struct(sty) = cty {
-        //         sty.methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-        //         sty.static_methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-        //     } else if let CType::Enum(ety) = cty {
-        //         ety.methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-        //         ety.static_methods.iter().map(|(name, ty)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-        //         ety.items.iter().map(|(name, ty, ..)| self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default()));
-        //     }
-        // }
+        self.resolve_import_item(&cty.clone(), is_all, item_name.clone(), as_name.clone())?;
+        Ok(())
+    }
+    fn resolve_import_item(&mut self, cty: &CType, is_all: bool, item_name: String, as_name: Option<String>) -> Result<(), SymbolTableError> {
+        if is_all {
+            if let CType::Package(ty) = cty {
+                for (is_pub, name, ty) in ty.enums.iter() {
+                    if *is_pub {
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                    }
+                }
+                for (is_pub, name, ty) in ty.bounds.iter() {
+                    if *is_pub {
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                    }
+                }
+                for (is_pub, name, ty) in ty.structs.iter() {
+                    if *is_pub {
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                    }
+                }
+                for (is_pub, name, ty) in ty.funs.iter() {
+                    if *is_pub {
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                    }
+                }
+                for (is_pub, name, ty) in ty.consts.iter() {
+                    if *is_pub {
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                    }
+                }
+                for (is_pub, name, ty) in ty.submods.iter() {
+                    if *is_pub {
+                        self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                    }
+                }
+            } else if let CType::Struct(sty) = cty {
+                for (name, ty) in &sty.static_methods {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default());
+                }
+            } else if let CType::Enum(ety) = cty {
+                for (name, ty) in &ety.static_methods {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default());
+                }
+                for (name, ty, ..) in &ety.items {
+                    self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default());
+                }
+            } else {
+                return Err(SymbolTableError {
+                    error: format!("只有package，struct和enum才能全部导出"),
+                    location: Loc::default(),
+                });
+            }
+        } else {
+            if as_name.is_some() {
+                self.register_name(&as_name.unwrap(), cty.clone(), SymbolUsage::Import, Loc::default());
+            } else {
+                self.register_name(&item_name, cty.clone(), SymbolUsage::Import, Loc::default());
+            }
+        }
         Ok(())
     }
 

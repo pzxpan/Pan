@@ -138,7 +138,7 @@ pub fn read_file_content(path: &Path, contents: &mut String) {
     file.read_to_string(contents).unwrap();
 }
 
-pub fn get_item_from_package(ty: &PackageType, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> Vec<(String, CType)> {
+pub fn get_item_from_package(ty: &PackageType, is_all: bool, item_name: Option<String>, as_name: Option<String>) -> Vec<(bool, String, CType)> {
     let mut v = vec![];
     v.extend_from_slice(&get_package_item(&ty.imports, is_all, &item_name, &as_name));
     v.extend_from_slice(&get_package_item(&ty.bounds, is_all, &item_name, &as_name));
@@ -205,14 +205,14 @@ pub fn get_item_from_package(ty: &PackageType, is_all: bool, item_name: Option<S
     v
 }
 
-pub fn get_package_item(item_vec: &[(String, CType)], is_all: bool, item_name: &Option<String>, as_name: &Option<String>) -> Vec<(String, CType)> {
+pub fn get_package_item(item_vec: &[(bool, String, CType)], is_all: bool, item_name: &Option<String>, as_name: &Option<String>) -> Vec<(bool, String, CType)> {
     let mut v = vec![];
     for item in item_vec {
         if is_all {
             v.push(item.clone());
-        } else if item_name.is_some() && item_name.as_ref().unwrap().eq(item.0.as_str()) {
+        } else if item_name.is_some() && item_name.as_ref().unwrap().eq(item.1.as_str()) {
             if as_name.is_some() {
-                v.push((as_name.as_ref().unwrap().clone(), item.1.clone()));
+                v.push((item.0, as_name.as_ref().unwrap().clone(), item.2.clone()));
             }
         }
     }
@@ -250,10 +250,10 @@ pub fn get_package_layer(ty: &CType, name: String) -> Option<CType> {
     return None;
 }
 
-pub fn get_package_item_by_name(item_vec: &[(String, CType)], name: &str) -> Option<CType> {
+pub fn get_package_item_by_name(item_vec: &[(bool, String, CType)], name: &str) -> Option<CType> {
     for item in item_vec {
-        if item.0.eq(name) {
-            return Some(item.1.clone());
+        if item.1.eq(name) {
+            return Some(item.2.clone());
         }
     }
     return None;
@@ -263,8 +263,8 @@ pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
     println!("package is {:?}", package);
     for item in &package.imports {
         println!("item:{:?},", item);
-        if item.0.eq(&get_package_name(idents)) {
-            return item.1.clone();
+        if item.1.eq(&get_package_name(idents)) {
+            return item.2.clone();
         }
     }
     return CType::Unknown;

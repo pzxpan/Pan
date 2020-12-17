@@ -62,13 +62,13 @@ pub struct FnType {
 #[derive(Debug, Clone, Eq, Hash)]
 pub struct PackageType {
     pub name: String,
-    pub consts: Vec<(String, CType)>,
-    pub funs: Vec<(String, CType)>,
-    pub enums: Vec<(String, CType)>,
-    pub structs: Vec<(String, CType)>,
-    pub bounds: Vec<(String, CType)>,
-    pub imports: Vec<(String, CType)>,
-    pub submods: Vec<(String, CType)>,
+    pub consts: Vec<(bool, String, CType)>,
+    pub funs: Vec<(bool, String, CType)>,
+    pub enums: Vec<(bool, String, CType)>,
+    pub structs: Vec<(bool, String, CType)>,
+    pub bounds: Vec<(bool, String, CType)>,
+    pub imports: Vec<(bool, String, CType)>,
+    pub submods: Vec<(bool, String, CType)>,
 }
 
 

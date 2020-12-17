@@ -95,9 +95,8 @@ pub enum Import {
     //import std.math.*;
     Plain(Vec<Identifier>, bool),
 
-    //import std.math.* as Math;
     //import std.math.sqrt as Sqrt
-    Rename(Vec<Identifier>, Identifier, bool),
+    Rename(Vec<Identifier>, Identifier),
 
     //import std.math {sqrt,floor};
     //import std.math {sqrt as Sqrt, floor as Floor};
