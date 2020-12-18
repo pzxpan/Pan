@@ -24,6 +24,7 @@ use std::sync::Arc;
 use std::time;
 use pan_bytecode::bytecode::CodeObject;
 use std::ops::Range;
+use std::path::PathBuf;
 use std::collections;
 
 struct aaa<A, B> {

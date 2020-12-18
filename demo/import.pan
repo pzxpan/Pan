@@ -5,12 +5,12 @@ package default;
 //import std.person.House;
 //import std.person.*;
 
-import color.Color;
-
+import std.person.*;
+import std.color.*;
 fun main() {
     let c = Color::Red(10);
-    let d = c.is_warm();
-    print(d);
+    let p = House!{size:1111.0,price:10.0};
+    print(c);
 }
 
 

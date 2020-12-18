@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer, get_dir_name};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer, get_dir_name, get_sub_table_byname};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
@@ -298,6 +298,7 @@ impl<O: OutputStream> Compiler<O> {
         self.enter_scope();
         //for package
         let mut main_index = 0;
+        hash_set.clear();
         println!("table is:{:#?},", self.symbol_table_stack);
         for (size, part) in program.module_parts.iter().enumerate() {
             match part {
@@ -311,7 +312,11 @@ impl<O: OutputStream> Compiler<O> {
                             let package_name = vv[0].clone();
                             let scope = self.scope_for_name(&package_name);
                             let p = self.variable_position(&package_name).unwrap();
-                            self.emit(Instruction::StoreNewVariable(scope));
+                            if !hash_set.contains(&package_name) {
+                                self.emit(Instruction::StoreNewVariable(scope));
+                                hash_set.insert(package_name);
+                            }
+
                             let t = get_table(vv[0].clone()).unwrap();
                             self.resovle_import_item(vv.get(0).unwrap().clone())?;
                             let cty = self.lookup_name(&vv[0]).ty.clone();
@@ -2788,7 +2793,10 @@ impl<O: OutputStream> Compiler<O> {
             }
         }
         //弹出包的值
-
+        //导出的是包类型时，需要将包对应的symboltable加入到缓存Map，不然，后续针对它的引用找到它很困难,得从顶层一层层往下找，不划算，这么来方便点;
+        if let CType::Package(..) = cty {
+            insert_table(item_name, t);
+        }
         return Ok(());
     }
     fn resolve_all(&mut self, cty: &CType, t: &SymbolTable) -> Result<(), CompileError> {
@@ -2876,13 +2884,15 @@ impl<O: OutputStream> Compiler<O> {
         } else {
             unreachable!();
         }
-        self.emit(Instruction::Pop);
+//        self.emit(Instruction::Pop);
         return Ok(());
     }
+
     //从前往后找,从包名开始;
     fn resolve_include_package_attribute(&mut self, ty: &CType, v: &Vec<(String, Expression)>) -> Result<bool, CompileError> {
         let mut cty = ty.clone();
         let len = v.len();
+        let mut table = get_table(v[0].0.clone()).unwrap();
         for (idx, name) in v.iter().enumerate() {
             if idx < len - 1 {
                 if let CType::Package(_) = cty.clone() {
@@ -2893,13 +2903,14 @@ impl<O: OutputStream> Compiler<O> {
                     let scope = self.scope_for_name(&name.0);
                     self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
                     println!("是不是已经被干掉了啊:{:#?},", self.symbol_table_stack);
-                    let table = get_table(name.0.clone()).unwrap();
+                    //  let table = get_table(name.0.clone()).unwrap();
                     println!("real_sub_table:{:#?},", table);
                     //println!("ddddreal_sub_table:{:#?},", subtable);
                     let p = self.variable_in_other_package_position(&table, &attri_name.0.clone()).unwrap();
                     //   let scope = self.scope_for_name(&attri_name.0.clone());
                     self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
                     self.emit(Instruction::Subscript);
+                    table = get_sub_table_byname(&table.sub_tables, attri_name.0);
                 } else if let CType::Struct(n) = cty.clone() {
                     let attri_name = v.get(idx + 1).unwrap().clone();
                     let tmp = cty.attri_name_type(attri_name.0.clone());

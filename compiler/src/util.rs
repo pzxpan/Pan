@@ -483,6 +483,15 @@ pub fn resolve_dir_compile<O: OutputStream>(compiler: &mut Compiler<O>, dir_name
     return Ok(());
 }
 
+pub fn get_sub_table_byname(subtables: &Vec<SymbolTable>, name: String) -> SymbolTable {
+    for table in subtables {
+        if table.name.eq(&name) {
+            return table.clone();
+        }
+    }
+    unreachable!()
+}
+
 
 
 
