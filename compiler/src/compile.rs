@@ -318,6 +318,7 @@ impl<O: OutputStream> Compiler<O> {
                             }
 
                             let t = get_table(vv[0].clone()).unwrap();
+                            println!("save_std_table_is:{:#?},",t);
                             self.resovle_import_item(vv.get(0).unwrap().clone())?;
                             let cty = self.lookup_name(&vv[0]).ty.clone();
                             if *is_all {
@@ -2768,7 +2769,7 @@ impl<O: OutputStream> Compiler<O> {
             let p = self.variable_in_other_package_position(&t, name).unwrap();
             self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
             self.emit(Instruction::Subscript);
-            let r = self.find_subtable(table, &name);
+            let r = self.find_subtable(&t, &name);
             if r.is_some() {
                 t = r.unwrap();
             }

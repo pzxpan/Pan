@@ -7,10 +7,13 @@ package default;
 
 import std.person.*;
 import std.color.*;
+import std.test.person.*;
 fun main() {
     let c = Color::Red(10);
-    let p = House!{size:1111.0,price:10.0};
-    print(c);
+    let d = House!{size:1111.0,price:10.0};
+    print(d);
+    let ddd = d.idea();
+    print(ddd);
 }
 
 

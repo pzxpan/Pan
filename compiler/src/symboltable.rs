@@ -293,6 +293,7 @@ impl SymbolTableBuilder {
         self.enter_scope(&name, SymbolTableType::Package, 0);
     }
     fn finish(&mut self) -> Result<SymbolTable, SymbolTableError> {
+        println!("ddddd::{:#?}", self.tables);
         assert_eq!(self.tables.len(), 1);
         let mut symbol_table = self.tables.pop().unwrap();
         analyze_symbol_table(&mut symbol_table)?;

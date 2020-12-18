@@ -221,6 +221,7 @@ pub fn get_package_item(item_vec: &[(bool, String, CType)], is_all: bool, item_n
 }
 
 pub fn get_package_layer(ty: &CType, name: String) -> Option<CType> {
+    println!("top_ddd:{:?},", ty);
     if let CType::Package(ty) = ty {
         let r = get_package_item_by_name(&ty.enums, name.as_str());
         if r.is_some() {
@@ -271,11 +272,11 @@ pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
     return CType::Unknown;
 }
 
-pub fn resolve_dir_import(builder: &mut SymbolTableBuilder, dir_name: String) -> SymbolTableResult {
-    let mut submods = vec![];
+pub fn resolve_dir_import(builder: &mut SymbolTableBuilder, dir_name: String, super_name: String, submods: &mut Vec<(bool, String, CType)>) -> SymbolTableResult {
+    let mut current_submods = vec![];
     let mod_name = get_dir_name(&dir_name);
     println!("mod_name:{:?},", mod_name);
-    builder.enter_scope(&dir_name, SymbolTableType::Package, 0);
+    builder.enter_scope(&mod_name, SymbolTableType::Package, 0);
     for entry in WalkDir::new(dir_name.clone()).max_depth(1) {
         let director = entry.unwrap();
         let path = director.path();
@@ -292,7 +293,7 @@ pub fn resolve_dir_import(builder: &mut SymbolTableBuilder, dir_name: String) ->
                 };
                 let top_hash_map = builder.scan_top_symbol_types(&md)?;
                 builder.scan_program(&md, &top_hash_map)?;
-                submods.push((md.is_pub, get_package_name(&module.package_name), builder.get_register_type(get_package_name(&module.package_name))?));
+                current_submods.push((md.is_pub, get_package_name(&module.package_name), builder.get_register_type(get_package_name(&module.package_name))?));
                 // let top = builder.tables.last();
                 // println!("last_table:{:#?}", top);
             }
@@ -300,16 +301,16 @@ pub fn resolve_dir_import(builder: &mut SymbolTableBuilder, dir_name: String) ->
             let mut s = String::new();
             s.push_str(path.to_str().unwrap());
             if s.ne(&dir_name.clone()) {
-                resolve_dir_import(builder, s)?;
+                resolve_dir_import(builder, s, mod_name.clone(), &mut current_submods)?;
             }
         }
     }
 
     builder.leave_scope();
 
-    let ty = CType::Package(PackageType { name: dir_name, consts: vec![], funs: vec![], enums: vec![], structs: vec![], bounds: vec![], imports: vec![], submods });
-    builder.register_name(&mod_name, ty, SymbolUsage::Import, Loc::default())?;
-
+    let ty = CType::Package(PackageType { name: mod_name.clone(), consts: vec![], funs: vec![], enums: vec![], structs: vec![], bounds: vec![], imports: vec![], submods: current_submods });
+    builder.register_name(&mod_name.clone(), ty.clone(), SymbolUsage::Import, Loc::default());
+    submods.push((true, mod_name.clone(), ty));
     return Ok(());
 }
 
@@ -337,9 +338,45 @@ pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, is_third: b
         builder.scan_program(&md, &top_hash_map)?;
         return Ok(());
     }
-
     //是路径
-    resolve_dir_import(builder, dir.1)?;
+    let mut submods = Vec::new();
+    let mod_name = get_dir_name(&dir.1);
+
+
+    builder.enter_scope(&mod_name, SymbolTableType::Package, 0);
+    for entry in WalkDir::new(dir.1.clone()).max_depth(1) {
+        let director = entry.unwrap();
+        let path = director.path();
+        if path.is_file() {
+            if path.extension().unwrap().eq("pan") {
+                let mut s = String::new();
+                s.push_str(path.to_str().unwrap());
+                let module = make_ast(&s).unwrap();
+                let md = ModuleDefinition {
+                    module_parts: module.content,
+                    name: Identifier { loc: Loc::default(), name: get_package_name(&module.package_name) },
+                    is_pub: true,
+                    package: get_package_name(&module.package_name),
+                };
+                let top_hash_map = builder.scan_top_symbol_types(&md)?;
+                builder.scan_program(&md, &top_hash_map)?;
+                submods.push((md.is_pub, get_package_name(&module.package_name), builder.get_register_type(get_package_name(&module.package_name))?));
+                // let top = builder.tables.last();
+                // println!("last_table:{:#?}", top);
+            }
+        } else if path.is_dir() {
+            let mut s = String::new();
+            s.push_str(path.to_str().unwrap());
+            if s.ne(&dir.1.clone()) {
+                resolve_dir_import(builder, s, mod_name.clone(), &mut submods)?;
+            }
+        }
+    }
+    builder.leave_scope();
+    //  resolve_dir_import(builder, dir.1, mod_name.clone(), &mut submods)?;
+    println!("sub_module is :{:?}", submods);
+    let ty = CType::Package(PackageType { name: mod_name.clone(), consts: vec![], funs: vec![], enums: vec![], structs: vec![], bounds: vec![], imports: vec![], submods });
+    builder.register_name(&mod_name, ty, SymbolUsage::Import, Loc::default())?;
     println!("symboltable:{:#?}", builder.tables);
     // let mut in_dir = false;
     // for entry in WalkDir::new(dir.1) {
