@@ -7,14 +7,15 @@ package default;
 
 import std.person.*;
 import std.color.*;
-import std.test.person.name_call;
+import std.test.person.*;
 fun main() {
     let c = Color::Red(10);
     let d = House!{size:1111.0,price:10.0};
-    let d = 20;
     print(d);
     let ddd = d.idea();
-    let cc = name_call!{age:40,name:"ddd"};
+    let name = "ddddd";
+    let age = 40000;
+    let cc = name_call!{name,age};
     print(cc);
     print(ddd);
 }

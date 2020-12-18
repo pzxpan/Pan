@@ -1688,7 +1688,7 @@ impl SymbolTableBuilder {
                     ExpressionContext::Store => {
                         if self.in_struct_func {
                             if self.in_current_scope(name.clone()) {
-                                self.register_name(name, ty, SymbolUsage::Mut, loc.clone())?;
+                                self.update_mutability(name.clone(), SymbolMutability::Mut)?;
                             } else if self.is_const_fun {
                                 //包括自身的属性和其他的变量;
                                 return Err(SymbolTableError {
@@ -2209,37 +2209,35 @@ impl SymbolTableBuilder {
         //     println!("aa:{:?},bb{:?}", a, b);
         // }
         let containing = table.symbols.contains_key(name);
-
+        println!("is_found::{:?}", containing);
         if containing {
-            if role <= SymbolUsage::Const {
-                match role {
-                    SymbolUsage::Attribute => {
-                        return Err(SymbolTableError {
-                            error: format!("'{}'是属性,不能重新绑定 ", name),
-                            location,
-                        });
-                    }
-                    SymbolUsage::Builtin => {
-                        return Err(SymbolTableError {
-                            error: format!("'{}'内建类型,不能重新绑定 ", name),
-                            location,
-                        });
-                    }
-                    SymbolUsage::Const => {
-                        return Err(SymbolTableError {
-                            error: format!("'{}'是常量,不能重新赋值和定义", name),
-                            location,
-                        });
-                    }
-                    SymbolUsage::Import => {
-                        //import 允许重复导入，后面一次覆盖前一次
-                    }
-                    _ => {
-                        return Err(SymbolTableError {
-                            error: format!("'{}'重复定义", name),
-                            location,
-                        });
-                    }
+            match role {
+                SymbolUsage::Attribute => {
+                    return Err(SymbolTableError {
+                        error: format!("'{}'是属性,不能重新绑定 ", name),
+                        location,
+                    });
+                }
+                SymbolUsage::Builtin => {
+                    return Err(SymbolTableError {
+                        error: format!("'{}'内建类型,不能重新绑定 ", name),
+                        location,
+                    });
+                }
+                SymbolUsage::Const => {
+                    return Err(SymbolTableError {
+                        error: format!("'{}'是常量,不能重新赋值和定义", name),
+                        location,
+                    });
+                }
+                SymbolUsage::Import => {
+                    //import 允许重复导入，后面一次覆盖前一次
+                }
+                _ => {
+                    return Err(SymbolTableError {
+                        error: format!("'{}'重复定义", name),
+                        location,
+                    });
                 }
             }
         }

@@ -98,6 +98,7 @@ pub struct Compiler<O: OutputStream = BasicOutputStream> {
 
 #[derive(Clone, Copy)]
 struct CompileContext {
+    in_need_block: bool,
     in_loop: bool,
     in_match: bool,
     in_lambda: bool,
@@ -204,6 +205,7 @@ impl<O: OutputStream> Compiler<O> {
             current_source_location: ast::Loc(1, 0, 0),
             current_qualified_path: None,
             ctx: CompileContext {
+                in_need_block: false,
                 in_lambda: false,
                 in_loop: false,
                 in_match: false,
@@ -318,7 +320,7 @@ impl<O: OutputStream> Compiler<O> {
                             }
 
                             let t = get_table(vv[0].clone()).unwrap();
-                            println!("save_std_table_is:{:#?},",t);
+                            println!("save_std_table_is:{:#?},", t);
                             self.resovle_import_item(vv.get(0).unwrap().clone())?;
                             let cty = self.lookup_name(&vv[0]).ty.clone();
                             if *is_all {
@@ -500,7 +502,7 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::LoadFrameReference(position.0 - 2, position.1, scope.clone()));
                 }
             } else {
-                if self.ctx.in_loop || self.ctx.in_match {
+                if self.ctx.in_loop || self.ctx.in_match || self.ctx.in_need_block {
                     self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
                     self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
@@ -570,7 +572,7 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::StoreFrameReference(position.0 - 2, position.1, scope.clone()));
                 }
             } else {
-                if self.ctx.in_loop || self.ctx.in_match {
+                if self.ctx.in_loop || self.ctx.in_match || self.ctx.in_need_block {
                     self.emit(Instruction::StoreFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
                     self.emit(Instruction::StoreCaptureReference(position.0 - 1, position.1, scope));
@@ -661,8 +663,11 @@ impl<O: OutputStream> Compiler<O> {
                     None => {
                         // 只有if分支
                         self.enter_scope();
+                        let need_block = self.ctx.in_need_block;
+                        self.ctx.in_need_block = true;
                         self.compile_jump_if(test, false, end_label)?;
                         self.compile_statements(body)?;
+                        self.ctx.in_need_block = need_block;
                         self.leave_scope();
                         self.set_label(end_label);
                     }
@@ -670,8 +675,11 @@ impl<O: OutputStream> Compiler<O> {
                         // if - else
                         let else_label = self.new_label();
                         self.enter_scope();
+                        let need_block = self.ctx.in_need_block;
+                        self.ctx.in_need_block = true;
                         self.compile_jump_if(test, false, else_label)?;
                         self.compile_statements(body)?;
+                        self.ctx.in_need_block = need_block;
                         self.leave_scope();
                         self.emit(Instruction::Jump(end_label));
 
@@ -944,6 +952,7 @@ impl<O: OutputStream> Compiler<O> {
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
+            in_need_block: false,
             in_lambda: false,
             in_match: false,
             in_loop: false,
@@ -981,6 +990,7 @@ impl<O: OutputStream> Compiler<O> {
         if in_lambda {
             self.scope_level = self.symbol_table_stack.len();
             self.ctx = CompileContext {
+                in_need_block: false,
                 in_lambda,
                 in_loop: false,
                 in_match: false,
@@ -988,6 +998,7 @@ impl<O: OutputStream> Compiler<O> {
             };
         } else {
             self.ctx = CompileContext {
+                in_need_block: false,
                 in_lambda,
                 in_loop: false,
                 in_match: false,
@@ -1054,6 +1065,7 @@ impl<O: OutputStream> Compiler<O> {
         if in_lambda {
             self.scope_level = self.symbol_table_stack.len();
             self.ctx = CompileContext {
+                in_need_block: false,
                 in_lambda,
                 in_loop: false,
                 in_match: false,
@@ -1061,6 +1073,7 @@ impl<O: OutputStream> Compiler<O> {
             };
         } else {
             self.ctx = CompileContext {
+                in_need_block: false,
                 in_lambda,
                 in_loop: false,
                 in_match: false,
@@ -1126,6 +1139,7 @@ impl<O: OutputStream> Compiler<O> {
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
+            in_need_block: false,
             in_lambda,
             in_loop: false,
             in_match: false,
@@ -1199,6 +1213,7 @@ impl<O: OutputStream> Compiler<O> {
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
+            in_need_block: false,
             func: FunctionContext::NoFunction,
             in_loop: false,
             in_lambda: false,
@@ -1277,6 +1292,7 @@ impl<O: OutputStream> Compiler<O> {
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
+            in_need_block: false,
             func: FunctionContext::NoFunction,
             in_loop: false,
             in_lambda: false,
@@ -1349,6 +1365,7 @@ impl<O: OutputStream> Compiler<O> {
     ) -> Result<(), CompileError> {
         let prev_ctx = self.ctx;
         self.ctx = CompileContext {
+            in_need_block: false,
             func: FunctionContext::NoFunction,
             in_loop: false,
             in_lambda: false,

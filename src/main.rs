@@ -97,7 +97,7 @@ fn main() {
     // println!("size:{:?},", std::mem::size_of_val(&v));
 
     // let start = std::time::Instant::now();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("import.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("enum.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
    // test_all_demo_file();
 }
@@ -135,7 +135,7 @@ fn test_one_file(home_path: &Path) {
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
 
         handle.join();
-        std::thread::sleep(Duration::from_secs(10));
+        //std::thread::sleep(Duration::from_secs(10));
         scope_clear();
         println!("执行 cost:{:?}", start.elapsed().as_secs());
         let t2 = time::SystemTime::now();
