@@ -2209,6 +2209,7 @@ impl SymbolTableBuilder {
         //     println!("aa:{:?},bb{:?}", a, b);
         // }
         let containing = table.symbols.contains_key(name);
+
         if containing {
             if role <= SymbolUsage::Const {
                 match role {
