@@ -271,8 +271,8 @@ pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
 }
 
 //根据单个名字导出,所有目录文件的内容作为一个symboltable返回;
-pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, package_name: String, loc: Loc) -> SymbolTableResult {
-    let dir = resolve_whole_dir(package_name.clone());
+pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, is_third: bool, package_name: String, loc: Loc) -> SymbolTableResult {
+    let dir = resolve_whole_dir(is_third, package_name.clone());
     if dir.is_none() {
         return Err(SymbolTableError {
             error: format!("找不到包或文件:{:?},", package_name.clone()),
@@ -335,8 +335,9 @@ pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, package_nam
 }
 
 
-pub fn compile_import_symbol<O: OutputStream>(compiler: &mut Compiler<O>, package_name: String, loc: Loc) -> Result<ModuleDefinition, CompileError> {
-    let dir = resolve_whole_dir(package_name.clone());
+
+pub fn compile_import_symbol<O: OutputStream>(compiler: &mut Compiler<O>, is_third: bool, package_name: String, loc: Loc) -> Result<ModuleDefinition, CompileError> {
+    let dir = resolve_whole_dir(is_third, package_name.clone());
     if dir.is_none() {
         return Err(CompileError {
             statement: None,

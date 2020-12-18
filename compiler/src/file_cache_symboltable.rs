@@ -114,7 +114,7 @@ pub fn resolve_file_name(idents: &Vec<Identifier>) -> Option<(bool, String)> {
     return None;
 }
 
-pub fn resolve_whole_dir(ident: String) -> Option<(bool, String)> {
+pub fn resolve_whole_dir(is_third: bool, ident: String) -> Option<(bool, String)> {
     let sys = resolve_one_dir(ident.clone(), &INCLUDE_DIR);
     if sys.is_some() {
         return Some(sys.unwrap());

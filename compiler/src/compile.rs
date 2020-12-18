@@ -257,7 +257,7 @@ impl<O: OutputStream> Compiler<O> {
                             let top_name = v.get(0).unwrap();
                             if !hash_set.contains(&top_name.name) {
                                 hash_set.insert(top_name.name.clone());
-                                let md = compile_import_symbol(self, top_name.name.clone(), top_name.loc)?;
+                                let md = compile_import_symbol(self, *b, top_name.name.clone(), top_name.loc)?;
                                 self.compile_program(&md, true)?;
                             }
 
@@ -303,7 +303,7 @@ impl<O: OutputStream> Compiler<O> {
             match part {
                 ast::PackagePart::ImportDirective(import) => {
                     match import {
-                        Import::Plain(b,v, is_all) => {
+                        Import::Plain(b, v, is_all) => {
                             //  insert_table(v.get(0).unwrap().name.clone(), self.symbol_table_stack.get(0).unwrap().clone());
                             // println!("SymbolTable:{:?}", get_table(v.get(0).unwrap().name.clone()));
 

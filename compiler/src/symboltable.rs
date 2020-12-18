@@ -747,7 +747,7 @@ impl SymbolTableBuilder {
                             let top_name = v.get(0).unwrap();
                             if !hash_set.contains(&top_name.name) {
                                 hash_set.insert(top_name.name.clone());
-                                resolve_import_symbol_table(self, top_name.name.clone(), top_name.loc)?;
+                                resolve_import_symbol_table(self, *b,top_name.name.clone(), top_name.loc)?;
                             }
                             let ty = &self.get_register_type(top_name.name.clone())?;
                             let last_item = v.last().unwrap();

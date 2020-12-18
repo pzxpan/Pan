@@ -1,4 +1,4 @@
-package std.color;
+package std.test.color;
 
 pub enum Color {
    Red(i32),
