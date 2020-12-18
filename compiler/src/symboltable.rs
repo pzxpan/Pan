@@ -941,7 +941,7 @@ impl SymbolTableBuilder {
             Args(_, _) => {}
             VariableDefinition(location, decl, expression) => {
                 let muttable = if decl.is_mut { SymbolUsage::Mut } else { SymbolUsage::Immutable };
-                if let Some(ast::Expression::Lambda(_, lambda)) = expression {
+                if let ast::Expression::Lambda(_, lambda) = expression {
                     if let LambdaDefinition { params, body, loc } = lambda.as_ref() {
                         let name = &decl.name.name.clone();
                         self.enter_function(name, false, params, loc.1)?;
@@ -968,20 +968,19 @@ impl SymbolTableBuilder {
                 //                                             Some(Identifier { loc: Loc(1, 24, 23), name: "Some" }), None),
                 //                   [FunctionCall(Loc(1, 24, 38), Attribute(Loc(1, 24, 35), Variable(Identifier { loc: Loc(1, 24, 30), name: "Option" }), Some(Identifier { loc: Loc(1, 24, 35), name: "Some" }), None), [NumberLiteral(Loc(1, 24, 37), 20)])])),
 
-                if let Some(e) = expression {
-                    self.scan_expression(e, &ExpressionContext::Load)?;
-                    let mut ty = e.get_type(&self.tables)?;
+                    self.scan_expression(expression, &ExpressionContext::Load)?;
+                    let mut ty = expression.get_type(&self.tables)?;
                     let lookup_symbol = ty == CType::Unknown;
                     if ty == CType::Unknown {
                         //如果是函数或获取属性，就获取注册了的函数和返回类型，
-                        ty = self.get_register_type(e.expr_name())?;
+                        ty = self.get_register_type(expression.expr_name())?;
                     }
                     if decl.ty.is_none() {
                         if lookup_symbol {
                             //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
                             // 那右侧表示符应该是变量，需要从表中查找到的类型进行推断
-                            if let Some(ast::Expression::Attribute(_, _, name, idx)) = expression {
-                                let mut tmp = self.resolve_attribute(expression.as_ref().unwrap(), &ty)?;
+                            if let ast::Expression::Attribute(_, _, name, idx) = expression {
+                                let mut tmp = self.resolve_attribute(expression, &ty)?;
                                 if let CType::Generic(_, cty) = tmp.clone() {
                                     tmp = cty.as_ref().clone();
                                 }
@@ -993,7 +992,7 @@ impl SymbolTableBuilder {
                                 self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                             }
                         } else {
-                            if let ast::Expression::FunctionCall(_, name, args) = e {
+                            if let ast::Expression::FunctionCall(_, name, args) = expression {
                                 if let ast::Expression::Variable(_) = name.as_ref() {
                                     if let CType::Enum(ety) = ty.clone() {
                                         if ty.is_generic() {
@@ -1037,7 +1036,7 @@ impl SymbolTableBuilder {
                         }
                     } else {
                         let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables)?;
-                        if let ast::Expression::Variable(Identifier { .. }) = e {
+                        if let ast::Expression::Variable(Identifier { .. }) = expression {
                             //函数和lambda特殊，直接删除原有定义，用右侧的覆盖;
                             if let Fn(_) = left_ty {
                                 if left_ty == ty.clone() {
@@ -1066,7 +1065,7 @@ impl SymbolTableBuilder {
                             });
                         }
                     }
-                }
+
             }
             Return(_, expression) => {
                 if let Some(e) = expression {

@@ -708,18 +708,14 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(expression)?;
             }
             VariableDefinition(_, decl, expression) => {
-                if let Some(e) = &expression {
-                    //绝大部分的类型都会在symbol分析阶段完成;
-                    if self.is_lambda(&decl.name.borrow().name) {
-                        //如果是lambda，就直接返回，不需要存储，因为lambda作为函数类型存储，只要将名称传递过去
-                        self.lambda_name = decl.name.borrow().name.clone();
-                        self.compile_expression(e)?;
-                        return Ok(());
-                    }
-                    self.compile_expression(e)?;
+                if self.is_lambda(&decl.name.borrow().name) {
+                    //如果是lambda，就直接返回，不需要存储，因为lambda作为函数类型存储，只要将名称传递过去
+                    self.lambda_name = decl.name.borrow().name.clone();
+                    self.compile_expression(expression)?;
+                    return Ok(());
                 }
+                self.compile_expression(expression)?;
                 self.emit(Instruction::StoreNewVariable(NameScope::Local));
-                // self.store_ref_name(&decl.name.name);
             }
 
             For(_, target, iter, body) => {

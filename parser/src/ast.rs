@@ -633,7 +633,7 @@ pub enum Statement {
     Args(Loc, Vec<NamedArgument>),
     If(Loc, Expression, Box<Statement>, Option<Box<Statement>>),
     Expression(Loc, Expression),
-    VariableDefinition(Loc, VariableDeclaration, Option<Expression>),
+    VariableDefinition(Loc, VariableDeclaration, Expression),
     MultiVariableDefinition(Loc, MultiVariableDeclaration, Expression),
     ConstDefinition(Loc, VariableDeclaration, Option<Expression>),
     While(Loc, Expression, Box<Statement>),
