@@ -1,7 +1,7 @@
 use crate::ctype::{CType, PackageType};
 use pan_parser::ast::{Loc, Identifier, MutOrOwn, ModuleDefinition};
 use pan_parser::ast::Expression;
-use crate::symboltable::{SymbolMutability, SymbolTable, SymbolTableResult, SymbolTableError, SymbolTableBuilder, SymbolTableType};
+use crate::symboltable::{SymbolMutability, SymbolTable, SymbolTableResult, SymbolTableError, SymbolTableBuilder, SymbolTableType, SymbolUsage};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::Read;
@@ -10,6 +10,7 @@ use crate::file_cache_symboltable::{resolve_whole_dir, make_ast};
 use crate::compile::Compiler;
 use crate::error::{CompileError, CompileErrorType};
 use crate::output_stream::OutputStream;
+use pan_bytecode::bytecode::Instruction;
 
 pub fn get_number_type(ty: CType) -> i32 {
     return match ty {
@@ -114,7 +115,7 @@ pub fn get_last_name(package: &String) -> String {
 }
 
 pub fn get_dir_name(package: &String) -> String {
-    return package.split_terminator("//").last().unwrap().to_string();
+    return package.split_terminator("/").last().unwrap().to_string();
 }
 
 pub fn get_mutability(mut_or_own: Option<MutOrOwn>, ty: &CType) -> SymbolMutability {
@@ -270,6 +271,48 @@ pub fn get_import(package: &PackageType, idents: &Vec<Identifier>) -> CType {
     return CType::Unknown;
 }
 
+pub fn resolve_dir_import(builder: &mut SymbolTableBuilder, dir_name: String) -> SymbolTableResult {
+    let mut submods = vec![];
+    let mod_name = get_dir_name(&dir_name);
+    println!("mod_name:{:?},", mod_name);
+    builder.enter_scope(&dir_name, SymbolTableType::Package, 0);
+    for entry in WalkDir::new(dir_name.clone()).max_depth(1) {
+        let director = entry.unwrap();
+        let path = director.path();
+        if path.is_file() {
+            if path.extension().unwrap().eq("pan") {
+                let mut s = String::new();
+                s.push_str(path.to_str().unwrap());
+                let module = make_ast(&s).unwrap();
+                let md = ModuleDefinition {
+                    module_parts: module.content,
+                    name: Identifier { loc: Loc::default(), name: get_package_name(&module.package_name) },
+                    is_pub: true,
+                    package: get_package_name(&module.package_name),
+                };
+                let top_hash_map = builder.scan_top_symbol_types(&md)?;
+                builder.scan_program(&md, &top_hash_map)?;
+                submods.push((md.is_pub, get_package_name(&module.package_name), builder.get_register_type(get_package_name(&module.package_name))?));
+                // let top = builder.tables.last();
+                // println!("last_table:{:#?}", top);
+            }
+        } else if path.is_dir() {
+            let mut s = String::new();
+            s.push_str(path.to_str().unwrap());
+            if s.ne(&dir_name.clone()) {
+                resolve_dir_import(builder, s)?;
+            }
+        }
+    }
+
+    builder.leave_scope();
+
+    let ty = CType::Package(PackageType { name: dir_name, consts: vec![], funs: vec![], enums: vec![], structs: vec![], bounds: vec![], imports: vec![], submods });
+    builder.register_name(&mod_name, ty, SymbolUsage::Import, Loc::default())?;
+
+    return Ok(());
+}
+
 //根据单个名字导出,所有目录文件的内容作为一个symboltable返回;
 pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, is_third: bool, package_name: String, loc: Loc) -> SymbolTableResult {
     let dir = resolve_whole_dir(is_third, package_name.clone());
@@ -296,47 +339,48 @@ pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, is_third: b
     }
 
     //是路径
-    let mut in_dir = false;
-    for entry in WalkDir::new(dir.1) {
-        let director = entry.unwrap();
-        let path = director.path();
-
-        println!("path:{:?},is .pan:{:?}", path, path.ends_with(".pan"));
-
-        if path.is_file() {
-            if path.extension().unwrap().eq("pan") {
-                let mut s = String::new();
-                s.push_str(path.to_str().unwrap());
-                let module = make_ast(&s).unwrap();
-                let md = ModuleDefinition {
-                    module_parts: module.content,
-                    name: Identifier { loc: Loc::default(), name: get_package_name(&module.package_name) },
-                    is_pub: true,
-                    package: get_package_name(&module.package_name),
-                };
-                let top_hash_map = builder.scan_top_symbol_types(&md)?;
-                builder.scan_program(&md, &top_hash_map)?;
-                let top = builder.tables.last();
-                println!("last_table:{:#?}", top);
-            }
-        } else {
-            if in_dir {
-                builder.leave_scope();
-            }
-            let name = get_last_name(&String::from(path.to_str().unwrap()));
-            builder.enter_scope(&name, SymbolTableType::Package, 0);
-            in_dir = true;
-        }
-    }
-    builder.leave_scope();
-    println!("build.table:{:#?},", builder.tables);
+    resolve_dir_import(builder, dir.1)?;
+    println!("symboltable:{:#?}", builder.tables);
+    // let mut in_dir = false;
+    // for entry in WalkDir::new(dir.1) {
+    //     let director = entry.unwrap();
+    //     let path = director.path();
+    //
+    //     println!("path:{:?},is .pan:{:?}", path, path.ends_with(".pan"));
+    //
+    //     if path.is_file() {
+    //         if path.extension().unwrap().eq("pan") {
+    //             let mut s = String::new();
+    //             s.push_str(path.to_str().unwrap());
+    //             let module = make_ast(&s).unwrap();
+    //             let md = ModuleDefinition {
+    //                 module_parts: module.content,
+    //                 name: Identifier { loc: Loc::default(), name: get_package_name(&module.package_name) },
+    //                 is_pub: true,
+    //                 package: get_package_name(&module.package_name),
+    //             };
+    //             let top_hash_map = builder.scan_top_symbol_types(&md)?;
+    //             builder.scan_program(&md, &top_hash_map)?;
+    //             let top = builder.tables.last();
+    //             println!("last_table:{:#?}", top);
+    //         }
+    //     } else {
+    //         if in_dir {
+    //             builder.leave_scope();
+    //         }
+    //         let name = get_last_name(&String::from(path.to_str().unwrap()));
+    //         builder.enter_scope(&name, SymbolTableType::Package, 0);
+    //         in_dir = true;
+    //     }
+    // }
+    // builder.leave_scope();
+    // println!("build.table:{:#?},", builder.tables);
 
     Ok(())
 }
 
 
-
-pub fn compile_import_symbol<O: OutputStream>(compiler: &mut Compiler<O>, is_third: bool, package_name: String, loc: Loc) -> Result<ModuleDefinition, CompileError> {
+pub fn compile_import_symbol<O: OutputStream>(compiler: &mut Compiler<O>, is_third: bool, package_name: String, loc: Loc) -> Result<(), CompileError> {
     let dir = resolve_whole_dir(is_third, package_name.clone());
     if dir.is_none() {
         return Err(CompileError {
@@ -357,7 +401,8 @@ pub fn compile_import_symbol<O: OutputStream>(compiler: &mut Compiler<O>, is_thi
             is_pub: true,
             package: get_package_name(&module.package_name),
         };
-        return Ok(md);
+        compiler.compile_program(&md, true);
+        return Ok(());
     }
 
     //是路径
@@ -395,8 +440,47 @@ pub fn compile_import_symbol<O: OutputStream>(compiler: &mut Compiler<O>, is_thi
     // }
     // builder.leave_scope();
     //  println!("build.table:{:#?},", builder.tables);
+    resolve_dir_compile(compiler, dir.1);
+    //unreachable!()
+    Ok(())
+}
 
-    unreachable!()
+pub fn resolve_dir_compile<O: OutputStream>(compiler: &mut Compiler<O>, dir_name: String) -> Result<(), CompileError> {
+    compiler.enter_scope();
+    let mut count = 0;
+    for entry in WalkDir::new(dir_name.clone()).max_depth(1) {
+        count += 1;
+        let director = entry.unwrap();
+        let path = director.path();
+        if path.is_file() {
+            if path.extension().unwrap().eq("pan") {
+                let mut s = String::new();
+                s.push_str(path.to_str().unwrap());
+
+                let module = make_ast(&s).unwrap();
+                let md = ModuleDefinition {
+                    module_parts: module.content,
+                    name: Identifier { loc: Loc::default(), name: get_package_name(&module.package_name) },
+                    is_pub: true,
+                    package: get_package_name(&module.package_name),
+                };
+                compiler.compile_program(&md, true);
+                // let top = builder.tables.last();
+                // println!("last_table:{:#?}", top);
+            }
+        } else if path.is_dir() {
+            let mut s = String::new();
+            s.push_str(path.to_str().unwrap());
+            if s.ne(&dir_name.clone()) {
+                resolve_dir_compile(compiler, s)?;
+            } else {
+                count -= 1;
+            }
+        }
+    }
+    compiler.emit(Instruction::BuildList(count, false));
+    compiler.leave_scope();
+    return Ok(());
 }
 
 

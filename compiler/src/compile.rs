@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer, get_dir_name};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
@@ -175,7 +175,8 @@ pub fn compile_program(
 ) -> Result<(String, CodeObject), CompileError> {
     let symbol_table = make_symbol_table(&ast)?;
     for i in symbol_table.sub_tables.iter() {
-        insert_table(i.name.clone(), i.clone());
+        let name = get_dir_name(&i.name.clone());
+        insert_table(name, i.clone());
         println!("ddddname:{:?},value:{:?}", i.name.clone(), i.clone())
     }
 
@@ -257,8 +258,7 @@ impl<O: OutputStream> Compiler<O> {
                             let top_name = v.get(0).unwrap();
                             if !hash_set.contains(&top_name.name) {
                                 hash_set.insert(top_name.name.clone());
-                                let md = compile_import_symbol(self, *b, top_name.name.clone(), top_name.loc)?;
-                                self.compile_program(&md, true)?;
+                                compile_import_symbol(self, *b, top_name.name.clone(), top_name.loc)?;
                             }
 
 
@@ -311,7 +311,7 @@ impl<O: OutputStream> Compiler<O> {
                             let package_name = vv[0].clone();
                             let scope = self.scope_for_name(&package_name);
                             let p = self.variable_position(&package_name).unwrap();
-                            self.emit(Instruction::LoadCaptureReference(p.0, p.1, scope));
+                            self.emit(Instruction::StoreNewVariable(scope));
                             let t = get_table(vv[0].clone()).unwrap();
                             self.resovle_import_item(vv.get(0).unwrap().clone())?;
                             let cty = self.lookup_name(&vv[0]).ty.clone();
@@ -402,7 +402,9 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::BuildList(program.module_parts.len(), false));
         //self.emit(Instruction::BuildList(program.module_parts.len(), false));
         let scope = self.scope_for_name(&program.package);
-        self.emit(Instruction::StoreNewVariable(scope));
+        if !in_import {
+            self.emit(Instruction::StoreNewVariable(scope));
+        }
         // assert_eq!(self.output_stack.len(), size_before);
 
         for i in self.import_instructions.clone().iter() {
@@ -2770,14 +2772,14 @@ impl<O: OutputStream> Compiler<O> {
             self.resolve_all(&cty, &t)?;
         } else {
             if as_name.is_some() {
-                // self.emit(Instruction::Duplicate);
+                self.emit(Instruction::Duplicate);
                 // let p = self.variable_in_other_package_position(&t, &item_name).unwrap();
                 // //有self
                 // self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
                 // self.emit(Instruction::Subscript);
                 self.emit(Instruction::StoreNewVariable(NameScope::Global));
             } else {
-                // self.emit(Instruction::Duplicate);
+                self.emit(Instruction::Duplicate);
                 // let p = self.variable_in_other_package_position(&t, &item_name).unwrap();
                 // //有self
                 // self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));

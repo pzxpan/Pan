@@ -18,7 +18,7 @@ use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds,
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
-use crate::util::{get_pos_lambda_name, get_package_name, get_mod_name, get_item_from_package, get_import, resolve_import_symbol_table, get_package_layer, get_package_item_by_name};
+use crate::util::{get_pos_lambda_name, get_package_name, get_mod_name, get_item_from_package, get_import, resolve_dir_import, resolve_import_symbol_table, get_package_layer, get_package_item_by_name};
 use crate::util::get_attribute_vec;
 use std::process::{exit, id};
 use crate::util::get_full_name;
@@ -747,11 +747,12 @@ impl SymbolTableBuilder {
                             let top_name = v.get(0).unwrap();
                             if !hash_set.contains(&top_name.name) {
                                 hash_set.insert(top_name.name.clone());
-                                resolve_import_symbol_table(self, *b,top_name.name.clone(), top_name.loc)?;
+                                resolve_import_symbol_table(self, *b, top_name.name.clone(), top_name.loc)?;
                             }
                             let ty = &self.get_register_type(top_name.name.clone())?;
                             let last_item = v.last().unwrap();
                             let item_name = last_item.name.clone();
+                            println!("top_ty::{:?},last_item:{:?},", ty, item_name);
                             self.resovle_import(&v[1..], ty, *is_all, item_name, Option::None)?;
                         }
                         _ => {}
@@ -803,7 +804,7 @@ impl SymbolTableBuilder {
         Ok(hash_map)
     }
 
-    fn get_register_type(&self, name: String) -> Result<CType, SymbolTableError> {
+    pub fn get_register_type(&self, name: String) -> Result<CType, SymbolTableError> {
         let len = self.tables.len();
         for i in (0..len).rev() {
             for item in &self.tables.get(i).unwrap().symbols {
@@ -2185,7 +2186,7 @@ impl SymbolTableBuilder {
 
 
     #[allow(clippy::single_match)]
-    fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
+    pub fn register_name(&mut self, name: &String, ty: CType, role: SymbolUsage, location: Loc) -> SymbolTableResult {
         println!("register_name:{:?},ty:{:?}", name, ty);
         //忽略_符号
         if name.is_empty() {
