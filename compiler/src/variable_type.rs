@@ -317,8 +317,6 @@ impl HasType for EnumDefinition {
                     }
                     if v.default.is_some() {
                         idx = v.default.unwrap();
-                    } else {
-                        idx += 1;
                     }
                     if hash_set.contains(&idx) {
                         return Err(SymbolTableError {
@@ -328,6 +326,7 @@ impl HasType for EnumDefinition {
                     }
                     hash_set.insert(idx);
                     variants.push((v.name.name.clone(), CType::Reference(v.name.name.clone(), ref_type), idx));
+                    idx += 1;
                 }
             }
         }

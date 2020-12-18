@@ -409,6 +409,7 @@ impl Expression {
             Expression::NamedFunctionCall(_, n, _) => n.as_ref().expr_name(),
             Expression::Variable(id) => id.clone().name,
             Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
+            Expression::Hole(_) => "_".to_string(),
             _ => "".to_string()
         }
     }

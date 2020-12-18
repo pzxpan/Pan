@@ -347,16 +347,20 @@ impl<O: OutputStream> Compiler<O> {
                 ast::PackagePart::EnumDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
+                    // for g in &def.generics {
+                    //     self.emit(Instruction::LoadConst(Constant::String(Box::new(g.name.name.clone()))));
+                    //     self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                    // }
                     self.compile_enum_def(name.as_str(), &body, &def.generics)?;
                 }
                 ast::PackagePart::StructDefinition(def) => {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
-                    for g in generics {
-                        self.emit(Instruction::LoadConst(Constant::String(Box::new(g.name.name.clone()))));
-                        self.emit(Instruction::StoreNewVariable(NameScope::Global));
-                    }
+                    // for g in generics {
+                    //     self.emit(Instruction::LoadConst(Constant::String(Box::new(g.name.name.clone()))));
+                    //     self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                    // }
                     if in_import {
                         self.compile_class_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
                     } else {
@@ -397,6 +401,10 @@ impl<O: OutputStream> Compiler<O> {
                     let name = &def.name.name;
                     let body = &def.parts;
                     let generics = &def.generics;
+                    // for g in generics {
+                    //     self.emit(Instruction::LoadConst(Constant::String(Box::new(g.name.name.clone()))));
+                    //     self.emit(Instruction::StoreNewVariable(NameScope::Global));
+                    // }
                     if in_import {
                         self.compile_bound_def(&self.get_full_name(&program.package, name.as_str()), &body, &generics)?;
                     } else {
@@ -493,19 +501,22 @@ impl<O: OutputStream> Compiler<O> {
         println!("dddname:{:?},in_loop:{:?}", name, self.ctx.in_loop || self.ctx.in_match);
         if is_local {
             self.emit(Instruction::LoadLocalName(position.1, NameScope::Local));
+        } else if scope == NameScope::Global {
+            self.emit(Instruction::LoadFrameReference(0, position.1, scope.clone()));
         } else {
             //package那一层占坑没拉屎，nnd
             if self.ctx.in_lambda {
                 if self.scope_level > position.0 {
                     self.emit(Instruction::LoadCaptureReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::LoadFrameReference(position.0 - 2, position.1, scope.clone()));
+                    // self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
+                    self.emit(Instruction::LoadCaptureReference(position.0 - 1, position.1, scope.clone()));
                 }
             } else {
                 if self.ctx.in_loop || self.ctx.in_match || self.ctx.in_need_block {
                     self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::LoadCaptureReference(position.0, position.1, scope.clone()));
+                    self.emit(Instruction::LoadCaptureReference(position.0 - 1, position.1, scope.clone()));
                 }
             }
         }
@@ -564,12 +575,14 @@ impl<O: OutputStream> Compiler<O> {
 
         if is_local {
             self.emit(Instruction::StoreLocalName(position.1, scope));
+        } else if scope == NameScope::Global {
+            self.emit(Instruction::LoadFrameReference(0, position.1, scope.clone()));
         } else {
             if self.ctx.in_lambda && self.scope_level > position.0 {
                 if self.scope_level > position.0 {
                     self.emit(Instruction::StoreCaptureReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::StoreFrameReference(position.0 - 2, position.1, scope.clone()));
+                    self.emit(Instruction::StoreFrameReference(position.0 - 1, position.1, scope.clone()));
                 }
             } else {
                 if self.ctx.in_loop || self.ctx.in_match || self.ctx.in_need_block {
@@ -859,8 +872,11 @@ impl<O: OutputStream> Compiler<O> {
     fn store_match_content(&mut self, expression: &Expression) -> Result<(), CompileError> {
         if let Expression::FunctionCall(_, _, args) = expression {
             for arg in args.iter() {
-                let p = self.variable_position(arg.expr_name().as_str()).unwrap();
-                self.emit(Instruction::StoreLocalName(p.1, NameScope::Local));
+                if arg.expr_name().ne("_") {
+                    println!("arg.expr_name():{:?}", arg.expr_name().as_str());
+                    let p = self.variable_position(arg.expr_name().as_str()).unwrap();
+                    self.emit(Instruction::StoreLocalName(p.1, NameScope::Local));
+                }
             }
         }
         Ok(())
@@ -3054,6 +3070,9 @@ impl<O: OutputStream> Compiler<O> {
                             println!("name_prefix:{:?}.", v);
                             if !v.is_empty() {
                                 self.resolve_package();
+                                let p = self.variable_position(&name.0).unwrap();
+                                self.emit(Instruction::LoadConst(Constant::I32(p.1 as i32)));
+                                self.emit(Instruction::Subscript);
                             } else {
                                 let scope = self.scope_for_name(&name.0);
                                 let p = self.variable_position(&name.0).unwrap();
