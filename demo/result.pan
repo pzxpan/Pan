@@ -24,6 +24,10 @@ fun main() {
        print(a);
    }
    print(a);
+
+   let ccc = "dddd";
+   read(ccc);
+   print(ccc);
 }
 
 

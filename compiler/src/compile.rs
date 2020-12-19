@@ -25,6 +25,7 @@ use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
 use crate::compile::FunctionContext::{Function, StructFunction};
 use crate::symboltable::SymbolScope::Const;
 use crate::file_cache_symboltable::{make_ast, resolve_file_name};
+use pan_bytecode::bytecode::Constant::Reference;
 
 
 lazy_static! {
@@ -2143,6 +2144,16 @@ impl<O: OutputStream> Compiler<O> {
         } else if function.expr_name().eq("panic") {
             self.gather_elements(args)?;
             self.emit(Instruction::Panic);
+        } else if function.expr_name().eq("read") {
+            self.gather_elements(args)?;
+            self.emit(Instruction::Read(args.len()));
+            self.emit(Instruction::Reverse(args.len()));
+            for arg in args {
+                let scope = self.scope_for_name(&arg.expr_name());
+                let p = self.variable_position(&arg.expr_name()).unwrap();
+                //函数有一层
+                self.emit(Instruction::StoreCaptureReference(p.0 - 1, p.1, scope));
+            }
         }
         return Ok(false);
     }

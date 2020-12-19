@@ -429,6 +429,13 @@ impl Frame {
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());
             }
+            bytecode::Instruction::Read(size) => {
+                let mut v = self.pop_multiple(*size);
+                for mut value in v {
+                    vm.read(&mut value);
+                    self.push_value(value);
+                }
+            }
             bytecode::Instruction::TypeOf => {
                 let v = self.pop_value();
                 self.push_value(Value::String(Box::new(v.ty_name())));

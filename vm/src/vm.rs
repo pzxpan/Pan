@@ -15,7 +15,7 @@ use pan_bytecode::value::*;
 use crate::frame::{ExecutionResult, Frame, FrameRef, FrameResult};
 use crate::scope::Scope;
 use std::collections::HashMap;
-use std::thread;
+use std::{thread, io};
 use std::thread::JoinHandle;
 use std::cell::RefCell;
 use std::sync::Mutex;
@@ -1141,6 +1141,13 @@ impl VirtualMachine {
         } else {
             println! {"{}", value.to_string()};
         }
+    }
+
+    pub fn read(&self, value: &mut Value) {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input);
+        // input.trim();
+        *value = Value::String(Box::new(String::from(input.trim())));
     }
 
     pub fn sub(&self, a: Value, b: Value) -> Value {
