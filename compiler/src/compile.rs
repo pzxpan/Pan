@@ -2165,6 +2165,8 @@ impl<O: OutputStream> Compiler<O> {
         let builtin = self.compile_builtin_fn(function, args)?;
         if builtin { return Ok(()); }
 
+
+        let mut is_std_fun = false;
         let mut is_enum_item = false;
         let mut is_thread_start = false;
         if let ast::Expression::Attribute(_, variable, attribute, _) = function {
@@ -2199,13 +2201,20 @@ impl<O: OutputStream> Compiler<O> {
                     //试下 单个
                     let scope = self.scope_for_name(name.as_str());
                     let p = self.variable_position(name.as_str()).unwrap();
-                    if scope == NameScope::Global {
-                        self.emit(Instruction::LoadCaptureReference(p.0, p.1, NameScope::Global));
+                    let prefix = &self.lookup_name(name).prefix;
+                    if prefix.len() > 0 && prefix[0].eq("std") {
+                        self.emit(Instruction::LoadConst(bytecode::Constant::NativeFn(
+                            Box::new(NativeFn { idx: 0, name: "current_dir".to_string() }))));
+                        is_std_fun = true;
                     } else {
-                        self.resolve_package();
-                        self.emit(Instruction::LoadConst(
-                            bytecode::Constant::Integer(p.1 as i32)));
-                        self.emit(Instruction::Subscript);
+                        if scope == NameScope::Global {
+                            self.emit(Instruction::LoadCaptureReference(p.0, p.1, NameScope::Global));
+                        } else {
+                            self.resolve_package();
+                            self.emit(Instruction::LoadConst(
+                                bytecode::Constant::Integer(p.1 as i32)));
+                            self.emit(Instruction::Subscript);
+                        }
                     }
                 }
 
@@ -2262,6 +2271,8 @@ impl<O: OutputStream> Compiler<O> {
             self.emit(Instruction::LoadBuildEnum(count + 3));
         } else if is_thread_start {
             self.emit(Instruction::StartThread);
+        } else if is_std_fun {
+            self.emit(Instruction::CallStdFunction(CallType::Positional(count + self_args)));
         } else {
             self.emit(Instruction::CallFunction(CallType::Positional(count + self_args)));
         }

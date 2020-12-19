@@ -278,6 +278,7 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
                 fmt.str(&n.as_ref().name)
             }
             Value::Nil => { fmt.str(&"None".to_string()) }
+            Value::NativeFn(n) => { fmt.str(&n.name) }
         }
     };
     if let Value::String(s) = format_str {

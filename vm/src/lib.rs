@@ -6,4 +6,6 @@ pub mod vm;
 pub mod scope;
 pub mod util;
 pub mod scope_vec;
+pub mod stdlib;
+pub mod context;
 

@@ -968,104 +968,103 @@ impl SymbolTableBuilder {
                 //                                             Some(Identifier { loc: Loc(1, 24, 23), name: "Some" }), None),
                 //                   [FunctionCall(Loc(1, 24, 38), Attribute(Loc(1, 24, 35), Variable(Identifier { loc: Loc(1, 24, 30), name: "Option" }), Some(Identifier { loc: Loc(1, 24, 35), name: "Some" }), None), [NumberLiteral(Loc(1, 24, 37), 20)])])),
 
-                    self.scan_expression(expression, &ExpressionContext::Load)?;
-                    let mut ty = expression.get_type(&self.tables)?;
-                    let lookup_symbol = ty == CType::Unknown;
-                    if ty == CType::Unknown {
-                        //如果是函数或获取属性，就获取注册了的函数和返回类型，
-                        ty = self.get_register_type(expression.expr_name())?;
-                    }
-                    if decl.ty.is_none() {
-                        if lookup_symbol {
-                            //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
-                            // 那右侧表示符应该是变量，需要从表中查找到的类型进行推断
-                            if let ast::Expression::Attribute(_, _, name, idx) = expression {
-                                let mut tmp = self.resolve_attribute(expression, &ty)?;
-                                if let CType::Generic(_, cty) = tmp.clone() {
-                                    tmp = cty.as_ref().clone();
+                self.scan_expression(expression, &ExpressionContext::Load)?;
+                let mut ty = expression.get_type(&self.tables)?;
+                let lookup_symbol = ty == CType::Unknown;
+                if ty == CType::Unknown {
+                    //如果是函数或获取属性，就获取注册了的函数和返回类型，
+                    ty = self.get_register_type(expression.expr_name())?;
+                }
+                if decl.ty.is_none() {
+                    if lookup_symbol {
+                        //定义时没有指定类型，且无法从expression 字面量直接获取到类型，
+                        // 那右侧表示符应该是变量，需要从表中查找到的类型进行推断
+                        if let ast::Expression::Attribute(_, _, name, idx) = expression {
+                            let mut tmp = self.resolve_attribute(expression, &ty)?;
+                            if let CType::Generic(_, cty) = tmp.clone() {
+                                tmp = cty.as_ref().clone();
+                            }
+                            self.register_name(decl.name.borrow().name.borrow(), tmp, muttable.clone(), decl.loc)?;
+                        } else {
+                            if let CType::Generic(_, cty) = ty.clone() {
+                                ty = cty.as_ref().clone();
+                            }
+                            self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
+                        }
+                    } else {
+                        if let ast::Expression::FunctionCall(_, name, args) = expression {
+                            if let ast::Expression::Variable(_) = name.as_ref() {
+                                if let CType::Enum(ety) = ty.clone() {
+                                    if ty.is_generic() {
+                                        let mut v = HashMap::new();
+                                        for arg in args.iter().enumerate() {
+                                            v.insert(name.expr_name(), arg.1.get_type(&self.tables)?);
+                                        }
+                                        ty = CType::Enum(resolve_enum_generic_fn(ety, v));
+                                    }
+                                } else if let CType::Generic(_, cty) = ty.clone() {
+                                    ty = cty.as_ref().clone();
                                 }
-                                self.register_name(decl.name.borrow().name.borrow(), tmp, muttable.clone(), decl.loc)?;
-                            } else {
+                                if let CType::Args(name, v) = ty.ret_type().clone() {
+                                    ty = self.get_register_type(name)?;
+                                }
+                                self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
+                            } else if let ast::Expression::Attribute(loc, n, Some(ident), _) = name.as_ref() {
+                                ty = self.get_register_type(n.expr_name())?;
+                                ty = self.resovle_method(name, &ty)?;
+
+                                if ty.is_generic() {
+                                    ty = self.get_recurse_ty(&ty, n.expr_name(), ident.name.clone(), args, loc.clone())?;
+                                }
                                 if let CType::Generic(_, cty) = ty.clone() {
                                     ty = cty.as_ref().clone();
+                                }
+                                if let CType::Args(name, v) = ty.ret_type().clone() {
+                                    ty = self.get_register_type(name)?;
                                 }
                                 self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
                             }
                         } else {
-                            if let ast::Expression::FunctionCall(_, name, args) = expression {
-                                if let ast::Expression::Variable(_) = name.as_ref() {
-                                    if let CType::Enum(ety) = ty.clone() {
-                                        if ty.is_generic() {
-                                            let mut v = HashMap::new();
-                                            for arg in args.iter().enumerate() {
-                                                v.insert(name.expr_name(), arg.1.get_type(&self.tables)?);
-                                            }
-                                            ty = CType::Enum(resolve_enum_generic_fn(ety, v));
-                                        }
-                                    } else if let CType::Generic(_, cty) = ty.clone() {
-                                        ty = cty.as_ref().clone();
-                                    }
-                                    if let CType::Args(name, v) = ty.ret_type().clone() {
-                                        ty = self.get_register_type(name)?;
-                                    }
-                                    self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
-                                } else if let ast::Expression::Attribute(loc, n, Some(ident), _) = name.as_ref() {
-                                    ty = self.get_register_type(n.expr_name())?;
-                                    ty = self.resovle_method(name, &ty)?;
-
-                                    if ty.is_generic() {
-                                        ty = self.get_recurse_ty(&ty, n.expr_name(), ident.name.clone(), args, loc.clone())?;
-                                    }
-                                    if let CType::Generic(_, cty) = ty.clone() {
-                                        ty = cty.as_ref().clone();
-                                    }
-                                    if let CType::Args(name, v) = ty.ret_type().clone() {
-                                        ty = self.get_register_type(name)?;
-                                    }
-                                    self.register_name(decl.name.borrow().name.borrow(), ty.ret_type().clone(), muttable.clone(), decl.loc)?;
-                                }
-                            } else {
-                                if let CType::Generic(_, cty) = ty.clone() {
-                                    ty = cty.as_ref().clone();
-                                }
-                                if let CType::Args(name, v) = ty.clone() {
-                                    ty = self.get_register_type(name)?;
-                                }
-                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
+                            if let CType::Generic(_, cty) = ty.clone() {
+                                ty = cty.as_ref().clone();
                             }
-                        }
-                    } else {
-                        let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables)?;
-                        if let ast::Expression::Variable(Identifier { .. }) = expression {
-                            //函数和lambda特殊，直接删除原有定义，用右侧的覆盖;
-                            if let Fn(_) = left_ty {
-                                if left_ty == ty.clone() {
-                                    self.delete_name(decl.name.borrow().name.borrow());
-                                    self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
-                                } else {
-                                    return Err(SymbolTableError {
-                                        error: format!("类型不匹配,右侧类型 {:?}\n, 左侧类型 {:?}", ty.clone(), left_ty),
-                                        location: location.clone(),
-                                    });
-                                }
+                            if let CType::Args(name, v) = ty.clone() {
+                                ty = self.get_register_type(name)?;
                             }
-                            return Ok(());
-                        }
-                        if let CType::Generic(_, cty) = ty.clone() {
-                            ty = cty.as_ref().clone();
-                        }
-                        if let CType::Args(name, v) = ty.clone() {
-                            ty = self.get_register_type(name)?;
-                        }
-                        let mut right_ty = ty.ret_type().clone();
-                        if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
-                            return Err(SymbolTableError {
-                                error: format!("类型不匹配,右侧类型 {:?}\n, 左侧类型 {:?}", right_ty, left_ty),
-                                location: location.clone(),
-                            });
+                            self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
                         }
                     }
-
+                } else {
+                    let left_ty = decl.ty.as_ref().unwrap().get_type(&self.tables)?;
+                    if let ast::Expression::Variable(Identifier { .. }) = expression {
+                        //函数和lambda特殊，直接删除原有定义，用右侧的覆盖;
+                        if let Fn(_) = left_ty {
+                            if left_ty == ty.clone() {
+                                self.delete_name(decl.name.borrow().name.borrow());
+                                self.register_name(decl.name.borrow().name.borrow(), ty.clone(), muttable.clone(), decl.loc)?;
+                            } else {
+                                return Err(SymbolTableError {
+                                    error: format!("类型不匹配,右侧类型 {:?}\n, 左侧类型 {:?}", ty.clone(), left_ty),
+                                    location: location.clone(),
+                                });
+                            }
+                        }
+                        return Ok(());
+                    }
+                    if let CType::Generic(_, cty) = ty.clone() {
+                        ty = cty.as_ref().clone();
+                    }
+                    if let CType::Args(name, v) = ty.clone() {
+                        ty = self.get_register_type(name)?;
+                    }
+                    let mut right_ty = ty.ret_type().clone();
+                    if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
+                        return Err(SymbolTableError {
+                            error: format!("类型不匹配,右侧类型 {:?}\n, 左侧类型 {:?}", right_ty, left_ty),
+                            location: location.clone(),
+                        });
+                    }
+                }
             }
             Return(_, expression) => {
                 if let Some(e) = expression {
@@ -2432,7 +2431,6 @@ impl SymbolTableBuilder {
     fn resovle_import(&mut self, idents: &[Identifier], ty: &CType, is_all: bool, item_name: String, as_name: Option<String>) -> Result<(), SymbolTableError> {
         let mut cty = ty.clone();
         println!("cccccty:{:?},", cty);
-
         let len = idents.len();
         if len < 1 {
             self.resolve_import_item(&cty.clone(), is_all, item_name.clone(), as_name.clone())?;
@@ -2524,7 +2522,7 @@ impl SymbolTableBuilder {
                 }
                 for (is_pub, name, ty) in ty.funs.iter() {
                     if *is_pub {
-                        self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                        self.register_package_item(name, ty.clone(), SymbolUsage::Import, Loc::default(), vec!["std".to_string(), "env".to_string()])?;
                     }
                 }
                 for (is_pub, name, ty) in ty.consts.iter() {

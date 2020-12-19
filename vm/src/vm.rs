@@ -5,7 +5,7 @@ use cached::proc_macro::cached;
 use std::borrow::Borrow;
 use std::rc::Rc;
 use std::ops::Add;
-
+use std::env;
 use num_traits::{ToPrimitive, AsPrimitive};
 
 use pan_bytecode::bytecode;
@@ -22,6 +22,8 @@ use std::sync::Mutex;
 use crate::scope_vec::{ScopeVec, NameProtocol};
 use std::sync::Arc;
 use std::time::Instant;
+use crate::context;
+use crate::context::Context;
 
 pub struct VirtualMachine {
     pub frame_count: usize,
@@ -426,6 +428,9 @@ impl VirtualMachine {
         None
     }
 
+    pub fn call_std_funs(&self, idx: i32, name: String, value: &Vec<Value>) -> Value {
+        return context::current_dir();
+    }
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
         None
     }
@@ -1144,10 +1149,10 @@ impl VirtualMachine {
     }
 
     pub fn read(&self, value: &mut Value) {
-        let mut input = String::new();
-        io::stdin().read_line(&mut input);
+        // let mut input = String::new();
+        // io::stdin().read_line(&mut input);
         // input.trim();
-        *value = Value::String(Box::new(String::from(input.trim())));
+        *value = context::current_dir();
     }
 
     pub fn sub(&self, a: Value, b: Value) -> Value {
@@ -1665,6 +1670,7 @@ pub fn unwrap_constant(constant: &bytecode::Constant) -> Value {
         None => Value::Nil,
         Struct(ref ty) => Value::Type(Box::new(ty.as_ref().to_owned())),
         Enum(ref ty) => Value::Enum(Box::new(ty.as_ref().to_owned())),
+        NativeFn(ref n) => Value::NativeFn(Box::new(n.as_ref().to_owned())),
         Reference(ref n) => Value::Reference(Box::new((n.as_ref().0, n.as_ref().1.clone(), n.as_ref().2.clone()))),
         Map(ref ty) => { Value::Nil }
     }

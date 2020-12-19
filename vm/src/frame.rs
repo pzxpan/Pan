@@ -266,6 +266,10 @@ impl Frame {
                     _ => self.push_value(Value::Nil)
                 }
             }
+
+            bytecode::Instruction::CallStdFunction(typ) => {
+                self.execute_std_call_function(vm, typ);
+            }
             bytecode::Instruction::StartThread => { self.start_thread(vm); }
             bytecode::Instruction::Jump(target) => {
                 self.jump(*target);
@@ -637,7 +641,30 @@ impl Frame {
         run_code_in_sub_thread(code, hash_map, global);
         return None;
     }
+    fn execute_std_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
+        let args = match typ {
+            bytecode::CallType::Positional(count) => {
+                if *count > 0 {
+                    let args = self.pop_multiple(*count);
+                    args
+                } else { vec![Value::Nil] }
+            }
+            bytecode::CallType::Keyword(count) => {
+                let args = self.pop_multiple(*count);
+                args
+            }
+            _ => { vec![Value::Nil] }
+        };
 
+        let mut std_funs = self.pop_value();
+        println!("std_funs::{:?}", std_funs);
+        if let Value::NativeFn(n) = std_funs {
+            let v = vm.call_std_funs(n.idx, n.name, &args);
+            self.push_value(v);
+            return None;
+        }
+        unreachable!()
+    }
     fn execute_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
         let mut named_call = false;
         let args = match typ {

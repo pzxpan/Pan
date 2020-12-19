@@ -110,6 +110,7 @@ pub enum Instruction {
     JumpIfFalseOrPop(Label),
     MakeFunction,
     MakeLambda(usize),
+    CallStdFunction(CallType),
     CallFunction(CallType),
     ForIter(Label),
     Ignore,
@@ -194,6 +195,7 @@ pub enum Constant {
     Map(Box<Vec<(Constant, Constant)>>),
     Struct(Box<TypeValue>),
     Enum(Box<EnumValue>),
+    NativeFn(Box<NativeFn>),
     Reference(Box<(usize, usize, NameScope)>),
     None,
 }
@@ -415,6 +417,7 @@ impl Instruction {
             MakeFunction => w!(MakeFunction),
             MakeLambda(usize) => w!(MakeLambda, usize),
             CallFunction(typ) => w!(CallFunction, format ! ("{:?}", typ)),
+            CallStdFunction(typ) => w!(CallStdFunction, format ! ("{:?}", typ)),
             IntoBlock => w!(IntoBlock),
             OutBlock => w!(OutBlock),
             ForIter(target) => w!(ForIter, label_map[target]),
@@ -510,7 +513,8 @@ impl fmt::Display for Constant {
                                                   .map(|e| format!("{},{}", e.0, e.1))
                                                   .collect::<Vec<_>>()
                                                   .join(", ")),
-            Constant::Reference(n) => write!(f, "Ref {:?},{:?}", n.as_ref().0, n.as_ref().1)
+            Constant::Reference(n) => write!(f, "Ref {:?},{:?}", n.as_ref().0, n.as_ref().1),
+            Constant::NativeFn(n) => write!(f, "NativeFn {:?},{:?}", n.name, n.idx)
         }
     }
 }

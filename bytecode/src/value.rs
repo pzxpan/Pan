@@ -56,7 +56,7 @@ pub enum Value {
     Fn(Box<FnValue>),
     Closure(Box<ClosureValue>),
     Thread(Box<ThreadValue>),
-    // NativeFn(NativeFn),
+    NativeFn(Box<NativeFn>),
     Type(Box<TypeValue>),
     Enum(Box<EnumValue>),
     Code(Box<CodeObject>),
@@ -90,6 +90,12 @@ pub struct EnumValue {
     pub idx: i32,
     pub methods: Vec<(String, CodeObject)>,
     pub static_fields: Vec<(String, CodeObject)>,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct NativeFn {
+    pub name: String,
+    pub idx: i32,
 }
 
 impl Value {
@@ -183,6 +189,7 @@ impl Value {
             Value::Bool(_) => { "bool".to_string() }
             Value::Reference(_) => { "Ref".to_string() }
             Value::Package(_) => { "Package".to_string() }
+            Value::NativeFn(_) => { "NativeFn".to_string() }
         }
     }
 
@@ -271,7 +278,8 @@ impl Value {
             Value::Code(code) => format!("<code {}>", code.as_ref()),
             Value::Enum(n) => format!("<enum {}>", &n.name),
             Value::Reference(n) => format!("<ref {} {}>", &n.as_ref().0, &n.as_ref().1),
-            Value::Package(n) => format!("<package {}>", &n.name)
+            Value::Package(n) => format!("<package {}>", &n.name),
+            Value::NativeFn(n) => format!("<package {}>", &n.name)
         }
     }
 
@@ -342,7 +350,9 @@ impl Display for Value {
             Value::Code(code) => write!(f, "<code {}>", code),
             Value::Enum(n) => write!(f, "<enum {}>", n.name),
             Value::Reference(n) => write!(f, "<ref {} {}>", &n.as_ref().0, &n.as_ref().1),
-            Value::Package(n) => write!(f, "<package {}>", &n.name)
+            Value::Package(n) => write!(f, "<package {}>", &n.name),
+            Value::NativeFn(n) => write!(f, "<nativefn {}>", &n.name)
+
         }
     }
 }
