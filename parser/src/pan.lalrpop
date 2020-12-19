@@ -7,33 +7,33 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'input,'err>(input: &'input str, file_no: usize,errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, LexicalError>>);
 
-pub TopModule: Module = {
-   "package" <p:Dot<Identifier>> ";" <s:ModulePart+> => Module{package:p,content:s}
+pub TopPackage: Package = {
+   "package" <p:Dot<Identifier>> ";" <s:PackagePart+> => Package{package_name:p,content:s}
 }
 
-ModulePart: ModulePart = {
-    StructDefinition => ModulePart::StructDefinition(<>),
-    ImportDirective => ModulePart::ImportDirective(<>),
-    EnumDefinition => ModulePart::EnumDefinition(<>),
-    DataDefinition => ModulePart::DataDefinition(<>),
-    FunctionDefinition => ModulePart::FunctionDefinition(<>),
-    BoundDefinition => ModulePart::BoundDefinition(<>),
-    ConstVariableDefinition => ModulePart::ConstDefinition(<>),
-    ModuleDefinition => ModulePart::ModuleDefinition(Box::new(<>)),
-    <err: !>  => { errors.push(err); ModulePart::Error},
+PackagePart: PackagePart = {
+    StructDefinition => PackagePart::StructDefinition(<>),
+    ImportDirective => PackagePart::ImportDirective(<>),
+    EnumDefinition => PackagePart::EnumDefinition(<>),
+    DataDefinition => PackagePart::DataDefinition(<>),
+    FunctionDefinition => PackagePart::FunctionDefinition(<>),
+    BoundDefinition => PackagePart::BoundDefinition(<>),
+    ConstVariableDefinition => PackagePart::ConstDefinition(<>),
+    ModuleDefinition => PackagePart::ModuleDefinition(Box::new(<>)),
+    <err: !>  => { errors.push(err); PackagePart::Error},
 }
 
 pub ModuleDefinition: ModuleDefinition = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:ModulePart+> "}" <R:@L> => {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:PackagePart+> "}" <R:@L> => {
         ModuleDefinition{module_parts:parts,name,is_pub:is_pub.is_some(),package:"".to_string()}
     }
 }
 
 ImportDirective: Import = {
-    "import" <s:Dot<Identifier>> <all:(".*")?> ";" => Import::Plain(s,all.is_some()),
-    "import" <s:Dot<Identifier>> <all:(".*")?> "as" <id:Identifier> ";" => Import::Rename(s, id,all.is_some()),
-    "import" <s:Dot<Identifier>> "{" <rename:CommaOne<ImportRename>> "}" ";" => {
-        Import::PartRename(s, rename)
+    "import" <third_part:"::"?> <s:Dot<Identifier>> <all:(".*")?> ";"? => Import::Plain(third_part.is_some(),s,all.is_some()),
+    "import" <third_part:"::"?> <s:Dot<Identifier>> "as" <id:Identifier> ";"? => Import::Rename(third_part.is_some(),s, id),
+    "import" <third_part:"::"?> <s:Dot<Identifier>> "{" <rename:CommaOne<ImportRename>> "}" ";"? => {
+        Import::PartRename(third_part.is_some(),s, rename)
     }
 }
 
@@ -160,7 +160,7 @@ StructVariableDefinition: Box<StructVariableDefinition> = {
 
 EnumVariableDefinition: Box<EnumVariableDefinition> = {
     <doc:DocComments> <l:@L>  <name:Identifier> <tys : ("(" <Comma<Expression>>  ")" )?> <e:("=" <Number>)?> <r:@R> ","? => {
-     let default = if e.is_some() { e.unwrap().to_i32()} else {0};
+     let default = if e.is_some() { Some(e.unwrap().to_i32())} else {None};
      Box::new(EnumVariableDefinition {
          doc, loc: Loc(file_no, l, r), tys, name,default,
         })
@@ -539,7 +539,7 @@ Statement: Statement = {
 }
 
 SimpleStatement: Statement = {
-    <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)?> <r:@R> => {
+    <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)> <r:@R> => {
         Statement::VariableDefinition(Loc(file_no, l, r), v, e)
     },
     //Set放在这里就没法嵌套定义，只能在"="的右边推导出一个Set;放在Expression的话，与NamedArgument有规约冲突

@@ -4,13 +4,14 @@ use crate::symboltable::*;
 use crate::ctype::*;
 use crate::ctype::CType::{Bool, Unknown};
 use std::ops::Deref;
-use crate::util::get_attribute_vec;
+use crate::util::{get_attribute_vec, get_mod_name, get_package_name, get_package_layer};
 use crate::util::get_full_name;
 use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
-use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type};
+use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type, get_self_type};
 use std::borrow::Borrow;
 use std::collections::HashSet;
+use crate::file_cache_symboltable::{resolve_file_name, make_ast};
 
 pub trait HasType {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError>;
@@ -314,10 +315,8 @@ impl HasType for EnumDefinition {
                             ref_type.push(tt);
                         }
                     }
-                    if v.default != idx {
-                        idx = v.default;
-                    } else {
-                        idx += 1;
+                    if v.default.is_some() {
+                        idx = v.default.unwrap();
                     }
                     if hash_set.contains(&idx) {
                         return Err(SymbolTableError {
@@ -326,9 +325,8 @@ impl HasType for EnumDefinition {
                         });
                     }
                     hash_set.insert(idx);
-
-
                     variants.push((v.name.name.clone(), CType::Reference(v.name.name.clone(), ref_type), idx));
+                    idx += 1;
                 }
             }
         }
@@ -344,6 +342,44 @@ impl HasType for EnumDefinition {
         } else {
             Ok(CType::Enum(EnumType { name, items: variants, generics: Some(type_args), bases, static_methods, is_pub: self.is_pub, methods }))
         }
+    }
+}
+
+impl HasType for ModuleDefinition {
+    fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
+        let name = self.package.clone();
+        let mut consts = vec![];
+        let mut funs = vec![];
+        let mut enums = vec![];
+        let mut structs = vec![];
+        let mut bounds = vec![];
+        let mut imports = vec![];
+        let mut submods = vec![];
+        for part in &self.module_parts {
+            match part {
+                PackagePart::ModuleDefinition(m) => {
+                    submods.push((m.is_pub, m.package.clone(), m.get_type(tables)?));
+                }
+                PackagePart::EnumDefinition(m) => {
+                    enums.push((m.is_pub, m.name.name.clone(), m.get_type(tables)?));
+                }
+                PackagePart::StructDefinition(m) => {
+                    structs.push((m.is_pub, m.name.name.clone(), m.get_type(tables)?));
+                }
+                PackagePart::FunctionDefinition(m) => {
+                    funs.push((m.is_pub, m.name.as_ref().unwrap().name.clone(), m.get_type(tables)?));
+                }
+                PackagePart::ConstDefinition(m) => {
+                    consts.push((m.is_pub, m.name.name.clone(), m.initializer.get_type(&tables)?));
+                }
+                PackagePart::BoundDefinition(m) => {
+                    bounds.push((m.is_pub, m.name.name.clone(), m.get_type(tables)?));
+                }
+
+                _ => {}
+            }
+        }
+        return Ok(CType::Package(PackageType { name, consts, funs, enums, structs, bounds, imports, submods }));
     }
 }
 
@@ -837,11 +873,11 @@ fn in_current_scope(tables: &Vec<SymbolTable>, name: String) -> bool {
     return false;
 }
 
-impl HasType for ModulePart {
+impl HasType for PackagePart {
     fn get_type(&self, tables: &Vec<SymbolTable>) -> Result<CType, SymbolTableError> {
         match &self {
-            ModulePart::FunctionDefinition(s) => { Ok(s.get_type(tables)?) }
-            ModulePart::StructDefinition(s) => { Ok(s.get_type(tables)?) }
+            PackagePart::FunctionDefinition(s) => { Ok(s.get_type(tables)?) }
+            PackagePart::StructDefinition(s) => { Ok(s.get_type(tables)?) }
             _ => { Ok(CType::Unknown) }
         }
     }
@@ -890,7 +926,10 @@ fn resolve_attribute(expr: &Expression, ty: &CType, tables: &Vec<SymbolTable>) -
     let len = v.len();
     for (idx, name) in v.iter().enumerate() {
         if idx < len - 1 {
-            if let CType::Struct(_) = cty.clone() {
+            if let CType::Package(_) = cty.clone() {
+                let attri_name = v.get(idx + 1).unwrap().clone();
+                cty = get_package_layer(&cty, attri_name.0).unwrap();
+            } else if let CType::Struct(_) = cty.clone() {
                 let attri_name = v.get(idx + 1).unwrap().clone();
                 let tmp = cty.attri_name_type(attri_name.0.clone());
                 // attri_type = tmp.0;

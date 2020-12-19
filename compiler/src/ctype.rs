@@ -39,10 +39,9 @@ pub enum CType {
     Generic(String, Box<CType>),
     Reference(String, Vec<CType>),
     Args(String, Vec<CType>),
+    Package(PackageType),
     Any,
     TSelf,
-    //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;
-    NeedPackageName,
     Unknown,
 }
 
@@ -59,6 +58,19 @@ pub struct FnType {
     pub is_static: bool,
     pub has_body: bool,
 }
+
+#[derive(Debug, Clone, Eq, Hash)]
+pub struct PackageType {
+    pub name: String,
+    pub consts: Vec<(bool, String, CType)>,
+    pub funs: Vec<(bool, String, CType)>,
+    pub enums: Vec<(bool, String, CType)>,
+    pub structs: Vec<(bool, String, CType)>,
+    pub bounds: Vec<(bool, String, CType)>,
+    pub imports: Vec<(bool, String, CType)>,
+    pub submods: Vec<(bool, String, CType)>,
+}
+
 
 impl FnType {
     pub fn new() -> Self {
@@ -173,6 +185,14 @@ impl EnumType {
     }
 }
 
+impl PartialEq for PackageType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name.eq(&other.name) {
+            return true;
+        }
+        return false;
+    }
+}
 
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Generic(\"E\", Any)]))],
 // items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Str]))],
@@ -382,6 +402,13 @@ impl CType {
                     return (4, cty, 0);
                 }
             }
+        } else if let CType::Bound(ty) = self {
+            //1为无参属性，2为有参属性，3为普通函数，4为静态函数
+            for (method_name, cty) in ty.methods.iter() {
+                if method_name.eq(&name) {
+                    return (3, cty, 0);
+                }
+            }
         }
         (0, &CType::Unknown, 0)
     }
@@ -403,6 +430,21 @@ impl CType {
     pub fn is_mut_fun(&self) -> bool {
         return if let CType::Fn(n) = self {
             n.is_mut
+        } else {
+            false
+        };
+    }
+    pub fn is_static(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_static
+        } else {
+            false
+        };
+    }
+
+    pub fn is_varargs(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_varargs
         } else {
             false
         };
@@ -533,6 +575,16 @@ impl FnType {
 }
 
 impl PartialOrd for FnType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
+        }
+    }
+}
+
+impl PartialOrd for PackageType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.name.eq(&other.name) {
             Some(Ordering::Equal)

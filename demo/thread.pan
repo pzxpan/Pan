@@ -41,7 +41,7 @@ fun main() {
                 print("1000+{}结果为:{}",bb,cc);
             });
     t2.run();
-    t1.run();
+   // t1.run();
 }
 
 

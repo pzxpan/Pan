@@ -5,7 +5,8 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
-use crate::bytecode::{CodeObject, Constant};
+
+use crate::bytecode::{CodeObject, Constant, NameScope};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FnValue {
@@ -59,10 +60,21 @@ pub enum Value {
     Type(Box<TypeValue>),
     Enum(Box<EnumValue>),
     Code(Box<CodeObject>),
-    Reference(Box<(usize, String)>),
+    Package(Box<PackageValue>),
+    Reference(Box<(usize, usize, NameScope)>),
     Nil,
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct PackageValue {
+    pub name: String,
+    pub bounds: Vec<TypeValue>,
+    pub structs: Vec<TypeValue>,
+    pub enums: Vec<EnumValue>,
+    pub funs: Vec<FnValue>,
+    pub consts: Vec<Value>,
+    pub subpackage: Vec<Box<PackageValue>>,
+}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct TypeValue {
@@ -70,6 +82,7 @@ pub struct TypeValue {
     pub methods: Vec<(String, CodeObject)>,
     pub static_fields: Vec<(String, CodeObject)>,
 }
+
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct EnumValue {
@@ -169,6 +182,7 @@ impl Value {
             Value::Closure(_) => { "Closure".to_string() }
             Value::Bool(_) => { "bool".to_string() }
             Value::Reference(_) => { "Ref".to_string() }
+            Value::Package(_) => { "Package".to_string() }
         }
     }
 
@@ -256,7 +270,8 @@ impl Value {
             Value::Nil => format!("None"),
             Value::Code(code) => format!("<code {}>", code.as_ref()),
             Value::Enum(n) => format!("<enum {}>", &n.name),
-            Value::Reference(n) => format!("<ref {} {}>", &n.as_ref().0, &n.as_ref().1)
+            Value::Reference(n) => format!("<ref {} {}>", &n.as_ref().0, &n.as_ref().1),
+            Value::Package(n) => format!("<package {}>", &n.name)
         }
     }
 
@@ -326,7 +341,8 @@ impl Display for Value {
             Value::Nil => write!(f, "None"),
             Value::Code(code) => write!(f, "<code {}>", code),
             Value::Enum(n) => write!(f, "<enum {}>", n.name),
-            Value::Reference(n) => write!(f, "<ref {} {}>", &n.as_ref().0, &n.as_ref().1)
+            Value::Reference(n) => write!(f, "<ref {} {}>", &n.as_ref().0, &n.as_ref().1),
+            Value::Package(n) => write!(f, "<package {}>", &n.name)
         }
     }
 }
@@ -355,6 +371,58 @@ pub enum Obj {
     InstanceObj(InstanceObj),
     EnumObj(EnumObj),
 }
+
+pub struct Range {
+    pub start: i32,
+    pub end: i32,
+    pub step: i32,
+    pub skip: i32,
+    pub up: bool,
+    pub include: bool,
+}
+
+impl Iterator for Range {
+    // we will be counting with usize
+    type Item = i32;
+
+    // next() is the only required method
+    fn next(&mut self) -> Option<Self::Item> {
+        // Increment our count. This is why we started at zero.
+        if self.up {
+            self.start += self.step;
+            if self.include {
+                if self.start <= self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            } else {
+                if self.start < self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            }
+        } else {
+            self.start -= self.step;
+            if self.include {
+                if self.start >= self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            } else {
+                if self.start > self.end {
+                    Some(self.start)
+                } else {
+                    return None;
+                }
+            }
+        }
+        // Check to see if we've finished counting or not.
+    }
+}
+
 
 impl Obj {
     // TODO: Proper toString impl
@@ -467,42 +535,42 @@ pub fn get_map_item(a: Constant, b: Value) -> Option<Constant> {
     }
 }
 
-pub fn unwrap_constant(value: &Constant) -> Value {
-    use Constant::*;
-    match value {
-        I8(ref value) => Value::I8(*value),
-        I16(ref value) => Value::I16(*value),
-        I32(ref value) => Value::I32(*value),
-        I64(ref value) => Value::I64(*value),
-        I128(ref value) => Value::I128(Box::new(*value.as_ref())),
-        ISize(ref value) => Value::ISize(*value),
-        U8(ref value) => Value::U8(*value),
-        U16(ref value) => Value::U16(*value),
-        U32(ref value) => Value::U32(*value),
-        U64(ref value) => Value::U64(*value),
-        U128(ref value) => Value::U128(Box::new(*value.as_ref())),
-        USize(ref value) => Value::USize(*value),
-        Integer(ref value) => Value::I32(*value),
-        Float(ref value) => Value::Float(*value),
-        Complex(ref value) => Value::Nil,
-        String(ref value) => Value::String(Box::new(value.as_ref().clone())),
-        Bytes(ref value) => Value::Nil,
-        Boolean(ref value) => Value::Bool(value.clone()),
-        Char(ref value) => Value::Char(value.clone()),
-        Code(ref code) => {
-            Value::Code(Box::new(*code.to_owned()))
-        }
-        Tuple(ref elements) => {
-            let mut v = Vec::new();
-            for e in elements.as_ref() {
-                v.push(unwrap_constant(e));
-            }
-            Value::new_array_obj(v)
-        }
-        None => Value::Nil,
-        Struct(ty) => Value::Type(Box::new(*ty.to_owned())),
-        Enum(ty) => Value::Enum(Box::new(*ty.to_owned())),
-        Reference(ref_value) => Value::Reference(Box::new((ref_value.as_ref().0, ref_value.as_ref().1.clone()))),
-        Map(ref elements) => { Value::Nil }
-    }
-}
+// pub fn unwrap_constant(value: &Constant) -> Value {
+//     use Constant::*;
+//     match value {
+//         I8(ref value) => Value::I8(*value),
+//         I16(ref value) => Value::I16(*value),
+//         I32(ref value) => Value::I32(*value),
+//         I64(ref value) => Value::I64(*value),
+//         I128(ref value) => Value::I128(Box::new(*value.as_ref())),
+//         ISize(ref value) => Value::ISize(*value),
+//         U8(ref value) => Value::U8(*value),
+//         U16(ref value) => Value::U16(*value),
+//         U32(ref value) => Value::U32(*value),
+//         U64(ref value) => Value::U64(*value),
+//         U128(ref value) => Value::U128(Box::new(*value.as_ref())),
+//         USize(ref value) => Value::USize(*value),
+//         Integer(ref value) => Value::I32(*value),
+//         Float(ref value) => Value::Float(*value),
+//         Complex(ref value) => Value::Nil,
+//         String(ref value) => Value::String(Box::new(value.as_ref().clone())),
+//         Bytes(ref value) => Value::Nil,
+//         Boolean(ref value) => Value::Bool(value.clone()),
+//         Char(ref value) => Value::Char(value.clone()),
+//         Code(ref code) => {
+//             Value::Code(Box::new(*code.to_owned()))
+//         }
+//         Tuple(ref elements) => {
+//             let mut v = Vec::new();
+//             for e in elements.as_ref() {
+//                 v.push(unwrap_constant(e));
+//             }
+//             Value::new_array_obj(v)
+//         }
+//         None => Value::Nil,
+//         Struct(ty) => Value::Type(Box::new(*ty.to_owned())),
+//         Enum(ty) => Value::Enum(Box::new(*ty.to_owned())),
+//         Reference(ref_value) => Value::Reference(Box::new((ref_value.as_ref().0, ref_value.as_ref().1))),
+//         Map(ref elements) => { Value::Nil }
+//     }
+// }

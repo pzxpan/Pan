@@ -23,9 +23,9 @@ pub struct DocComment {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Module {
-    pub content: Vec<ModulePart>,
-    pub package: Vec<Identifier>,
+pub struct Package {
+    pub content: Vec<PackagePart>,
+    pub package_name: Vec<Identifier>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -34,7 +34,6 @@ pub enum Type {
     Array(Identifier, usize),
     Tuple(Option<Vec<Type>>),
     FunType(Option<Vec<Type>>, Option<Box<Type>>),
-
 }
 
 impl Type {
@@ -70,14 +69,14 @@ impl Type {
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleDefinition {
-    pub module_parts: Vec<ModulePart>,
+    pub module_parts: Vec<PackagePart>,
     pub name: Identifier,
     pub package: String,
     pub is_pub: bool,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ModulePart {
+pub enum PackagePart {
     StructDefinition(Box<StructDefinition>),
     BoundDefinition(Box<BoundDefinition>),
     ImportDirective(Import),
@@ -94,16 +93,15 @@ pub enum ModulePart {
 pub enum Import {
     //import std.math.sqrt;
     //import std.math.*;
-    Plain(Vec<Identifier>, bool),
+    Plain(bool, Vec<Identifier>, bool),
 
-    //import std.math.* as Math;
     //import std.math.sqrt as Sqrt
-    Rename(Vec<Identifier>, Identifier, bool),
+    Rename(bool, Vec<Identifier>, Identifier),
 
     //import std.math {sqrt,floor};
     //import std.math {sqrt as Sqrt, floor as Floor};
     //import std { math as Math, math.floor as Floor};
-    PartRename(Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
+    PartRename(bool, Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -242,7 +240,7 @@ pub struct EnumVariableDefinition {
     pub loc: Loc,
     pub tys: Option<Vec<Expression>>,
     pub name: Identifier,
-    pub default: i32,
+    pub default: Option<i32>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -411,6 +409,7 @@ impl Expression {
             Expression::NamedFunctionCall(_, n, _) => n.as_ref().expr_name(),
             Expression::Variable(id) => id.clone().name,
             Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
+            Expression::Hole(_) => "_".to_string(),
             _ => "".to_string()
         }
     }
@@ -634,7 +633,7 @@ pub enum Statement {
     Args(Loc, Vec<NamedArgument>),
     If(Loc, Expression, Box<Statement>, Option<Box<Statement>>),
     Expression(Loc, Expression),
-    VariableDefinition(Loc, VariableDeclaration, Option<Expression>),
+    VariableDefinition(Loc, VariableDeclaration, Expression),
     MultiVariableDefinition(Loc, MultiVariableDeclaration, Expression),
     ConstDefinition(Loc, VariableDeclaration, Option<Expression>),
     While(Loc, Expression, Box<Statement>),

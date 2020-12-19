@@ -1,5 +1,4 @@
-/// 从入口文件开始，递归import所有依赖的Symbol,用来分析类型；解析执行时，编译之后，这数据不需要；但在JIT时，会需要，因为链接时需要这些信息
-/// 以减少二进制文件的大小;
+/// 从入口文件开始，递归import所有依赖的Symbol,用来分析类型；
 ///
 use std::env;
 use std::fs::File;
@@ -20,6 +19,7 @@ use dynformat::check;
 use std::borrow::Borrow;
 use crate::util;
 use std::collections::HashMap;
+//根据文件名和路径名，返回PackageSymbolTable;
 
 pub fn scan_import_symbol(build: &mut SymbolTableBuilder, idents: &Vec<Identifier>, as_name: Option<String>, is_all: &bool) -> SymbolTableResult {
     //顺序为系统目录，工作目录，当前子目录;
@@ -98,8 +98,8 @@ fn scan_import_file(build: &mut SymbolTableBuilder, path: &PathBuf, item_name: O
     let ast = parse(&contents, path.clone().into_os_string().into_string().unwrap());
     let module_name = util::get_mod_name(String::from(path.to_str().unwrap()));
     let module = ast.unwrap();
-    let md = ModuleDefinition { module_parts: module.content, name: Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: util::get_package_name(&module.package) };
-    build.scan_top_symbol_types(&md, true, *is_all, item_name, as_name)?;
+    let md = ModuleDefinition { module_parts: module.content, name: Identifier { loc: Loc::default(), name: module_name }, is_pub: true, package: util::get_package_name(&module.package_name) };
+    build.scan_top_symbol_types(&md)?;
     Ok(())
 }
 
@@ -725,6 +725,20 @@ pub fn get_register_type(tables: &Vec<SymbolTable>, name: String) -> CType {
         let a = t.unwrap().lookup(name.as_str());
         if a.is_some() {
             return a.unwrap().ty.clone();
+        }
+    }
+    CType::Unknown
+}
+
+pub fn get_self_type(tables: &Vec<SymbolTable>) -> CType {
+    let len = tables.len();
+    for i in 0..len {
+        let t = tables.get(len - i - 1);
+        let a = t.unwrap().lookup("self");
+        if a.is_some() {
+            if a.unwrap().ty != CType::TSelf {
+                return a.unwrap().ty.clone();
+            }
         }
     }
     CType::Unknown

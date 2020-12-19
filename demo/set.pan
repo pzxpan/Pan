@@ -1,5 +1,5 @@
 package default;
-import core.option.*;
+//import core.option.*;
 pub fun fib(a:i32) : i32 {
     if a == 0 : 0 elif a == 1 : 1 else :  fib(a-1) + fib(a-2) |;
 }
@@ -11,11 +11,11 @@ fun main() {
    let i = 10_i32;
    let u = 1000_i64;
    let ss = 1000_us;
-   let b = Option::Some(10);
+  // let b = Option::Some(10);
 
-   if b.is_some() {
-    print("ok");
-  }
+  // if b.is_some() {
+   // print("ok");
+ // }
   let c = add(20);
 
   let cc = fib(9);

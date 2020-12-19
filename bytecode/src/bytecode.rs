@@ -55,7 +55,7 @@ impl Label {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum NameScope {
     Local,
     Global,
@@ -71,8 +71,9 @@ pub enum Instruction {
     DefineConstStart,
     DefineConstEnd,
 
-    LoadName(String, NameScope),
-    StoreName(String, NameScope),
+    LoadLocalName(usize, NameScope),
+    StoreLocalName(usize, NameScope),
+    StoreNewVariable(NameScope),
     Subscript,
     StoreSubscript,
     DeleteSubscript,
@@ -101,6 +102,8 @@ pub enum Instruction {
     JumpIfTrue(Label),
     ///假跳
     JumpIfFalse(Label),
+    //match需要弹出比较项中的内容;
+    JumpIfFalsePopBlock(Label),
     /// 真跳假弹
     JumpIfTrueOrPop(Label),
     /// 假跳真弹
@@ -139,8 +142,13 @@ pub enum Instruction {
     LoadBuildModule,
     BuildThread,
     StartThread,
-    LoadReference(String, NameScope),
-    StoreReference,
+    LoadReference(usize, usize, NameScope),
+    StoreReference(usize, usize, NameScope),
+    LoadCaptureReference(usize, usize, NameScope),
+    StoreCaptureReference(usize, usize, NameScope),
+    LoadFrameReference(usize, usize, NameScope),
+    StoreFrameReference(usize, usize, NameScope),
+    StoreDefaultArg(usize, usize),
     UnpackSequence(usize),
     UnpackEx(usize, usize),
     Reverse(usize),
@@ -185,7 +193,7 @@ pub enum Constant {
     Map(Box<Vec<(Constant, Constant)>>),
     Struct(Box<TypeValue>),
     Enum(Box<EnumValue>),
-    Reference(Box<(usize, String)>),
+    Reference(Box<(usize, usize, NameScope)>),
     None,
 }
 
@@ -349,34 +357,28 @@ impl Instruction {
         level: usize,
     ) -> fmt::Result {
         macro_rules! w {
-( $ variant: ident) => {
-write ! (f, "{:20}\n", stringify ! ($ variant))
-};
-( $ variant: ident, $ var:expr) => {
-write ! (f, "{:20} ({})\n", stringify ! ($ variant), $ var)
-};
-( $ variant: ident, $ var1:expr, $ var2: expr) => {
-write ! (f, "{:20} ({}, {})\n", stringify ! ($ variant), $ var1, $ var2)
-};
-( $ variant: ident, $ var1:expr, $ var2: expr, $ var3:expr) => {
-write ! (
-f,
-"{:20} ({}, {}, {})\n",
-stringify ! ($ variant),
-$ var1,
-$ var2,
-$ var3
-)
-};
-}
+            ($variant: ident) => {
+                write!(f, "{:20}\n", stringify!($variant))
+            };
+            ($variant: ident, $var:expr) => {
+                write!(f, "{:20} ({})\n", stringify!($variant), $var)
+            };
+            ($variant: ident, $var1:expr, $var2: expr) => {
+                write!(f, "{:20} ({}, {})\n", stringify!($variant), $var1, $var2)
+             };
+            ($variant: ident, $var1:expr, $var2: expr, $var3:expr) => {
+                write! (f,"{:20} ({}, {}, {})\n",stringify!($variant),$var1,$var2,$var3)
+             };
+       }
 
         match self {
             ConstStart => w!(ConstStart),
             ConstEnd => w!(ConstEnd),
             DefineConstEnd => w!(DefineConstEnd),
             DefineConstStart => w!(DefineConstStart),
-            LoadName(name, scope) => w!(LoadName, name, format ! ("{:?}", scope)),
-            StoreName(name, scope) => w!(StoreName, name, format! ("{:?}", scope)),
+            LoadLocalName(v_idx, scope) => w!(LoadName, v_idx, format ! ("{:?}", scope)),
+            StoreLocalName(v_idx, scope) => w!(StoreName, v_idx, format! ("{:?}", scope)),
+            StoreNewVariable(scope) => w!(StoreName, format! ("{:?}", scope)),
             Subscript => w!(Subscript),
             StoreSubscript => w!(StoreSubscript),
             DeleteSubscript => w!(DeleteSubscript),
@@ -407,6 +409,7 @@ $ var3
             JumpIfTrue(target) => w!(JumpIfTrue, label_map[target]),
             JumpIfFalse(target) => w!(JumpIfFalse, label_map[target]),
             JumpIfTrueOrPop(target) => w!(JumpIfTrueOrPop, label_map[target]),
+            JumpIfFalsePopBlock(target) => w!(JumpIfFalsePopBlock,label_map[target]),
             JumpIfFalseOrPop(target) => w!(JumpIfFalseOrPop, label_map[target]),
             MakeFunction => w!(MakeFunction),
             MakeLambda(usize) => w!(MakeLambda, usize),
@@ -437,8 +440,14 @@ $ var3
                 for_call,
             ) => w!(BuildMap, size, unpack, for_call),
             Slice => w!(BuildSlice),
-            LoadReference(name, scope) => w!(LoadReference, name, format!("{:?}",scope)),
-            StoreReference => w!(StoreReference),
+            LoadReference(scope_idx, variable_idx, n) => w!(LoadReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreReference(scope_idx, variable_idx, n) => w!(StoreReference,scope_idx,variable_idx,format!("{:?}", n)),
+            LoadCaptureReference(scope_idx, variable_idx, n) => w!(LoadCaptureReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreCaptureReference(scope_idx, variable_idx, n) => w!(StoreCaptureReference,scope_idx,variable_idx,format!("{:?}", n)),
+            LoadFrameReference(scope_idx, variable_idx, n) => w!(LoadFrameReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreFrameReference(scope_idx, variable_idx, n) => w!(StoreFrameReference,scope_idx,variable_idx,format!("{:?}", n)),
+
+            StoreDefaultArg(scope_idx, variable_idx) => w!(StoreDefaultArg,scope_idx,variable_idx),
             ListAppend(i) => w!(ListAppend, i),
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),

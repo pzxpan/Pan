@@ -10,22 +10,21 @@ pub fn get_builtin_type() -> Vec<(String, CType, SymbolUsage)> {
     vec.push(("i32".to_owned(), CType::I32, SymbolUsage::Builtin));
     vec.push(("i64".to_owned(), CType::I64, SymbolUsage::Builtin));
     vec.push(("i128".to_owned(), CType::I128, SymbolUsage::Builtin));
-    vec.push(("isize".to_owned(), CType::ISize, SymbolUsage::Builtin));
 
+    vec.push(("isize".to_owned(), CType::ISize, SymbolUsage::Builtin));
     vec.push(("u8".to_owned(), CType::U8, SymbolUsage::Builtin));
     vec.push(("u16".to_owned(), CType::U16, SymbolUsage::Builtin));
     vec.push(("u32".to_owned(), CType::U32, SymbolUsage::Builtin));
     vec.push(("u64".to_owned(), CType::U64, SymbolUsage::Builtin));
+
     vec.push(("u128".to_owned(), CType::U128, SymbolUsage::Builtin));
     vec.push(("usize".to_owned(), CType::USize, SymbolUsage::Builtin));
-
     vec.push(("f64".to_owned(), CType::Float, SymbolUsage::Builtin));
-
     vec.push(("char".to_owned(), CType::Char, SymbolUsage::Builtin));
     vec.push(("bool".to_owned(), CType::Bool, SymbolUsage::Builtin));
+
     vec.push(("type".to_owned(), CType::Type, SymbolUsage::Builtin));
     vec.push(("string".to_owned(), CType::Str, SymbolUsage::Builtin));
-
     vec.push(("None".to_owned(), CType::None, SymbolUsage::Builtin));
     vec.push(("Any".to_owned(), CType::Any, SymbolUsage::Builtin));
     vec.push(("Self".to_owned(), CType::TSelf, SymbolUsage::Builtin));
