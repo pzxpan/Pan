@@ -1,3 +1,4 @@
+#![feature(fn_traits)]
 #[macro_use]
 extern crate lazy_static;
 

@@ -110,6 +110,16 @@ pub fn get_full_name(package: &String, s: &str) -> String {
     // return tmp;
 }
 
+pub fn get_std_fun_name(prefix: &Vec<String>, name: String) -> String {
+    let mut s = prefix.iter().fold("".to_string(), |mut ss, s| {
+        ss.push_str(&s);
+        ss.push_str("$");
+        return ss;
+    });
+    s.push_str(name.as_str());
+    return s;
+}
+
 pub fn get_last_name(package: &String) -> String {
     return package.split_terminator("$").last().unwrap().to_string();
 }

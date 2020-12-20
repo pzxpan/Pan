@@ -433,13 +433,13 @@ impl Frame {
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());
             }
-            bytecode::Instruction::Read(size) => {
-                let mut v = self.pop_multiple(*size);
-                for mut value in v {
-                    vm.read(&mut value);
-                    self.push_value(value);
-                }
-            }
+            // bytecode::Instruction::Read(size) => {
+            //     let mut v = self.pop_multiple(*size);
+            //     for mut value in v {
+            //         vm.read(&mut value);
+            //         self.push_value(value);
+            //     }
+            // }
             bytecode::Instruction::TypeOf => {
                 let v = self.pop_value();
                 self.push_value(Value::String(Box::new(v.ty_name())));
@@ -642,7 +642,7 @@ impl Frame {
         return None;
     }
     fn execute_std_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
-        let args = match typ {
+        let mut args = match typ {
             bytecode::CallType::Positional(count) => {
                 if *count > 0 {
                     let args = self.pop_multiple(*count);
@@ -659,7 +659,7 @@ impl Frame {
         let mut std_funs = self.pop_value();
         println!("std_funs::{:?}", std_funs);
         if let Value::NativeFn(n) = std_funs {
-            let v = vm.call_std_funs(n.idx, n.name, &args);
+            let v = vm.call_std_funs(n.idx, n.name, &mut args);
             self.push_value(v);
             return None;
         }

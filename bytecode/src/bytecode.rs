@@ -135,7 +135,7 @@ pub enum Instruction {
     Sleep,
     MapAdd(usize),
     Print,
-    Read(usize),
+    // Read(usize),
     TypeOf,
     Panic,
     //感觉不靠谱，得换这两个指令
@@ -456,7 +456,7 @@ impl Instruction {
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),
             Print => w!(Print),
-            Read(size) => w!(Read,size),
+            // Read(size) => w!(Read,size),
             TypeOf => w!(TypeOf),
             LoadBuildStruct => w!(LoadBuildClass),
             LoadBuildEnum(size) => w!(LoadBuildEnum, size),

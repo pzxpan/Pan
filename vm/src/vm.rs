@@ -28,6 +28,7 @@ use crate::context::Context;
 pub struct VirtualMachine {
     pub frame_count: usize,
     pub initialized: bool,
+    pub context: Context,
 }
 
 pub const NSIG: usize = 64;
@@ -266,9 +267,11 @@ pub enum InitParameter {
 impl VirtualMachine {
     pub fn new() -> VirtualMachine {
         let initialize_parameter = InitParameter::NoInitialize;
+        let context = Context::new();
         let mut vm = VirtualMachine {
             frame_count: 0,
             initialized: false,
+            context,
         };
         vm.initialize(initialize_parameter);
         vm
@@ -428,8 +431,12 @@ impl VirtualMachine {
         None
     }
 
-    pub fn call_std_funs(&self, idx: i32, name: String, value: &Vec<Value>) -> Value {
-        return context::current_dir();
+    pub fn call_std_funs(&self, idx: i32, name: String, mut_values: &mut Vec<Value>) -> Value {
+        // let v = mut_values.get_mut(0).unwrap();
+        // *v = Value::Nil;
+        println!("std_name:{:?}", name);
+        println!("values:{:?}.", mut_values);
+        return self.context.call_std(name.as_str(), mut_values);
     }
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
         None
@@ -1149,10 +1156,10 @@ impl VirtualMachine {
     }
 
     pub fn read(&self, value: &mut Value) {
-        // let mut input = String::new();
-        // io::stdin().read_line(&mut input);
-        // input.trim();
-        *value = context::current_dir();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input);
+        input.trim();
+        //*value = context::args();
     }
 
     pub fn sub(&self, a: Value, b: Value) -> Value {

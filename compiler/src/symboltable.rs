@@ -754,7 +754,7 @@ impl SymbolTableBuilder {
                             let last_item = v.last().unwrap();
                             let item_name = last_item.name.clone();
                             println!("top_ty::{:?},last_item:{:?},", ty, item_name);
-                            self.resovle_import(&v[1..], ty, *is_all, item_name, Option::None)?;
+                            self.resovle_import(top_name.name.clone(), &v[1..], ty, *is_all, item_name, Option::None)?;
                         }
                         _ => {}
                     }
@@ -2428,12 +2428,13 @@ impl SymbolTableBuilder {
         Ok(cty)
     }
 
-    fn resovle_import(&mut self, idents: &[Identifier], ty: &CType, is_all: bool, item_name: String, as_name: Option<String>) -> Result<(), SymbolTableError> {
+    fn resovle_import(&mut self, top_name: String, idents: &[Identifier], ty: &CType, is_all: bool, item_name: String, as_name: Option<String>) -> Result<(), SymbolTableError> {
         let mut cty = ty.clone();
         println!("cccccty:{:?},", cty);
         let len = idents.len();
+        let prefix: Vec<String> = idents.iter().map(|s| s.name.clone()).collect();
         if len < 1 {
-            self.resolve_import_item(&cty.clone(), is_all, item_name.clone(), as_name.clone())?;
+            self.resolve_import_item(top_name.clone(), &vec![], &cty.clone(), is_all, item_name.clone(), as_name.clone())?;
         }
 
         for (idx, name) in idents.iter().enumerate() {
@@ -2499,10 +2500,10 @@ impl SymbolTableBuilder {
             }
         }
         println!("cty:{:?},", cty);
-        self.resolve_import_item(&cty.clone(), is_all, item_name.clone(), as_name.clone())?;
+        self.resolve_import_item(top_name.clone(), &prefix, &cty.clone(), is_all, item_name.clone(), as_name.clone())?;
         Ok(())
     }
-    fn resolve_import_item(&mut self, cty: &CType, is_all: bool, item_name: String, as_name: Option<String>) -> Result<(), SymbolTableError> {
+    fn resolve_import_item(&mut self, top_name: String, prefix: &Vec<String>, cty: &CType, is_all: bool, item_name: String, as_name: Option<String>) -> Result<(), SymbolTableError> {
         if is_all {
             if let CType::Package(ty) = cty {
                 for (is_pub, name, ty) in ty.enums.iter() {
@@ -2522,7 +2523,13 @@ impl SymbolTableBuilder {
                 }
                 for (is_pub, name, ty) in ty.funs.iter() {
                     if *is_pub {
-                        self.register_package_item(name, ty.clone(), SymbolUsage::Import, Loc::default(), vec!["std".to_string(), "env".to_string()])?;
+                        if top_name.eq("std") {
+                            let mut v = vec!["std".to_string()];
+                            v.extend_from_slice(prefix);
+                            self.register_package_item(name, ty.clone(), SymbolUsage::Import, Loc::default(), v)?;
+                        } else {
+                            self.register_name(name, ty.clone(), SymbolUsage::Import, Loc::default())?;
+                        }
                     }
                 }
                 for (is_pub, name, ty) in ty.consts.iter() {

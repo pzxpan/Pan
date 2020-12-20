@@ -18,7 +18,7 @@ use crate::ctype::CType;
 use crate::ctype::*;
 use crate::variable_type::HasType;
 use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
-use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer, get_dir_name, get_sub_table_byname};
+use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer, get_dir_name, get_sub_table_byname, get_std_fun_name};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
 use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
@@ -2144,16 +2144,6 @@ impl<O: OutputStream> Compiler<O> {
         } else if function.expr_name().eq("panic") {
             self.gather_elements(args)?;
             self.emit(Instruction::Panic);
-        } else if function.expr_name().eq("read") {
-            self.gather_elements(args)?;
-            self.emit(Instruction::Read(args.len()));
-            self.emit(Instruction::Reverse(args.len()));
-            for arg in args {
-                let scope = self.scope_for_name(&arg.expr_name());
-                let p = self.variable_position(&arg.expr_name()).unwrap();
-                //函数有一层
-                self.emit(Instruction::StoreCaptureReference(p.0 - 1, p.1, scope));
-            }
         }
         return Ok(false);
     }
@@ -2202,9 +2192,11 @@ impl<O: OutputStream> Compiler<O> {
                     let scope = self.scope_for_name(name.as_str());
                     let p = self.variable_position(name.as_str()).unwrap();
                     let prefix = &self.lookup_name(name).prefix;
+                    println!("dddprefix:{:?},", prefix);
                     if prefix.len() > 0 && prefix[0].eq("std") {
+                        let std_name = get_std_fun_name(prefix, name.to_string());
                         self.emit(Instruction::LoadConst(bytecode::Constant::NativeFn(
-                            Box::new(NativeFn { idx: 0, name: "current_dir".to_string() }))));
+                            Box::new(NativeFn { idx: 0, name: std_name }))));
                         is_std_fun = true;
                     } else {
                         if scope == NameScope::Global {
