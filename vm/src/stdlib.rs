@@ -1,5 +1,4 @@
 pub mod env;
-#[cfg(feature = "http")]
 pub mod http;
 pub mod fs;
 pub mod process;

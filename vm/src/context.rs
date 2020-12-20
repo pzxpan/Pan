@@ -5,6 +5,7 @@ use std::time;
 use std::collections::HashMap;
 use std::ops::{DerefMut, Deref};
 use crate::stdlib::fs::*;
+use crate::stdlib::http::open;
 
 pub struct Context {
     pub fns: HashMap<String, StdFn>,
@@ -91,6 +92,13 @@ impl Context {
             idx: 0,
             name: "file_exists".to_string(),
             body: file_exists,
+            args: 1,
+        });
+
+        fns.insert(String::from("std$http$open"), StdFn {
+            idx: 0,
+            name: "open".to_string(),
+            body: open,
             args: 1,
         });
         Context {

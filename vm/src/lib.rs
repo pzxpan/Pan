@@ -1,6 +1,7 @@
 #![feature(fn_traits)]
 #[macro_use]
 extern crate lazy_static;
+extern crate reqwest;
 
 pub mod frame;
 pub mod vm;
