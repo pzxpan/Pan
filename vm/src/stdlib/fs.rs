@@ -5,6 +5,174 @@ use std::{
     sync::Mutex,
 };
 
+use pan_bytecode::value::Value;
+use std::path::{Path, PathBuf};
+
+enum OpenOptions {
+    Read,
+    Write,
+    Append,
+    Truncate,
+    Create,
+    CreateNew,
+}
+
+fn open_file_with(path: &str, opts: Vec<OpenOptions>) -> File {
+    let mut open_with = std::fs::OpenOptions::new();
+
+    for opt in opts {
+        match opt {
+            OpenOptions::Read => open_with.read(true),
+            OpenOptions::Write => open_with.write(true),
+            OpenOptions::Append => open_with.append(true),
+            OpenOptions::Truncate => open_with.truncate(true),
+            OpenOptions::Create => open_with.create(true),
+            OpenOptions::CreateNew => open_with.create_new(true),
+        };
+    }
+    open_with.open(path).unwrap()
+}
+
+fn read_file_to_array(s: &str) -> Vec<Value> {
+    let mut buffer = Vec::new();
+    match File::open(s).and_then(|mut file| file.read_to_end(&mut buffer)) {
+        Ok(_) => buffer.iter().map(|s| Value::U8(*s)).collect(),
+        Err(err) => vec![],
+    }
+}
+
+pub fn read_file_to_string(ss: &Vec<Value>) -> Value {
+    let s = ss.get(0).unwrap();
+    let ss = s.to_string();
+    let s = ss.as_str();
+    let mut buffer = String::new();
+    match File::open(s).and_then(|mut file| file.read_to_string(&mut buffer)) {
+        Ok(_) => Value::String(Box::new(buffer)),
+        Err(err) => Value::String(Box::new(err.to_string()))
+    }
+}
+
+pub fn write_file(ss: &Vec<Value>) -> Value {
+    let s = ss.get(0).unwrap();
+    let name = s.to_string();
+    let s = name.as_str();
+    let content = ss.get(1).unwrap();
+    let content = content.to_string();
+    let content = content.as_bytes();
+    let mut file = std::fs::OpenOptions::new().append(true).open(s).expect(
+        "无法打开文件");
+    file.write_all(content).expect("写入失败");
+    Value::Nil
+}
+
+pub fn create_file(ss: &Vec<Value>) -> Value {
+    let s = ss.get(0).unwrap();
+    let name = s.to_string();
+    let s = name.as_str();
+    std::fs::File::create(s).unwrap();
+    Value::Nil
+}
+
+pub fn delete_file(ss: &Vec<Value>) -> Value {
+    let s = ss.get(0).unwrap();
+    let name = s.to_string();
+    let s = name.as_str();
+    std::fs::remove_file(s).unwrap();
+    Value::Nil
+}
+
+pub fn file_exists(ss: &Vec<Value>) -> Value {
+    let s = ss.get(0).unwrap();
+    let name = s.to_string();
+    let s = name.as_str();
+    let mut p = PathBuf::new();
+    p.push(s);
+    Value::Bool(p.exists())
+}
+
+
+// fn read_file(file: &GluonFile, count: usize) -> IO<RuntimeResult<Option<Vec<u8>>, String>> {
+//     let mut file = file.0.lock().unwrap();
+//     let file = unwrap_file!(file);
+//     let mut buffer = Vec::with_capacity(count);
+//
+//     unsafe {
+//         buffer.set_len(count);
+//         match file.read(&mut *buffer) {
+//             Ok(bytes_read) if bytes_read == 0 => IO::Value(RuntimeResult::Return(None)),
+//             Ok(bytes_read) => {
+//                 buffer.truncate(bytes_read);
+//                 IO::Value(RuntimeResult::Return(Some(buffer)))
+//             }
+//             Err(err) => IO::Exception(format!("{}", err)),
+//         }
+//     }
+// }
+//
+// fn read_file_to_end(file: &GluonFile) -> IO<RuntimeResult<Vec<u8>, String>> {
+//     let mut file = file.0.lock().unwrap();
+//     let file = unwrap_file!(file);
+//     let mut buf = Vec::new();
+//
+//     match file.read_to_end(&mut buf) {
+//         Ok(_) => IO::Value(RuntimeResult::Return(buf)),
+//         Err(err) => IO::Exception(err.to_string()),
+//     }
+// }
+//
+// fn write_slice_file(
+//     file: &GluonFile,
+//     buf: &[u8],
+//     start: usize,
+//     end: usize,
+// ) -> IO<RuntimeResult<usize, String>> {
+//     if start > end {
+//         return IO::Value(RuntimeResult::Panic(format!(
+//             "slice index starts at {} but ends at {}",
+//             start, end
+//         )));
+//     }
+//
+//     if end > buf.len() {
+//         return IO::Value(RuntimeResult::Panic(format!(
+//             "index {} is out of range for array of length {}",
+//             end,
+//             buf.len()
+//         )));
+//     }
+//
+//     let mut file = file.0.lock().unwrap();
+//     let file = unwrap_file!(file);
+//
+//     match file.write(&buf[start..end]) {
+//         Ok(bytes_written) => IO::Value(RuntimeResult::Return(bytes_written)),
+//         Err(why) => IO::Exception(why.to_string()),
+//     }
+// }
+//
+// fn flush_file(file: &GluonFile) -> IO<RuntimeResult<(), String>> {
+//     let mut file = file.0.lock().unwrap();
+//
+//     match unwrap_file!(file).flush() {
+//         Ok(_) => IO::Value(RuntimeResult::Return(())),
+//         Err(why) => IO::Exception(why.to_string()),
+//     }
+// }
+//
+// fn close_file(file: &GluonFile) -> IO<()> {
+//     let mut file = file.0.lock().unwrap();
+//
+//     match file.take() {
+//         Some(mut file) => file.flush().into(),
+//         None => IO::Value(()),
+//     }
+// }
+//
+// fn is_file_closed(file: &GluonFile) -> bool {
+//     file.0.lock().unwrap().is_none()
+// }
+
+
 // use futures::prelude::*;
 //
 // use futures::Future;

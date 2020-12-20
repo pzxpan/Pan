@@ -4,6 +4,7 @@ use std::any::Any;
 use std::time;
 use std::collections::HashMap;
 use std::ops::{DerefMut, Deref};
+use crate::stdlib::fs::*;
 
 pub struct Context {
     pub fns: HashMap<String, StdFn>,
@@ -13,8 +14,8 @@ pub struct Context {
 pub struct StdFn {
     pub idx: i32,
     pub name: String,
-    pub body: fn() -> Value,
-    pub args: Vec<Value>,
+    pub body: fn(&Vec<Value>) -> Value,
+    pub args: i32,
 }
 
 impl Context {
@@ -25,38 +26,72 @@ impl Context {
             idx: 0,
             name: "current_dir".to_string(),
             body,
-            args: vec![],
+            args: 0,
         });
         fns.insert(String::from("std$env$args"), StdFn {
             idx: 0,
             name: "args".to_string(),
             body: args,
-            args: vec![],
+            args: 0,
         });
 
         fns.insert(String::from("std$io$read"), StdFn {
             idx: 0,
             name: "read".to_string(),
             body: read,
-            args: vec![],
+            args: 0,
         });
         fns.insert(String::from("std$io$read_float"), StdFn {
             idx: 0,
             name: "read".to_string(),
             body: read_f64,
-            args: vec![],
+            args: 0,
         });
         fns.insert(String::from("std$io$read_line"), StdFn {
             idx: 0,
             name: "read".to_string(),
             body: read_line,
-            args: vec![],
+            args: 0,
         });
         fns.insert(String::from("std$io$read_int"), StdFn {
             idx: 0,
             name: "read_int".to_string(),
             body: read_int,
-            args: vec![],
+            args: 0,
+        });
+
+        fns.insert(String::from("std$fs$read_file"), StdFn {
+            idx: 0,
+            name: "read_file".to_string(),
+            body: read_file_to_string,
+            args: 1,
+        });
+
+        fns.insert(String::from("std$fs$write_file"), StdFn {
+            idx: 0,
+            name: "write_file".to_string(),
+            body: write_file,
+            args: 1,
+        });
+
+        fns.insert(String::from("std$fs$create_file"), StdFn {
+            idx: 0,
+            name: "create_file".to_string(),
+            body: create_file,
+            args: 1,
+        });
+        fns.insert(String::from("std$fs$delete_file"), StdFn {
+            idx: 0,
+            name: "delete_file".to_string(),
+            body: delete_file,
+            args: 1,
+        });
+
+        fns.insert(String::from("std$fs$file_exists"), StdFn {
+            idx: 0,
+            name: "file_exists".to_string(),
+            body: file_exists,
+            args: 1,
         });
         Context {
             fns
@@ -64,7 +99,7 @@ impl Context {
     }
     pub fn call_std(&self, name: &str, values: &mut Vec<Value>) -> Value {
         let f = self.fns.get(name).unwrap();
-        (f.body)()
+        (f.body)(values)
     }
 }
 
@@ -75,7 +110,7 @@ impl Context {
 //     *value.get_mut(0).unwrap() = Value::String(Box::new(input));
 // }
 
-pub fn read_int() -> Value {
+pub fn read_int(values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     input.trim();
@@ -84,7 +119,7 @@ pub fn read_int() -> Value {
     Value::I32(input.parse::<i32>().unwrap())
 }
 
-pub fn read_line() -> Value {
+pub fn read_line(values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     let input = input.replace("\n", "");
@@ -92,7 +127,7 @@ pub fn read_line() -> Value {
     Value::String(Box::new(input))
 }
 
-pub fn read() -> Value {
+pub fn read(values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     let input = input.replace("\n", "");
@@ -101,7 +136,7 @@ pub fn read() -> Value {
     // Value::Float(input.parse::<f64>().unwrap())
 }
 
-pub fn read_f64() -> Value {
+pub fn read_f64(values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     input.trim();
@@ -110,11 +145,11 @@ pub fn read_f64() -> Value {
     Value::Float(input.parse::<f64>().unwrap())
 }
 
-pub fn args() -> Value {
+pub fn args(values: &Vec<Value>) -> Value {
     Value::new_array_obj(std::env::args().map(|s| Value::String(Box::new(s))).collect())
 }
 
-pub fn current_dir() -> Value {
+pub fn current_dir(values: &Vec<Value>) -> Value {
     let dir = String::from(std::env::current_dir().unwrap().to_str().unwrap());
     Value::String(Box::new(dir))
 }
