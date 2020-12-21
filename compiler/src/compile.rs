@@ -21,7 +21,7 @@ use crate::resolve_fns::{resolve_import_compile, resolve_builtin_fun};
 use crate::util::{get_number_type, get_pos_lambda_name, get_attribute_vec, get_mod_name, get_package_name, get_full_name, compile_import_symbol, get_package_layer, get_dir_name, get_sub_table_byname, get_std_fun_name};
 
 use pan_bytecode::bytecode::ComparisonOperator::In;
-use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr};
+use pan_bytecode::bytecode::Instruction::{LoadLocalName, LoadAttr, StoreAttr};
 use crate::compile::FunctionContext::{Function, StructFunction};
 use crate::symboltable::SymbolScope::Const;
 use crate::file_cache_symboltable::{make_ast, resolve_file_name};
@@ -1558,10 +1558,19 @@ impl<O: OutputStream> Compiler<O> {
                 // }
             }
             ast::Expression::Attribute(_, obj, attr, idx) => {
-                self.compile_expression(obj)?;
+                let ty = &self.lookup_name(&obj.expr_name()).ty;
+                if ty.name().eq("Mutex") {
+                    self.emit(Instruction::LoadMutex(obj.expr_name()));
+                    self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
+                    self.emit(Instruction::StoreMutex(obj.expr_name()));
+                    return Ok(());
+                } else {
+                    self.compile_expression(obj)?;
+                }
                 if attr.is_some() {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
                     self.store_name(&obj.expr_name());
+
                     // if obj.expr_name().eq("self") {
                     //     self.emit(Instruction::Duplicate);
                     //     self.store_ref_name("self");
@@ -2241,8 +2250,6 @@ impl<O: OutputStream> Compiler<O> {
 
         if is_enum_item {
             self.emit(Instruction::LoadBuildEnum(count + 3));
-        } else if is_thread_start {
-            self.emit(Instruction::StartThread);
         } else if is_std_fun {
             self.emit(Instruction::CallStdFunction(CallType::Positional(count + self_args)));
         } else {
@@ -2283,8 +2290,8 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::BuildMap(args.len(), false, false));
 
         if is_constructor {
-            if function.expr_name().eq("Thread") {
-                self.emit(Instruction::BuildThread);
+            if function.expr_name().eq("Mutex") {
+                self.emit(Instruction::BuildMutex);
             } else {
                 self.emit(Instruction::LoadBuildStruct);
             }
@@ -2990,7 +2997,9 @@ impl<O: OutputStream> Compiler<O> {
                         //instructions.push();
                     }
                     if idx == 0 {
-                        if name.0.eq("self") {
+                        if cty.name().eq("Mutex") {
+                            instructions.push(Instruction::LoadMutex(name.0.clone()));
+                        } else if name.0.eq("self") {
                             self.emit(Instruction::LoadLocalName(0, NameScope::Local));
                         } else {
                             if let FunctionContext::StructFunction(..) = self.ctx.func {

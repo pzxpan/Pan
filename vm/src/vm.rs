@@ -38,6 +38,21 @@ lazy_static! {
     static ref SCOPE: Arc<Mutex<ScopeVec>> = Arc::new(Mutex::new(ScopeVec::with_builtins(vec![vec![]],vec![])));
     static ref CONSTANT: Arc<Mutex<HashMap<String,Constant>>> = Arc::new(Mutex::new(HashMap::new()));
     static ref TYPE: Arc<Mutex<HashMap<String,TypeValue>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref MUTEX_VALUE: Arc<Mutex<HashMap<String,Value>>> = Arc::new(Mutex::new(HashMap::new()));
+}
+pub fn add_mutex_value(name: String, value: Value) {
+    let ref mut map = MUTEX_VALUE.lock().unwrap();
+    map.insert(name, value);
+}
+
+pub fn get_mutex_value(name: String) -> Value {
+    let ref mut map = MUTEX_VALUE.lock().unwrap();
+    return map.get(&name).unwrap().clone();
+}
+
+pub fn set_mutex_value(name: String, value: Value) {
+    let ref mut map = MUTEX_VALUE.lock().unwrap();
+    map.insert(name, value);
 }
 
 pub fn add_constant_value(name: String, value: Constant) {

@@ -11,7 +11,7 @@ use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::{VirtualMachine, unwrap_constant};
+use crate::vm::{VirtualMachine, unwrap_constant, add_mutex_value, get_mutex_value, set_mutex_value};
 use crate::scope::{Scope, NameProtocol};
 
 use crate::util::change_to_primitive_type;
@@ -20,6 +20,7 @@ use bitflags::_core::time::Duration;
 use crate::vm::run_code_in_sub_thread;
 use std::time::Instant;
 use pan_bytecode::value::Obj::InstanceObj;
+use std::thread::current;
 lazy_static! {
     static ref STORE_COUNT:i32 = 0;
 }
@@ -108,7 +109,7 @@ impl Frame {
         let instruction = self.fetch_instruction();
         // let name = format!("{:?}", instruction);
         // let start = Instant::now();
-        println!("instruction是:{:?},", instruction);
+        println!("thread_id:{:?} instruction是:{:?},", current(), instruction);
         match instruction {
             bytecode::Instruction::OutBlock => {
                 vm.scope_remove();
@@ -262,7 +263,7 @@ impl Frame {
             bytecode::Instruction::CallStdFunction(typ) => {
                 self.execute_std_call_function(vm, typ);
             }
-            bytecode::Instruction::StartThread => { self.start_thread(vm); }
+            //bytecode::Instruction::StartThread => { self.start_thread(vm); }
             bytecode::Instruction::Jump(target) => {
                 self.jump(*target);
             }
@@ -332,8 +333,8 @@ impl Frame {
             bytecode::Instruction::LoadBuildStruct => {
                 self.excute_make_struct_instance(vm);
             }
-            bytecode::Instruction::BuildThread => {
-                self.excute_make_struct_instance(vm);
+            bytecode::Instruction::BuildMutex => {
+                self.excute_make_mutex_instance(vm);
             }
 
             bytecode::Instruction::LoadBuildEnum(count) => {
@@ -361,8 +362,8 @@ impl Frame {
             bytecode::Instruction::StoreCaptureReference(scope_idx, variable_idx, n) => {
                 if n == &NameScope::Local {
                     let value = self.pop_value();
-                    //println!("222store_value:{:?}", value);
                     vm.store_name(*scope_idx - self.scope_deps, *variable_idx, value, n);
+                    //println!("222store_value:{:?}", value);
                 } else {
                     let value = self.pop_value();
                     //println!("222store_value:{:?}", value);
@@ -392,7 +393,14 @@ impl Frame {
                     vm.store_name(0, *variable_idx, value, n);
                 }
             }
+            bytecode::Instruction::LoadMutex(name) => {
+                self.push_value(get_mutex_value(name.clone()));
+            }
 
+            bytecode::Instruction::StoreMutex(name) => {
+                let v = self.pop_value();
+                set_mutex_value(name.clone(), v);
+            }
             // bytecode::Instruction::LoadReference(scope_idx, variable_idx, n) => {
             //     println!("当前frame所在的vm中的scope.local长度:{:?}", vm.scope_len());
             //     if n == &NameScope::Local {
@@ -792,6 +800,14 @@ impl Frame {
         let args = self.pop_value();
         let ty = self.pop_value();
         self.push_value(Value::new_instance_obj(ty, args.hash_map_value()));
+        None
+    }
+
+    fn excute_make_mutex_instance(&self, vm: &VirtualMachine) -> FrameResult {
+        let args = self.pop_value();
+        let ty = self.pop_value();
+        self.push_value(Value::new_instance_obj(ty.clone(), args.hash_map_value()));
+        add_mutex_value("mutex".to_string(), Value::new_instance_obj(ty, args.hash_map_value()));
         None
     }
 

@@ -21,19 +21,29 @@ fun main() {
   //  print(file_content);
    // let ccc = open("http://www.baidu.com");
    // print(ccc);
+   let mutex = Mutex! {value:0};
 
    let c = () => {
         //let sum = 0;
-        let sum = Mutex! {value:0};
-        for i in 0..=100  {
-          sum.value += i;
+        for i in 1..=10 {
+            mutex.value += i;
         }
-        print(sum);
    };
 
-   c();
- //  print(sum);
-  // run(c);
+   let d = () => {
+           //let sum = 0;
+           for i in 1..= 10  {
+               mutex.value += i;
+           }
+      };
+
+   //c();
+ // print(sum);
+   run(c,false);
+   run(d,false);
+   sleep(3000);
+   let v = mutex.value;
+   print(v);
 }
 
 
