@@ -76,7 +76,7 @@ impl VirtualMachine {
             frame_count: 0,
             initialized: false,
             context,
-            scope: ScopeVec::with_builtins(vec![vec![]], vec![]),
+            scope: ScopeVec::with_builtins(vec![], vec![]),
         };
         vm.initialize(initialize_parameter);
         vm
@@ -109,6 +109,12 @@ impl VirtualMachine {
     pub fn scope_remove(&mut self) {
         //  let ref mut map = SCOPE.lock().unwrap();
         self.scope.locals.pop();
+    }
+    pub fn scope_remove_last(&mut self, size: usize) {
+        //  let ref mut map = SCOPE.lock().unwrap();
+        for _ in 0..size {
+            self.scope.locals.pop();
+        }
     }
 
     pub fn scope_clear(&mut self) {
@@ -160,6 +166,20 @@ impl VirtualMachine {
     fn load_primitive_name(&self, scope_idx: usize, idx: usize) -> Value {
         // let ref mut scope = SCOPE.lock().unwrap();
         return self.scope.load_local(scope_idx, idx);
+    }
+
+    pub fn load_primitive_local(&self, idx: usize) -> Value {
+        // let ref mut scope = SCOPE.lock().unwrap();
+        let v = self.scope.locals.last().unwrap();
+        return v.get(idx).unwrap().clone();
+    }
+
+    pub fn store_primitive_local(&mut self, idx: usize, value: Value) {
+        // let ref mut scope = SCOPE.lock().unwrap();
+        let v = self.scope.locals.last_mut().unwrap();
+        let vv = v.get_mut(idx).unwrap();
+        *vv = value;
+        return;
     }
 
     fn get_attribute_global_inner(&self, a: &Value, b: &Value) -> Option<Value> {
@@ -246,26 +266,26 @@ impl VirtualMachine {
         // None
     }
 
-    pub fn store_primitive_local(&mut self, scope_idx: usize, idx: usize, value: Value) {
-        //  println!("ddddscope:{:?},idx:{:?},value:{:?},", scope_idx, idx, value);
-        let cc = Instant::now();
-        // let ref mut scope = SCOPE.lock().unwrap();
-        // println!("获取锁:{:?},", cc.elapsed().as_nanos());
-        // println!("store_name index:{:?},value:{:?}", idx, value);
-        let a = self.scope.locals.get_mut(scope_idx).unwrap();
-        //  println!("获取map:{:?},", cc.elapsed().as_nanos());
-        //  println!("value_is:{:?}", value);
-        //   println!("获取2222map:{:?},", cc.elapsed().as_nanos());
-        let v = a.get_mut(idx);
-        if v.is_some() {
-            let v = v.unwrap();
-            *v = value;
-        } else {
-            a.push(value);
-        }
-
-        //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
-    }
+    // pub fn store_primitive_local(&mut self, scope_idx: usize, idx: usize, value: Value) {
+    //     //  println!("ddddscope:{:?},idx:{:?},value:{:?},", scope_idx, idx, value);
+    //     let cc = Instant::now();
+    //     // let ref mut scope = SCOPE.lock().unwrap();
+    //     // println!("获取锁:{:?},", cc.elapsed().as_nanos());
+    //     // println!("store_name index:{:?},value:{:?}", idx, value);
+    //     let a = self.scope.locals.get_mut(scope_idx).unwrap();
+    //     //  println!("获取map:{:?},", cc.elapsed().as_nanos());
+    //     //  println!("value_is:{:?}", value);
+    //     //   println!("获取2222map:{:?},", cc.elapsed().as_nanos());
+    //     let v = a.get_mut(idx);
+    //     if v.is_some() {
+    //         let v = v.unwrap();
+    //         *v = value;
+    //     } else {
+    //         a.push(value);
+    //     }
+    //
+    //     //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
+    // }
 
     pub fn store_default_arg(&mut self, scope_idx: usize, idx: usize, value: Value) {
         // let ref mut scope = SCOPE.lock().unwrap();
@@ -277,8 +297,9 @@ impl VirtualMachine {
     }
 
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: Vec<Value>) -> FrameResult {
-        let mut frame = Frame::new(code, self.scope_len());
         self.add_local_value(hash_map);
+        let mut frame = Frame::new(code, 0);
+
 
         let r = self.run_frame(&mut frame);
         r
@@ -310,6 +331,22 @@ impl VirtualMachine {
             bytecode::NameScope::Global => self.load_primitive_global(idx),
             bytecode::NameScope::Local => {
                 self.load_primitive_name(scope_idx, idx)
+            }
+            bytecode::NameScope::Const => self.load_primitive_global(idx),
+        };
+        println!("load_name:{:?},value:{:?}", idx, optional_value);
+        optional_value
+    }
+
+    pub fn load_local_name(
+        &self,
+        idx: usize,
+        name_scope: &bytecode::NameScope,
+    ) -> Value {
+        let optional_value = match name_scope {
+            bytecode::NameScope::Global => self.load_primitive_global(idx),
+            bytecode::NameScope::Local => {
+                self.load_primitive_local(idx)
             }
             bytecode::NameScope::Const => self.load_primitive_global(idx),
         };
@@ -376,7 +413,7 @@ impl VirtualMachine {
                 self.store_primitive_global(idx, obj);
             }
             bytecode::NameScope::Local => {
-                self.store_primitive_local(scope_idx, idx, obj);
+                self.store_primitive_value(scope_idx, idx, obj);
             }
             bytecode::NameScope::Const => {
                 self.store_primitive_global(idx, obj);
@@ -786,8 +823,9 @@ impl VirtualMachine {
 
 pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) -> JoinHandle<()> {
     return thread::spawn(|| {
-        let scope = Scope::new(vec![locals], global);
+        let scope = Scope::new(vec![], global);
         let mut vm = VirtualMachine::new();
+        vm.add_local_value(vec![]);
         let mut frame = Frame::new(code, 0);
 
         // vm.frame_count += 1;
@@ -806,15 +844,16 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
 // field_map: Obj(MapObj({"f": Fn(FnValue { name: "main.<locals>.lambda_35_13", code: <code object lambda_35_13 at ??? file
 // "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }), "state": I32(0)})) })), "state": I32(0)}
 
-pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<Value>) {
-    let hander = thread::spawn(|| {
+pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<Value>, scope_deps: usize) {
+    let hander = thread::spawn(move || {
         // println!("local_hash_map:{:?},", locals);
         // println!("global_:{:?},", global);
         //  let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
+        //vm.add_local_value(locals);
+        println!("scope_deps::{:?},", scope_deps);
+        let mut frame = Frame::new(code, scope_deps);
         vm.add_local_value(locals);
-        let mut frame = Frame::new(code, 0);
-
 
         //vm.frame_count += 1;
         vm.run_frame(&mut frame);

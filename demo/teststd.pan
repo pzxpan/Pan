@@ -5,6 +5,7 @@ import std.io.*
 import std.fs.*
 
 import std.http.*
+import std.thread.*;
 
 fun main() {
 
@@ -18,8 +19,18 @@ fun main() {
     //    delete_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/test_input.pan");
     //}
   //  print(file_content);
-    let ccc = open("http://www.baidu.com");
-    print(ccc);
+   // let ccc = open("http://www.baidu.com");
+   // print(ccc);
+   let c = () => {
+        let sum = 0;
+        for i in 0..=100{
+          sum += i;
+        }
+        print(sum);
+   };
+
+   run(c);
+
 }
 
 

@@ -58,9 +58,10 @@ impl NameProtocol for ScopeVec {
     }
 
     fn store_local_new(&mut self, value: Value) {
-        // println!("value:{:?}", value);
+        println!("value:{:?}", value);
         let c = self.locals.last_mut().unwrap();
         c.push(value);
+        println!("locals:{:#?}", self.locals);
     }
 
     fn load_current(&self, variable_idx: usize) -> Value {

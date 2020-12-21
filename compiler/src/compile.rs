@@ -503,7 +503,7 @@ impl<O: OutputStream> Compiler<O> {
         if is_local {
             self.emit(Instruction::LoadLocalName(position.1, NameScope::Local));
         } else if scope == NameScope::Global {
-            self.emit(Instruction::LoadFrameReference(0, position.1, scope.clone()));
+            self.emit(Instruction::LoadFunctionCallFrameReference(0, position.1, scope.clone()));
         } else {
             //package那一层占坑没拉屎，nnd
             if self.ctx.in_lambda {
@@ -515,7 +515,7 @@ impl<O: OutputStream> Compiler<O> {
                 }
             } else {
                 if self.ctx.in_loop || self.ctx.in_match || self.ctx.in_need_block {
-                    self.emit(Instruction::LoadFrameReference(position.0 - 1, position.1, scope.clone()));
+                    self.emit(Instruction::LoadFunctionCallFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
                     self.emit(Instruction::LoadCaptureReference(position.0 - 1, position.1, scope.clone()));
                 }
@@ -577,17 +577,17 @@ impl<O: OutputStream> Compiler<O> {
         if is_local {
             self.emit(Instruction::StoreLocalName(position.1, scope));
         } else if scope == NameScope::Global {
-            self.emit(Instruction::LoadFrameReference(0, position.1, scope.clone()));
+            self.emit(Instruction::LoadFunctionCallFrameReference(0, position.1, scope.clone()));
         } else {
             if self.ctx.in_lambda && self.scope_level > position.0 {
                 if self.scope_level > position.0 {
                     self.emit(Instruction::StoreCaptureReference(position.0 - 1, position.1, scope.clone()));
                 } else {
-                    self.emit(Instruction::StoreFrameReference(position.0 - 1, position.1, scope.clone()));
+                    self.emit(Instruction::StoreFunctionCallFrameReference(position.0 - 1, position.1, scope.clone()));
                 }
             } else {
                 if self.ctx.in_loop || self.ctx.in_match || self.ctx.in_need_block {
-                    self.emit(Instruction::StoreFrameReference(position.0 - 1, position.1, scope.clone()));
+                    self.emit(Instruction::StoreFunctionCallFrameReference(position.0 - 1, position.1, scope.clone()));
                 } else {
                     self.emit(Instruction::StoreCaptureReference(position.0 - 1, position.1, scope));
                 }
@@ -2175,7 +2175,7 @@ impl<O: OutputStream> Compiler<O> {
                 } else if self.is_struct_item_def("self".to_string(), name.clone()) {
                     let p = self.variable_position(name.as_str()).unwrap();
                     let scope = self.scope_for_name(name.as_str());
-                    self.emit(Instruction::LoadReference(p.0, p.1, scope));
+                    self.emit(Instruction::LoadFunctionCallFrameReference(p.0 - 1, p.1, scope));
                     self.emit(Instruction::LoadAttr(name.clone()));
                 } else {
                     self.load_name(name);
@@ -3068,7 +3068,7 @@ impl<O: OutputStream> Compiler<O> {
                     println!("sccc:{:?}", scope);
                     let p = self.variable_position(&name.0).unwrap();
                     if tmp.0 == 3 {
-                        self_instruction = Some(Instruction::LoadReference(p.0 - 1, p.1, scope.clone()));
+                        self_instruction = Some(Instruction::LoadFunctionCallFrameReference(p.0 - 1, p.1, scope.clone()));
                         //instructions.push();
                     }
 

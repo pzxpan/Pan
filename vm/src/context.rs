@@ -5,6 +5,7 @@ use std::time;
 use std::collections::HashMap;
 use std::ops::{DerefMut, Deref};
 use crate::stdlib::fs::*;
+use crate::stdlib::thread::*;
 use crate::stdlib::http::open;
 
 pub struct Context {
@@ -99,6 +100,12 @@ impl Context {
             idx: 0,
             name: "open".to_string(),
             body: open,
+            args: 1,
+        });
+        fns.insert(String::from("std$thread$run"), StdFn {
+            idx: 0,
+            name: "run".to_string(),
+            body: run,
             args: 1,
         });
         Context {

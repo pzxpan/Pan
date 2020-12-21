@@ -97,7 +97,7 @@ fn main() {
     // println!("size:{:?},", std::mem::size_of_val(&v));
 
     // let start = std::time::Instant::now();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("teststd.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("while.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
 }
