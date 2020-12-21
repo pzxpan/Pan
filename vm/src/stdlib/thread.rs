@@ -10,13 +10,18 @@ use crate::vm::run_code_in_sub_thread;
 use std::path::{Path, PathBuf};
 use bitflags::_core::time::Duration;
 use std::thread::{JoinHandle, Thread};
-use std::convert::{TryFrom, TryInto};
-use pan_bytecode::value::Obj::InstanceObj;
+use std::borrow::BorrowMut;
 
 pub fn run(values: &Vec<Value>) -> Value {
     let code = values.get(0).unwrap();
     let scope_idx = values.get(1).unwrap();
-    run_code_in_sub_thread(code.code(), vec![], vec![], scope_idx.usize());
+    let join = values.get(2);
+
+    let r = run_code_in_sub_thread(code.code(), vec![], vec![], scope_idx.usize());
+    if join.is_none() || join.unwrap().bool_value() {
+        r.join().unwrap();
+    }
+
     Value::Nil
 
     //run_code_in_sub_thread(values.get(0))
@@ -36,6 +41,7 @@ pub fn stop(values: &Vec<Value>) -> Value {
 pub fn join(values: &Vec<Value>) -> Value {
     //let time = values.get(0).unwrap();
     let s = std::thread::current();
+
     println!("thread_id:{:?}", s);
     Value::Nil
 }

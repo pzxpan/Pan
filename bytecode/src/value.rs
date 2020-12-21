@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 
 use crate::bytecode::{CodeObject, Constant, NameScope};
+use std::thread::JoinHandle;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FnValue {

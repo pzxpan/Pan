@@ -129,7 +129,7 @@ impl Context {
         println!("1111current_thread:{:?}", std::thread::current());
         let f = self.fns.get(name).unwrap();
         if name.eq("std$thread$run") {
-            values.push(Value::USize(scope_idx));
+            values.insert(1, Value::USize(scope_idx));
         }
         (f.body)(values)
     }
