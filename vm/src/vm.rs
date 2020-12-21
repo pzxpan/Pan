@@ -29,6 +29,7 @@ pub struct VirtualMachine {
     pub frame_count: usize,
     pub initialized: bool,
     pub context: Context,
+    pub scope: ScopeVec,
 }
 
 pub const NSIG: usize = 64;
@@ -59,203 +60,6 @@ pub fn get_type_value(name: String) -> TypeValue {
     return map.get(&name).unwrap().clone();
 }
 
-pub fn add_local_value(vec_value: Vec<Value>) {
-    let ref mut map = SCOPE.lock().unwrap();
-    println!("before:size:{:?},", map.locals.len());
-    map.locals.push(vec_value);
-    println!("after:size:{:?},", map.locals.len());
-}
-
-pub fn scope_len() -> usize {
-    let ref mut map = SCOPE.lock().unwrap();
-    return map.locals.len();
-}
-
-pub fn scope_remove() {
-    let ref mut map = SCOPE.lock().unwrap();
-    map.locals.pop();
-}
-
-pub fn scope_clear() {
-    let ref mut map = SCOPE.lock().unwrap();
-    map.locals.clear();
-    map.globals.clear();
-}
-
-pub fn load_capture_reference(scope_idx: usize, variable_idx: usize) -> Value {
-    let ref mut scope = SCOPE.lock().unwrap();
-    println!("scope_idx:{:?},value::{:?}", scope_idx, variable_idx);
-    return scope.load_local(scope_idx, variable_idx);
-    // //println!("idx::{:?},name:{:?}", idx, name);
-    // let vvvv = vv.unwrap().get(&name).unwrap();
-    // vvvv.clone()
-}
-
-// [{"print": Fn(FnValue { name: "print", code: < code object print at ? ? ? file "", line 0 >, has_return: true }),
-// "sleep": Fn(FnValue { name: "sleep", code: < code object sleep at ? ? ? file "", line 0 >, has_return: true }),
-// "typeof": Fn(FnValue { name: "typeof", code: < code object typeof at ? ? ? file "", line 0 >, has_return: true }),
-// "format": Fn(FnValue { name: "format", code: < code object format at ? ? ? file "", line 0 >, has_return: true }),
-// "panic": Fn(FnValue { name: "panic", code: < code object panic at ? ? ? file "", line 0 >, has_return: true })},
-// {"capture$$idx": USize(2), "capture$$name": String("person"),
-// "person": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff",
-// < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older",
-// <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ),
-// ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ),
-// ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )],
-// static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }),
-// field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) }))}, {"age": I32(50), "a": I32(1000), "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older", <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ), ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ), ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )], static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }), field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) })), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")}]
-
-
-pub fn store_primitive_value(scope_idx: usize, variable_idx: usize, value: Value) {
-    let ref mut scope = SCOPE.lock().unwrap();
-    scope.store_local(scope_idx, variable_idx, value);
-}
-
-
-fn load_primitive_global(idx: usize) -> Value {
-    let ref mut scope = SCOPE.lock().unwrap();
-    scope.load_global(idx)
-}
-
-// fn load_reference_global(idx: usize) -> Option<Value> {
-//     let ref mut scope = SCOPE.lock().unwrap();
-//     return scope.sto();
-// }
-
-fn store_primitive_global(v_idx: usize, value: Value) {
-    let ref mut scope = SCOPE.lock().unwrap();
-    scope.store_global(v_idx, value);
-}
-
-fn store_global_new(value: Value) {
-    let ref mut scope = SCOPE.lock().unwrap();
-    scope.store_global_new(value);
-}
-
-fn store_local_new(value: Value) {
-    let ref mut scope = SCOPE.lock().unwrap();
-    scope.store_local_new(value);
-}
-
-fn load_primitive_name(scope_idx: usize, idx: usize) -> Value {
-    let ref mut scope = SCOPE.lock().unwrap();
-    return scope.load_local(scope_idx, idx);
-}
-
-fn get_attribute_inner(a: &Value, b: &Value) -> Option<Value> {
-    match (a, b) {
-        (Value::Obj(e), Value::I32(sub)) => {
-            match e.as_ref() {
-                Obj::ArrayObj(arr) => {
-                    arr.get(*sub as usize).cloned()
-                }
-                Obj::MapObj(map) => {
-                    map.get(&sub.to_string()).cloned()
-                }
-                _ => unreachable!()
-            }
-        }
-
-        (Value::Obj(e), Value::String(sub)) => {
-            match e.as_ref() {
-                Obj::MapObj(map) => {
-                    map.get(sub.as_str()).cloned()
-                }
-                _ => unreachable!()
-            }
-        }
-        _ => unreachable!()
-    }
-}
-
-pub fn get_attribute(obj: Value, attr: Value) -> Option<Value> {
-    if let Value::Reference(n) = obj {
-        let ref mut scope = SCOPE.lock().unwrap();
-        if n.as_ref().2 == NameScope::Local {
-            let v = scope.locals.get(n.as_ref().0).unwrap();
-            let vv = v.get(n.as_ref().1).unwrap();
-            return get_attribute_inner(vv, &attr);
-        } else {
-            let v = scope.globals.get(n.as_ref().1).unwrap();
-            return get_attribute_inner(v, &attr);
-        }
-    } else {
-        return get_attribute_inner(&obj, &attr);
-    }
-    None
-}
-
-pub fn set_attribute(obj: &mut Value, attr: Value, value: Value) {
-    // let now = Instant::now();
-    if let Value::Reference(n) = obj {
-        let ref mut scope = SCOPE.lock().unwrap();
-        // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
-        // let v = scope.locals.get_mut(1).unwrap();
-        // println!("获取ddv:{:?}", now.elapsed().as_nanos());
-        // let vv = v.get_mut(0).unwrap();
-        // println!("获取222:{:?}", now.elapsed().as_nanos());
-        VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
-        //  println!("获取333:{:?}", now.elapsed().as_nanos());
-    } else {
-        VirtualMachine::update_item(obj, attr, value);
-    }
-    //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
-}
-
-pub fn is_ref_value(scope_idx: usize, variable_idx: usize) -> (bool, Option<Value>) {
-    // let now = Instant::now();
-    let ref mut scope = SCOPE.lock().unwrap();
-    // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
-    // let v = scope.locals.get_mut(1).unwrap();
-    // println!("获取ddv:{:?}", now.elapsed().as_nanos());
-    // let vv = v.get_mut(0).unwrap();
-    // println!("获取222:{:?}", now.elapsed().as_nanos());
-    // VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
-    let ref_value = &scope.locals[scope_idx][variable_idx];
-    if let Value::Reference(n) = &ref_value {
-        return (true, Some(Value::Reference(n.clone())));
-    }
-    return (false, None);
-    //  println!("获取333:{:?}", now.elapsed().as_nanos());
-    //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
-}
-
-fn load_reference_name(scope_idx: usize, idx: usize) -> Value {
-    let ref mut scope = SCOPE.lock().unwrap();
-    scope.load_local(scope_idx, idx)
-    // None
-}
-
-pub fn store_primitive_local(scope_idx: usize, idx: usize, value: Value) {
-    //  println!("ddddscope:{:?},idx:{:?},value:{:?},", scope_idx, idx, value);
-    let cc = Instant::now();
-    let ref mut scope = SCOPE.lock().unwrap();
-    // println!("获取锁:{:?},", cc.elapsed().as_nanos());
-    // println!("store_name index:{:?},value:{:?}", idx, value);
-    let a = scope.locals.get_mut(scope_idx).unwrap();
-    //  println!("获取map:{:?},", cc.elapsed().as_nanos());
-    //  println!("value_is:{:?}", value);
-    //   println!("获取2222map:{:?},", cc.elapsed().as_nanos());
-    let v = a.get_mut(idx);
-    if v.is_some() {
-        let v = v.unwrap();
-        *v = value;
-    } else {
-        a.push(value);
-    }
-
-    //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
-}
-
-pub fn store_default_arg(scope_idx: usize, idx: usize, value: Value) {
-    let ref mut scope = SCOPE.lock().unwrap();
-    let a = scope.locals.get_mut(scope_idx).unwrap();
-    let v = a.get_mut(idx);
-    if v.is_none() {
-        a.push(value);
-    }
-}
-
 
 #[derive(Copy, Clone)]
 pub enum InitParameter {
@@ -272,6 +76,7 @@ impl VirtualMachine {
             frame_count: 0,
             initialized: false,
             context,
+            scope: ScopeVec::with_builtins(vec![vec![]], vec![]),
         };
         vm.initialize(initialize_parameter);
         vm
@@ -289,9 +94,191 @@ impl VirtualMachine {
         }
     }
 
+    pub fn add_local_value(&mut self, vec_value: Vec<Value>) {
+        // let ref mut map = SCOPE.lock().unwrap();
+        println!("before:size:{:?},", self.scope.locals.len());
+        self.scope.locals.push(vec_value);
+        println!("after:size:{:?},", self.scope.locals.len());
+    }
+
+    pub fn scope_len(&self) -> usize {
+        //let ref mut map = SCOPE.lock().unwrap();
+        return self.scope.locals.len();
+    }
+
+    pub fn scope_remove(&mut self) {
+        //  let ref mut map = SCOPE.lock().unwrap();
+        self.scope.locals.pop();
+    }
+
+    pub fn scope_clear(&mut self) {
+        //let ref mut map = SCOPE.lock().unwrap();
+        self.scope.locals.clear();
+        self.scope.globals.clear();
+    }
+
+    pub fn load_capture_reference_inner(&self, scope_idx: usize, variable_idx: usize) -> Value {
+        //  let ref mut scope = SCOPE.lock().unwrap();
+        println!("scope_idx:{:?},value::{:?}", scope_idx, variable_idx);
+        return self.scope.load_local(scope_idx, variable_idx);
+        // //println!("idx::{:?},name:{:?}", idx, name);
+        // let vvvv = vv.unwrap().get(&name).unwrap();
+        // vvvv.clone()
+    }
+
+    pub fn store_primitive_value(&mut self, scope_idx: usize, variable_idx: usize, value: Value) {
+        //let ref mut scope = SCOPE.lock().unwrap();
+        self.scope.store_local(scope_idx, variable_idx, value);
+    }
+
+
+    fn load_primitive_global(&self, idx: usize) -> Value {
+        //let ref mut scope = SCOPE.lock().unwrap();
+        self.scope.load_global(idx)
+    }
+
+// fn load_reference_global(idx: usize) -> Option<Value> {
+//     let ref mut scope = SCOPE.lock().unwrap();
+//     return scope.sto();
+// }
+
+    fn store_primitive_global(&mut self, v_idx: usize, value: Value) {
+        //   let ref mut scope = SCOPE.lock().unwrap();
+        self.scope.store_global(v_idx, value);
+    }
+
+    fn store_global_new(&mut self, value: Value) {
+        //let ref mut scope = SCOPE.lock().unwrap();
+        self.scope.store_global_new(value);
+    }
+
+    fn store_local_new(&mut self, value: Value) {
+        //let ref mut scope = SCOPE.lock().unwrap();
+        self.scope.store_local_new(value);
+    }
+
+    fn load_primitive_name(&self, scope_idx: usize, idx: usize) -> Value {
+        // let ref mut scope = SCOPE.lock().unwrap();
+        return self.scope.load_local(scope_idx, idx);
+    }
+
+    fn get_attribute_global_inner(&self, a: &Value, b: &Value) -> Option<Value> {
+        match (a, b) {
+            (Value::Obj(e), Value::I32(sub)) => {
+                match e.as_ref() {
+                    Obj::ArrayObj(arr) => {
+                        arr.get(*sub as usize).cloned()
+                    }
+                    Obj::MapObj(map) => {
+                        map.get(&sub.to_string()).cloned()
+                    }
+                    _ => unreachable!()
+                }
+            }
+
+            (Value::Obj(e), Value::String(sub)) => {
+                match e.as_ref() {
+                    Obj::MapObj(map) => {
+                        map.get(sub.as_str()).cloned()
+                    }
+                    _ => unreachable!()
+                }
+            }
+            _ => unreachable!()
+        }
+    }
+
+    pub fn get_attribute_global(&self, obj: Value, attr: Value) -> Option<Value> {
+        if let Value::Reference(n) = obj {
+            let ref mut scope = SCOPE.lock().unwrap();
+            if n.as_ref().2 == NameScope::Local {
+                let v = scope.locals.get(n.as_ref().0).unwrap();
+                let vv = v.get(n.as_ref().1).unwrap();
+                return self.get_attribute_global_inner(vv, &attr);
+            } else {
+                let v = scope.globals.get(n.as_ref().1).unwrap();
+                return self.get_attribute_global_inner(v, &attr);
+            }
+        } else {
+            return self.get_attribute_global_inner(&obj, &attr);
+        }
+        None
+    }
+
+    pub fn set_attribute_global(&mut self, obj: &mut Value, attr: Value, value: Value) {
+        // let now = Instant::now();
+        if let Value::Reference(n) = obj {
+            // let ref mut scope = SCOPE.lock().unwrap();
+            // // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
+            // // let v = scope.locals.get_mut(1).unwrap();
+            // // println!("获取ddv:{:?}", now.elapsed().as_nanos());
+            // // let vv = v.get_mut(0).unwrap();
+            // // println!("获取222:{:?}", now.elapsed().as_nanos());
+            VirtualMachine::update_item(&mut self.scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
+            //  println!("获取333:{:?}", now.elapsed().as_nanos());
+        } else {
+            VirtualMachine::update_item(obj, attr, value);
+        }
+        //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
+    }
+
+    pub fn is_ref_value(&self, scope_idx: usize, variable_idx: usize) -> (bool, Option<Value>) {
+        // let now = Instant::now();
+        // let ref mut scope = SCOPE.lock().unwrap();
+        // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
+        // let v = scope.locals.get_mut(1).unwrap();
+        // println!("获取ddv:{:?}", now.elapsed().as_nanos());
+        // let vv = v.get_mut(0).unwrap();
+        // println!("获取222:{:?}", now.elapsed().as_nanos());
+        // VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
+        let ref_value = &self.scope.locals[scope_idx][variable_idx];
+        if let Value::Reference(n) = &ref_value {
+            return (true, Some(Value::Reference(n.clone())));
+        }
+        return (false, None);
+        //  println!("获取333:{:?}", now.elapsed().as_nanos());
+        //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
+    }
+
+    fn load_reference_name(&self, scope_idx: usize, idx: usize) -> Value {
+        // let ref mut scope = SCOPE.lock().unwrap();
+        self.scope.load_local(scope_idx, idx)
+        // None
+    }
+
+    pub fn store_primitive_local(&mut self, scope_idx: usize, idx: usize, value: Value) {
+        //  println!("ddddscope:{:?},idx:{:?},value:{:?},", scope_idx, idx, value);
+        let cc = Instant::now();
+        // let ref mut scope = SCOPE.lock().unwrap();
+        // println!("获取锁:{:?},", cc.elapsed().as_nanos());
+        // println!("store_name index:{:?},value:{:?}", idx, value);
+        let a = self.scope.locals.get_mut(scope_idx).unwrap();
+        //  println!("获取map:{:?},", cc.elapsed().as_nanos());
+        //  println!("value_is:{:?}", value);
+        //   println!("获取2222map:{:?},", cc.elapsed().as_nanos());
+        let v = a.get_mut(idx);
+        if v.is_some() {
+            let v = v.unwrap();
+            *v = value;
+        } else {
+            a.push(value);
+        }
+
+        //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
+    }
+
+    pub fn store_default_arg(&mut self, scope_idx: usize, idx: usize, value: Value) {
+        // let ref mut scope = SCOPE.lock().unwrap();
+        let a = self.scope.locals.get_mut(scope_idx).unwrap();
+        let v = a.get_mut(idx);
+        if v.is_none() {
+            a.push(value);
+        }
+    }
+
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: Vec<Value>) -> FrameResult {
-        let mut frame = Frame::new(code, scope_len());
-        add_local_value(hash_map);
+        let mut frame = Frame::new(code, self.scope_len());
+        self.add_local_value(hash_map);
 
         let r = self.run_frame(&mut frame);
         r
@@ -320,11 +307,11 @@ impl VirtualMachine {
         name_scope: &bytecode::NameScope,
     ) -> Value {
         let optional_value = match name_scope {
-            bytecode::NameScope::Global => load_primitive_global(idx),
+            bytecode::NameScope::Global => self.load_primitive_global(idx),
             bytecode::NameScope::Local => {
-                load_primitive_name(scope_idx, idx)
+                self.load_primitive_name(scope_idx, idx)
             }
-            bytecode::NameScope::Const => load_primitive_global(idx),
+            bytecode::NameScope::Const => self.load_primitive_global(idx),
         };
         println!("load_name:{:?},value:{:?}", idx, optional_value);
         optional_value
@@ -338,11 +325,11 @@ impl VirtualMachine {
         idx: usize,
     ) -> Value {
         let optional_value = match name_scope {
-            bytecode::NameScope::Global => load_primitive_global(idx),
+            bytecode::NameScope::Global => self.load_primitive_global(idx),
             bytecode::NameScope::Local => {
-                load_reference_name(scope_idx, idx)
+                self.load_reference_name(scope_idx, idx)
             }
-            bytecode::NameScope::Const => load_primitive_global(idx),
+            bytecode::NameScope::Const => self.load_primitive_global(idx),
         };
         //println!("load_name:{:?},value:{:?}", name, optional_value);
         optional_value
@@ -353,18 +340,18 @@ impl VirtualMachine {
         scope_idx: usize,
         v_idx: usize,
     ) -> Value {
-        return load_capture_reference(scope_idx, v_idx);
+        return self.load_capture_reference(scope_idx, v_idx);
     }
 
     pub fn load_global_reference(
         &self,
         v_idx: usize,
     ) -> Value {
-        return load_primitive_global(v_idx);
+        return self.load_primitive_global(v_idx);
     }
 
-    pub fn store_global_reference(&self, v_idx: usize, value: Value) {
-        store_primitive_global(v_idx, value);
+    pub fn store_global_reference(&mut self, v_idx: usize, value: Value) {
+        self.store_primitive_global(v_idx, value);
     }
 
     pub fn store_capture_reference(
@@ -373,7 +360,7 @@ impl VirtualMachine {
         v_idx: usize,
         value: Value,
     ) {
-        store_primitive_value(scope_idx, v_idx, value);
+        self.store_primitive_value(scope_idx, v_idx, value);
     }
 
     pub fn store_name(
@@ -386,13 +373,13 @@ impl VirtualMachine {
         let a = Instant::now();
         match name_scope {
             bytecode::NameScope::Global => {
-                store_primitive_global(idx, obj);
+                self.store_primitive_global(idx, obj);
             }
             bytecode::NameScope::Local => {
-                store_primitive_local(scope_idx, idx, obj);
+                self.store_primitive_local(scope_idx, idx, obj);
             }
             bytecode::NameScope::Const => {
-                store_primitive_global(idx, obj);
+                self.store_primitive_global(idx, obj);
             }
         }
         // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
@@ -405,7 +392,7 @@ impl VirtualMachine {
         idx: usize,
         obj: Value,
     ) -> FrameResult {
-        store_default_arg(scope_idx, idx, obj);
+        self.store_default_arg(scope_idx, idx, obj);
         // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
         None
     }
@@ -418,13 +405,13 @@ impl VirtualMachine {
         let a = Instant::now();
         match name_scope {
             bytecode::NameScope::Global => {
-                store_global_new(value);
+                self.store_global_new(value);
             }
             bytecode::NameScope::Local => {
-                store_local_new(value);
+                self.store_local_new(value);
             }
             bytecode::NameScope::Const => {
-                store_global_new(value);
+                self.store_global_new(value);
             }
         }
         println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
@@ -505,10 +492,10 @@ impl VirtualMachine {
         println!("obj:{:?},attri:{:?}", obj, attr);
         if let Value::Reference(n) = obj {
             if n.as_ref().2 == NameScope::Global {
-                let v = load_primitive_global(n.as_ref().1);
+                let v = self.load_primitive_global(n.as_ref().1);
                 return self.get_attribute_inner(v, attr);
             } else {
-                let v = load_reference_name(n.as_ref().0, n.as_ref().1);
+                let v = self.load_reference_name(n.as_ref().0, n.as_ref().1);
                 return self.get_attribute_inner(v, attr);
             }
         } else {
@@ -561,147 +548,9 @@ impl VirtualMachine {
         }
     }
 
-    pub fn _eq(&self, a: Value, b: Value) -> Value {
-        println!("a:{:?},b:{:?}", a, b);
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::Char(a), Value::Char(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::String(a), Value::String(b)) => {
-                Value::Bool(a.eq(&b))
-            }
-            //TODO
-            (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(a.as_ref() == b.as_ref())
-            }
-            (Value::Enum(a), Value::Enum(b)) => {
-                Value::Bool(a == b)
-            }
-            (Value::Obj(a), Value::I32(b)) => {
-                Value::Bool(a.to_i32() == b)
-            }
-            (Value::I32(b), Value::Obj(a)) => {
-                Value::Bool(a.to_i32() == b)
-            }
-            (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(a.to_i32() == b.to_i32())
-            }
-            (Value::String(a), Value::String(b)) => {
-                Value::Bool(a.as_str().eq(b.as_str()))
-            }
-            (Value::String(a), Value::Reference(b)) => {
-                let v = load_capture_reference(b.as_ref().0, b.as_ref().1);
-                if let Value::String(ss) = v {
-                    Value::Bool(a.as_str().eq(ss.as_str()))
-                } else {
-                    Value::Bool(false)
-                }
-            }
-            (Value::Nil, Value::Nil) => {
-                Value::Bool(true)
-            }
-            (Value::Nil, _) | (_, Value::Nil) => {
-                Value::Bool(false)
-            }
-            _ => unreachable!()
-        }
-    }
-
-    pub fn _ne(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::Char(a), Value::Char(b)) => {
-                Value::Bool(a != b)
-            }
-            (Value::String(a), Value::String(b)) => {
-                Value::Bool(a.ne(&b))
-            }
-            (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(a.to_i32() != b.to_i32())
-            }
-            (Value::Obj(a), Value::I32(b)) => {
-                Value::Bool(a.to_i32() != b)
-            }
-            (Value::I32(b), Value::Obj(a)) => {
-                Value::Bool(a.to_i32() != b)
-            }
-            _ => unreachable!()
-        }
-    }
 
     pub fn get_item(&self, a: Value, b: Value) -> Option<Value> {
-        return get_attribute(a, b);
+        return self.get_attribute_global(a, b);
         // let mut v = Value::Nil;
         // if let Value::Reference(n) = a {
         //     v = load_primitive_name(n.as_ref().1.clone(), n.as_ref().0).unwrap();
@@ -820,8 +669,6 @@ impl VirtualMachine {
 
             _ => unreachable!()
         }
-
-
         return;
     }
     pub fn set_item(&self, obj: &mut Value, idx: Value, value: Value) {
@@ -852,233 +699,7 @@ impl VirtualMachine {
         }
     }
 
-    pub fn _le(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::Char(a), Value::Char(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Bool(a <= b)
-            }
-            (Value::Obj(a), Value::I32(b)) => {
-                Value::Bool(a.to_i32() <= b)
-            }
-            (Value::I32(b), Value::Obj(a)) => {
-                Value::Bool(b <= a.to_i32())
-            }
-            (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(a.to_i32() <= b.to_i32())
-            }
-            _ => unreachable!()
-        }
-    }
 
-    pub fn _ge(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::Char(a), Value::Char(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Bool(a >= b)
-            }
-            (Value::Obj(a), Value::I32(b)) => {
-                Value::Bool(a.to_i32() >= b)
-            }
-            (Value::I32(b), Value::Obj(a)) => {
-                Value::Bool(b >= a.to_i32())
-            }
-            (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(a.to_i32() >= b.to_i32())
-            }
-            _ => unreachable!()
-        }
-    }
-
-    pub fn _gt(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::Char(a), Value::Char(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Bool(a > b)
-            }
-            (Value::Obj(a), Value::I32(b)) => {
-                Value::Bool(a.to_i32() > b)
-            }
-            (Value::I32(b), Value::Obj(a)) => {
-                Value::Bool(b > a.to_i32())
-            }
-            (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(a.to_i32() > b.to_i32())
-            }
-            _ => unreachable!()
-        }
-    }
-
-    pub fn _lt(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::Char(a), Value::Char(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Bool(a < b)
-            }
-            (Value::Obj(a), Value::I32(b)) => {
-                Value::Bool(a.to_i32() < b)
-            }
-            (Value::I32(b), Value::Obj(a)) => {
-                Value::Bool(b < a.to_i32())
-            }
-            (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(a.to_i32() < b.to_i32())
-            }
-            _ => unreachable!()
-        }
-    }
     pub fn get_next_iter(&self, v: &mut Value) -> Value {
         //let now = Instant::now();
         let mut ret = Value::Nil;
@@ -1161,455 +782,13 @@ impl VirtualMachine {
         input.trim();
         //*value = context::args();
     }
-
-    pub fn sub(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a - b)
-            }
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a - b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a - b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a - b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a - b)
-            }
-
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a - b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a - b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a - b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() - b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() - b.as_ref().clone()))
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::ISize(a - b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::USize(a - b)
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Float(a - b)
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn add(&self, a: &Value, b: &Value) -> Value {
-        println!("hhhha:{:?},b:{:?}", a, b);
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a + b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a + b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a + b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a + b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a + b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a + b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a + b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a + b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() + b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() + b.as_ref().clone()))
-            }
-            (Value::ISize(a), Value::ISize(b)) => {
-                Value::ISize(a + b)
-            }
-            (Value::USize(a), Value::USize(b)) => {
-                Value::USize(a + b)
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Float(a + b)
-            }
-            (Value::Reference(n1), Value::Reference(n2)) => {
-                let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
-                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
-                self.add(&v1, &v2)
-            }
-            (Value::String(n1), Value::Reference(n2)) => {
-                //  let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
-                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
-                self.add(a, &v2)
-            }
-            (Value::Reference(n2), Value::String(n1)) => {
-                //  let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
-                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
-                self.add(&v2, b)
-            }
-            (Value::String(s1), Value::String(s2)) => {
-                let mut s = s1.as_ref().clone();
-                s.push_str(s2.as_str());
-                Value::String(Box::new(s))
-            }
-
-            _ => unreachable!()
-        }
-    }
-    pub fn mul(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a * b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a * b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a * b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a * b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a * b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a * b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a * b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a * b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() * b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() * b.as_ref().clone()))
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Float(a * b)
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn divide(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a / b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a / b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a / b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a / b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a / b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a / b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a / b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a / b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() / b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() / b.as_ref().clone()))
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                Value::Float(a / b)
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn modulo(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a % b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a % b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a % b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a % b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a % b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a % b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a % b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a % b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() % b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() % b.as_ref().clone()))
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn bitor(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a | b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a | b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a | b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a | b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a | b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a | b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a | b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a | b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() | b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() | b.as_ref().clone()))
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn bitxor(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a ^ b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a ^ b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a ^ b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a ^ b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a ^ b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a ^ b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a ^ b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a ^ b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() ^ b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() ^ b.as_ref().clone()))
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn bitand(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a & b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a & b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a & b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a & b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a & b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a & b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a & b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a & b)
-            }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() & b.as_ref().clone()))
-            }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() & b.as_ref().clone()))
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn shiftleft(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a << b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a << b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a << b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a << b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a << b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a << b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a << b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a << b)
-            }
-            (Value::I128(a), Value::I32(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() << b))
-            }
-            (Value::U128(a), Value::I32(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() << b))
-            }
-            _ => unreachable!()
-        }
-    }
-    pub fn shiftright(&self, a: Value, b: Value) -> Value {
-        match (a, b) {
-            (Value::I8(a), Value::I8(b)) => {
-                Value::I8(a >> b)
-            }
-            (Value::U8(a), Value::U8(b)) => {
-                Value::U8(a >> b)
-            }
-            (Value::I16(a), Value::I16(b)) => {
-                Value::I16(a >> b)
-            }
-            (Value::U16(a), Value::U16(b)) => {
-                Value::U16(a >> b)
-            }
-            (Value::I32(a), Value::I32(b)) => {
-                Value::I32(a >> b)
-            }
-            (Value::U32(a), Value::U32(b)) => {
-                Value::U32(a >> b)
-            }
-            (Value::I64(a), Value::I64(b)) => {
-                Value::I64(a >> b)
-            }
-            (Value::U64(a), Value::U64(b)) => {
-                Value::U64(a >> b)
-            }
-            (Value::I128(a), Value::I32(b)) => {
-                Value::I128(Box::new(a.as_ref().clone() >> b))
-            }
-            (Value::U128(a), Value::I32(b)) => {
-                Value::U128(Box::new(a.as_ref().clone() >> b))
-            }
-            _ => unreachable!()
-        }
-    }
-
-
-    pub fn neg(&self, value: Value) -> Value {
-        match value {
-            Value::I8(i) => Value::I8(-i),
-            Value::I16(i) => Value::I16(-i),
-            Value::I32(i) => Value::I32(-i),
-            Value::I64(i) => Value::I64(-i),
-            Value::I128(i) => Value::I128(Box::new(-i.as_ref().clone())),
-            Value::ISize(i) => Value::ISize(-i),
-            Value::Float(i) => Value::Float(-i),
-            _ => { return value; }
-        }
-    }
-    pub fn plus(&self, value: Value) -> Value {
-        match value {
-            Value::I8(i) => if i < 0 { Value::I8(-i) } else { value },
-            Value::I16(i) => if i < 0 { Value::I16(-i) } else { value },
-            Value::I32(i) => if i < 0 { Value::I32(-i) } else { value },
-            Value::I64(i) => if i < 0 { Value::I64(-i) } else { value },
-            Value::I128(i) => if i.as_ref().is_negative() { Value::I128(Box::new(-i.as_ref().clone())) } else { Value::I128(Box::new(i.as_ref().clone())) },
-            Value::ISize(i) => if i < 0 { Value::ISize(-i) } else { value },
-            _ => { return value; }
-        }
-    }
-    pub fn not(&self, value: Value) -> Value {
-        match value {
-            Value::Bool(i) => Value::Bool(!i),
-            Value::I8(i) => Value::I8(!i),
-            Value::I16(i) => Value::I16(!i),
-            Value::I32(i) => Value::I32(!i),
-            Value::I64(i) => Value::I64(!i),
-            Value::I128(i) => Value::I128(Box::new(!i.as_ref().clone())),
-            Value::ISize(i) => Value::ISize(!i),
-            Value::U8(i) => Value::U8(!i),
-            Value::U16(i) => Value::U16(!i),
-            Value::U32(i) => Value::U32(!i),
-            Value::U64(i) => Value::U64(!i),
-            Value::U128(i) => Value::U128(Box::new(!i.as_ref().clone())),
-            Value::USize(i) => Value::USize(!i),
-            _ => { return value; }
-        }
-    }
 }
-
 
 pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) -> JoinHandle<()> {
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
-        let mut frame = Frame::new(code, scope_len() - 1);
+        let mut frame = Frame::new(code, 0);
 
         // vm.frame_count += 1;
 
@@ -1633,8 +812,8 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<
         // println!("global_:{:?},", global);
         //  let scope = Scope::new(vec![locals], global);
         let mut vm = VirtualMachine::new();
-        add_local_value(locals);
-        let mut frame = Frame::new(code, scope_len() - 1);
+        vm.add_local_value(locals);
+        let mut frame = Frame::new(code, 0);
 
 
         //vm.frame_count += 1;
@@ -1682,3 +861,4 @@ pub fn unwrap_constant(constant: &bytecode::Constant) -> Value {
         Map(ref ty) => { Value::Nil }
     }
 }
+

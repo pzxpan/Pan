@@ -1,4 +1,3 @@
-#![feature(fn_traits)]
 #[macro_use]
 extern crate lazy_static;
 extern crate reqwest;
@@ -10,4 +9,5 @@ pub mod util;
 pub mod scope_vec;
 pub mod stdlib;
 pub mod context;
+pub mod binary_opration;
 

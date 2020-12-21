@@ -5,13 +5,13 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 use itertools::Itertools;
+use crate::binary_opration::*;
 
 use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::{VirtualMachine, scope_len, store_primitive_value, set_attribute, unwrap_constant, is_ref_value};
-use crate::vm::{add_local_value, scope_remove};
+use crate::vm::{VirtualMachine, unwrap_constant};
 use crate::scope::{Scope, NameProtocol};
 
 use crate::util::change_to_primitive_type;
@@ -111,12 +111,12 @@ impl Frame {
         println!("instruction是:{:?},", instruction);
         match instruction {
             bytecode::Instruction::OutBlock => {
-                scope_remove();
+                vm.scope_remove();
                 self.idx -= 1;
                 self.inner_scope -= 1;
             }
             bytecode::Instruction::IntoBlock => {
-                add_local_value(vec![]);
+                vm.add_local_value(vec![]);
                 self.idx += 1;
                 self.inner_scope += 1;
             }
@@ -158,7 +158,7 @@ impl Frame {
             bytecode::Instruction::Subscript => { self.execute_subscript(vm); }
             bytecode::Instruction::Slice => { self.execute_slice(vm); }
             bytecode::Instruction::StoreSubscript => {
-                self.execute_store_subscript();
+                self.execute_store_subscript(vm);
             }
             bytecode::Instruction::DeleteSubscript => { self.execute_delete_subscript(vm); }
             bytecode::Instruction::Pop => {
@@ -210,16 +210,16 @@ impl Frame {
                 println!("return_value:{:?}", value);
                 for a in 0..self.inner_scope {
                     self.idx -= 1;
-                    scope_remove();
+                    vm.scope_remove();
                 }
                 self.inner_scope = 0;
-                scope_remove();
+                vm.scope_remove();
                 return Some(ExecutionResult::Return(value));
             }
             bytecode::Instruction::Ignore => {
                 for a in 0..self.inner_scope {
                     self.idx -= 1;
-                    scope_remove();
+                    vm.scope_remove();
                 }
                 self.inner_scope = 0;
                 return Some(ExecutionResult::Ignore);
@@ -248,7 +248,7 @@ impl Frame {
                 let include = self.pop_value();
                 let end = self.pop_value();
                 let start = self.pop_value();
-                if vm._gt(end.clone(), start.clone()).bool_value() {
+                if _gt(end.clone(), start.clone()).bool_value() {
                     self.push_value(Value::new_range_obj(start.clone(), end, true, include.bool_value()));
                 } else {
                     self.push_value(Value::new_range_obj(start.clone(), end, false, include.bool_value()));
@@ -316,7 +316,7 @@ impl Frame {
                 if !value {
                     self.jump(*target);
                 } else {
-                    scope_remove();
+                    vm.scope_remove();
                 }
             }
 
@@ -334,7 +334,7 @@ impl Frame {
                     }
                     self.push_value(matched)
                 } else {
-                    self.push_value(vm._eq(a, b));
+                    self.push_value(_eq(vm, a, b));
                 }
             }
             bytecode::Instruction::LoadBuildStruct => {
@@ -354,7 +354,7 @@ impl Frame {
             }
 
             bytecode::Instruction::LoadReference(scope_idx, variable_idx, n) => {
-                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, scope_len());
+                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, vm.scope_len());
                 if n == &NameScope::Local {
                     let v = vm.load_name(*scope_idx + self.idx - 1, *variable_idx, n);
                     self.push_value(v);
@@ -379,7 +379,7 @@ impl Frame {
             }
 
             bytecode::Instruction::LoadCaptureReference(scope_idx, variable_idx, n) => {
-                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, scope_len());
+                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, vm.scope_len());
                 if n == &NameScope::Local {
                     let v = vm.load_name(*scope_idx, *variable_idx, n);
                     self.push_value(v);
@@ -404,7 +404,7 @@ impl Frame {
             }
 
             bytecode::Instruction::LoadFrameReference(scope_idx, variable_idx, n) => {
-                println!("当前栈号:{:?},当前scope.local长度:{:?},inner_scope:{:?},scope_idx:{:?}", self.idx, scope_len(), self.inner_scope, scope_idx);
+                println!("当前栈号:{:?},当前scope.local长度:{:?},inner_scope:{:?},scope_idx:{:?}", self.idx, vm.scope_len(), self.inner_scope, scope_idx);
                 if n == &NameScope::Local {
                     let v = vm.load_name(self.idx - (self.inner_scope + 1) + *scope_idx, *variable_idx, n);
                     self.push_value(v);
@@ -569,7 +569,7 @@ impl Frame {
         None
     }
 
-    fn execute_store_subscript(&self) -> FrameResult {
+    fn execute_store_subscript(&self, vm: &mut VirtualMachine) -> FrameResult {
         // let now = Instant::now();
         let idx = self.pop_value();
         let mut obj = self.pop_value();
@@ -577,7 +577,7 @@ impl Frame {
         // println!("pop 耗时:{:?}", now.elapsed().as_nanos());
         //println!("idx:{:?},obj:{:?},value:{:?}", idx.clone(), obj.clone(), value.clone());
         //let now = Instant::now();
-        set_attribute(&mut obj, idx, value);
+        vm.set_attribute_global(&mut obj, idx, value);
         //   println!("set_attribute 耗时:{:?}", now.elapsed().as_nanos());
         // println!("vvv::{:?},", v);
 
@@ -835,30 +835,30 @@ impl Frame {
         let a_ref = self.pop_value();
         let value = if inplace {
             match *op {
-                bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                bytecode::BinaryOperator::Add => vm.add(&a_ref, &b_ref),
-                bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
-                bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
-                bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
-                bytecode::BinaryOperator::Lshift => vm.shiftleft(a_ref, b_ref),
-                bytecode::BinaryOperator::Rshift => vm.shiftright(a_ref, b_ref),
-                bytecode::BinaryOperator::Xor => vm.bitxor(a_ref, b_ref),
-                bytecode::BinaryOperator::Or => vm.bitor(a_ref, b_ref),
-                bytecode::BinaryOperator::And => vm.bitand(a_ref, b_ref),
+                bytecode::BinaryOperator::Subtract => sub(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => add(vm,&a_ref, &b_ref),
+                bytecode::BinaryOperator::Multiply => mul(a_ref, b_ref),
+                bytecode::BinaryOperator::Divide => divide(a_ref, b_ref),
+                bytecode::BinaryOperator::Modulo => modulo(a_ref, b_ref),
+                bytecode::BinaryOperator::Lshift => shiftleft(a_ref, b_ref),
+                bytecode::BinaryOperator::Rshift => shiftright(a_ref, b_ref),
+                bytecode::BinaryOperator::Xor => bitxor(a_ref, b_ref),
+                bytecode::BinaryOperator::Or => bitor(a_ref, b_ref),
+                bytecode::BinaryOperator::And => bitand(a_ref, b_ref),
                 _ => Value::I32(0)
             }
         } else {
             match *op {
-                bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                bytecode::BinaryOperator::Add => vm.add(&a_ref, &b_ref),
-                bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
-                bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
-                bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
-                bytecode::BinaryOperator::Lshift => vm.shiftleft(a_ref, b_ref),
-                bytecode::BinaryOperator::Rshift => vm.shiftright(a_ref, b_ref),
-                bytecode::BinaryOperator::Xor => vm.bitxor(a_ref, b_ref),
-                bytecode::BinaryOperator::Or => vm.bitor(a_ref, b_ref),
-                bytecode::BinaryOperator::And => vm.bitand(a_ref, b_ref),
+                bytecode::BinaryOperator::Subtract => sub(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => add(vm,&a_ref, &b_ref),
+                bytecode::BinaryOperator::Multiply => mul(a_ref, b_ref),
+                bytecode::BinaryOperator::Divide => divide(a_ref, b_ref),
+                bytecode::BinaryOperator::Modulo => modulo(a_ref, b_ref),
+                bytecode::BinaryOperator::Lshift => shiftleft(a_ref, b_ref),
+                bytecode::BinaryOperator::Rshift => shiftright(a_ref, b_ref),
+                bytecode::BinaryOperator::Xor => bitxor(a_ref, b_ref),
+                bytecode::BinaryOperator::Or => bitor(a_ref, b_ref),
+                bytecode::BinaryOperator::And => bitand(a_ref, b_ref),
                 _ => Value::I32(0)
             }
         };
@@ -872,9 +872,9 @@ impl Frame {
     fn execute_unop(&self, vm: &VirtualMachine, op: &bytecode::UnaryOperator) -> FrameResult {
         let a = self.pop_value();
         let value = match *op {
-            bytecode::UnaryOperator::Minus => vm.neg(a),
-            bytecode::UnaryOperator::Plus => vm.plus(a),
-            bytecode::UnaryOperator::Not => vm.not(a),
+            bytecode::UnaryOperator::Minus => neg(a),
+            bytecode::UnaryOperator::Plus => plus(a),
+            bytecode::UnaryOperator::Not => not(a),
         };
         self.push_value(value);
         None
@@ -889,12 +889,12 @@ impl Frame {
         let b = self.pop_value();
         let a = self.pop_value();
         let value = match *op {
-            bytecode::ComparisonOperator::Equal => vm._eq(a, b),
-            bytecode::ComparisonOperator::NotEqual => vm._ne(a, b),
-            bytecode::ComparisonOperator::Less => vm._lt(a, b),
-            bytecode::ComparisonOperator::LessOrEqual => vm._le(a, b),
-            bytecode::ComparisonOperator::Greater => vm._gt(a, b),
-            bytecode::ComparisonOperator::GreaterOrEqual => vm._ge(a, b),
+            bytecode::ComparisonOperator::Equal => _eq(vm,a, b),
+            bytecode::ComparisonOperator::NotEqual => _ne(a, b),
+            bytecode::ComparisonOperator::Less => _lt(a, b),
+            bytecode::ComparisonOperator::LessOrEqual =>_le(a, b),
+            bytecode::ComparisonOperator::Greater => _gt(a, b),
+            bytecode::ComparisonOperator::GreaterOrEqual => _ge(a, b),
             _ => unreachable!()
         };
 
@@ -953,21 +953,21 @@ impl Frame {
         None
     }
 
-    fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
+    fn store_attr(&self, vm: &mut VirtualMachine, attr_name: &str) -> FrameResult {
         let mut parent = self.pop_value();
         let value = self.pop_value();
         println!("parent:{:?},value:{:?},", parent, value);
         loop {
             if let Value::Reference(n) = parent.clone() {
-                let r = is_ref_value(n.as_ref().0, n.as_ref().1);
+                let r = vm.is_ref_value(n.as_ref().0, n.as_ref().1);
                 if r.0 {
                     parent = r.1.unwrap();
                 } else {
-                    set_attribute(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
+                    vm.set_attribute_global(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
                     break;
                 }
             } else {
-                set_attribute(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
+                vm.set_attribute_global(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
                 break;
             }
         }

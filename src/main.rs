@@ -11,7 +11,7 @@ use pan_bytecode::value::{Value, Obj, FnValue, ClosureValue, ThreadValue, TypeVa
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
 
-use pan_vm::vm::{VirtualMachine, store_primitive_local, scope_remove, scope_clear};
+use pan_vm::vm::{VirtualMachine};
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::{Duration, Instant};
@@ -136,7 +136,7 @@ fn test_one_file(home_path: &Path) {
 
         handle.join();
         //std::thread::sleep(Duration::from_secs(10));
-        scope_clear();
+        //scope_clear();
         println!("执行 cost:{:?}", start.elapsed().as_secs());
         let t2 = time::SystemTime::now();
         // std::thread::sleep(Duration::from_millis(10000));

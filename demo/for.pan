@@ -1,15 +1,14 @@
 package default;
 fun main() {
   let sum = 0;
-  for i in 99..1110  {
-      sum += i;
+  for i in 0..=100  {
+      for j in 0..=10 {
+            sum += i + j;
+      }
   }
 
   print(sum);
-  sum = 1009;
 
-  let aa = if sum > 2000 : 20 elif sum > 1000 : 200 else :300;
-  print(aa);
   return;
 }
 
