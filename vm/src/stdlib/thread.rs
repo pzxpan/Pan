@@ -8,16 +8,42 @@ use std::{
 use pan_bytecode::value::Value;
 use crate::vm::run_code_in_sub_thread;
 use std::path::{Path, PathBuf};
-use std::thread::{current, sleep};
 use bitflags::_core::time::Duration;
+use std::thread::{JoinHandle, Thread};
+use std::convert::{TryFrom, TryInto};
+use pan_bytecode::value::Obj::InstanceObj;
 
 pub fn run(values: &Vec<Value>) -> Value {
     let code = values.get(0).unwrap();
-    run_code_in_sub_thread(code.code(), vec![], vec![], 2);
-    sleep(Duration::from_secs(1));
+    let scope_idx = values.get(1).unwrap();
+    run_code_in_sub_thread(code.code(), vec![], vec![], scope_idx.usize());
     Value::Nil
+
     //run_code_in_sub_thread(values.get(0))
 }
+
+pub fn sleep(values: &Vec<Value>) -> Value {
+    let time = values.get(0).unwrap();
+    std::thread::sleep(Duration::from_millis(time.u64()));
+    Value::Nil
+}
+
+pub fn stop(values: &Vec<Value>) -> Value {
+    std::thread::yield_now();
+    Value::Nil
+}
+
+pub fn join(values: &Vec<Value>) -> Value {
+    //let time = values.get(0).unwrap();
+    let s = std::thread::current();
+    println!("thread_id:{:?}", s);
+    Value::Nil
+}
+
+pub fn panicking(values: &Vec<Value>) -> Value {
+    Value::Bool(std::thread::panicking())
+}
+
 
 // fn read_file(file: &GluonFile, count: usize) -> IO<RuntimeResult<Option<Vec<u8>>, String>> {
 //     let mut file = file.0.lock().unwrap();

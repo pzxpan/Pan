@@ -2119,28 +2119,6 @@ impl<O: OutputStream> Compiler<O> {
             self.gather_elements(args)?;
             self.emit(Instruction::TypeOf);
             return Ok(true);
-        } else if function.expr_name().eq("sleep") {
-            if args.len() > 1 {
-                return Err(CompileError {
-                    statement: None,
-                    error: CompileErrorType::SyntaxError(format!("typeof函数只能一次求一个")),
-                    location: self.current_source_location.clone(),
-                    source_path: self.source_path.clone(),
-                });
-            }
-            let arg = args.get(0).unwrap();
-            let ty = arg.get_type(&self.symbol_table_stack)?;
-            if ty <= CType::I8 || ty > CType::U64 {
-                return Err(CompileError {
-                    statement: None,
-                    error: CompileErrorType::SyntaxError(format!("sleep的参数只能为小于i64的整形")),
-                    location: self.current_source_location.clone(),
-                    source_path: self.source_path.clone(),
-                });
-            }
-            self.gather_elements(args)?;
-            self.emit(Instruction::Sleep);
-            return Ok(true);
         } else if function.expr_name().eq("panic") {
             self.gather_elements(args)?;
             self.emit(Instruction::Panic);

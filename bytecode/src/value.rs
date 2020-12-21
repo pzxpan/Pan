@@ -117,7 +117,7 @@ impl Value {
             Value::I32(v) => { v as usize }
             Value::U64(v) => { v as usize }
             Value::I64(v) => { v as usize }
-            Value::USize(v) => { v as usize }
+            Value::ISize(v) => { v as usize }
             _ => unreachable!()
         }
     }
@@ -352,7 +352,6 @@ impl Display for Value {
             Value::Reference(n) => write!(f, "<ref {} {}>", &n.as_ref().0, &n.as_ref().1),
             Value::Package(n) => write!(f, "<package {}>", &n.name),
             Value::NativeFn(n) => write!(f, "<nativefn {}>", &n.name)
-
         }
     }
 }

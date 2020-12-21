@@ -108,12 +108,29 @@ impl Context {
             body: run,
             args: 1,
         });
+        fns.insert(String::from("std$thread$sleep"), StdFn {
+            idx: 0,
+            name: "sleep".to_string(),
+            body: sleep,
+            args: 1,
+        });
+
+        fns.insert(String::from("std$thread$join"), StdFn {
+            idx: 0,
+            name: "sleep".to_string(),
+            body: join,
+            args: 1,
+        });
         Context {
             fns
         }
     }
-    pub fn call_std(&self, name: &str, values: &mut Vec<Value>) -> Value {
+    pub fn call_std(&self, name: &str, scope_idx: usize, values: &mut Vec<Value>) -> Value {
+        println!("1111current_thread:{:?}", std::thread::current());
         let f = self.fns.get(name).unwrap();
+        if name.eq("std$thread$run") {
+            values.push(Value::USize(scope_idx));
+        }
         (f.body)(values)
     }
 }

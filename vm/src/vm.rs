@@ -28,8 +28,8 @@ use crate::context::Context;
 pub struct VirtualMachine {
     pub frame_count: usize,
     pub initialized: bool,
-    pub context: Context,
     pub scope: ScopeVec,
+    pub context: Context,
 }
 
 pub const NSIG: usize = 64;
@@ -304,8 +304,6 @@ impl VirtualMachine {
     pub fn run_code_obj(&mut self, code: CodeObject, hash_map: Vec<Value>) -> FrameResult {
         self.add_local_value(hash_map);
         let mut frame = Frame::new(code, 0);
-
-
         let r = self.run_frame(&mut frame);
         r
     }
@@ -319,9 +317,7 @@ impl VirtualMachine {
     }
 
     pub fn run_frame(&mut self, frame: &mut Frame) -> FrameResult {
-        //self.frames.push(Rc::from(frame.clone()));
         let result = frame.run(self);
-        //self.frames.pop();
         result
     }
 
@@ -464,7 +460,7 @@ impl VirtualMachine {
         // *v = Value::Nil;
         println!("std_name:{:?}", name);
         println!("values:{:?}.", mut_values);
-        return self.context.call_std(name.as_str(), mut_values);
+        return self.context.call_std(name.as_str(), self.scope_len(), mut_values);
     }
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
         None
@@ -826,18 +822,12 @@ impl VirtualMachine {
 }
 
 pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) -> JoinHandle<()> {
-    return thread::spawn(|| {
-        let scope = Scope::new(vec![], global);
+    thread::spawn(|| {
         let mut vm = VirtualMachine::new();
         vm.add_local_value(vec![]);
         let mut frame = Frame::new(code, 0);
-
-        // vm.frame_count += 1;
-
         vm.run_frame(&mut frame);
-        // vm.frame_count -= 1;
-        let handle = thread::current();
-    });
+    })
 }
 // {"f": Fn(FnValue { name: "main.<locals>.lambda_35_13",
 // code: <code object lambda_35_13 at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }),
@@ -848,7 +838,7 @@ pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, glob
 // field_map: Obj(MapObj({"f": Fn(FnValue { name: "main.<locals>.lambda_35_13", code: <code object lambda_35_13 at ??? file
 // "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }), "state": I32(0)})) })), "state": I32(0)}
 
-pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<Value>, scope_deps: usize) {
+pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<Value>, scope_deps: usize) -> JoinHandle<()> {
     let hander = thread::spawn(move || {
         // println!("local_hash_map:{:?},", locals);
         // println!("global_:{:?},", global);
@@ -862,9 +852,9 @@ pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<
         //vm.frame_count += 1;
         vm.run_frame(&mut frame);
         //vm.frame_count -= 1;
-        let handle = thread::current();
+        //let handle = thread::current();
     });
-    //hander.join();
+    hander
     // println!("handler:{:?}",thread::current());
 }
 

@@ -118,10 +118,10 @@ impl Frame {
                 vm.add_local_value(vec![]);
                 self.inner_scope += 1;
             }
-            bytecode::Instruction::Sleep => {
-                let time = self.pop_value();
-                std::thread::sleep(Duration::from_millis(time.u64()));
-            }
+            // bytecode::Instruction::Sleep => {
+            //     let time = self.pop_value();
+            //     std::thread::sleep(Duration::from_millis(time.u64()));
+            // }
             bytecode::Instruction::Panic => {
                 let v = self.pop_value();
                 panic!(v.to_string());

@@ -23,14 +23,13 @@ fun main() {
    // print(ccc);
    let c = () => {
         let sum = 0;
-        for i in 0..=100{
+        for i in 0..=3 {
           sum += i;
         }
         print(sum);
    };
-
    run(c);
-
+   join();
 }
 
 

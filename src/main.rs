@@ -39,7 +39,7 @@ pub struct AA {
     pub c: i32,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct BB {
     pub b: i32,
     pub dd: i32,
@@ -121,8 +121,8 @@ fn main() {
     // let mut a = AA { bb: cc.clone(), c: 20 };
     // a.bb.add(1000);
 
-    println!("dddd{:?},cc:{:?}", a,cc.clone());
-    test_one_file(&env::current_dir().unwrap().join("demo").join("reference.pan"));
+    //println!("dddd{:?},cc:{:?}", a,cc.clone());
+    test_one_file(&env::current_dir().unwrap().join("demo").join("teststd.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
 }
@@ -159,7 +159,7 @@ fn test_one_file(home_path: &Path) {
         let start = std::time::Instant::now();
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
 
-        handle.join();
+        handle.join().unwrap();
         //std::thread::sleep(Duration::from_secs(10));
         //scope_clear();
         println!("执行 cost:{:?}", start.elapsed().as_secs());
