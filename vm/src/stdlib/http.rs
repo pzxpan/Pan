@@ -12,13 +12,6 @@ pub fn open(ss: &Vec<Value>) -> Value {
     let s = ss.get(0).unwrap();
     let name = s.to_string();
     let url = name.as_str();
-    //  let request = Request::builder()
-    //      .uri(url)
-    //      .header("User-Agent", "awesome/1.0")
-    //      .body(())
-    //      .unwrap();
-    // // let response = send(request.body(()).unwrap());
-    //  println!("response is {:?}", request);
     let resp = reqwest::blocking::get(url);
     if resp.is_ok() {
         let text = resp.unwrap().text().unwrap();

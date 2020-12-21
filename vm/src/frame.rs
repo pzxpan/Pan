@@ -421,7 +421,7 @@ impl Frame {
             bytecode::Instruction::StoreDefaultArg(scope_idx, variable_idx) => {
                 let value = self.pop_value();
                 //println!("222store_value:{:?}", value);
-                vm.store_default_args(*scope_idx + self.inner_scope - self.scope_deps, *variable_idx, value);
+                vm.store_default_args(*variable_idx, value);
             }
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());

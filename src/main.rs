@@ -11,7 +11,7 @@ use pan_bytecode::value::{Value, Obj, FnValue, ClosureValue, ThreadValue, TypeVa
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
 
-use pan_vm::vm::{VirtualMachine};
+use pan_vm::vm::VirtualMachine;
 use pan_vm::scope::Scope;
 use pan_vm::vm::run_code_in_thread;
 use std::time::{Duration, Instant};
@@ -27,10 +27,30 @@ use std::ops::Range;
 use std::path::PathBuf;
 use std::collections;
 
+#[derive(Debug)]
 struct aaa<A, B> {
     pub a: A,
     pub b: B,
 }
+
+#[derive(Debug)]
+pub struct AA {
+    pub bb: BB,
+    pub c: i32,
+}
+
+#[derive(Debug,Clone)]
+pub struct BB {
+    pub b: i32,
+    pub dd: i32,
+}
+
+impl BB {
+    pub fn add(&mut self, ad: i32) {
+        self.b += ad;
+    }
+}
+
 
 fn neverend() -> i32 {
     loop {}
@@ -97,7 +117,12 @@ fn main() {
     // println!("size:{:?},", std::mem::size_of_val(&v));
 
     // let start = std::time::Instant::now();
-    test_one_file(&env::current_dir().unwrap().join("demo").join("while.pan"));
+    // let cc = BB { b: 14, dd: 20 };
+    // let mut a = AA { bb: cc.clone(), c: 20 };
+    // a.bb.add(1000);
+
+    println!("dddd{:?},cc:{:?}", a,cc.clone());
+    test_one_file(&env::current_dir().unwrap().join("demo").join("reference.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
 }

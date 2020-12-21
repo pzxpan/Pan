@@ -177,8 +177,12 @@ impl VirtualMachine {
     pub fn store_primitive_local(&mut self, idx: usize, value: Value) {
         // let ref mut scope = SCOPE.lock().unwrap();
         let v = self.scope.locals.last_mut().unwrap();
-        let vv = v.get_mut(idx).unwrap();
-        *vv = value;
+        let vv = v.get_mut(idx);
+        if vv.is_some() {
+            *vv.unwrap() = value;
+        } else {
+            v.push(value);
+        }
         return;
     }
 
@@ -287,9 +291,10 @@ impl VirtualMachine {
     //     //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
     // }
 
-    pub fn store_default_arg(&mut self, scope_idx: usize, idx: usize, value: Value) {
+    pub fn store_default_arg(&mut self, idx: usize, value: Value) {
         // let ref mut scope = SCOPE.lock().unwrap();
-        let a = self.scope.locals.get_mut(scope_idx).unwrap();
+        println!("ddddlocals:{:#?}", self.scope.locals);
+        let a = self.scope.locals.last_mut().unwrap();
         let v = a.get_mut(idx);
         if v.is_none() {
             a.push(value);
@@ -425,11 +430,10 @@ impl VirtualMachine {
 
     pub fn store_default_args(
         &mut self,
-        scope_idx: usize,
         idx: usize,
         obj: Value,
     ) -> FrameResult {
-        self.store_default_arg(scope_idx, idx, obj);
+        self.store_default_arg(idx, obj);
         // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
         None
     }

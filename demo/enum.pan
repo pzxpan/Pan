@@ -11,7 +11,7 @@ pub enum Color {
 }
 
 fun main() {
-   let color2 = Color::Black;
+   let color2 = Color::Red(10);
    let bb = color2.is_warm();
    print(bb);
 
