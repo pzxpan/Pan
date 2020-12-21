@@ -1561,6 +1561,7 @@ impl<O: OutputStream> Compiler<O> {
                 self.compile_expression(obj)?;
                 if attr.is_some() {
                     self.emit(Instruction::StoreAttr(attr.as_ref().unwrap().name.clone()));
+                    self.store_name(&obj.expr_name());
                     // if obj.expr_name().eq("self") {
                     //     self.emit(Instruction::Duplicate);
                     //     self.store_ref_name("self");
@@ -1574,6 +1575,7 @@ impl<O: OutputStream> Compiler<O> {
                     self.emit(Instruction::LoadConst(bytecode::Constant::Integer(
                         idx.unwrap())));
                     self.emit(Instruction::StoreSubscript);
+                    self.store_name(&obj.expr_name());
                     // if obj.expr_name().eq("self") {
                     //     self.emit(Instruction::Duplicate);
                     //     self.store_ref_name("self");

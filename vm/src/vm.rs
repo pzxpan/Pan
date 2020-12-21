@@ -483,14 +483,15 @@ impl VirtualMachine {
                                 }
                             }
                         }
-                        if let Value::Obj(map) = field_map {
-                            match map.as_mut() {
-                                Obj::MapObj(m) => {
-                                    return (false, m.get(attr.as_str()).unwrap().clone());
-                                }
-                                _ => unreachable!()
-                            }
-                        }
+                        return (false, field_map.get(attr.as_str()).unwrap().clone());
+                        // if let Value::Obj(map) = field_map {
+                        //     match map.as_mut() {
+                        //         Obj::MapObj(m) => {
+                        //
+                        //         }
+                        //         _ => unreachable!()
+                        //     }
+                        // }
                     }
                     Obj::EnumObj(ety) => {
                         if let Value::Type(n) = ety.typ.as_ref() {
@@ -542,25 +543,26 @@ impl VirtualMachine {
         unreachable!()
     }
 
-    pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
-        let mut update_value = Value::Nil;
-        match obj {
-            Value::Obj(ref mut e) => {
-                match e.as_mut() {
-                    Obj::InstanceObj(o) => {
-                        if let InstanceObj { field_map, typ } = o {
-                            if let Value::Obj(map) = field_map {
-                                map.as_mut().insert(attr, value);
-                            }
-                        }
-                    }
-                    _ => unreachable!()
-                }
-            }
-            _ => unreachable!()
-        }
-        return update_value;
-    }
+    // pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
+    //     let mut update_value = Value::Nil;
+    //     match obj {
+    //         Value::Obj(ref mut e) => {
+    //             match e.as_mut() {
+    //                 Obj::InstanceObj(o) => {
+    //                     o.field_map.insert(attr, value);
+    //                     // if let InstanceObj { field_map, typ } = o {
+    //                     //     if let Value::Obj(map) = field_map {
+    //                     //         map.as_mut().insert(attr, value);
+    //                     //     }
+    //                     // }
+    //                 }
+    //                 _ => unreachable!()
+    //             }
+    //         }
+    //         _ => unreachable!()
+    //     }
+    //     return update_value;
+    // }
 
 
     pub fn _match(&self, obj: Value, b: Value) -> (Value, Vec<Value>) {
@@ -694,11 +696,14 @@ impl VirtualMachine {
                         //    update_value = Value::new_map_obj(map.clone());
                     }
                     Obj::InstanceObj(o) => {
-                        if let InstanceObj { field_map, typ } = o {
-                            if let Value::Obj(map) = field_map {
-                                map.as_mut().insert(sub.to_string(), value);
-                            }
-                        }
+                        o.field_map.insert(sub.to_string(), value);
+                        println!("o.filed_map:{:?}", o.field_map);
+                        // if let InstanceObj { field_map, typ } = o {
+                        //     if let Value::Obj(map) = field_map {
+                        //         map.as_mut().insert(sub.to_string(), value);
+                        //         println!("insert_mapp:{:?},{:?}", map, field_map);
+                        //     }
+                        // }
                     }
                     _ => unreachable!()
                 }

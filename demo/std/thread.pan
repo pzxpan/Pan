@@ -5,9 +5,13 @@ pub struct Thread {
     pub id: i32,
 }
 
-pub fun run(f:fun()->None,join: bool = true) {}
+pub struct Mutex<T> {
+    pub value: T,
+}
 
-pub fun sleep(time: i32) {}
+pub fun run(f:fun() -> None,join: bool = true) {}
+
+pub fun sleep(milli_seconds: i32) {}
 
 
 

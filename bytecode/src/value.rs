@@ -220,7 +220,7 @@ impl Value {
                         return map.clone();
                     }
                     Obj::InstanceObj(obj) => {
-                        return obj.field_map.hash_map_value();
+                        return obj.field_map.clone();
                     }
                     _ => unreachable!()
                 }
@@ -304,7 +304,7 @@ impl Value {
         Value::Obj(Box::new(map))
     }
 
-    pub fn new_instance_obj(typ: Value, fields: Value) -> Value {
+    pub fn new_instance_obj(typ: Value, fields: HashMap<String, Value>) -> Value {
         let inst = Obj::InstanceObj(InstanceObj { typ: Box::new(typ), field_map: fields });
         Value::Obj(Box::new(inst))
     }
@@ -360,7 +360,7 @@ impl Display for Value {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstanceObj {
     pub typ: Box<Value>,
-    pub field_map: Value,
+    pub field_map: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

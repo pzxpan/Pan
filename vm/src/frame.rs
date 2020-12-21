@@ -571,6 +571,7 @@ impl Frame {
         //println!("idx:{:?},obj:{:?},value:{:?}", idx.clone(), obj.clone(), value.clone());
         //let now = Instant::now();
         vm.set_attribute_global(&mut obj, idx, value);
+        self.push_value(obj);
         //   println!("set_attribute 耗时:{:?}", now.elapsed().as_nanos());
         // println!("vvv::{:?},", v);
 
@@ -790,7 +791,7 @@ impl Frame {
     fn excute_make_struct_instance(&self, vm: &VirtualMachine) -> FrameResult {
         let args = self.pop_value();
         let ty = self.pop_value();
-        self.push_value(Value::new_instance_obj(ty, args));
+        self.push_value(Value::new_instance_obj(ty, args.hash_map_value()));
         None
     }
 
@@ -949,7 +950,7 @@ impl Frame {
     fn store_attr(&self, vm: &mut VirtualMachine, attr_name: &str) -> FrameResult {
         let mut parent = self.pop_value();
         let value = self.pop_value();
-        println!("parent:{:?},value:{:?},", parent, value);
+        println!("1111parent:{:?},value:{:?},", parent, value);
         loop {
             if let Value::Reference(n) = parent.clone() {
                 let r = vm.is_ref_value(n.as_ref().0, n.as_ref().1);
@@ -957,10 +958,12 @@ impl Frame {
                     parent = r.1.unwrap();
                 } else {
                     vm.set_attribute_global(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
+                    self.push_value(parent);
                     break;
                 }
             } else {
                 vm.set_attribute_global(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
+                self.push_value(parent);
                 break;
             }
         }
