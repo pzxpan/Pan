@@ -101,7 +101,72 @@ pub enum Import {
     //import std.math {sqrt,floor};
     //import std.math {sqrt as Sqrt, floor as Floor};
     //import std { math as Math, math.floor as Floor};
-    PartRename(bool, Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
+    MultiPart(bool, Vec<Identifier>, Vec<Vec<Identifier>>),
+}
+
+impl Import {
+    pub fn is_all(&self) -> bool {
+        if let Import::Plain(_, _, b) = self {
+            return *b;
+        }
+        return false;
+    }
+
+    pub fn is_third(&self) -> bool {
+        if let Import::Plain(a, _, _) = self {
+            return *a;
+        } else if let Import::Rename(a, _, _) = self {
+            return *a;
+        }
+        return false;
+    }
+
+    pub fn loc(&self) -> Loc {
+        if let Import::Plain(_, v, _) = self {
+            return v.get(0).unwrap().loc;
+        } else if let Import::Rename(_, v, _) = self {
+            return v.get(0).unwrap().loc;
+        } else if let Import::MultiPart(_, v, _) = self {
+            return v.get(0).unwrap().loc;
+        }
+        return Loc::default();
+    }
+
+    pub fn top_name(&self) -> String {
+        if let Import::Plain(_, v, _) = self {
+            return v.get(0).unwrap().name.clone();
+        } else if let Import::Rename(_, v, _) = self {
+            return v.get(0).unwrap().name.clone();
+        } else if let Import::MultiPart(_, v, _) = self {
+            return v.get(0).unwrap().name.clone();
+        }
+        return "".to_string();
+    }
+
+    pub fn last_name(&self) -> String {
+        if let Import::Plain(_, v, _) = self {
+            return v.last().unwrap().name.clone();
+        } else if let Import::Rename(_, v, _) = self {
+            return v.last().unwrap().name.clone();
+        }
+        return "".to_string();
+    }
+    //a.b.c  top_name = a;   prefix = b.c
+    pub fn prefix(&self) -> Vec<String> {
+        if let Import::Plain(_, v, _) = self {
+            return v[1..].iter().map(|s| s.name.clone()).collect();
+        } else if let Import::Rename(_, v, _) = self {
+            return v[1..].iter().map(|s| s.name.clone()).collect();
+        }
+        return vec![];
+    }
+
+    pub fn as_name(&self) -> Option<String> {
+        if let Import::Rename(_, v, as_name) = self {
+            return Some(as_name.name.clone());
+        }
+        return None;
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

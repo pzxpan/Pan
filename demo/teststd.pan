@@ -2,12 +2,8 @@ package default;
 
 import std.fs.*;
 import std.thread.*;
-
-
-
 fun main() {
-
-    // let file_content = read_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.pan");
+    //let file_content = read_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.pan");
    // print(file_dir);
    // let file_content = read_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.pan");
     //write_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/test_input.pan",file_content);

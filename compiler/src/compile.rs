@@ -281,7 +281,7 @@ impl<O: OutputStream> Compiler<O> {
                         Import::Rename(b, mod_path, as_name) => {
                             //   resolve_import_compile(self, &mod_path, Some(as_name.clone().name), &all)?;
                         }
-                        Import::PartRename(b, mod_path, as_part) => {
+                        Import::MultiPart(b, mod_path, as_part) => {
                             // for (name, a_name) in as_part {
                             //     let mut path = mod_path.clone();
                             //     path.extend_from_slice(&name);
