@@ -7,8 +7,9 @@ use std::{
 
 use reqwest;
 use pan_bytecode::value::Value;
+use crate::vm::VirtualMachine;
 
-pub fn open(ss: &Vec<Value>) -> Value {
+pub fn open(vm: &VirtualMachine, ss: &Vec<Value>) -> Value {
     let s = ss.get(0).unwrap();
     let name = s.to_string();
     let url = name.as_str();
@@ -19,7 +20,6 @@ pub fn open(ss: &Vec<Value>) -> Value {
     } else {
         Value::Nil
     }
-
 }
 // use {
 //     collect_mac::collect,

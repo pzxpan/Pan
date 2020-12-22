@@ -1,14 +1,14 @@
 package default;
 
-import std.env.*
-import std.io.*
-import std.fs.*
-
-import std.http.*
+import std.fs.*;
 import std.thread.*;
+
+
 
 fun main() {
 
+    // let file_content = read_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.pan");
+   // print(file_dir);
    // let file_content = read_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.pan");
     //write_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/test_input.pan",file_content);
 
@@ -18,30 +18,22 @@ fun main() {
    // if f {
     //    delete_file("/Users/panzhenxing/Desktop/PanPan/Pan/demo/test_input.pan");
     //}
-  //  print(file_content);
+    //  print(file_content);
    // let ccc = open("http://www.baidu.com");
    // print(ccc);
-   let mutex = Mutex! {value:0};
+   let mutex = Mutex! {value:"pan"};
+   for i in 0..10 {
+      let c = () => {
+         let s = 4 - i;
+         print("sss is :{:d}",s);
+         //print(s);
 
-   let c = () => {
-        //let sum = 0;
-        for i in 1..=10 {
-            mutex.value += i;
-        }
-   };
-
-   let d = () => {
-           //let sum = 0;
-           for i in 1..= 10  {
-               mutex.value += i;
-           }
+         mutex.value += s + "aaa";
       };
+     run(c);
+   }
 
-   //c();
- // print(sum);
-   run(c,false);
-   run(d,false);
-   sleep(3000);
+   sleep(10000);
    let v = mutex.value;
    print(v);
 }

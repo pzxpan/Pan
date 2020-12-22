@@ -17,7 +17,7 @@ use crate::scope::{Scope, NameProtocol};
 use crate::util::change_to_primitive_type;
 use crate::util::get_string_value;
 use bitflags::_core::time::Duration;
-use crate::vm::run_code_in_sub_thread;
+// use crate::vm::run_code_in_sub_thread;
 use std::time::Instant;
 use pan_bytecode::value::Obj::InstanceObj;
 use std::thread::current;
@@ -348,8 +348,9 @@ impl Frame {
 
             bytecode::Instruction::LoadCaptureReference(scope_idx, variable_idx, n) => {
                 println!("当前scope.local长度:{:?}", vm.scope_len());
+               // println!("vm.locals:{:?},", vm.scope.locals);
                 if n == &NameScope::Local {
-                    let v = vm.load_name(*scope_idx - self.scope_deps, *variable_idx, n);
+                    let v = vm.load_name(*scope_idx , *variable_idx, n);
                     self.push_value(v);
                 } else {
                     let v = vm.load_name(*scope_idx, *variable_idx, n);
@@ -362,7 +363,7 @@ impl Frame {
             bytecode::Instruction::StoreCaptureReference(scope_idx, variable_idx, n) => {
                 if n == &NameScope::Local {
                     let value = self.pop_value();
-                    vm.store_name(*scope_idx - self.scope_deps, *variable_idx, value, n);
+                    vm.store_name(*scope_idx, *variable_idx, value, n);
                     //println!("222store_value:{:?}", value);
                 } else {
                     let value = self.pop_value();
@@ -640,7 +641,7 @@ impl Frame {
         None
     }
     fn create_new_thread(code: CodeObject, hash_map: Vec<Value>, global: Vec<Value>) -> FrameResult {
-        run_code_in_sub_thread(code, hash_map, global, 1);
+        //  run_code_in_sub_thread(code, hash_map, global, 1);
         return None;
     }
     fn execute_std_call_function(&self, vm: &mut VirtualMachine, typ: &bytecode::CallType) -> FrameResult {
@@ -662,7 +663,9 @@ impl Frame {
         println!("std_funs::{:?}", std_funs);
         if let Value::NativeFn(n) = std_funs {
             let v = vm.call_std_funs(n.idx, n.name, &mut args);
-            self.push_value(v);
+            if Value::Nil != v {
+                self.push_value(v);
+            }
             return None;
         }
         unreachable!()

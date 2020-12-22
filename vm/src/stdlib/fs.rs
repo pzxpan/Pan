@@ -7,6 +7,7 @@ use std::{
 
 use pan_bytecode::value::Value;
 use std::path::{Path, PathBuf};
+use crate::vm::VirtualMachine;
 
 enum OpenOptions {
     Read,
@@ -17,7 +18,7 @@ enum OpenOptions {
     CreateNew,
 }
 
-fn open_file_with(path: &str, opts: Vec<OpenOptions>) -> File {
+fn open_file_with(vm: &VirtualMachine, path: &str, opts: Vec<OpenOptions>) -> File {
     let mut open_with = std::fs::OpenOptions::new();
 
     for opt in opts {
@@ -33,7 +34,7 @@ fn open_file_with(path: &str, opts: Vec<OpenOptions>) -> File {
     open_with.open(path).unwrap()
 }
 
-fn read_file_to_array(s: &str) -> Vec<Value> {
+fn read_file_to_array(vm: &VirtualMachine, s: &str) -> Vec<Value> {
     let mut buffer = Vec::new();
     match File::open(s).and_then(|mut file| file.read_to_end(&mut buffer)) {
         Ok(_) => buffer.iter().map(|s| Value::U8(*s)).collect(),
@@ -41,7 +42,7 @@ fn read_file_to_array(s: &str) -> Vec<Value> {
     }
 }
 
-pub fn read_file_to_string(ss: &Vec<Value>) -> Value {
+pub fn read_file_to_string(vm: &VirtualMachine, ss: &Vec<Value>) -> Value {
     let s = ss.get(0).unwrap();
     let ss = s.to_string();
     let s = ss.as_str();
@@ -52,7 +53,7 @@ pub fn read_file_to_string(ss: &Vec<Value>) -> Value {
     }
 }
 
-pub fn write_file(ss: &Vec<Value>) -> Value {
+pub fn write_file(vm: &VirtualMachine, ss: &Vec<Value>) -> Value {
     let s = ss.get(0).unwrap();
     let name = s.to_string();
     let s = name.as_str();
@@ -65,7 +66,7 @@ pub fn write_file(ss: &Vec<Value>) -> Value {
     Value::Nil
 }
 
-pub fn create_file(ss: &Vec<Value>) -> Value {
+pub fn create_file(vm: &VirtualMachine, ss: &Vec<Value>) -> Value {
     let s = ss.get(0).unwrap();
     let name = s.to_string();
     let s = name.as_str();
@@ -73,7 +74,7 @@ pub fn create_file(ss: &Vec<Value>) -> Value {
     Value::Nil
 }
 
-pub fn delete_file(ss: &Vec<Value>) -> Value {
+pub fn delete_file(vm: &VirtualMachine, ss: &Vec<Value>) -> Value {
     let s = ss.get(0).unwrap();
     let name = s.to_string();
     let s = name.as_str();
@@ -81,7 +82,7 @@ pub fn delete_file(ss: &Vec<Value>) -> Value {
     Value::Nil
 }
 
-pub fn file_exists(ss: &Vec<Value>) -> Value {
+pub fn file_exists(vm: &VirtualMachine, ss: &Vec<Value>) -> Value {
     let s = ss.get(0).unwrap();
     let name = s.to_string();
     let s = name.as_str();

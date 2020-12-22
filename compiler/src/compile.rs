@@ -716,7 +716,8 @@ impl<O: OutputStream> Compiler<O> {
                     return Ok(());
                 }
                 self.compile_expression(expression)?;
-                self.emit(Instruction::StoreNewVariable(NameScope::Local));
+                self.store_name(&decl.name.borrow().name);
+                //self.emit(Instruction::StoreNewVariable(NameScope::Local));
             }
 
             For(_, target, iter, body) => {
@@ -1133,7 +1134,8 @@ impl<O: OutputStream> Compiler<O> {
         self.emit(Instruction::MakeFunction);
         let scope = self.scope_for_name(name);
         println!("ddddscope:{:?}", scope);
-        self.emit(Instruction::StoreNewVariable(scope));
+        self.store_name(name);
+        // self.emit(Instruction::StoreNewVariable(scope));
         // self.store_ref_name(name);
         self.current_qualified_path = old_qualified_path;
         self.ctx = prev_ctx;

@@ -6,18 +6,19 @@ use std::{
 };
 
 use pan_bytecode::value::Value;
-use crate::vm::run_code_in_sub_thread;
+// use crate::vm::run_code_in_sub_thread;
 use std::path::{Path, PathBuf};
 use bitflags::_core::time::Duration;
 use std::thread::{JoinHandle, Thread};
 use std::borrow::BorrowMut;
+use crate::vm::VirtualMachine;
 
-pub fn run(values: &Vec<Value>) -> Value {
+pub fn run(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     let code = values.get(0).unwrap();
     let scope_idx = values.get(1).unwrap();
     let join = values.get(2);
 
-    let r = run_code_in_sub_thread(code.code(), vec![], vec![], scope_idx.usize());
+    let r = vm.run_code_in_sub_thread(code.code(), vm.scope.locals.clone(), vec![], scope_idx.usize());
     if join.is_none() || join.unwrap().bool_value() {
         r.join().unwrap();
     }
@@ -27,18 +28,18 @@ pub fn run(values: &Vec<Value>) -> Value {
     //run_code_in_sub_thread(values.get(0))
 }
 
-pub fn sleep(values: &Vec<Value>) -> Value {
+pub fn sleep(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     let time = values.get(0).unwrap();
     std::thread::sleep(Duration::from_millis(time.u64()));
     Value::Nil
 }
 
-pub fn stop(values: &Vec<Value>) -> Value {
+pub fn stop(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     std::thread::yield_now();
     Value::Nil
 }
 
-pub fn join(values: &Vec<Value>) -> Value {
+pub fn join(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     //let time = values.get(0).unwrap();
     let s = std::thread::current();
 
@@ -46,7 +47,7 @@ pub fn join(values: &Vec<Value>) -> Value {
     Value::Nil
 }
 
-pub fn panicking(values: &Vec<Value>) -> Value {
+pub fn panicking(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     Value::Bool(std::thread::panicking())
 }
 

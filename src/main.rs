@@ -122,7 +122,7 @@ fn main() {
     // a.bb.add(1000);
 
     //println!("dddd{:?},cc:{:?}", a,cc.clone());
-    test_one_file(&env::current_dir().unwrap().join("demo").join("teststd.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("result.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
 }

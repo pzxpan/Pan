@@ -7,6 +7,7 @@ use std::ops::{DerefMut, Deref};
 use crate::stdlib::fs::*;
 use crate::stdlib::thread::*;
 use crate::stdlib::http::open;
+use crate::vm::VirtualMachine;
 
 pub struct Context {
     pub fns: HashMap<String, StdFn>,
@@ -16,7 +17,7 @@ pub struct Context {
 pub struct StdFn {
     pub idx: i32,
     pub name: String,
-    pub body: fn(&Vec<Value>) -> Value,
+    pub body: fn(&VirtualMachine, &Vec<Value>) -> Value,
     pub args: i32,
 }
 
@@ -125,13 +126,13 @@ impl Context {
             fns
         }
     }
-    pub fn call_std(&self, name: &str, scope_idx: usize, values: &mut Vec<Value>) -> Value {
+    pub fn call_std(&self, vm: &VirtualMachine, name: &str, scope_idx: usize, values: &mut Vec<Value>) -> Value {
         println!("1111current_thread:{:?}", std::thread::current());
         let f = self.fns.get(name).unwrap();
         if name.eq("std$thread$run") {
             values.insert(1, Value::USize(scope_idx));
         }
-        (f.body)(values)
+        (f.body)(vm, values)
     }
 }
 
@@ -142,7 +143,7 @@ impl Context {
 //     *value.get_mut(0).unwrap() = Value::String(Box::new(input));
 // }
 
-pub fn read_int(values: &Vec<Value>) -> Value {
+pub fn read_int(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     input.trim();
@@ -151,7 +152,7 @@ pub fn read_int(values: &Vec<Value>) -> Value {
     Value::I32(input.parse::<i32>().unwrap())
 }
 
-pub fn read_line(values: &Vec<Value>) -> Value {
+pub fn read_line(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     let input = input.replace("\n", "");
@@ -159,7 +160,7 @@ pub fn read_line(values: &Vec<Value>) -> Value {
     Value::String(Box::new(input))
 }
 
-pub fn read(values: &Vec<Value>) -> Value {
+pub fn read(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     let input = input.replace("\n", "");
@@ -168,7 +169,7 @@ pub fn read(values: &Vec<Value>) -> Value {
     // Value::Float(input.parse::<f64>().unwrap())
 }
 
-pub fn read_f64(values: &Vec<Value>) -> Value {
+pub fn read_f64(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input);
     input.trim();
@@ -177,11 +178,11 @@ pub fn read_f64(values: &Vec<Value>) -> Value {
     Value::Float(input.parse::<f64>().unwrap())
 }
 
-pub fn args(values: &Vec<Value>) -> Value {
+pub fn args(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     Value::new_array_obj(std::env::args().map(|s| Value::String(Box::new(s))).collect())
 }
 
-pub fn current_dir(values: &Vec<Value>) -> Value {
+pub fn current_dir(vm: &VirtualMachine, values: &Vec<Value>) -> Value {
     let dir = String::from(std::env::current_dir().unwrap().to_str().unwrap());
     Value::String(Box::new(dir))
 }
