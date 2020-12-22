@@ -473,7 +473,7 @@ pub fn resolve_fn_generic(st: FnType, args: Vec<Parameter>, tables: &Vec<SymbolT
     return result_ty;
 }
 
-pub fn resolve_generic(st: StructType, args: Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
+pub fn resolve_struct_generic(st: StructType, args: &Vec<NamedArgument>, tables: &Vec<SymbolTable>) -> StructType {
     let mut result_ty = st.clone();
     if st.generics.is_some() {
         let mut generics = st.generics.clone().unwrap();

@@ -8,7 +8,7 @@ use crate::util::{get_attribute_vec, get_mod_name, get_package_name, get_package
 use crate::util::get_full_name;
 use crate::util::get_mutability;
 use crate::symboltable::SymbolTableType::Struct;
-use crate::resolve_symbol::{resolve_enum_generic, resolve_generic, get_register_type, get_self_type};
+use crate::resolve_symbol::{resolve_enum_generic, resolve_struct_generic, get_register_type, get_self_type};
 use std::borrow::Borrow;
 use std::collections::HashSet;
 use crate::file_cache_symboltable::{resolve_file_name, make_ast};
@@ -41,7 +41,7 @@ impl HasType for Type {
                         // },sty})
                         // }
                     }
-                    ty = CType::Struct(resolve_generic(sty, named_argument, &tables));
+                    ty = CType::Struct(resolve_struct_generic(sty, &named_argument, &tables));
                 }
                 if ty == CType::Unknown {
                     let table_name = &tables.last().unwrap().name.clone();
@@ -473,7 +473,7 @@ impl HasType for Expression {
             Expression::NamedFunctionCall(loc, name, args) => {
                 let ty = name.get_type(&tables)?;
                 if let CType::Struct(tty) = ty {
-                    return Ok(CType::Struct(resolve_generic(tty, args.clone(), tables)));
+                    return Ok(CType::Struct(resolve_struct_generic(tty, args, tables)));
                 }
                 // TODO 解决函数范型,FunctionCall也需要;
                 return Ok(ty.ret_type().clone());

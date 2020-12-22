@@ -14,7 +14,7 @@ use crate::error::{CompileError, CompileErrorType};
 use crate::ctype::CType::*;
 use crate::ctype::*;
 use crate::variable_type::*;
-use crate::resolve_symbol::{scan_import_symbol, resolve_generic, resolve_bounds, resovle_build_funs, resolve_enum_generic, resolve_enum_generic_fn, resolve_function_call_generic};
+use crate::resolve_symbol::{scan_import_symbol, resolve_struct_generic, resolve_bounds, resovle_build_funs, resolve_enum_generic, resolve_enum_generic_fn, resolve_function_call_generic, resolve_fn_generic};
 use crate::builtin::builtin_type::get_builtin_type;
 use std::sync::atomic::Ordering::SeqCst;
 use pan_bytecode::bytecode::Instruction::YieldFrom;
@@ -970,6 +970,7 @@ impl SymbolTableBuilder {
 
                 self.scan_expression(expression, &ExpressionContext::Load)?;
                 let mut ty = expression.get_type(&self.tables)?;
+
                 let lookup_symbol = ty == CType::Unknown;
                 if ty == CType::Unknown {
                     //如果是函数或获取属性，就获取注册了的函数和返回类型，
@@ -1057,7 +1058,31 @@ impl SymbolTableBuilder {
                     if let CType::Args(name, v) = ty.clone() {
                         ty = self.get_register_type(name)?;
                     }
+
                     let mut right_ty = ty.ret_type().clone();
+                    if right_ty.is_generic() {
+                        if let CType::Enum(enum_ty) = right_ty.clone() {
+                            if let ast::Expression::FunctionCall(_, name, args) = expression {
+                                let args: Vec<CType> = args.iter().map(|s| {
+                                    let mut ty = s.get_type(&self.tables).unwrap();
+                                    if ty == CType::Unknown {
+                                        ty = self.get_register_type(s.expr_name()).unwrap();
+                                    }
+                                    ty
+                                }).collect();
+                                right_ty = CType::Enum(resolve_enum_generic(enum_ty, args));
+                            }
+                        } else if let CType::Struct(sty) = right_ty.clone() {
+                            if let ast::Expression::NamedFunctionCall(_, name, args) = expression {
+                                right_ty = CType::Struct(resolve_struct_generic(sty, args, &self.tables));
+                            }
+                        } else if let CType::Fn(fnty) = right_ty.clone() {
+                            //TODO
+                            // if let ast::Expression::FunctionCall(_, name, args) = expression {
+                            //     right_ty = CType::Fn(resolve_fn_generic(fnty, args, &self.tables));
+                            // }
+                        }
+                    }
                     if (left_ty > right_ty && left_ty < CType::Str) || left_ty == right_ty {} else {
                         return Err(SymbolTableError {
                             error: format!("类型不匹配,右侧类型 {:?}\n, 左侧类型 {:?}", right_ty, left_ty),
@@ -1739,7 +1764,7 @@ impl SymbolTableBuilder {
                 println!("named_call:{:?},", expression);
                 let mut ty = self.get_register_type(exp.as_ref().expr_name())?;
                 if let CType::Struct(sty) = ty.clone() {
-                    let struct_ty = resolve_generic(sty, args.clone(), &self.tables);
+                    let struct_ty = resolve_struct_generic(sty, args, &self.tables);
                     ty = CType::Struct(struct_ty);
                     for arg in args {
 
