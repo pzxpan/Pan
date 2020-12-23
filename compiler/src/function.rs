@@ -131,7 +131,7 @@ impl package_part_fun for FunctionDefinition {
             builder.ret_ty = tt.ret_type().clone();
             let fun_name = name.name.clone();
             builder.register_package_item(&name.name, tt.clone(), SymbolUsage::Attribute, self.loc, vec![package_name, fun_name])?;
-            builder.enter_function(&name.name, false, &self.params, self.loc.1)?;
+            builder.enter_function(&name.name, false, &self.params, self.loc.clone())?;
             if self.body.is_some() {
                 builder.scan_statement(&self.body.as_ref().unwrap())?;
                 // if def.generics.is_empty() {

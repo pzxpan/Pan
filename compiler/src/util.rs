@@ -286,7 +286,7 @@ pub fn resolve_dir_import(builder: &mut SymbolTableBuilder, dir_name: String, su
     let mut current_submods = vec![];
     let mod_name = get_dir_name(&dir_name);
     println!("mod_name:{:?},", mod_name);
-    builder.enter_scope(&mod_name, SymbolTableType::Package, 0);
+    builder.enter_scope(&mod_name, SymbolTableType::Package, Loc::default());
     for entry in WalkDir::new(dir_name.clone()).max_depth(1) {
         let director = entry.unwrap();
         let path = director.path();
@@ -353,7 +353,7 @@ pub fn resolve_import_symbol_table(builder: &mut SymbolTableBuilder, is_third: b
     let mod_name = get_dir_name(&dir.1);
 
 
-    builder.enter_scope(&mod_name, SymbolTableType::Package, 0);
+    builder.enter_scope(&mod_name, SymbolTableType::Package, Loc::default());
     for entry in WalkDir::new(dir.1.clone()).max_depth(1) {
         let director = entry.unwrap();
         let path = director.path();

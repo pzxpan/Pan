@@ -157,7 +157,7 @@ pub fn resolve_generics(generics: &Vec<Generic>, map: &mut HashMap<String, CType
 
 pub fn resolve_top_symbol(program: &ast::ModuleDefinition) -> HashMap<String, CType> {
     let mut hash_map: HashMap<String, CType> = HashMap::new();
-    let table: SymbolTable = SymbolTable::new(program.package.clone(), SymbolTableType::Package, 0);
+    let table: SymbolTable = SymbolTable::new(program.package.clone(), SymbolTableType::Package, Loc::default());
     let mut tables: Vec<SymbolTable> = vec![table];
     for part in &program.module_parts {
         match part {
