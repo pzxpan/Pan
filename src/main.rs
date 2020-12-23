@@ -28,6 +28,19 @@ use std::path::PathBuf;
 use std::collections;
 use pan_codegen::llvm;
 
+use inkwell::AddressSpace;
+use inkwell::context::Context;
+
+#[test]
+fn test_no_context_double_free() {
+    let context = Context::create();
+    let int = context.i8_type();
+    println!("aaaddd:{:?},", int);
+    {
+        int.get_context();
+    }
+}
+
 #[derive(Debug)]
 struct aaa<A, B> {
     pub a: A,
@@ -121,7 +134,6 @@ fn main() {
     // let cc = BB { b: 14, dd: 20 };
     // let mut a = AA { bb: cc.clone(), c: 20 };
     // a.bb.add(1000);
-
     //println!("dddd{:?},cc:{:?}", a,cc.clone());
     //test_one_file(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
     test_one_file_code_gen(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
@@ -147,11 +159,11 @@ fn test_one_file_code_gen(home_path: &Path) {
     file.read_to_string(&mut contents).unwrap();
     let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0, false);
     if code_object.is_ok() {
-        let target_triple: Option<String> = None;
-        let mut llvm_module = llvm::compile_to_module(&code_object.unwrap().1, "test", target_triple);
-        let llvm_ir_cstr = llvm_module.to_cstring();
-        let llvm_ir = String::from_utf8_lossy(llvm_ir_cstr.as_bytes());
-        println!("{}", llvm_ir);
+        // let target_triple: Option<String> = None;
+        // let mut llvm_module = llvm::compile_to_module(&code_object.unwrap().1, "test", target_triple);
+        // let llvm_ir_cstr = llvm_module.to_cstring();
+        // let llvm_ir = String::from_utf8_lossy(llvm_ir_cstr.as_bytes());
+        // println!("{}", llvm_ir);
     }
 }
 
