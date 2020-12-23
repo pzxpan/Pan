@@ -14,4 +14,6 @@
 ##三、规划:
 #### 1.2021年0.1版本,解释器发布,2021年3月,0.1版本编译器发布; 1.0版本实现自编译;
 
+#llvm  LLVM_SYS_110_PREFIX=/usr/local/opt/llvm cargo build
+
 
