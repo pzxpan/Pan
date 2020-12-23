@@ -26,6 +26,7 @@ use pan_bytecode::bytecode::CodeObject;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::collections;
+use pan_codegen::llvm;
 
 #[derive(Debug)]
 struct aaa<A, B> {
@@ -122,7 +123,8 @@ fn main() {
     // a.bb.add(1000);
 
     //println!("dddd{:?},cc:{:?}", a,cc.clone());
-    test_one_file(&env::current_dir().unwrap().join("demo").join("teststd.pan"));
+    //test_one_file(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
+    test_one_file_code_gen(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
 }
@@ -133,8 +135,23 @@ fn test_all_demo_file() {
         let path = dir.path();
         if path.is_file() {
             println!("正在测试：{:?}", path);
-            test_one_file(path);
+            test_one_file_code_gen(path);
+            // test_one_file(path);
         }
+    }
+}
+
+fn test_one_file_code_gen(home_path: &Path) {
+    let mut file = File::open(home_path.clone()).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+    let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0, false);
+    if code_object.is_ok() {
+        let target_triple: Option<String> = None;
+        let mut llvm_module = llvm::compile_to_module(&code_object.unwrap().1, "test", target_triple);
+        let llvm_ir_cstr = llvm_module.to_cstring();
+        let llvm_ir = String::from_utf8_lossy(llvm_ir_cstr.as_bytes());
+        println!("{}", llvm_ir);
     }
 }
 
@@ -146,28 +163,9 @@ fn test_one_file(home_path: &Path) {
     if code_object.is_ok() {
         let global_value = HashMap::new();
         let local_value: HashMap<String, Value> = HashMap::new();
-        // let mut v = Vec::new();
-
-        //   v.push(local_value);
-        //  let scope = Scope::with_builtins(v, global_value);
-        //vm.run_code_obj(code_object.unwrap(),scope);
-
         let code = code_object.unwrap().1;
-        let t = time::SystemTime::now();
-
-        // let mut vm = VirtualMachine::new(v);
-        let start = std::time::Instant::now();
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
-
         handle.join().unwrap();
-        //std::thread::sleep(Duration::from_secs(10));
-        //scope_clear();
-        println!("执行 cost:{:?}", start.elapsed().as_secs());
-        let t2 = time::SystemTime::now();
-        // std::thread::sleep(Duration::from_millis(10000));
-        // let byte_file = env::current_dir().unwrap().join("demo/targets").join("dst.txt");
-        // let mut f = File::create(byte_file).unwrap();
-        // f.write(&code.clone().to_bytes()).unwrap();
     } else {
         let error = code_object.err().unwrap();
         match error.error {
