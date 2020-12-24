@@ -28,9 +28,6 @@ use std::path::PathBuf;
 use std::collections;
 use pan_codegen::llvm;
 
-use inkwell::AddressSpace;
-use inkwell::context::Context;
-
 #[test]
 fn test_no_context_double_free() {
     let context = Context::create();
@@ -135,7 +132,7 @@ fn main() {
     // let mut a = AA { bb: cc.clone(), c: 20 };
     // a.bb.add(1000);
     //println!("dddd{:?},cc:{:?}", a,cc.clone());
-    //test_one_file(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
+    test_one_file(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
     test_one_file_code_gen(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
@@ -176,6 +173,7 @@ fn test_one_file(home_path: &Path) {
         let global_value = HashMap::new();
         let local_value: HashMap<String, Value> = HashMap::new();
         let code = code_object.unwrap().1;
+        println!("code object is:{:#?},", code);
         let handle = run_code_in_thread(code.clone(), local_value, global_value);
         handle.join().unwrap();
     } else {
