@@ -248,6 +248,7 @@ impl<O: OutputStream> Compiler<O> {
         program: &ast::ModuleDefinition,
         in_import: bool,
     ) -> Result<(), CompileError> {
+
         // trace!("compile symboltable{:?}", symbol_table);
         let mut found_main = false;
         // self.symbol_table_stack.push(symbol_table);

@@ -32,7 +32,7 @@ impl Location {
 
 /// Data、Struct、 Function，Module 对应一个CodeObject；
 ///
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodeObject {
     pub instructions: Vec<Instruction>,
     /// 跳转指令;
@@ -522,12 +522,12 @@ impl fmt::Display for Constant {
     }
 }
 
-impl fmt::Debug for CodeObject {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "<code object {} at ??? file {:?}, line {}>",
-            self.obj_name, self.source_path, self.first_line_number
-        )
-    }
-}
+// impl fmt::Debug for CodeObject {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(
+//             f,
+//             "<code object {} at ??? file {:?}, line {}>",
+//             self.obj_name, self.source_path, self.first_line_number
+//         )
+//     }
+// }

@@ -1,11 +1,11 @@
 package default;
 pub fun add(a:i32,b:i32) :i32 {
-    return a + b;
+    let c =  a + b;
+    return c;
 }
-fun main() {
-  let c = add(10,20);
-  print(c);
-  return;
+fun main() : i32 {
+  let c = add(40,1000);
+  return c;
 }
 
 

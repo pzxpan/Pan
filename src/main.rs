@@ -26,7 +26,14 @@ use pan_bytecode::bytecode::CodeObject;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::collections;
-use pan_codegen::llvm;
+use pan_codegen::code_gen;
+use pan_parser::parse;
+use pan_parser::ast::Loc;
+use pan_parser::ast;
+use pan_compiler::util::{get_mod_name, get_package_name};
+use inkwell::context::Context;
+use inkwell::passes::PassManager;
+
 
 #[test]
 fn test_no_context_double_free() {
@@ -132,7 +139,7 @@ fn main() {
     // let mut a = AA { bb: cc.clone(), c: 20 };
     // a.bb.add(1000);
     //println!("dddd{:?},cc:{:?}", a,cc.clone());
-    test_one_file(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
+    //test_one_file(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
     test_one_file_code_gen(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
@@ -154,13 +161,33 @@ fn test_one_file_code_gen(home_path: &Path) {
     let mut file = File::open(home_path.clone()).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0, false);
-    if code_object.is_ok() {
-        // let target_triple: Option<String> = None;
-        // let mut llvm_module = llvm::compile_to_module(&code_object.unwrap().1, "test", target_triple);
-        // let llvm_ir_cstr = llvm_module.to_cstring();
-        // let llvm_ir = String::from_utf8_lossy(llvm_ir_cstr.as_bytes());
-        // println!("{}", llvm_ir);
+    let mut ast = parse(contents.as_str(), String::from(home_path.clone().to_str().unwrap()));
+    if ast.is_ok() {
+        let module_name = get_mod_name(String::from(home_path.clone().to_str().unwrap()));
+        let module = ast.unwrap();
+        let md = ast::ModuleDefinition { module_parts: module.content, name: ast::Identifier { loc: Loc::default(), name: module_name.clone() }, is_pub: true, package: get_package_name(&module.package_name) };
+
+        // let fpm = PassManager::create(module);
+        // fpm.add_instruction_combining_pass();
+        // fpm.add_reassociate_pass();
+        // fpm.add_gvn_pass();
+        // fpm.add_cfg_simplification_pass();
+        // fpm.add_basic_alias_analysis_pass();
+        // fpm.add_promote_memory_to_register_pass();
+        // fpm.add_instruction_combining_pass();
+        // fpm.add_reassociate_pass();
+        // fpm.initialize();
+
+        code_gen::module_codegen(&md, Some("test".to_string()));
+        //  let code_object = compile(&contents, String::from(home_path.clone().to_str().unwrap()), 0, false);
+        // if code_object.is_ok() {
+        //     println!("222code:{:#?}", code_object.unwrap().1);
+        //     // let target_triple: Option<String> = None;
+        //     // let mut llvm_module = llvm::compile_to_module(&code_object.unwrap().1, "test", target_triple);
+        //     // let llvm_ir_cstr = llvm_module.to_cstring();
+        //     // let llvm_ir = String::from_utf8_lossy(llvm_ir_cstr.as_bytes());
+        //     // println!("{}", llvm_ir);
+        // }
     }
 }
 

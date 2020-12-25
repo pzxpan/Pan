@@ -370,6 +370,21 @@ impl Number {
             _ => 0,
         }
     }
+    pub fn to_u64(&self) -> u64 {
+        match self {
+            Number::I8(v) => return *v as u64,
+            Number::I16(v) => return *v as u64,
+            Number::I32(v) => return *v as u64,
+            Number::I64(v) => return *v as u64,
+            Number::I128(v) => return *v as u64,
+            Number::U8(v) => return *v as u64,
+            Number::U16(v) => return *v as u64,
+            Number::U32(v) => return *v as u64,
+            Number::U64(v) => return *v as u64,
+            Number::U128(v) => return *v as u64,
+            _ => 0,
+        }
+    }
     pub fn to_usize(&self) -> usize {
         match self {
             Number::I32(v) => return *v as usize,
