@@ -499,6 +499,13 @@ impl Expression {
             _ => false
         }
     }
+
+    pub fn is_lambda_var(&self) -> bool {
+        match self {
+            Expression::Lambda(_, _) => true,
+            _ => false
+        }
+    }
     pub fn is_compare_operation(&self) -> bool {
         match self {
             Expression::More(_, _, _) |

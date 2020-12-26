@@ -852,6 +852,7 @@ impl HasType for LambdaDefinition {
                 let s = statements.last();
                 match s {
                     Some(Statement::Return(_, e)) => {
+                        println!("lambad_return{:?}",e);
                         let ty = e.as_ref().unwrap().get_type(tables)?;
                         ty
                     }
