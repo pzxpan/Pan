@@ -2,7 +2,7 @@ use inkwell::context::Context;
 use pan_bytecode::bytecode::{CodeObject, Instruction, Constant};
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
-use inkwell::AddressSpace;
+use inkwell::{AddressSpace, IntPredicate};
 use inkwell::targets::TargetTriple;
 use inkwell::values::{FunctionValue, PointerValue, FloatValue, BasicValue, BasicValueEnum, AnyValue, StructValue, IntValue, AnyValueEnum};
 use inkwell::builder::Builder;
@@ -29,10 +29,14 @@ pub fn module_codegen(
     let builder = context.create_builder();
     let v_ty = context.i32_type();
 
+    // let fun = v_ty.fn_type(&[
+    //     BasicTypeEnum::IntType(context.i32_type())
+    // ], false);
+    let target = TargetTriple::create("x86_64-apple-darwin");
     let fun = v_ty.fn_type(&[
-        BasicTypeEnum::IntType(context.i32_type())
-    ], false);
-    module.add_function("putchar", fun, Some(inkwell::module::Linkage::External));
+        BasicTypeEnum::PointerType(context.i8_type().ptr_type(AddressSpace::Generic))
+    ], true);
+    module.add_function("printf", fun, Some(inkwell::module::Linkage::External));
     // module.set_triple(TargetTriple::create("x86_64-pc-linux-gnu"));
     module.set_triple(&TargetTriple::create("x86_64-apple-darwin"));
     //"x86_64-apple-darwin"
@@ -74,6 +78,32 @@ pub fn module_codegen(
     }
 }
 
+#[derive(Clone, Copy)]
+struct CodeGenContext {
+    in_need_block: bool,
+    in_loop: bool,
+    in_match: bool,
+    in_lambda: bool,
+    func: FunctionContext,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum FunctionContext {
+    NoFunction,
+    Function,
+    // AsyncFunction,
+    StructFunction(bool),
+}
+
+impl CodeGenContext {
+    fn in_func(self) -> bool {
+        match self.func {
+            FunctionContext::NoFunction => false,
+            _ => true,
+        }
+    }
+}
+
 pub struct CodeGen<'a, 'ctx> {
     pub symbol_table_stack: Vec<SymbolTable>,
     pub context: &'ctx Context,
@@ -84,6 +114,7 @@ pub struct CodeGen<'a, 'ctx> {
     pub lambdas: HashMap<String, FunctionValue<'ctx>>,
     variables: HashMap<String, (PointerValue<'ctx>, BasicValueEnum<'ctx>)>,
     fn_value_opt: Option<FunctionValue<'ctx>>,
+    ctx: CodeGenContext,
 }
 
 impl<'a, 'ctx> CodeGen<'a, 'ctx> {
@@ -113,6 +144,20 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
         builder.build_alloca(self.context.i32_type(), name)
     }
+
+    pub fn enter_scope(&mut self) {
+        let table = self
+            .symbol_table_stack
+            .last_mut()
+            .unwrap()
+            .sub_tables
+            .remove(0);
+        self.symbol_table_stack.push(table);
+    }
+
+    pub fn leave_scope(&mut self) {
+        self.symbol_table_stack.pop().unwrap();
+    }
     // fn unwrap_const2ir_value(&mut self, context: &'a Context, value: &Constant) -> Result<FloatValue<'ctx>, &'static str> {
     //     match value {
     //         Constant::I8(v) => {
@@ -124,6 +169,113 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
     //         _ => { Ok(context.i8_type().const_int(0 as u64, false)) }
     //     }
     // }
+    fn codegen_for(&mut self, target: &ast::Expression,
+                   iter: &ast::Expression,
+                   body: &ast::Statement) -> Result<(), &'static str> {
+        let parent = self.fn_value();
+        let pre_ctx = self.ctx;
+        self.ctx.in_loop = true;
+        // go from current block to loop block
+        //let loop_bb = self.context.append_basic_block(parent, "loop");
+        if let ast::Expression::Range(_, start, end, include) = iter {
+            let target_str = target.expr_name();
+            let var_name = target_str.as_str();
+            //let mut start_alloca = self.builder.build_alloca(self.context.i32_type().const_int(0,false), var_name);
+            // if start.is_some() {
+            //     start_alloca = self.create_entry_block_alloca(var_name);
+            // }
+            //let start_alloca = self.create_entry_block_alloca(var_name);
+            let start_alloca = self.create_entry_block_alloca(var_name);
+            let start = self.compile_expr(&start.as_ref().as_ref().unwrap())?;
+
+            self.builder.build_store(start_alloca, start);
+
+
+            // go from current block to loop block
+            let loop_bb = self.context.append_basic_block(parent, "loop");
+
+            self.builder.build_unconditional_branch(loop_bb);
+            self.builder.position_at_end(loop_bb);
+
+            let old_val = self.variables.remove(var_name);
+
+            self.variables.insert(var_name.to_owned(), (start_alloca, BasicValueEnum::IntValue(self.context.i32_type().const_int(0, false))));
+
+            // emit body
+            self.compile_statement(body)?;
+
+            let step = self.context.i32_type().const_int(1, false);
+
+            // emit step
+            // let step = match *step {
+            //     Some(ref step) => self.compile_expr(step)?,
+            //     None => self.context.f64_type().const_float(1.0)
+            // };
+
+            // compile end condition
+            let end_cond = self.compile_expr(&end.as_ref().as_ref().unwrap())?;
+            let end_cond = end_cond.into_int_value();
+            let curr_var = self.builder.build_load(start_alloca, var_name);
+            let next_var = self.builder.build_int_add(curr_var.into_int_value(), step, "nextvar");
+
+            self.builder.build_store(start_alloca, next_var);
+
+            let end_cond = self.builder.build_int_compare(IntPredicate::SLT, next_var, end_cond, "loopcond");
+            let after_bb = self.context.append_basic_block(parent, "afterloop");
+
+            self.builder.build_conditional_branch(end_cond, loop_bb, after_bb);
+            self.builder.position_at_end(after_bb);
+
+            self.variables.remove(var_name);
+
+            if let Some(val) = old_val {
+                self.variables.insert(var_name.to_owned(), val);
+            }
+        }
+
+        Ok(())
+    }
+    fn codegen_if(&mut self, test: &ast::Expression, body: &ast::Statement, orelse: &Option<Box<ast::Statement>>) -> Result<(), &'static str> {
+        let parent = self.fn_value();
+        let zero_const = self.context.i32_type().const_int(0, false);
+
+        // create condition by comparing without 0.0 and returning an int
+        let cond = self.compile_expr(test)?;
+        let cond = self.builder.build_int_compare(IntPredicate::NE, cond.into_int_value(), zero_const, "ifcond");
+
+        // build branch
+        let then_bb = self.context.append_basic_block(parent, "then");
+        let else_bb = self.context.append_basic_block(parent, "else");
+        let cont_bb = self.context.append_basic_block(parent, "ifcont");
+
+        self.builder.build_conditional_branch(cond, then_bb, else_bb);
+
+        // build then block
+        self.builder.position_at_end(then_bb);
+        self.compile_statement(body)?;
+        self.builder.build_unconditional_branch(cont_bb);
+
+        let then_bb = self.builder.get_insert_block().unwrap();
+        // build else block
+        if orelse.is_some() {
+            self.builder.position_at_end(else_bb);
+            self.compile_statement(&orelse.as_ref().unwrap())?;
+            self.builder.build_unconditional_branch(cont_bb);
+            let else_bb = self.builder.get_insert_block().unwrap();
+            // emit merge block
+            self.builder.position_at_end(cont_bb);
+
+            // let phi = self.builder.build_phi(self.context.i32_type(), "iftmp");
+            //
+            // phi.add_incoming(&[
+            //     (&then_val, then_bb),
+            //     (&else_val, else_bb)
+            // ]);
+        } else {}
+
+
+        Ok(())
+    }
     fn compile_statement(&mut self, stmt: &ast::Statement) -> Result<(), &'static str> {
         println!("stmt:{:?}", stmt);
         match &stmt {
@@ -146,8 +298,20 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
                 // self.builder.build_store(p.clone().0, v);
             }
+
+            ast::Statement::Continue(_) => {}
+            ast::Statement::Break(_) => {}
+            ast::Statement::For(_, target, iter, body) => {
+                self.enter_scope();
+                self.codegen_for(target, iter, body.as_ref().unwrap())?;
+                self.leave_scope();
+            }
+            ast::Statement::If(_, test, body, orelse) => {
+                self.codegen_if(test, body, orelse);
+            }
             ast::Statement::Expression(loc, expr) => {
-                self.compile_expr(expr)?;
+                let value = self.compile_expr(expr)?;
+
             }
 
             ast::Statement::Return(loc, r) => {
@@ -185,6 +349,17 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 return Ok(BasicValueEnum::IntValue(self.builder.build_load(v.clone().0, name.name.as_str()).into_int_value()));
                 // println!("vv is :{:?}", vv);
             }
+            ast::Expression::StringLiteral(values) => {
+                let mut value = values.iter().fold(String::new(), |mut s, x| {
+                    s.push_str(&x.string);
+                    s
+                });
+
+                let v = self.context.const_string(value.as_bytes(), true);
+                let value = self.module.add_global(v.get_type(), Some(AddressSpace::Generic), "outputs");
+                value.set_initializer(&v);
+                return Ok(BasicValueEnum::PointerValue(value.as_pointer_value()));
+            }
             ast::Expression::Lambda(loc, lambda) => {
                 return Ok(BasicValueEnum::FunctionValue(self.compile_lambda(lambda)?));
             }
@@ -213,7 +388,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     fun_name = "lambda".to_string();
                 }
                 if fun_name.eq("print") {
-                    fun_name = "putchar".to_string();
+                    fun_name = "printf".to_string();
                 }
                 let v = self.get_function(&fun_name);
                 match v {
@@ -225,8 +400,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                             compiled_args.push(self.compile_expr(arg)?);
                         }
 
-                        let argsv: Vec<BasicValueEnum> = compiled_args.iter().by_ref().map(|&val| val.into()).collect();
+                        let mut argsv: Vec<BasicValueEnum> = compiled_args.iter().by_ref().map(|&val| val.into()).collect();
                         println!("argsv:{:?}", argsv);
+
                         let call = self.builder.build_call(fun, argsv.as_slice(), "tmp").try_as_basic_value();
                         println!("is_left or not :{:?}", call.is_left());
 
@@ -691,6 +867,13 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             module: module,
             fn_value_opt: None,
             variables: HashMap::new(),
+            ctx: CodeGenContext {
+                in_need_block: false,
+                in_lambda: false,
+                in_loop: false,
+                in_match: false,
+                func: FunctionContext::NoFunction,
+            },
         };
         let m = compiler.compile_md(md)?;
         // ModuleValue { struct_values: vec![], fn_values: vec![] };
