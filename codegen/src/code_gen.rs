@@ -19,6 +19,7 @@ use pan_compiler::variable_type::HasType;
 use std::env::args_os;
 use pan_compiler::ctype::CType;
 use std::convert::TryInto;
+use crate::control_flow_block::ControlFlowBlock;
 
 pub fn module_codegen(
     md: &ast::ModuleDefinition,
@@ -115,6 +116,7 @@ pub struct CodeGen<'a, 'ctx> {
     variables: HashMap<String, (PointerValue<'ctx>, BasicValueEnum<'ctx>)>,
     fn_value_opt: Option<FunctionValue<'ctx>>,
     ctx: CodeGenContext,
+    control_blocks: ControlFlowBlock<'a>,
 }
 
 impl<'a, 'ctx> CodeGen<'a, 'ctx> {
@@ -193,13 +195,16 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
             // go from current block to loop block
             let loop_bb = self.context.append_basic_block(parent, "loop");
+            let after_bb = self.context.append_basic_block(parent, "afterloop");
+            self.control_blocks.add_loop_block(loop_bb);
+            self.control_blocks.add_loop_after_block(after_bb);
 
             self.builder.build_unconditional_branch(loop_bb);
             self.builder.position_at_end(loop_bb);
 
             let old_val = self.variables.remove(var_name);
 
-            self.variables.insert(var_name.to_owned(), (start_alloca, BasicValueEnum::IntValue(self.context.i32_type().const_int(0, false))));
+            self.variables.insert(var_name.to_owned(), (start_alloca, start));
 
             // emit body
             self.compile_statement(body)?;
@@ -220,10 +225,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
             self.builder.build_store(start_alloca, next_var);
 
-            let end_cond = self.builder.build_int_compare(IntPredicate::SLT, next_var, end_cond, "loopcond");
-            let after_bb = self.context.append_basic_block(parent, "afterloop");
+            let compare_result = self.builder.build_int_compare(IntPredicate::SLT, next_var, end_cond, "loopcond");
 
-            self.builder.build_conditional_branch(end_cond, loop_bb, after_bb);
+            self.builder.build_conditional_branch(compare_result, loop_bb, after_bb);
             self.builder.position_at_end(after_bb);
 
             self.variables.remove(var_name);
@@ -231,10 +235,54 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             if let Some(val) = old_val {
                 self.variables.insert(var_name.to_owned(), val);
             }
+
+            self.control_blocks.pop_loop_block();
+            self.control_blocks.pop_loop_after_block();
         }
 
         Ok(())
     }
+    fn codegen_compare(&mut self, vals: &[ast::Expression], ops: &[ast::Expression]) -> Result<(), &'static str> {
+        // let to_operator = |op: &ast::Expression| match op {
+        //     ast::Expression::Equal(_, _, _) => bytecode::ComparisonOperator::Equal,
+        //     ast::Expression::NotEqual(_, _, _) => bytecode::ComparisonOperator::NotEqual,
+        //     ast::Expression::More(_, _, _) => bytecode::ComparisonOperator::Greater,
+        //     ast::Expression::MoreEqual(_, _, _) => bytecode::ComparisonOperator::GreaterOrEqual,
+        //     ast::Expression::Less(_, _, _) => bytecode::ComparisonOperator::Less,
+        //     ast::Expression::LessEqual(_, _, _) => bytecode::ComparisonOperator::LessOrEqual,
+        //     ast::Expression::In(_, _, _) => bytecode::ComparisonOperator::In,
+        //     ast::Expression::Is(_, _, _) => bytecode::ComparisonOperator::Is,
+        //     _ => unreachable!()
+        // };
+        //
+        // let value = self.compile_expr(&vals[0])?;
+        //
+        // let break_label = self.new_label();
+        // let last_label = self.new_label();
+        //
+        // let ops_slice = &ops[0..ops.len()];
+        // let vals_slice = &vals[1..ops.len()];
+        // for (op, val) in ops_slice.iter().zip(vals_slice.iter()) {
+        //     self.compile_expression(val)?;
+        //     self.emit(Instruction::Duplicate);
+        //     self.emit(Instruction::Rotate(3));
+        //
+        //     self.emit(Instruction::CompareOperation(to_operator(op)));
+        //     self.emit(Instruction::JumpIfFalseOrPop(break_label));
+        // }
+        //
+        // self.compile_expression(vals.last().unwrap())?;
+        // self.emit(Instruction::CompareOperation(to_operator(ops.last().unwrap())));
+        // self.emit(Instruction::Jump(last_label));
+        //
+        // self.set_label(break_label);
+        // self.emit(Instruction::Rotate(2));
+        // self.emit(Instruction::Pop);
+        //
+        // self.set_label(last_label);
+        Ok(())
+    }
+
     fn codegen_if(&mut self, test: &ast::Expression, body: &ast::Statement, orelse: &Option<Box<ast::Statement>>) -> Result<(), &'static str> {
         let parent = self.fn_value();
         let zero_const = self.context.i32_type().const_int(0, false);
@@ -254,28 +302,18 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         self.builder.position_at_end(then_bb);
         self.compile_statement(body)?;
         self.builder.build_unconditional_branch(cont_bb);
-
-        let then_bb = self.builder.get_insert_block().unwrap();
+        self.builder.position_at_end(else_bb);
         // build else block
         if orelse.is_some() {
-            self.builder.position_at_end(else_bb);
             self.compile_statement(&orelse.as_ref().unwrap())?;
-            self.builder.build_unconditional_branch(cont_bb);
-            let else_bb = self.builder.get_insert_block().unwrap();
-            // emit merge block
-            self.builder.position_at_end(cont_bb);
-
-            // let phi = self.builder.build_phi(self.context.i32_type(), "iftmp");
-            //
-            // phi.add_incoming(&[
-            //     (&then_val, then_bb),
-            //     (&else_val, else_bb)
-            // ]);
-        } else {}
+        }
+        self.builder.build_unconditional_branch(cont_bb);
+        self.builder.position_at_end(cont_bb);
 
 
         Ok(())
     }
+
     fn compile_statement(&mut self, stmt: &ast::Statement) -> Result<(), &'static str> {
         println!("stmt:{:?}", stmt);
         match &stmt {
@@ -299,8 +337,15 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 // self.builder.build_store(p.clone().0, v);
             }
 
-            ast::Statement::Continue(_) => {}
-            ast::Statement::Break(_) => {}
+            ast::Statement::Continue(_) => {
+                let b = self.control_blocks.loopblock.last().unwrap();
+                self.builder.build_unconditional_branch(*b);
+            }
+            ast::Statement::Break(_) => {
+                let b = self.control_blocks.loopafterblock.last().unwrap();
+                println!("break to :{:#?}", b);
+                self.builder.build_unconditional_branch(*b);
+            }
             ast::Statement::For(_, target, iter, body) => {
                 self.enter_scope();
                 self.codegen_for(target, iter, body.as_ref().unwrap())?;
@@ -311,7 +356,6 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             }
             ast::Statement::Expression(loc, expr) => {
                 let value = self.compile_expr(expr)?;
-
             }
 
             ast::Statement::Return(loc, r) => {
@@ -328,6 +372,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         }
         return Ok(());
     }
+
     /// Compiles the specified `Expr` into an LLVM `FloatValue`.
     fn compile_expr(&mut self, expr: &ast::Expression) -> Result<BasicValueEnum<'ctx>, &'static str> {
         println!("expr:{:?}", expr);
@@ -336,6 +381,12 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 let l = self.compile_expr(l.as_ref())?;
                 let r = self.compile_expr(r.as_ref())?;
                 return Ok(BasicValueEnum::IntValue(self.builder.build_int_add(l.into_int_value(), r.into_int_value(), "tmp")));
+            }
+            ast::Expression::Assign(_, a, b) => {
+                let value = self.compile_expr(b.as_ref())?;
+                let alloc = self.variables.get(&a.expr_name()).unwrap().0;
+                self.builder.build_store(alloc, value);
+                // self.compile_store(a)?;
             }
             ast::Expression::Variable(name) => {
                 if name.name.eq("add") {
@@ -354,9 +405,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     s.push_str(&x.string);
                     s
                 });
-
+                // let string = context.const_string(b"my_string", false);
                 let v = self.context.const_string(value.as_bytes(), true);
-                let value = self.module.add_global(v.get_type(), Some(AddressSpace::Generic), "outputs");
+                let value = self.module.add_global(v.get_type().get_element_type(), Some(AddressSpace::Generic), "outputs");
                 value.set_initializer(&v);
                 return Ok(BasicValueEnum::PointerValue(value.as_pointer_value()));
             }
@@ -436,6 +487,19 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             ast::Expression::Number(loc, num) => {
                 return Ok(BasicValueEnum::IntValue(self.context.i32_type().const_int(num.to_u64(), false)));
             }
+            ast::Expression::Less(_, a, b) | ast::Expression::More(_, a, b) |
+            ast::Expression::LessEqual(_, a, b) | ast::Expression::MoreEqual(_, a, b) |
+            ast::Expression::Equal(_, a, b) | ast::Expression::NotEqual(_, a, b) |
+            ast::Expression::Is(_, a, b) |
+            ast::Expression::In(_, a, b) => {
+                let mut v = Vec::new();
+                v.push(a.as_ref().clone());
+                v.push(b.as_ref().clone());
+                let mut ops = Vec::new();
+                ops.push(expr.clone());
+                self.codegen_compare(&*v, &*ops)?;
+            }
+
             _ => {}
         }
         Ok(BasicValueEnum::IntValue(self.context.i32_type().const_int(0, false)))
@@ -645,6 +709,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         //     Ok(self.context.f64_type().const_float(0.0))
         // }
     }
+
     pub fn llvm_type(&self, ty: &CType) -> BasicTypeEnum<'ctx> {
         match ty {
             CType::Bool => BasicTypeEnum::IntType(self.context.bool_type()),
@@ -664,6 +729,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             _ => unreachable!()
         }
     }
+
     /// Compiles the specified `Prototype` into an extern LLVM `FunctionValue`.
     fn compile_prototype(&self, def: &FunctionDefinition) -> Result<FunctionValue<'ctx>, &'static str> {
         let mut ret_type: BasicTypeEnum = BasicTypeEnum::IntType(self.context.i32_type());
@@ -724,6 +790,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         println!("moduleValues:{:#?},", fn_values);
         return Ok(ModuleValue { fn_values, struct_values: vec![] });
     }
+
     fn compile_lamba_prototype(&self, def: &LambdaDefinition) -> Result<FunctionValue<'ctx>, &'static str> {
         let mut ret_type: BasicTypeEnum = BasicTypeEnum::IntType(self.context.i32_type());
         let cty = def.get_type(&self.symbol_table_stack).unwrap();
@@ -797,6 +864,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         // self.builder.build_aggregate_return(r.as_slice());
         Ok(function)
     }
+
     /// Compiles the specified `Function` into an LLVM `FunctionValue`.
     fn compile_fn(&mut self, fun: &FunctionDefinition) -> Result<FunctionValue<'ctx>, &'static str> {
         let function = self.compile_prototype(fun)?;
@@ -873,6 +941,11 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 in_loop: false,
                 in_match: false,
                 func: FunctionContext::NoFunction,
+            },
+            control_blocks: ControlFlowBlock {
+                funblock: vec![],
+                loopblock: vec![],
+                loopafterblock: vec![],
             },
         };
         let m = compiler.compile_md(md)?;

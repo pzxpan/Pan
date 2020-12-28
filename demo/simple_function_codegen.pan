@@ -5,7 +5,19 @@ pub fun subddd(a:i32,b:i32) :i32 {
 }
 
 fun main():i32 {
- print("ccc");
+ print("ccc\r\n");
+ let sum = 0;
+ if sum > 0 {
+    print("ok");
+ }
+ print("sum is %d\r\n",sum);
+ for i in 0..10 {
+    print("i is %d",i);
+    if i > 5 {
+        print("i>5");
+    }
+ }
+
  //subddd(10,20);
  return 0;
 }
