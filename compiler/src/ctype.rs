@@ -256,6 +256,13 @@ impl PartialEq for EnumType {
 }
 
 impl CType {
+    pub fn is_signed(&self) -> bool {
+        return self == &CType::I8 ||
+            self == &CType::I16 ||
+            self == &CType::I32 ||
+            self == &CType::I64 ||
+            self == &CType::I128;
+    }
     pub fn is_unit(&self) -> bool {
         match self {
             CType::Tuple(n) => return n.is_empty(),

@@ -3,6 +3,12 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Default)]
 pub struct Loc(pub usize, pub usize, pub usize);
 
+impl Loc {
+    pub fn to_string(&self) -> String {
+        format!("{:?}_{:?}", self.1, self.2)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub loc: Loc,
@@ -490,7 +496,11 @@ impl Expression {
             Expression::Variable(id) => id.clone().name,
             Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
             Expression::Hole(_) => "_".to_string(),
-            _ => "".to_string()
+            _ => {
+                let mut s = "$".to_string();
+                s.push_str(self.loc().to_string().as_str());
+                s
+            }
         }
     }
     pub fn is_a_variable(&self) -> bool {

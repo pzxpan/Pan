@@ -224,8 +224,12 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             let next_var = self.builder.build_int_add(curr_var.into_int_value(), step, "nextvar");
 
             self.builder.build_store(start_alloca, next_var);
-
-            let compare_result = self.builder.build_int_compare(IntPredicate::SLT, next_var, end_cond, "loopcond");
+            let comparation = if *include {
+                IntPredicate::SLE
+            } else {
+                IntPredicate::SLT
+            };
+            let compare_result = self.builder.build_int_compare(comparation, next_var, end_cond, "loopcond");
 
             self.builder.build_conditional_branch(compare_result, loop_bb, after_bb);
             self.builder.position_at_end(after_bb);
@@ -242,61 +246,33 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
         Ok(())
     }
-    fn codegen_compare(&mut self, vals: &[ast::Expression], ops: &[ast::Expression]) -> Result<(), &'static str> {
-        // let to_operator = |op: &ast::Expression| match op {
-        //     ast::Expression::Equal(_, _, _) => bytecode::ComparisonOperator::Equal,
-        //     ast::Expression::NotEqual(_, _, _) => bytecode::ComparisonOperator::NotEqual,
-        //     ast::Expression::More(_, _, _) => bytecode::ComparisonOperator::Greater,
-        //     ast::Expression::MoreEqual(_, _, _) => bytecode::ComparisonOperator::GreaterOrEqual,
-        //     ast::Expression::Less(_, _, _) => bytecode::ComparisonOperator::Less,
-        //     ast::Expression::LessEqual(_, _, _) => bytecode::ComparisonOperator::LessOrEqual,
-        //     ast::Expression::In(_, _, _) => bytecode::ComparisonOperator::In,
-        //     ast::Expression::Is(_, _, _) => bytecode::ComparisonOperator::Is,
-        //     _ => unreachable!()
-        // };
-        //
-        // let value = self.compile_expr(&vals[0])?;
-        //
-        // let break_label = self.new_label();
-        // let last_label = self.new_label();
-        //
-        // let ops_slice = &ops[0..ops.len()];
-        // let vals_slice = &vals[1..ops.len()];
-        // for (op, val) in ops_slice.iter().zip(vals_slice.iter()) {
-        //     self.compile_expression(val)?;
-        //     self.emit(Instruction::Duplicate);
-        //     self.emit(Instruction::Rotate(3));
-        //
-        //     self.emit(Instruction::CompareOperation(to_operator(op)));
-        //     self.emit(Instruction::JumpIfFalseOrPop(break_label));
-        // }
-        //
-        // self.compile_expression(vals.last().unwrap())?;
-        // self.emit(Instruction::CompareOperation(to_operator(ops.last().unwrap())));
-        // self.emit(Instruction::Jump(last_label));
-        //
-        // self.set_label(break_label);
-        // self.emit(Instruction::Rotate(2));
-        // self.emit(Instruction::Pop);
-        //
-        // self.set_label(last_label);
-        Ok(())
+
+    fn codegen_compare(&mut self, left: &ast::Expression, right: &ast::Expression, op: &ast::Expression) -> Result<BasicValueEnum<'ctx>, &'static str> {
+        let to_operator = |op: &ast::Expression| match op {
+            ast::Expression::Equal(_, _, _) => inkwell::IntPredicate::EQ,
+            ast::Expression::NotEqual(_, _, _) => inkwell::IntPredicate::NE,
+            ast::Expression::More(_, _, _) => inkwell::IntPredicate::SGT,
+            ast::Expression::MoreEqual(_, _, _) => inkwell::IntPredicate::SGE,
+            ast::Expression::Less(_, _, _) => inkwell::IntPredicate::SLT,
+            ast::Expression::LessEqual(_, _, _) => inkwell::IntPredicate::SLE,
+            //ast::Expression::In(_, _, _) => inkwell::IntPredicate::EQ,
+            //ast::Expression::Is(_, _, _) => bytecode::ComparisonOperator::Is,
+            _ => unreachable!()
+        };
+        let left = self.compile_expr(left)?;
+        let right = self.compile_expr(right)?;
+        return Ok(BasicValueEnum::IntValue(self.builder.build_int_compare(to_operator(op), left.into_int_value(), right.into_int_value(), "ifcond")));
     }
 
     fn codegen_if(&mut self, test: &ast::Expression, body: &ast::Statement, orelse: &Option<Box<ast::Statement>>) -> Result<(), &'static str> {
         let parent = self.fn_value();
-        let zero_const = self.context.i32_type().const_int(0, false);
-
-        // create condition by comparing without 0.0 and returning an int
         let cond = self.compile_expr(test)?;
-        let cond = self.builder.build_int_compare(IntPredicate::NE, cond.into_int_value(), zero_const, "ifcond");
-
         // build branch
         let then_bb = self.context.append_basic_block(parent, "then");
         let else_bb = self.context.append_basic_block(parent, "else");
         let cont_bb = self.context.append_basic_block(parent, "ifcont");
 
-        self.builder.build_conditional_branch(cond, then_bb, else_bb);
+        self.builder.build_conditional_branch(cond.into_int_value(), then_bb, else_bb);
 
         // build then block
         self.builder.position_at_end(then_bb);
@@ -309,9 +285,80 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         }
         self.builder.build_unconditional_branch(cont_bb);
         self.builder.position_at_end(cont_bb);
-
-
         Ok(())
+    }
+
+    fn codegen_op(&mut self, left_expr: &ast::Expression, right_expr: &ast::Expression, op: &ast::Expression, aim_ty: &CType,
+                  need_promotion: bool) -> Result<BasicValueEnum<'ctx>, &'static str> {
+        let mut is_float = false;
+        if aim_ty > &CType::U128 {
+            is_float = true;
+        }
+        let left = self.compile_expr(left_expr)?;
+        let right = self.compile_expr(right_expr)?;
+        if is_float {
+            let result = match op {
+                ast::Expression::Add(_, _, _) => {
+                    self.builder.build_float_add(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
+                }
+                ast::Expression::Subtract(_, _, _) => {
+                    self.builder.build_float_sub(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
+                }
+                ast::Expression::Multiply(_, _, _) => {
+                    self.builder.build_float_mul(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
+                }
+                ast::Expression::Divide(_, _, _) => {
+                    self.builder.build_float_div(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
+                }
+                // ast::Expression::Power(_, _, _) => bytecode::BinaryOperator::Power,
+                _ => unreachable!()
+            };
+            Ok(BasicValueEnum::FloatValue(result))
+        } else {
+            let result = match op {
+                ast::Expression::Add(_, _, _) => {
+                    self.builder.build_int_add(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                }
+                ast::Expression::Subtract(_, _, _) => {
+                    self.builder.build_int_sub(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                }
+                ast::Expression::Multiply(_, _, _) => {
+                    self.builder.build_int_mul(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                }
+                ast::Expression::Divide(_, _, _) => {
+                    if aim_ty.is_signed() {
+                        self.builder.build_int_signed_div(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                    } else {
+                        self.builder.build_int_unsigned_div(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                    }
+                }
+                ast::Expression::Modulo(_, _, _) => {
+                    if aim_ty.is_signed() {
+                        self.builder.build_int_unsigned_rem(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                    } else {
+                        self.builder.build_int_signed_rem(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                    }
+                }
+                // ast::Expression::Power(_, _, _) => bytecode::BinaryOperator::Power,
+                ast::Expression::ShiftLeft(_, _, _) => {
+                    self.builder.build_left_shift(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                }
+                ast::Expression::ShiftRight(_, _, _) => {
+                    self.builder.build_right_shift(left.into_int_value(), right.into_int_value(), false, op.expr_name().as_str())
+                }
+                ast::Expression::BitwiseOr(_, _, _) => {
+                    self.builder.build_or(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                }
+                ast::Expression::BitwiseXor(_, _, _) => {
+                    self.builder.build_xor(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                }
+                ast::Expression::BitwiseAnd(_, _, _) => {
+                    self.builder.build_and(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
+                }
+                _ => unreachable!()
+            };
+            Ok(BasicValueEnum::IntValue(result))
+        }
     }
 
     fn compile_statement(&mut self, stmt: &ast::Statement) -> Result<(), &'static str> {
@@ -414,6 +461,59 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             ast::Expression::Lambda(loc, lambda) => {
                 return Ok(BasicValueEnum::FunctionValue(self.compile_lambda(lambda)?));
             }
+
+            ast::Expression::Not(_, name) => {
+                let v = self.compile_expr(name)?;
+                let r = self.builder.build_not(v.into_int_value(), name.expr_name().as_str());
+                return Ok(BasicValueEnum::IntValue(r));
+            }
+            ast::Expression::UnaryPlus(_, name) => {}
+            ast::Expression::UnaryMinus(_, name) => {
+                let v = self.compile_expr(name)?;
+                let r = self.builder.build_int_neg(v.into_int_value(), name.expr_name().as_str());
+                return Ok(BasicValueEnum::IntValue(r));
+            }
+            ast::Expression::Power(_, a, b) |
+            ast::Expression::Multiply(_, a, b) |
+            ast::Expression::Divide(_, a, b) |
+            ast::Expression::Modulo(_, a, b) |
+            // ast::Expression::Add(_, a, b) |
+            ast::Expression::Subtract(_, a, b) |
+            ast::Expression::ShiftLeft(_, a, b) |
+            ast::Expression::ShiftRight(_, a, b) |
+            ast::Expression::BitwiseAnd(_, a, b) |
+            ast::Expression::BitwiseXor(_, a, b) |
+            ast::Expression::BitwiseOr(_, a, b) |
+            ast::Expression::And(_, a, b) |
+            ast::Expression::Or(_, a, b) => {
+                // let rt = expr.get_type(&self.symbol_table_stack).unwrap();
+                println!("symbol_table:{:#?}", self.symbol_table_stack);
+                let at = a.get_type(&self.symbol_table_stack).unwrap();
+                let bt = b.get_type(&self.symbol_table_stack).unwrap();
+                // let max = if at < bt { bt.clone() } else { at.clone() };
+                let max = CType::I32;
+                println!("end_ty:{:?},at:{:?},bt:{:?}", max, at, bt);
+                return Ok(self.codegen_op(a, b, expr, &max, false)?);
+                // if at == bt {
+                //     self.compile_expression(a)?;
+                //     self.compile_expression(b)?;
+                // } else if at < bt {
+                //     self.compile_expression(a)?;
+                //     let idx = get_number_type(bt);
+                //     self.emit(Instruction::PrimitiveTypeChange(idx));
+                //     self.compile_expression(b)?;
+                // } else {
+                //     self.compile_expression(a)?;
+                //     self.compile_expression(b)?;
+                //     let idx = get_number_type(at);
+                //     self.emit(Instruction::PrimitiveTypeChange(idx));
+                // }
+                // self.compile_op(expression, false);
+                // if rt != max {
+                //     let idx = get_number_type(rt);
+                //     self.emit(Instruction::PrimitiveTypeChange(idx));
+                // }
+            }
             // Expr::Call { ref fn_name, ref args } => {
             //     match self.get_function(fn_name.as_str()) {
             //         Some(fun) => {
@@ -492,12 +592,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             ast::Expression::Equal(_, a, b) | ast::Expression::NotEqual(_, a, b) |
             ast::Expression::Is(_, a, b) |
             ast::Expression::In(_, a, b) => {
-                let mut v = Vec::new();
-                v.push(a.as_ref().clone());
-                v.push(b.as_ref().clone());
-                let mut ops = Vec::new();
-                ops.push(expr.clone());
-                self.codegen_compare(&*v, &*ops)?;
+                return Ok(self.codegen_compare(a, b, expr)?);
             }
 
             _ => {}
@@ -773,6 +868,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
     fn compile_md(&mut self, md: &ModuleDefinition) -> Result<ModuleValue<'ctx>, &'static str> {
         println!("md:{:#?},", md);
+        self.enter_scope();
         let mut fn_values = Vec::new();
         for (size, part) in md.module_parts.iter().enumerate() {
             match part {
@@ -788,6 +884,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             }
         }
         println!("moduleValues:{:#?},", fn_values);
+        self.leave_scope();
         return Ok(ModuleValue { fn_values, struct_values: vec![] });
     }
 
