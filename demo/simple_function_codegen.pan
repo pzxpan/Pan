@@ -4,14 +4,14 @@ pub fun subddd(a:i32,b:i32) :i32 {
     return 20;
 }
 
+
 fun main():i32 {
 
- let a = 1;
- for i in 1..10 {
-    print("iis %d",i);
-    a = a * i;
+ let a = -1.2;
+ for i in 1..4 {
+    a *= i;
  }
- print("ddd:%d,",a);
+ print("ddd:%f,",a);
 
  return 0;
 }

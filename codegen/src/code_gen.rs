@@ -11,7 +11,7 @@ use inkwell::{FloatPredicate, OptimizationLevel};
 use inkwell::types::{BasicTypeEnum, FunctionType, VoidType};
 use inkwell::execution_engine::JitFunction;
 use pan_parser::ast;
-use crate::util::{unwrap_const2ir_float_value, llvm_type};
+use crate::util::{unwrap_const2ir_float_value, llvm_type, unwrap_const2ir_int_value, get_register_type};
 use pan_parser::ast::{ModuleDefinition, FunctionDefinition, LambdaDefinition};
 use crate::module_value::ModuleValue;
 use pan_compiler::symboltable::{SymbolTable, make_symbol_table};
@@ -20,6 +20,7 @@ use std::env::args_os;
 use pan_compiler::ctype::CType;
 use std::convert::TryInto;
 use crate::control_flow_block::ControlFlowBlock;
+use std::process::exit;
 
 pub fn module_codegen(
     md: &ast::ModuleDefinition,
@@ -294,20 +295,35 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         if aim_ty > &CType::U128 {
             is_float = true;
         }
-        let left = self.compile_expr(left_expr)?;
-        let right = self.compile_expr(right_expr)?;
+        let mut left = self.compile_expr(left_expr)?;
+
+        let mut right = self.compile_expr(right_expr)?;
         if is_float {
+            if left.is_int_value() {
+                if left_expr.get_type(&self.symbol_table_stack).unwrap().is_signed() {
+                    left = BasicValueEnum::FloatValue(self.builder.build_signed_int_to_float(left.into_int_value(), self.context.f64_type(), left_expr.expr_name().as_str()));
+                } else {
+                    left = BasicValueEnum::FloatValue(self.builder.build_unsigned_int_to_float(left.into_int_value(), self.context.f64_type(), left_expr.expr_name().as_str()));
+                }
+            }
+            if right.is_int_value() {
+                if right_expr.get_type(&self.symbol_table_stack).unwrap().is_signed() {
+                    right = BasicValueEnum::FloatValue(self.builder.build_signed_int_to_float(right.into_int_value(), self.context.f64_type(), right_expr.expr_name().as_str()));
+                } else {
+                    right = BasicValueEnum::FloatValue(self.builder.build_unsigned_int_to_float(right.into_int_value(), self.context.f64_type(), right_expr.expr_name().as_str()));
+                }
+            }
             let result = match op {
-                ast::Expression::Add(_, _, _) => {
+                ast::Expression::Add(_, _, _) | ast::Expression::AssignAdd(_, _, _) => {
                     self.builder.build_float_add(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
                 }
-                ast::Expression::Subtract(_, _, _) => {
+                ast::Expression::Subtract(_, _, _) | ast::Expression::AssignSubtract(_, _, _) => {
                     self.builder.build_float_sub(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
                 }
-                ast::Expression::Multiply(_, _, _) => {
+                ast::Expression::Multiply(_, _, _) | ast::Expression::AssignMultiply(_, _, _) => {
                     self.builder.build_float_mul(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
                 }
-                ast::Expression::Divide(_, _, _) => {
+                ast::Expression::Divide(_, _, _) | ast::Expression::AssignDivide(_, _, _) => {
                     self.builder.build_float_div(left.into_float_value(), right.into_float_value(), op.expr_name().as_str())
                 }
                 // ast::Expression::Power(_, _, _) => bytecode::BinaryOperator::Power,
@@ -315,24 +331,38 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             };
             Ok(BasicValueEnum::FloatValue(result))
         } else {
+            if left.is_float_value() {
+                if aim_ty.is_signed() {
+                    left = BasicValueEnum::IntValue(self.builder.build_float_to_signed_int(left.into_float_value(), self.llvm_type(&aim_ty).into_int_type(), left_expr.expr_name().as_str()));
+                } else {
+                    left = BasicValueEnum::IntValue(self.builder.build_float_to_unsigned_int(left.into_float_value(), self.llvm_type(&aim_ty).into_int_type(), left_expr.expr_name().as_str()));
+                }
+            }
+            if right.is_float_value() {
+                if aim_ty.is_signed() {
+                    right = BasicValueEnum::IntValue(self.builder.build_float_to_signed_int(right.into_float_value(), self.llvm_type(&aim_ty).into_int_type(), right_expr.expr_name().as_str()));
+                } else {
+                    right = BasicValueEnum::IntValue(self.builder.build_float_to_unsigned_int(right.into_float_value(), self.llvm_type(&aim_ty).into_int_type(), right_expr.expr_name().as_str()));
+                }
+            }
             let result = match op {
-                ast::Expression::Add(_, _, _) => {
+                ast::Expression::Add(_, _, _) | ast::Expression::AssignAdd(_, _, _) => {
                     self.builder.build_int_add(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                 }
-                ast::Expression::Subtract(_, _, _) => {
+                ast::Expression::Subtract(_, _, _) | ast::Expression::AssignSubtract(_, _, _) => {
                     self.builder.build_int_sub(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                 }
-                ast::Expression::Multiply(_, _, _) => {
+                ast::Expression::Multiply(_, _, _) | ast::Expression::AssignMultiply(_, _, _) => {
                     self.builder.build_int_mul(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                 }
-                ast::Expression::Divide(_, _, _) => {
+                ast::Expression::Divide(_, _, _) | ast::Expression::AssignDivide(_, _, _) => {
                     if aim_ty.is_signed() {
                         self.builder.build_int_signed_div(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                     } else {
                         self.builder.build_int_unsigned_div(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                     }
                 }
-                ast::Expression::Modulo(_, _, _) => {
+                ast::Expression::Modulo(_, _, _) | ast::Expression::AssignModulo(_, _, _) => {
                     if aim_ty.is_signed() {
                         self.builder.build_int_unsigned_rem(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                     } else {
@@ -340,19 +370,19 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     }
                 }
                 // ast::Expression::Power(_, _, _) => bytecode::BinaryOperator::Power,
-                ast::Expression::ShiftLeft(_, _, _) => {
+                ast::Expression::ShiftLeft(_, _, _) | ast::Expression::AssignShiftLeft(_, _, _) => {
                     self.builder.build_left_shift(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                 }
-                ast::Expression::ShiftRight(_, _, _) => {
+                ast::Expression::ShiftRight(_, _, _) | ast::Expression::AssignShiftRight(_, _, _) => {
                     self.builder.build_right_shift(left.into_int_value(), right.into_int_value(), false, op.expr_name().as_str())
                 }
-                ast::Expression::BitwiseOr(_, _, _) => {
+                ast::Expression::BitwiseOr(_, _, _) | ast::Expression::AssignOr(_, _, _) => {
                     self.builder.build_or(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                 }
-                ast::Expression::BitwiseXor(_, _, _) => {
+                ast::Expression::BitwiseXor(_, _, _) | ast::Expression::AssignXor(_, _, _) => {
                     self.builder.build_xor(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                 }
-                ast::Expression::BitwiseAnd(_, _, _) => {
+                ast::Expression::BitwiseAnd(_, _, _) | ast::Expression::AssignAnd(_, _, _) => {
                     self.builder.build_and(left.into_int_value(), right.into_int_value(), op.expr_name().as_str())
                 }
                 _ => unreachable!()
@@ -372,7 +402,8 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             ast::Statement::VariableDefinition(_, variable, e) => {
                 if !e.is_lambda_var() {
                     let v = self.compile_expr(e)?;
-                    let alloca = self.builder.build_alloca(self.context.i32_type(), &variable.name.name);
+                    let cty = get_register_type(&self.symbol_table_stack, variable.name.name.clone());
+                    let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
                     self.builder.build_store(alloca, v);
                     self.variables.insert(String::from(variable.name.name.as_str()), (alloca, v));
                 } else {
@@ -444,7 +475,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 }
                 let v = self.variables.get(name.name.as_str()).unwrap();
                 println!("vv:{:?},name:{:?}", v, name);
-                return Ok(BasicValueEnum::IntValue(self.builder.build_load(v.clone().0, name.name.as_str()).into_int_value()));
+                return Ok(self.builder.build_load(v.clone().0, name.name.as_str()));
                 // println!("vv is :{:?}", vv);
             }
             ast::Expression::StringLiteral(values) => {
@@ -458,6 +489,16 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 value.set_initializer(&v);
                 return Ok(BasicValueEnum::PointerValue(value.as_pointer_value()));
             }
+            ast::Expression::BoolLiteral(_, value) => {
+                let int_value = if *value { 1 } else { 0 };
+                let v = self.context.bool_type().const_int(int_value, false);
+                return Ok(BasicValueEnum::IntValue(v));
+            }
+            ast::Expression::NumberLiteral(_, value) => {
+                let v = self.context.i32_type().const_int(*value as u64, true);
+                return Ok(BasicValueEnum::IntValue(v));
+            }
+
             ast::Expression::Lambda(loc, lambda) => {
                 return Ok(BasicValueEnum::FunctionValue(self.compile_lambda(lambda)?));
             }
@@ -490,8 +531,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 println!("symbol_table:{:#?}", self.symbol_table_stack);
                 let at = a.get_type(&self.symbol_table_stack).unwrap();
                 let bt = b.get_type(&self.symbol_table_stack).unwrap();
-                // let max = if at < bt { bt.clone() } else { at.clone() };
-                let max = CType::I32;
+                let max = if at < bt { bt.clone() } else { at.clone() };
                 println!("end_ty:{:?},at:{:?},bt:{:?}", max, at, bt);
                 return Ok(self.codegen_op(a, b, expr, &max, false)?);
                 // if at == bt {
@@ -514,6 +554,25 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 //     self.emit(Instruction::PrimitiveTypeChange(idx));
                 // }
             }
+            ast::Expression::AssignOr(_, a, b) |
+            ast::Expression::AssignAnd(_, a, b) |
+            ast::Expression::AssignXor(_, a, b) |
+            ast::Expression::AssignShiftLeft(_, a, b) |
+            ast::Expression::AssignShiftRight(_, a, b) |
+            ast::Expression::AssignAdd(_, a, b) |
+            ast::Expression::AssignSubtract(_, a, b) |
+            ast::Expression::AssignMultiply(_, a, b) |
+            ast::Expression::AssignDivide(_, a, b) |
+            ast::Expression::AssignModulo(_, a, b)
+            => {
+                let at = a.get_type(&self.symbol_table_stack).unwrap();
+                let bt = b.get_type(&self.symbol_table_stack).unwrap();
+                let max = if at < bt { bt.clone() } else { at.clone() };
+                let value = self.codegen_op(a, b, expr, &max, false)?;
+                let alloc = self.variables.get(&a.expr_name()).unwrap().0;
+                self.builder.build_store(alloc, value);
+            }
+
             // Expr::Call { ref fn_name, ref args } => {
             //     match self.get_function(fn_name.as_str()) {
             //         Some(fun) => {
@@ -585,7 +644,14 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 // }
             }
             ast::Expression::Number(loc, num) => {
-                return Ok(BasicValueEnum::IntValue(self.context.i32_type().const_int(num.to_u64(), false)));
+                let cty = expr.get_type(&self.symbol_table_stack).unwrap();
+                let ty = self.llvm_type(&cty);
+                if cty == CType::Float {
+                    let v = ty.into_float_type().const_float(num.to_float());
+                    return Ok(BasicValueEnum::FloatValue(v));
+                } else {
+                    return Ok(BasicValueEnum::IntValue(ty.into_int_type().const_int(num.to_u64(), cty.is_signed())));
+                }
             }
             ast::Expression::Less(_, a, b) | ast::Expression::More(_, a, b) |
             ast::Expression::LessEqual(_, a, b) | ast::Expression::MoreEqual(_, a, b) |
@@ -873,7 +939,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         for (size, part) in md.module_parts.iter().enumerate() {
             match part {
                 ast::PackagePart::FunctionDefinition(def) => {
+                    self.enter_scope();
                     let f = self.compile_fn(def)?;
+                    self.leave_scope();
                     //self.variables.insert(def.name.unwrap().name,(AnyValueEnum::PointerValue(f.),f))
                     fn_values.push(f);
                 }
@@ -928,6 +996,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
     }
 
     fn compile_lambda(&mut self, fun: &LambdaDefinition) -> Result<FunctionValue<'ctx>, &'static str> {
+        self.enter_scope();
         let function = self.compile_lamba_prototype(fun)?;
         let entry = self.context.append_basic_block(function, "lambda");
         println!("lambdabasicBlock is :{:#?}", entry);
@@ -952,7 +1021,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         self.builder.position_at_end(entry);
         let mut ret_type = BasicTypeEnum::IntType(self.context.i32_type());
         let cty = fun.get_type(&self.symbol_table_stack).unwrap();
-
+        self.leave_scope();
         println!("2222lambdabasicBlock is :{:#?}", entry);
         // if let Some(ret) = &fun.returns {
         //     ret_type = llvm_type(self.module, self.context, &cty.ret_type());

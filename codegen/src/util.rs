@@ -7,6 +7,7 @@ use inkwell::types::{IntType, FunctionType, FloatType, PointerType, StructType, 
 use inkwell::support::LLVMString;
 use inkwell::module::Module;
 use inkwell::AddressSpace;
+use pan_compiler::symboltable::SymbolTable;
 
 pub fn unwrap_const2ir_float_value<'a>(context: &'a Context, value: &'a Constant) -> Result<FloatValue<'a>, &'static str> {
     match value {
@@ -267,6 +268,32 @@ pub fn llvm_type<'a>(module: &'a Module, context: &'a Context, ty: &'a CType) ->
         // }
         // _ => unreachable!(),
     }
+}
+
+pub fn get_register_type(tables: &Vec<SymbolTable>, name: String) -> CType {
+    let len = tables.len();
+    for i in 0..len {
+        let t = tables.get(len - i - 1);
+        let a = t.unwrap().lookup(name.as_str());
+        if a.is_some() {
+            return a.unwrap().ty.clone();
+        }
+    }
+    CType::Unknown
+}
+
+pub fn get_self_type(tables: &mut Vec<SymbolTable>) -> CType {
+    let len = tables.len();
+    for i in 0..len {
+        let t = tables.get(len - i - 1);
+        let a = t.unwrap().lookup("self");
+        if a.is_some() {
+            if a.unwrap().ty != CType::TSelf {
+                return a.unwrap().ty.clone();
+            }
+        }
+    }
+    CType::Unknown
 }
 
 

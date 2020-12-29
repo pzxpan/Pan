@@ -409,7 +409,7 @@ impl HasType for Expression {
             => {
                 let mut l = left.get_type(tables)?;
                 let mut r = right.get_type(tables)?;
-                let (max, min) = if l >= r { (l, r) } else { (r, l) };
+                let (max, min) = if l >= r { (l.clone(), r) } else { (r, l.clone()) };
                 return if max == CType::Str {
                     //String类型能加，且自动转型String
                     Ok(max)
@@ -428,14 +428,14 @@ impl HasType for Expression {
             => {
                 let mut l = left.get_type(tables)?;
                 let mut r = right.get_type(tables)?;
-                let (max, min) = if l >= r { (l, r) } else { (r, l) };
-                return if min < CType::I8 || max > CType::Float || min != max {
+                let (max, min) = if l >= r { (l.clone(), r) } else { (r, l.clone()) };
+                return if min < CType::I8 || max > CType::Float {
                     Err(SymbolTableError {
                         error: format!("只有数字类型才能进行四则运算{:?}", left.expr_name()),
                         location: loc.clone(),
                     })
                 } else {
-                    Ok(min)
+                    Ok(l.clone())
                 };
             }
             Expression::AssignAnd(loc, left, right) |
@@ -446,14 +446,14 @@ impl HasType for Expression {
             Expression::AssignXor(loc, left, right) => {
                 let mut l = left.get_type(tables)?;
                 let mut r = right.get_type(tables)?;
-                let (max, min) = if l >= r { (l, r) } else { (r, l) };
-                return if min < CType::I8 || max > CType::U128 || min != max {
+                let (max, min) = if l >= r { (l.clone(), r) } else { (r, l.clone()) };
+                return if min < CType::I8 || max > CType::U128 {
                     Err(SymbolTableError {
                         error: format!("只有整数类型才能进行位运算{:?}", left.expr_name()),
                         location: loc.clone(),
                     })
                 } else {
-                    Ok(min)
+                    Ok(l.clone())
                 };
             }
 
@@ -852,7 +852,7 @@ impl HasType for LambdaDefinition {
                 let s = statements.last();
                 match s {
                     Some(Statement::Return(_, e)) => {
-                        println!("lambad_return{:?}",e);
+                        println!("lambad_return{:?}", e);
                         let ty = e.as_ref().unwrap().get_type(tables)?;
                         ty
                     }

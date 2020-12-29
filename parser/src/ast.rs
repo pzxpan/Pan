@@ -376,6 +376,12 @@ impl Number {
             _ => 0,
         }
     }
+    pub fn to_float(&self) -> f64 {
+        match self {
+            Number::Float(v) => return *v,
+            _ => 0.0,
+        }
+    }
     pub fn to_u64(&self) -> u64 {
         match self {
             Number::I8(v) => return *v as u64,
