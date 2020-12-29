@@ -33,7 +33,7 @@ impl function_call for Expression {
                         }
                         if ety != &CType::Any {
                             if *is_varargs {
-                                if let CType::Array(_) = ety {
+                                if let CType::Array(_, _) = ety {
                                     continue;
                                 }
                             }

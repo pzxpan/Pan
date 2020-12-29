@@ -29,7 +29,7 @@ pub enum CType {
     Module,
     Type,
     Tuple(Box<Vec<CType>>),
-    Array(Box<CType>),
+    Array(Box<CType>, usize),
     Dict(Box<CType>, Box<CType>),
     Fn(FnType),
     Struct(StructType),

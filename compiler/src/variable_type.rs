@@ -52,7 +52,7 @@ impl HasType for Type {
                 }
                 return Ok(ty);
             }
-            Type::Array(name, _) => { return Ok(CType::Array(Box::new(get_register_type(tables, name.name.clone())))); }
+            Type::Array(name, size) => { return Ok(CType::Array(Box::new(get_register_type(tables, name.name.clone())), *size)); }
             Type::Tuple(ids) => {
                 let mut v = Vec::new();
                 if ids.is_some() {
@@ -636,9 +636,9 @@ impl HasType for Expression {
                             });
                         }
                     }
-                    return Ok(CType::Array(Box::new(ty)));
+                    return Ok(CType::Array(Box::new(ty), elements.len()));
                 }
-                return Ok(CType::Array(Box::new(CType::None)));
+                return Ok(CType::Array(Box::new(CType::None), 0));
             }
 
             Expression::Dict(loc, dicts) => {
@@ -752,7 +752,7 @@ impl HasType for Expression {
                         error: format!("下标必须为整型"),
                         location: loc.clone(),
                     });
-                } else if let CType::Array(ty) = a_ty {
+                } else if let CType::Array(ty, _) = a_ty {
                     return Ok(ty.as_ref().clone());
                 } else if let CType::Dict(key, value) = a_ty {
                     return Ok(value.as_ref().clone());
@@ -779,15 +779,15 @@ impl HasType for Expression {
                 let (max, min) = if l >= r { (l, r) } else { (r, l) };
                 //0..100
                 if max < CType::Float && min >= CType::Char {
-                    return Ok(CType::Array(Box::new(min)));
+                    return Ok(CType::Array(Box::new(min), 0));
                 }
                 // ..100
                 if start.is_none() || min >= CType::Char && min < CType::Float {
-                    return Ok(CType::Array(Box::new(min)));
+                    return Ok(CType::Array(Box::new(min), 0));
                 }
                 // 2..
                 if end.is_none() || min >= CType::Char && min < CType::Float {
-                    return Ok(CType::Array(Box::new(min)));
+                    return Ok(CType::Array(Box::new(min), 0));
                 }
 
                 return Err(SymbolTableError {
@@ -797,7 +797,7 @@ impl HasType for Expression {
             }
             Expression::List(loc, elements) => {
                 if elements.is_empty() {
-                    return Ok(CType::Array(Box::new(CType::Any)));
+                    return Ok(CType::Array(Box::new(CType::Any), 0));
                 } else {
                     let ty = elements.get(0).unwrap().1.as_ref().unwrap().get_type(&tables)?;
                     for element in elements {
@@ -808,7 +808,7 @@ impl HasType for Expression {
                             });
                         }
                     }
-                    return Ok(CType::Array(Box::new(ty)));
+                    return Ok(CType::Array(Box::new(ty), elements.len()));
                 }
             }
             Expression::Attribute(loc, obj, name, idx) => {

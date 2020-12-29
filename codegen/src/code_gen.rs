@@ -8,7 +8,7 @@ use inkwell::values::{FunctionValue, PointerValue, FloatValue, BasicValue, Basic
 use inkwell::builder::Builder;
 use std::collections::HashMap;
 use inkwell::{FloatPredicate, OptimizationLevel};
-use inkwell::types::{BasicTypeEnum, FunctionType, VoidType};
+use inkwell::types::{BasicTypeEnum, FunctionType, VoidType, BasicType};
 use inkwell::execution_engine::JitFunction;
 use pan_parser::ast;
 use crate::util::{unwrap_const2ir_float_value, llvm_type, unwrap_const2ir_int_value, get_register_type};
@@ -21,6 +21,7 @@ use pan_compiler::ctype::CType;
 use std::convert::TryInto;
 use crate::control_flow_block::ControlFlowBlock;
 use std::process::exit;
+use pan_compiler::ctype::CType::I32;
 
 pub fn module_codegen(
     md: &ast::ModuleDefinition,
@@ -289,6 +290,13 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         Ok(())
     }
 
+    fn codegen_if_expr(&mut self, test: &ast::Expression, body: &ast::Expression, orelse: &ast::Expression) -> Result<BasicValueEnum<'ctx>, &'static str> {
+        let cond = self.compile_expr(test)?;
+        let left = self.compile_expr(body)?;
+        let right = self.compile_expr(&orelse)?;
+        Ok(self.builder.build_select(cond.into_int_value(), left, right, test.expr_name().as_str()))
+    }
+
     fn codegen_op(&mut self, left_expr: &ast::Expression, right_expr: &ast::Expression, op: &ast::Expression, aim_ty: &CType,
                   need_promotion: bool) -> Result<BasicValueEnum<'ctx>, &'static str> {
         let mut is_float = false;
@@ -402,7 +410,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             ast::Statement::VariableDefinition(_, variable, e) => {
                 if !e.is_lambda_var() {
                     let v = self.compile_expr(e)?;
+                    println!("vvv:{:#?}", v);
                     let cty = get_register_type(&self.symbol_table_stack, variable.name.name.clone());
+                    println!("varaible_ty:{:?}", cty);
                     let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
                     self.builder.build_store(alloca, v);
                     self.variables.insert(String::from(variable.name.name.as_str()), (alloca, v));
@@ -455,6 +465,22 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
     fn compile_expr(&mut self, expr: &ast::Expression) -> Result<BasicValueEnum<'ctx>, &'static str> {
         println!("expr:{:?}", expr);
         match expr {
+            ast::Expression::Subscript(_, a, b) => {
+                let ptr = self.variables.get(a.expr_name().as_str()).unwrap().0;
+                //let obj = self.compile_expr(a)?;
+                let slice_or_sub = self.compile_expr(b)?;
+                if let ast::Expression::Range(_, start, end, include) = b.as_ref() {
+                    let start_value = self.context.i32_type().const_int(1, false);
+                    let end_value = self.context.i32_type().const_int(2 as u64, false);
+
+                    let r = unsafe { self.builder.build_in_bounds_gep(ptr, &[start_value, end_value], "index") };
+                    return Ok(self.builder.build_load(r, "subscript"));
+                } else {
+                    // let array = self.builder.build_load(ptr,"arr");
+                    let r = unsafe { self.builder.build_gep(ptr, &[self.context.i32_type().const_zero(), slice_or_sub.into_int_value()], "index") };
+                    return Ok(self.builder.build_load(r, "subscript"));
+                }
+            }
             ast::Expression::Add(loc, l, r) => {
                 let l = self.compile_expr(l.as_ref())?;
                 let r = self.compile_expr(r.as_ref())?;
@@ -524,9 +550,8 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             ast::Expression::ShiftRight(_, a, b) |
             ast::Expression::BitwiseAnd(_, a, b) |
             ast::Expression::BitwiseXor(_, a, b) |
-            ast::Expression::BitwiseOr(_, a, b) |
-            ast::Expression::And(_, a, b) |
-            ast::Expression::Or(_, a, b) => {
+            ast::Expression::BitwiseOr(_, a, b)
+            => {
                 // let rt = expr.get_type(&self.symbol_table_stack).unwrap();
                 println!("symbol_table:{:#?}", self.symbol_table_stack);
                 let at = a.get_type(&self.symbol_table_stack).unwrap();
@@ -553,6 +578,16 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 //     let idx = get_number_type(rt);
                 //     self.emit(Instruction::PrimitiveTypeChange(idx));
                 // }
+            }
+            ast::Expression::And(_, a, b) |
+            ast::Expression::Or(_, a, b) => {
+                let left = self.compile_expr(a.as_ref()).unwrap();
+                let right = self.compile_expr(b.as_ref()).unwrap();
+                if let ast::Expression::And(_, _, _) = expr {
+                    return Ok(BasicValueEnum::IntValue(self.builder.build_and(left.into_int_value(), right.into_int_value(), expr.expr_name().as_str())));
+                } else {
+                    return Ok(BasicValueEnum::IntValue(self.builder.build_or(left.into_int_value(), right.into_int_value(), expr.expr_name().as_str())));
+                }
             }
             ast::Expression::AssignOr(_, a, b) |
             ast::Expression::AssignAnd(_, a, b) |
@@ -625,23 +660,11 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     }
                     None => { return Err("Unknown function."); }
                 }
-                // match self.get_function(name.expr_name().as_str()) {
-                //     Some(fun) => {
-                //         let mut compiled_args = Vec::with_capacity(args.len());
-                //
-                //         for arg in args {
-                //             compiled_args.push(self.compile_expr(arg)?);
-                //         }
-                //
-                //         let argsv: Vec<BasicValueEnum> = compiled_args.iter().by_ref().map(|&val| val.into()).collect();
-                //         println!("argsv:{:?}", argsv);
-                //         return match self.builder.build_call(fun, argsv.as_slice(), "tmp").try_as_basic_value().left() {
-                //             Some(value) => Ok(BasicValueEnum::IntValue(value.into_int_value())),
-                //             None => Err("Invalid call produced.")
-                //         };
-                //     }
-                //     None => { return Err("Unknown function."); }
-                // }
+            }
+
+            ast::Expression::IfExpression(_, test, body, orelse) => {
+                let result = self.codegen_if_expr(test, body.as_ref(), orelse.as_ref())?;
+                return Ok(result);
             }
             ast::Expression::Number(loc, num) => {
                 let cty = expr.get_type(&self.symbol_table_stack).unwrap();
@@ -659,6 +682,26 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             ast::Expression::Is(_, a, b) |
             ast::Expression::In(_, a, b) => {
                 return Ok(self.codegen_compare(a, b, expr)?);
+            }
+            ast::Expression::ArrayLiteral(_, elements) => {
+                let size = elements.len();
+                let values = self.gather_elements(elements)?;
+                let cty = expr.get_type(&self.symbol_table_stack).unwrap();
+                if let CType::Array(ty, _) = cty {
+                    let lty = self.llvm_type(ty.as_ref());
+                    if ty.as_ref() < &CType::Float {
+                        let v: Vec<IntValue> = values.iter().map(|s| { s.into_int_value() }).collect();
+                        return Ok(BasicValueEnum::ArrayValue(lty.into_int_type().const_array(&v[..])));
+                    } else if ty.as_ref() == &CType::Float {
+                        let v: Vec<FloatValue> = values.iter().map(|s| { s.into_float_value() }).collect();
+                        return Ok(BasicValueEnum::ArrayValue(lty.into_float_type().const_array(&v[..])));
+                    } else {
+                        let v: Vec<StructValue> = values.iter().map(|s| { s.into_struct_value() }).collect();
+                        return Ok(BasicValueEnum::ArrayValue(lty.into_struct_type().const_array(&v[..])));
+                    }
+                } else {
+                    unreachable!()
+                }
             }
 
             _ => {}
@@ -886,9 +929,18 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             CType::I128 => BasicTypeEnum::IntType(self.context.i128_type()),
             CType::U128 => BasicTypeEnum::IntType(self.context.i128_type()),
             CType::Float => BasicTypeEnum::FloatType(self.context.f64_type()),
+            CType::Array(cty, size) => BasicTypeEnum::ArrayType(self.llvm_type(&cty).array_type(*size as u32)),
             // CType::Str => BasicTypeEnum::VectorType(module.get_struct_type("struct.vector").unwrap().into()),
             _ => unreachable!()
         }
+    }
+
+    fn gather_elements(&mut self, elements: &[ast::Expression]) -> Result<Vec<BasicValueEnum<'ctx>>, &'static str> {
+        let mut v = vec![];
+        for element in elements {
+            v.push(self.compile_expr(element)?);
+        }
+        Ok(v)
     }
 
     /// Compiles the specified `Prototype` into an extern LLVM `FunctionValue`.

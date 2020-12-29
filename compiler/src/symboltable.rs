@@ -754,7 +754,7 @@ impl SymbolTableBuilder {
                         //如果类型相同的Tuple,就退化为Array,允许对其中的元素进行迭代;
                         self.register_name(symbol_name.borrow(), cty.clone(), SymbolUsage::Mut, iter.loc())?;
                     }
-                } else if let CType::Array(cty) = ty {
+                } else if let CType::Array(cty, _) = ty {
                     self.register_name(symbol_name.borrow(), cty.as_ref().clone(), SymbolUsage::Mut, iter.loc())?;
                 } else if let CType::Dict(key, value) = ty {
                     self.register_name(symbol_name.borrow(), CType::Tuple(Box::new(vec![key.as_ref().clone(), value.as_ref().clone()])), SymbolUsage::Mut, iter.loc())?;
@@ -1166,7 +1166,7 @@ impl SymbolTableBuilder {
 
     fn scan_multi_value_def(&mut self, decls: &MultiVariableDeclaration, ty: &CType) -> SymbolTableResult {
         match ty {
-            CType::Array(item_ty) => {
+            CType::Array(item_ty, _) => {
                 for part in &decls.variables {
                     self.scan_multi_value_part(&part, item_ty);
                 }
@@ -1285,7 +1285,7 @@ impl SymbolTableBuilder {
             }
             Subscript(loc, a, b) => {
                 let sty = a.get_type(&self.tables)?;
-                if let CType::Array(_) = sty {
+                if let CType::Array(_, _) = sty {
                     self.scan_expression(a, context)?;
                 } else if let CType::Str = sty {
                     self.scan_expression(a, context)?;

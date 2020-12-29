@@ -26,7 +26,6 @@ use crate::compile::FunctionContext::{Function, StructFunction};
 use crate::symboltable::SymbolScope::Const;
 use crate::file_cache_symboltable::{make_ast, resolve_file_name};
 use pan_bytecode::bytecode::Constant::Reference;
-use crate::resolve_symbol::get_register_type;
 
 
 lazy_static! {
@@ -1765,6 +1764,7 @@ impl<O: OutputStream> Compiler<O> {
         let mut subsize = 0;
         let mut is_set = false;
         for entry in pairs {
+
             self.compile_expression(&entry.key)?;
             if entry.value.is_some() {
                 self.compile_expression(&entry.value.as_ref().unwrap())?;
