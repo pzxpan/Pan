@@ -1,6 +1,6 @@
 use inkwell::context::Context;
 use pan_bytecode::bytecode::{CodeObject, Instruction, Constant};
-use inkwell::module::Module;
+use inkwell::module::{Module, Linkage};
 use inkwell::passes::PassManager;
 use inkwell::{AddressSpace, IntPredicate};
 use inkwell::targets::TargetTriple;
@@ -8,13 +8,13 @@ use inkwell::values::{FunctionValue, PointerValue, FloatValue, BasicValue, Basic
 use inkwell::builder::Builder;
 use std::collections::HashMap;
 use inkwell::{FloatPredicate, OptimizationLevel};
-use inkwell::types::{BasicTypeEnum, FunctionType, VoidType, BasicType};
+use inkwell::types::{BasicTypeEnum, FunctionType, VoidType, BasicType, StructType};
 use inkwell::execution_engine::JitFunction;
 use pan_parser::ast;
 use crate::util::{unwrap_const2ir_float_value, llvm_type, unwrap_const2ir_int_value, get_register_type};
-use pan_parser::ast::{ModuleDefinition, FunctionDefinition, LambdaDefinition};
+use pan_parser::ast::{ModuleDefinition, FunctionDefinition, LambdaDefinition, StructPart, StructDefinition};
 use crate::module_value::ModuleValue;
-use pan_compiler::symboltable::{SymbolTable, make_symbol_table};
+use pan_compiler::symboltable::{SymbolTable, make_symbol_table, Symbol};
 use pan_compiler::variable_type::HasType;
 use std::env::args_os;
 use pan_compiler::ctype::CType;
@@ -63,10 +63,13 @@ pub fn module_codegen(
     println!("file:{:?}", file);
     module.write_bitcode_to_path(&std::env::current_dir().unwrap().join("demo").join("for.bc"));
     println!("write_to_bc_file");
-    let f = module.get_function("main").unwrap();
+    let mut main_name = String::from(md.package.clone());
+    main_name.push_str("::main");
+    println!("main_name:{:?}", main_name);
+    let f = module.get_function(&main_name).unwrap();
     // let d = module.get_function("lambda").unwrap();
     println!("wwwwmodule is:f{:#?},ee:{:#?}", f, ee);
-    let maybe_fn = unsafe { ee.get_function::<unsafe extern "C" fn() -> i32>("main") };
+    let maybe_fn = unsafe { ee.get_function::<unsafe extern "C" fn() -> i32>(&main_name) };
     println!("maybe");
     let compiled_fn = match maybe_fn {
         Ok(f) => f,
@@ -244,6 +247,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
             self.control_blocks.pop_loop_block();
             self.control_blocks.pop_loop_after_block();
+            self.ctx = pre_ctx;
         }
 
         Ok(())
@@ -265,7 +269,37 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         let right = self.compile_expr(right)?;
         return Ok(BasicValueEnum::IntValue(self.builder.build_int_compare(to_operator(op), left.into_int_value(), right.into_int_value(), "ifcond")));
     }
+    fn codegen_slice(&mut self, ptr: &PointerValue<'ctx>, range: &ast::Expression) -> Result<BasicValueEnum<'ctx>, &'static str> {
+        if let ast::Expression::Range(_, start, end, include) = range {
+            let mut start_value = self.context.i32_type().const_int(0, false);
+            let mut end_value = self.context.i32_type().const_int(0, false);
+            if start.is_some() {
+                start_value = self.compile_expr(start.as_ref().as_ref().unwrap())?.into_int_value();
+            }
+            if end.is_some() {
+                end_value = self.compile_expr(end.as_ref().as_ref().unwrap())?.into_int_value();
+            }
+            let inclusive = self.context.bool_type().const_int(*include as u64, false);
+            //应该放在单独的文件中,用来slice，暂时放在这里，将就下;
+            // let bb = self.builder.get_insert_block().unwrap();
+            //
+            // let struct_type = self.context.struct_type(&[BasicTypeEnum::PointerType(ptr.get_type()), BasicTypeEnum::IntType(start_value.get_type()),
+            //     BasicTypeEnum::IntType(end_value.get_type()), BasicTypeEnum::IntType(inclusive.get_type())], false);
+            // let fn_type = struct_type.fn_type(&[BasicTypeEnum::PointerType(ptr.get_type()), BasicTypeEnum::IntType(start_value.get_type()),
+            //     BasicTypeEnum::IntType(end_value.get_type()), BasicTypeEnum::IntType(inclusive.get_type())], false);
+            // let fn_value = self.module.add_function("slice", fn_type, None);
+            // let call = self.builder.build_call(fn_value, &[BasicValueEnum::PointerValue(*ptr), BasicValueEnum::IntValue(start_value),
+            //     BasicValueEnum::IntValue(end_value), BasicValueEnum::IntValue(inclusive)], "tmp").try_as_basic_value();
+            // //let r = self.builder.build_call() build_return();
+            // self.builder.position_at_end(bb);
 
+            let r = unsafe { self.builder.build_in_bounds_gep(*ptr, &[start_value, end_value], "index") };
+            // return Ok(call.left().unwrap());
+
+            return Ok(self.builder.build_load(r, "subscript"));
+        }
+        unreachable!()
+    }
     fn codegen_if(&mut self, test: &ast::Expression, body: &ast::Statement, orelse: &Option<Box<ast::Statement>>) -> Result<(), &'static str> {
         let parent = self.fn_value();
         let cond = self.compile_expr(test)?;
@@ -409,13 +443,21 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             }
             ast::Statement::VariableDefinition(_, variable, e) => {
                 if !e.is_lambda_var() {
-                    let v = self.compile_expr(e)?;
-                    println!("vvv:{:#?}", v);
                     let cty = get_register_type(&self.symbol_table_stack, variable.name.name.clone());
                     println!("varaible_ty:{:?}", cty);
-                    let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
-                    self.builder.build_store(alloca, v);
-                    self.variables.insert(String::from(variable.name.name.as_str()), (alloca, v));
+                    if let CType::Struct(_) = cty {
+                        let bb = self.builder.get_insert_block().unwrap();
+                        let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
+                        self.builder.position_at_end(bb);
+                        self.variables.insert(String::from(variable.name.name.as_str()), (alloca, BasicValueEnum::PointerValue(alloca)));
+                        let v = self.compile_expr(e)?;
+                        // self.builder.build_store(alloca, v);
+                    } else {
+                        let v = self.compile_expr(e)?;
+                        let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
+                        self.builder.build_store(alloca, v);
+                        self.variables.insert(String::from(variable.name.name.as_str()), (alloca, v));
+                    }
                 } else {
                     let bb = self.builder.get_insert_block().unwrap();
                     let v = self.compile_expr(e)?;
@@ -460,7 +502,97 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         }
         return Ok(());
     }
+    fn is_constructor(&self, expr: &ast::Expression) -> bool {
+        // let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
+        //
+        // let mut v = get_attribute_vec(&expr);
+        // let mut skip = 0;
+        // let len = v.len();
+        // if let CType::Package(pk) = cty.clone() {
+        //     for (idx, name) in v.iter().enumerate() {
+        //         if idx < len - 1 {
+        //             if let CType::Package(_) = cty.clone() {
+        //                 let attri_name = v.get(idx + 1).unwrap().clone();
+        //                 cty = get_package_layer(&cty, attri_name.0.clone()).unwrap();
+        //             } else {
+        //                 skip = idx;
+        //                 break;
+        //             }
+        //         }
+        //     }
+        // }
+        // if let CType::Struct(_) = cty {
+        //     return true;
+        // }
+        return false;
+    }
+    fn compile_named_call(
+        &mut self,
+        function: &ast::Expression,
+        args: &[ast::NamedArgument],
+    ) -> Result<BasicValueEnum<'ctx>, &'static str> {
+        let mut is_constructor = false;
+        is_constructor = self.is_constructor(function);
+        if let ast::Expression::Variable(ast::Identifier { name, .. }) = function {
+            //有问题，多层没处理
+            // let mut fun_name = name.expr_name();
 
+            let v = self.get_function("default::AAA");
+            match v {
+                Some(fun) => {
+                    // let f = fun.clone();
+                    println!("vvvv:{:?}", v);
+                    let mut compiled_args = Vec::with_capacity(args.len());
+                    let cty = get_register_type(&self.symbol_table_stack, name.clone());
+                    if let CType::Fn(fnty) = cty {
+                        for fn_arg in fnty.arg_types {
+                            for arg in args {
+                                if fn_arg.0.eq(&arg.name.name) {
+                                    compiled_args.push(self.compile_expr(&arg.expr)?);
+                                }
+                            }
+                        }
+                    } else if let CType::Struct(structty) = cty {
+                        for (idx, field) in structty.fields.iter().enumerate() {
+                            for arg in args {
+                                if field.0.eq(&arg.name.name) {
+                                    let start_value = self.context.i32_type().const_int(0, false);
+                                    let end_value = self.context.i32_type().const_int(idx as u64, false);
+                                    //
+                                    let ptr = self.variables.get("aa").unwrap().clone().0;
+                                    let r = unsafe { self.builder.build_in_bounds_gep(ptr, &[start_value, end_value], "index") };
+                                    self.builder.build_store(r, self.compile_expr(&arg.expr)?);
+
+                                    //compiled_args.push();
+                                }
+                            }
+                        }
+                        return Ok(BasicValueEnum::IntValue(self.context.i32_type().const_int(0, false)));
+                    } else {
+                        unreachable!()
+                    }
+
+                    let mut argsv: Vec<BasicValueEnum> = compiled_args.iter().by_ref().map(|&val| val.into()).collect();
+                    println!("argsv:{:?}", argsv);
+
+                    let call = self.builder.build_call(fun, argsv.as_slice(), "tmp").try_as_basic_value();
+                    println!("is_left or not :{:?}", call.is_left());
+
+                    if call.is_left() {
+                        return match call.left() {
+                            Some(value) => Ok(value),
+                            None => Err("Invalid call produced.")
+                        };
+                    }
+                }
+                None => { return Err("Unknown function."); }
+            }
+        } else {
+            self.compile_expr(function)?;
+        }
+
+        Err("Invalid named call produced.")
+    }
     /// Compiles the specified `Expr` into an LLVM `FloatValue`.
     fn compile_expr(&mut self, expr: &ast::Expression) -> Result<BasicValueEnum<'ctx>, &'static str> {
         println!("expr:{:?}", expr);
@@ -470,11 +602,12 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 //let obj = self.compile_expr(a)?;
                 let slice_or_sub = self.compile_expr(b)?;
                 if let ast::Expression::Range(_, start, end, include) = b.as_ref() {
-                    let start_value = self.context.i32_type().const_int(1, false);
-                    let end_value = self.context.i32_type().const_int(2 as u64, false);
-
-                    let r = unsafe { self.builder.build_in_bounds_gep(ptr, &[start_value, end_value], "index") };
-                    return Ok(self.builder.build_load(r, "subscript"));
+                    // let start_value = self.context.i32_type().const_int(1, false);
+                    // let end_value = self.context.i32_type().const_int(2 as u64, false);
+                    //
+                    // let r = unsafe { self.builder.build_in_bounds_gep(ptr, &[start_value, end_value], "index") };
+                    // return Ok(self.builder.build_load(r, "subscript"));
+                    return Ok(self.codegen_slice(&ptr, b.as_ref())?);
                 } else {
                     // let array = self.builder.build_load(ptr,"arr");
                     let r = unsafe { self.builder.build_gep(ptr, &[self.context.i32_type().const_zero(), slice_or_sub.into_int_value()], "index") };
@@ -627,6 +760,10 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             //         None => Err("Unknown function.")
             //     }
             // }
+            ast::Expression::NamedFunctionCall(loc, name, args) => {
+                return Ok(self.compile_named_call(name, args)?);
+            }
+
             ast::Expression::FunctionCall(loc, name, args) => {
                 let mut fun_name = name.expr_name();
                 if fun_name.eq("add") {
@@ -913,7 +1050,21 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         //     Ok(self.context.f64_type().const_float(0.0))
         // }
     }
-
+    pub fn lookup_name_prefix(&self, name: &String) -> String {
+        // println!("Looking up {:?}", name);
+        println!("symbol:{:#?}", self.symbol_table_stack);
+        let len: usize = self.symbol_table_stack.len();
+        let mut v = String::new();
+        //module名字重了; 需要处理一下;
+        for i in 1..len - 1 {
+            let name = &self.symbol_table_stack[i].name;
+            v.push_str(&name);
+            v.push_str("::");
+        }
+        v.push_str(name.as_str());
+        println!("presss:{:?}", v);
+        return v;
+    }
     pub fn llvm_type(&self, ty: &CType) -> BasicTypeEnum<'ctx> {
         match ty {
             CType::Bool => BasicTypeEnum::IntType(self.context.bool_type()),
@@ -930,6 +1081,13 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             CType::U128 => BasicTypeEnum::IntType(self.context.i128_type()),
             CType::Float => BasicTypeEnum::FloatType(self.context.f64_type()),
             CType::Array(cty, size) => BasicTypeEnum::ArrayType(self.llvm_type(&cty).array_type(*size as u32)),
+            CType::Struct(cty) => {
+                let mut v: Vec<BasicTypeEnum<'ctx>> = vec![];
+                for field in &cty.fields {
+                    v.push(self.llvm_type(&field.1));
+                }
+                BasicTypeEnum::StructType(self.context.struct_type(&v[..], false))
+            }
             // CType::Str => BasicTypeEnum::VectorType(module.get_struct_type("struct.vector").unwrap().into()),
             _ => unreachable!()
         }
@@ -960,7 +1118,8 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         // args_types.push(ret_type);
         let fn_type = ret_type.into_int_type().fn_type(args_types.as_ref(), false);
 
-        let fn_val = self.module.add_function(def.name.as_ref().unwrap().name.as_str(), fn_type, None);
+        let fn_val = self.module.add_function(self.lookup_name_prefix(&def.name.as_ref().unwrap().name).as_str(), fn_type,
+                                              Some(Linkage::Internal));
 
         // set arguments names
         for (i, arg) in fn_val.get_param_iter().enumerate() {
@@ -998,7 +1157,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     fn_values.push(f);
                 }
                 ast::PackagePart::StructDefinition(def) => {
-                    //  self.comp
+                    self.enter_scope();
+                    self.compile_struct_def(def.as_ref());
+                    self.leave_scope();
                 }
                 _ => {}
             }
@@ -1006,6 +1167,50 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         println!("moduleValues:{:#?},", fn_values);
         self.leave_scope();
         return Ok(ModuleValue { fn_values, struct_values: vec![] });
+    }
+    fn compile_struct_def(&mut self, def: &StructDefinition) -> Result<(), &'static str> {
+        let prev_ctx = self.ctx;
+        self.ctx = CodeGenContext {
+            in_need_block: false,
+            func: FunctionContext::NoFunction,
+            in_loop: false,
+            in_lambda: false,
+            in_match: false,
+        };
+        let mut field_tys = vec![];
+        for field in &def.parts {
+            if let StructPart::StructVariableDefinition(v) = field {
+                let cty = get_register_type(&self.symbol_table_stack, v.name.name.clone());
+                field_tys.push(self.llvm_type(&cty));
+            }
+        }
+        let struct_type = self.context.struct_type(&field_tys[..], false);
+        let fn_type = struct_type.fn_type(&field_tys[..], false);
+
+        self.module.add_function(&self.lookup_name_prefix(&def.name.name), fn_type, Some(Linkage::Internal));
+        for item in &def.parts {
+            match item {
+                StructPart::FunctionDefinition(fun) => {
+                    self.enter_scope();
+                    self.compile_fn(fun.as_ref());
+                    self.leave_scope();
+                }
+                _ => {}
+            }
+        }
+        self.ctx = prev_ctx;
+        return Ok(());
+    }
+    fn lookup_name(&self, name: &str) -> &Symbol {
+        println!("Looking up {:?}", name);
+        let len: usize = self.symbol_table_stack.len();
+        for i in (0..len).rev() {
+            let symbol = self.symbol_table_stack[i].lookup(name);
+            if symbol.is_some() {
+                return symbol.unwrap();
+            }
+        }
+        unreachable!()
     }
 
     fn compile_lamba_prototype(&self, def: &LambdaDefinition) -> Result<FunctionValue<'ctx>, &'static str> {

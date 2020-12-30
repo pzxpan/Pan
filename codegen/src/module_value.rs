@@ -6,3 +6,8 @@ pub struct ModuleValue<'ctx> {
     // enum_values: Vec<EnumValue>,
     pub fn_values: Vec<FunctionValue<'ctx>>,
 }
+
+pub struct CStruct<'ctx> {
+    pub fn_value: Vec<FunctionValue<'ctx>>,
+    pub bases: Vec<StructValue<'ctx>>,
+}

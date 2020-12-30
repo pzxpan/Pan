@@ -2600,17 +2600,6 @@ impl<O: OutputStream> Compiler<O> {
             return true;
         }
         return false;
-
-        // let len: usize = self.symbol_table_stack.len();
-        // for i in (0..len).rev() {
-        //     let symbol = self.symbol_table_stack[i].lookup(name);
-        //     if let Some(s) = symbol {
-        //         if let CType::Struct(_) = &s.ty {
-        //             return true;
-        //         }
-        //     }
-        // }
-        // return false;
     }
 
     fn is_lambda(&self, name: &str) -> bool {

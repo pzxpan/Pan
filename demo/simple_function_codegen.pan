@@ -1,18 +1,23 @@
 package default;
-pub fun subddd(a:i32,b:i32) :i32 {
-    //let c =  a + b;
-    return 20;
+
+pub struct AAA {
+    pub aaa: i32,
+    pub bbb: i32,
+    pub fun get_aaa() :i32 {
+        return 0;
+    }
 }
 
+
+pub fun add(a:i32,b:i32) :i32 {
+    return a + b;
+}
 
 fun main():i32 {
 
 
-
-let arr = [1,2,3,4,5,6,7,8,9];
-let bb = arr[..];
-let cc = bb[1];
-print("aaaddd %d",cc);
+   let aa = AAA!{aaa:30,bbb:10};
+   let bb = 0;
  return 0;
 }
  //%tmp = call i32 (i8*, ...) @printf([3 x i8]* @outputs)\n

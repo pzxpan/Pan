@@ -138,6 +138,17 @@ impl Symbol {
             ty,
         }
     }
+
+    pub fn whole_path(&self) -> String {
+        let mut s = self.prefix.iter().fold(String::new(), |mut s, p| {
+            s.push_str(p.as_str());
+            s.push_str("::");
+            s
+        });
+        println!("prefix:{:?}", s);
+        s.push_str(&self.name.as_str());
+        s
+    }
     pub fn new_with_package(name: &str, ty: CType, package: Vec<String>) -> Self {
         Symbol {
             name: name.to_owned(),
