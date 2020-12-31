@@ -8,6 +8,7 @@ use inkwell::support::LLVMString;
 use inkwell::module::Module;
 use inkwell::AddressSpace;
 use pan_compiler::symboltable::SymbolTable;
+use pan_parser::ast::Expression;
 
 pub fn unwrap_const2ir_float_value<'a>(context: &'a Context, value: &'a Constant) -> Result<FloatValue<'a>, &'static str> {
     match value {
@@ -294,6 +295,39 @@ pub fn get_self_type(tables: &mut Vec<SymbolTable>) -> CType {
         }
     }
     CType::Unknown
+}
+
+pub fn get_attribute_vec(expression: &Expression) -> Vec<(String, Expression)> {
+    let mut v: Vec<(String, Expression)> = vec![];
+
+    let mut expr = expression.clone();
+    loop {
+        if let Expression::Attribute(loc, ex, name, idx) = expr.clone() {
+            if name.is_some() {
+                v.push((name.as_ref().unwrap().name.clone(), Expression::Error));
+            } else {
+                v.push((idx.unwrap().to_string(), Expression::Error));
+            }
+
+            if let Expression::Attribute(loc, ex2, name2, idx) = *ex.clone() {
+                expr = ex.as_ref().clone();
+            } else if let Expression::FunctionCall(_, name, ..) = *ex.clone() {
+                v.push((name.expr_name(), *ex.clone()));
+                //函数插入两边，因为需要取返回值类型，相当于停顿了一下再来
+                v.push(("".to_string(), Expression::Error));
+            } else {
+                v.push((ex.expr_name(), Expression::Error));
+                break;
+            }
+        } else if let Expression::FunctionCall(_, name, ..) = expr.clone() {
+            v.push((name.expr_name(), expr.clone()));
+            v.push(("".to_string(), Expression::Error));
+        } else {
+            break;
+        }
+    }
+    v.reverse();
+    v
 }
 
 

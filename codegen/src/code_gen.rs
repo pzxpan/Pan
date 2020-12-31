@@ -22,6 +22,7 @@ use std::convert::TryInto;
 use crate::control_flow_block::ControlFlowBlock;
 use std::process::exit;
 use pan_compiler::ctype::CType::I32;
+use crate::resovle_code_gen::resolve_compile_field;
 
 pub fn module_codegen(
     md: &ast::ModuleDefinition,
@@ -118,7 +119,7 @@ pub struct CodeGen<'a, 'ctx> {
     pub module: &'a Module<'ctx>,
     // pub function: &'a FunctionValue<'ctx>,
     pub lambdas: HashMap<String, FunctionValue<'ctx>>,
-    variables: HashMap<String, (PointerValue<'ctx>, BasicValueEnum<'ctx>)>,
+    pub variables: HashMap<String, (PointerValue<'ctx>, BasicValueEnum<'ctx>)>,
     fn_value_opt: Option<FunctionValue<'ctx>>,
     ctx: CodeGenContext,
     control_blocks: ControlFlowBlock<'a>,
@@ -148,8 +149,12 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             Some(first_instr) => builder.position_before(&first_instr),
             None => builder.position_at_end(entry)
         }
-
-        builder.build_alloca(self.context.i32_type(), name)
+        let ty = get_register_type(&self.symbol_table_stack, name.to_string());
+        if name.eq("self") {
+            let self_ptr = self.llvm_type(&ty).ptr_type(AddressSpace::Generic);
+            return builder.build_alloca(self_ptr, name);
+        }
+        builder.build_alloca(self.llvm_type(&ty), name)
     }
 
     pub fn enter_scope(&mut self) {
@@ -502,6 +507,11 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         }
         return Ok(());
     }
+    fn is_attribute(&self, name: &str) -> bool {
+        let symbol = self.lookup_name(&name);
+        return symbol.is_attribute;
+    }
+
     fn is_constructor(&self, expr: &ast::Expression) -> bool {
         // let mut cty = self.lookup_name(&expr.expr_name()).ty.clone();
         //
@@ -593,10 +603,14 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
         Err("Invalid named call produced.")
     }
+
     /// Compiles the specified `Expr` into an LLVM `FloatValue`.
     fn compile_expr(&mut self, expr: &ast::Expression) -> Result<BasicValueEnum<'ctx>, &'static str> {
         println!("expr:{:?}", expr);
         match expr {
+            ast::Expression::Attribute(_, name, attri, idx) => {
+                return Ok(resolve_compile_field(self, expr)?);
+            }
             ast::Expression::Subscript(_, a, b) => {
                 let ptr = self.variables.get(a.expr_name().as_str()).unwrap().0;
                 //let obj = self.compile_expr(a)?;
@@ -626,15 +640,32 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 // self.compile_store(a)?;
             }
             ast::Expression::Variable(name) => {
-                if name.name.eq("add") {
-                    let fn_value = self.get_function("lambda").unwrap();
-                    // let v = self.variables.get("add").unwrap();
-                    // println!("ddddvvv:{:#?},", v.1);
-                    return Ok(BasicValueEnum::FunctionValue(fn_value));
+                let is_attribute = self.is_attribute(&name.name);
+                println!("is_attriubte:{:?}", is_attribute);
+                if is_attribute {
+                    let v = self.variables.get("self").unwrap();
+                    let ptr = self.builder.build_load(v.clone().0, "self");
+                    // println!("vvvv222:{:#?},", self.variables);
+                    let cty = get_register_type(&self.symbol_table_stack, "self".to_string());
+                    let tmp = cty.attri_name_type(name.name.clone());
+                    let v_idx = self.context.i32_type().const_int(0 as u64, false);
+                    let num_idx = self.context.i32_type().const_int(tmp.2 as u64, false);
+                    // let ptr = BasicValueEnum::PointerValue();
+                    let r = unsafe { self.builder.build_gep(ptr.into_pointer_value(), &[v_idx, num_idx], "index") };
+                    return Ok(self.builder.build_load(r, name.name.as_str()));
+                } else {
+                    if name.name.eq("add") {
+                        let fn_value = self.get_function("lambda").unwrap();
+                        // let v = self.variables.get("add").unwrap();
+                        // println!("ddddvvv:{:#?},", v.1);
+                        return Ok(BasicValueEnum::FunctionValue(fn_value));
+                    }
+                    let v = self.variables.get(name.name.as_str()).unwrap();
+                    println!("vv:{:?},name:{:?}", v, name);
+                    return Ok(self.builder.build_load(v.clone().0, name.name.as_str()));
                 }
-                let v = self.variables.get(name.name.as_str()).unwrap();
-                println!("vv:{:?},name:{:?}", v, name);
-                return Ok(self.builder.build_load(v.clone().0, name.name.as_str()));
+
+
                 // println!("vv is :{:?}", vv);
             }
             ast::Expression::StringLiteral(values) => {
@@ -766,18 +797,29 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
             ast::Expression::FunctionCall(loc, name, args) => {
                 let mut fun_name = name.expr_name();
-                if fun_name.eq("add") {
-                    fun_name = "lambda".to_string();
+                let mut self_pointer: Option<PointerValue<'ctx>> = None;
+                if let ast::Expression::Variable(name) = name.as_ref() {
+                    if fun_name.eq("add") {
+                        fun_name = "lambda".to_string();
+                    }
+                    if fun_name.eq("print") {
+                        fun_name = "printf".to_string();
+                    }
+                } else if let ast::Expression::Attribute(_, name, attri, _) = name.as_ref() {
+                    fun_name = String::from("default::AAA::get_aaa");
+                    self_pointer = Some(self.variables.get(&name.expr_name()).unwrap().0.clone());
+                    self.variables.insert("self".to_string(), self.variables.get(&name.expr_name()).unwrap().clone());
                 }
-                if fun_name.eq("print") {
-                    fun_name = "printf".to_string();
-                }
+
                 let v = self.get_function(&fun_name);
                 match v {
                     Some(fun) => {
                         // let f = fun.clone();
-                        let mut compiled_args = Vec::with_capacity(args.len());
 
+                        let mut compiled_args = Vec::with_capacity(args.len());
+                        if self_pointer.is_some() {
+                            compiled_args.push(BasicValueEnum::PointerValue(self_pointer.unwrap()));
+                        }
                         for arg in args {
                             compiled_args.push(self.compile_expr(arg)?);
                         }
@@ -1102,7 +1144,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
     }
 
     /// Compiles the specified `Prototype` into an extern LLVM `FunctionValue`.
-    fn compile_prototype(&self, def: &FunctionDefinition) -> Result<FunctionValue<'ctx>, &'static str> {
+    fn compile_prototype(&self, def: &FunctionDefinition, need_self: bool) -> Result<FunctionValue<'ctx>, &'static str> {
         let mut ret_type: BasicTypeEnum = BasicTypeEnum::IntType(self.context.i32_type());
         let cty = def.get_type(&self.symbol_table_stack).unwrap();
         if let Some(ret) = &def.returns {
@@ -1110,19 +1152,28 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         }
 
         let mut args_types = vec![];
+        if need_self {
+            let ty = get_register_type(&self.symbol_table_stack, "self".to_string());
+            let c = BasicTypeEnum::PointerType(self.llvm_type(&ty).ptr_type(AddressSpace::Generic));
+            args_types.push(c);
+        }
         for s in cty.param_type().iter() {
             let v_ty = self.llvm_type(&s.0.clone());
             args_types.push(v_ty);
         }
 
         // args_types.push(ret_type);
-        let fn_type = ret_type.into_int_type().fn_type(args_types.as_ref(), false);
+        let fn_type = ret_type.fn_type(args_types.as_ref(), false);
 
         let fn_val = self.module.add_function(self.lookup_name_prefix(&def.name.as_ref().unwrap().name).as_str(), fn_type,
                                               Some(Linkage::Internal));
 
         // set arguments names
         for (i, arg) in fn_val.get_param_iter().enumerate() {
+            if need_self && i == 0 {
+                arg.into_pointer_value().set_name("self");
+                continue;
+            }
             if arg.is_array_value() {
                 arg.into_array_value().set_name(def.params[i].1.as_ref().unwrap().name.as_ref().unwrap().name.as_str());
             } else if arg.is_float_value() {
@@ -1151,7 +1202,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             match part {
                 ast::PackagePart::FunctionDefinition(def) => {
                     self.enter_scope();
-                    let f = self.compile_fn(def)?;
+                    let f = self.compile_fn(def, false)?;
                     self.leave_scope();
                     //self.variables.insert(def.name.unwrap().name,(AnyValueEnum::PointerValue(f.),f))
                     fn_values.push(f);
@@ -1192,7 +1243,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             match item {
                 StructPart::FunctionDefinition(fun) => {
                     self.enter_scope();
-                    self.compile_fn(fun.as_ref());
+                    self.compile_fn(fun.as_ref(), true);
                     self.leave_scope();
                 }
                 _ => {}
@@ -1201,8 +1252,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         self.ctx = prev_ctx;
         return Ok(());
     }
-    fn lookup_name(&self, name: &str) -> &Symbol {
+    pub fn lookup_name(&self, name: &str) -> &Symbol {
         println!("Looking up {:?}", name);
+        //   println!("table::{:#?},", self.symbol_table_stack);
         let len: usize = self.symbol_table_stack.len();
         for i in (0..len).rev() {
             let symbol = self.symbol_table_stack[i].lookup(name);
@@ -1289,8 +1341,8 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
     }
 
     /// Compiles the specified `Function` into an LLVM `FunctionValue`.
-    fn compile_fn(&mut self, fun: &FunctionDefinition) -> Result<FunctionValue<'ctx>, &'static str> {
-        let function = self.compile_prototype(fun)?;
+    fn compile_fn(&mut self, fun: &FunctionDefinition, need_self: bool) -> Result<FunctionValue<'ctx>, &'static str> {
+        let function = self.compile_prototype(fun, need_self)?;
         println!("function is :{:#?}", function);
         // got external function, returning only compiled prototype
         if fun.body.is_none() {
@@ -1305,10 +1357,19 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         self.fn_value_opt = Some(function);
 
         // build variables map
-        self.variables.reserve(fun.params.len());
+        if need_self {
+            self.variables.reserve(fun.params.len() + 1);
+        } else {
+            self.variables.reserve(fun.params.len());
+        }
 
         for (i, arg) in function.get_param_iter().enumerate() {
-            let arg_name = fun.params[i].1.as_ref().unwrap().name.as_ref().unwrap().name.as_str();
+            let arg_name = if i == 0 && need_self {
+                "self"
+            } else {
+                fun.params[i].1.as_ref().unwrap().name.as_ref().unwrap().name.as_str()
+            };
+
             let alloca = self.create_entry_block_alloca(arg_name);
             self.builder.build_store(alloca, arg);
             self.variables.insert(String::from(arg_name), (alloca, arg));
@@ -1324,6 +1385,7 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
         }
         // let r = vec![ret_type];
         // self.builder.build_aggregate_return(r.as_slice());
+        println!("function_vvv:{:#?},", function);
         Ok(function)
         // return the whole thing after verification and optimization
         // if function.verify(false) {

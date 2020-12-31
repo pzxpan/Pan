@@ -370,19 +370,19 @@ impl CType {
     pub fn attri_name_type(&self, name: String) -> (i32, &CType, i32) {
         if let CType::Struct(ty) = self {
             //1为字段，2为普通函数，3为静态函数
-            for (method_name, cty, is_pub, ..) in ty.fields.iter() {
+            for (idx, (method_name, cty, is_pub, ..)) in ty.fields.iter().enumerate() {
                 if method_name.eq(&name) {
-                    return (1, cty, 0);
+                    return (1, cty, idx as i32);
                 }
             }
-            for (method_name, cty) in ty.methods.iter() {
+            for (idx, (method_name, cty)) in ty.methods.iter().enumerate() {
                 if method_name.eq(&name) {
-                    return (2, cty, 0);
+                    return (2, cty, idx as i32);
                 }
             }
-            for (method_name, cty) in ty.static_methods.iter() {
+            for (idx, (method_name, cty)) in ty.static_methods.iter().enumerate() {
                 if method_name.eq(&name) {
-                    return (3, cty, 0);
+                    return (3, cty, idx as i32);
                 }
             }
         } else if let CType::Enum(ty) = self {
