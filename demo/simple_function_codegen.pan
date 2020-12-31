@@ -5,7 +5,7 @@ pub struct AAA {
     pub bbb: i32,
     pub fun change_aaa() :i32 {
         self.aaa = 1000;
-        let cc = self.aaa + 200;
+        let cc = self.aaa + bbb;
         return cc;
     }
     pub fun change_bbb_return_aaa() :i32 {
@@ -20,11 +20,10 @@ pub fun add(a:i32,b:i32) :i32 {
 }
 
 fun main():i32 {
-   let aa = AAA!{aaa:30,bbb:10000};
-   let cc = aa.change_aaa();
-   let a = aa.aaa;
-   print("aa%d",a);
-   print("%d",cc);
+   let bbbb = AAA!{aaa:30,bbb:10000};
+   let cc = bbbb.change_bbb_return_aaa();
+   let a = bbbb.aaa;
+   print("ccc %d",cc);
    let bb = 0;
    return 0;
 }
