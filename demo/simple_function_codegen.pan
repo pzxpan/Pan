@@ -23,7 +23,7 @@ fun main():i32 {
    let bbbb = AAA!{aaa:30,bbb:10000};
    let cc = bbbb.change_bbb_return_aaa();
    let a = bbbb.aaa;
-   print("ccc %d",cc);
+   print("我们是 %d",a);
    let bb = 0;
    return 0;
 }

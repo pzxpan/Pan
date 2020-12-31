@@ -64,8 +64,8 @@ pub fn module_codegen(
     println!("file:{:?}", file);
     module.write_bitcode_to_path(&std::env::current_dir().unwrap().join("demo").join("for.bc"));
     println!("write_to_bc_file");
-    let mut main_name = String::from(md.package.clone());
-    main_name.push_str("::main");
+    let mut main_name = String::from("main");
+    // main_name.push_str("::main");
     println!("main_name:{:?}", main_name);
     let f = module.get_function(&main_name).unwrap();
     // let d = module.get_function("lambda").unwrap();
@@ -681,9 +681,13 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                 });
                 // let string = context.const_string(b"my_string", false);
                 let v = self.context.const_string(value.as_bytes(), true);
-                let value = self.module.add_global(v.get_type().get_element_type(), Some(AddressSpace::Generic), "outputs");
+                // "/0需要添加进去"
+                let len = value.as_bytes().len() + 1;
+                let value = self.module.add_global(self.context.i8_type().array_type(len as u32), None, "outputs");
                 value.set_initializer(&v);
-                return Ok(BasicValueEnum::PointerValue(value.as_pointer_value()));
+                let start_value = self.context.i32_type().const_int(0 as u64, false);
+                let r = unsafe { self.builder.build_in_bounds_gep(value.as_pointer_value(), &[start_value, start_value], "index") };
+                return Ok(BasicValueEnum::PointerValue(r));
             }
             ast::Expression::BoolLiteral(_, value) => {
                 let int_value = if *value { 1 } else { 0 };
@@ -1192,13 +1196,18 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
         // args_types.push(ret_type);
         let fn_type = ret_type.fn_type(args_types.as_ref(), false);
+
         let mut fun_name = self.lookup_name_prefix(&def.name.as_ref().unwrap().name);
         if self.ctx.in_struct_func() {
             fun_name = self.lookup_name_prefix(&"self".to_string());
         }
         fun_name.push_str(&def.name.as_ref().unwrap().name);
-        let fn_val = self.module.add_function(&fun_name, fn_type,
-                                              Some(Linkage::Internal));
+        let mut linkage = Some(Linkage::Internal);
+        if def.name.as_ref().unwrap().name.eq("main") {
+            fun_name = String::from("main");
+            linkage = None;
+        }
+        let fn_val = self.module.add_function(&fun_name, fn_type, linkage);
 
         // set arguments names
         for (i, arg) in fn_val.get_param_iter().enumerate() {
