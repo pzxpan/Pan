@@ -1403,13 +1403,6 @@ impl<O: OutputStream> Compiler<O> {
         ));
         self.enter_scope();
 
-
-        // self.emit(Instruction::LoadName("__name__".to_owned(), bytecode::NameScope::Global));
-        // self.emit(Instruction::StoreName("__module__".to_owned(), bytecode::NameScope::Global));
-        // self.emit(Instruction::LoadConst(bytecode::Constant::String(Box::new(qualified_name.clone()))));
-        // self.emit(Instruction::StoreName("__qualname__".to_owned(), bytecode::NameScope::Global));
-        // self.emit(Instruction::StoreName("self".to_owned(), bytecode::NameScope::Local));
-
         let mut methods: Vec<(String, CodeObject)> = Vec::new();
         let mut static_fields: Vec<(String, CodeObject)> = Vec::new();
         for part in body {

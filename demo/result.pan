@@ -23,7 +23,6 @@ fun main() {
    let x: Result<u32,string> = Result::Ok(30_u32);
    print(x.is_ok());
    print(x.unwrap());
-
 }
 
 

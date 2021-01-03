@@ -1,10 +1,10 @@
 use inkwell::context::Context;
 use pan_bytecode::bytecode::{CodeObject, Instruction, Constant};
-use inkwell::module::{Module, Linkage};
+use inkwell::module::{Module, Linkage, FlagBehavior};
 use inkwell::passes::PassManager;
 use inkwell::{AddressSpace, IntPredicate};
 use inkwell::targets::TargetTriple;
-use inkwell::values::{FunctionValue, PointerValue, FloatValue, BasicValue, BasicValueEnum, AnyValue, StructValue, IntValue, AnyValueEnum};
+use inkwell::values::{FunctionValue, PointerValue, FloatValue, BasicValue, BasicValueEnum, AnyValue, StructValue, IntValue, AnyValueEnum, UnnamedAddress};
 use inkwell::builder::Builder;
 use std::collections::HashMap;
 use inkwell::{FloatPredicate, OptimizationLevel};
@@ -21,8 +21,10 @@ use pan_compiler::ctype::CType;
 use std::convert::TryInto;
 use crate::control_flow_block::ControlFlowBlock;
 use std::process::exit;
+use crate::util;
 use pan_compiler::ctype::CType::I32;
 use crate::resovle_code_gen::{resolve_compile_field, resolve_codegen_store};
+use std::borrow::Borrow;
 
 pub fn module_codegen(
     md: &ast::ModuleDefinition,
@@ -455,21 +457,34 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
             }
             ast::Statement::VariableDefinition(_, variable, e) => {
                 if !e.is_lambda_var() {
-                    let cty = get_register_type(&self.symbol_table_stack, variable.name.name.clone());
-                    println!("varaible_ty:{:?}", cty);
-                    if let CType::Struct(_) = cty {
-                        self.last_obj_name = String::from(variable.name.name.clone());
-                        let bb = self.builder.get_insert_block().unwrap();
-                        let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
-                        self.builder.position_at_end(bb);
-                        self.variables.insert(String::from(variable.name.name.as_str()), (alloca, BasicValueEnum::PointerValue(alloca)));
-                        let v = self.compile_expr(e)?;
-                        // self.builder.build_store(alloca, v);
+                    if variable.name.name.eq("panpan") {
+                        let cty = self.module.get_struct_type("foo");
+                        let size = util::get_max_enum_item_size(&get_register_type(&self.symbol_table_stack, variable.name.name.clone()));
+                        println!("enum_item max is :{:?}", size);
+                        let alloca = self.builder.build_alloca(cty.unwrap(), &variable.name.name);
+                        let item = self.module.get_struct_type("fff").unwrap().ptr_type(AddressSpace::Generic);
+                        let ptr = self.builder.build_bitcast(alloca, item, "dddd");
+                        let start_value = self.context.i32_type().const_int(0, false);
+                        let end_value = self.context.i32_type().const_int(0, false);
+                        let r = unsafe { self.builder.build_in_bounds_gep(ptr.into_pointer_value(), &[start_value, end_value], "index") };
+                        self.builder.build_store(r, self.context.i32_type().const_int(1 as u64, false));
+                        // self.builder.build_store(ptr.into_pointer_value(), self.context.i32_type().const_int(1 as u64, false));
                     } else {
-                        let v = self.compile_expr(e)?;
-                        let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
-                        self.builder.build_store(alloca, v);
-                        self.variables.insert(String::from(variable.name.name.as_str()), (alloca, v));
+                        let cty = get_register_type(&self.symbol_table_stack, variable.name.name.clone());
+                        if let CType::Struct(_) = cty {
+                            self.last_obj_name = String::from(variable.name.name.clone());
+                            let bb = self.builder.get_insert_block().unwrap();
+                            let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
+                            self.builder.position_at_end(bb);
+                            self.variables.insert(String::from(variable.name.name.as_str()), (alloca, BasicValueEnum::PointerValue(alloca)));
+                            let v = self.compile_expr(e)?;
+                            // self.builder.build_store(alloca, v);
+                        } else {
+                            let v = self.compile_expr(e)?;
+                            let alloca = self.builder.build_alloca(self.llvm_type(&cty), &variable.name.name);
+                            self.builder.build_store(alloca, v);
+                            self.variables.insert(String::from(variable.name.name.as_str()), (alloca, v));
+                        }
                     }
                 } else {
                     let bb = self.builder.get_insert_block().unwrap();
@@ -1253,12 +1268,118 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     self.compile_struct_def(def.as_ref());
                     self.leave_scope();
                 }
+                ast::PackagePart::EnumDefinition(def) => {
+                    self.enter_scope();
+                    self.compile_enum_def(def.as_ref());
+                    self.leave_scope();
+                }
                 _ => {}
             }
         }
         println!("moduleValues:{:#?},", fn_values);
         self.leave_scope();
         return Ok(ModuleValue { fn_values, struct_values: vec![] });
+    }
+    fn compile_enum_def(&mut self, def: &ast::EnumDefinition) -> Result<(), &'static str> {
+        let prev_ctx = self.ctx;
+        // IntValue {
+        //     int_value: Value { name: "",
+        //         address: 0x7fc516e04250, is_const: true,
+        //         is_null: false, is_undef: false,
+        //         llvm_value:
+        //         "i64 mul nuw (i64 ptrtoint (i32* getelementptr (i32, i32* null, i32 1) to i64), i64 3)",
+        //         llvm_type: "i64" }
+        // }),
+
+        let mut field_tys = vec![];
+        field_tys.push(BasicTypeEnum::ArrayType(self.context.i32_type().array_type(0 as u32)));
+        field_tys.push(BasicTypeEnum::IntType(self.context.i32_type()));
+        for field in &def.parts {
+            if let ast::EnumPart::EnumVariableDefinition(v) = field {
+                println!("enumvariable:{:?}", v);
+                let cty = get_register_type(&self.symbol_table_stack, v.name.name.clone());
+
+                println!("ccty:{:?}", cty);
+                // let v = self.llvm_type(&CType::I32);
+                //field_tys.push(self.llvm_type(&CType::Float));
+            }
+        }
+        field_tys.push(BasicTypeEnum::ArrayType(self.context.i32_type().array_type(4 as u32)));
+        let struct_ty = self.context.opaque_struct_type("foo");
+        struct_ty.set_body(&field_tys[..], false);
+        let struct_ty = self.context.opaque_struct_type("fff");
+        struct_ty.set_body(&field_tys[1..2], false);
+        // println!("structsize :{:?},", struct_ty.size_of().unwrap().);
+        // field_tys.push(self.llvm_type(&CType::I32));
+        // let md = self.context.metadata_string("lots of metadata here");
+        // use inkwell::module::FlagBehavior;
+        // self.module.add_metadata_flag(
+        //     "some_key",
+        //     FlagBehavior::Error,
+        //     md,
+        // );
+        // // let struct_type = self.context.struct_type()
+        // let struct_type = self.context.struct_type(&field_tys[..], false).as_basic_type_enum();
+        // //let debugbuilder = self.module.create_debug_info_builder()
+        // //  self.builder.position_before(struct_type,);
+        // // self.module.add_type("dddd",struct_type.struct_type(),Linkage::DLLExport);
+        // // let v = struct_type.as_basic_type_enum();
+        // //self.builder.build_malloc(v,"dddddd");
+        // // struct_type.get_name()
+        // let opaque_struct_type = self.context.opaque_struct_type("foo::Color");
+        // // // self.module.add_type("ddd",opaque_struct_type);
+        // //  //self.module.add_type()
+        // opaque_struct_type.set_body(&field_tys[..], false);
+        // if self.module.get_struct_type("foo").is_none() {
+        //     println!("Not found struct");
+        //     //self.module.add_type("dddd",struct_type,Some(Linkage::Internal));
+        //     // let opaque_struct_type = self.context.opaque_struct_type("foo");
+        //     // self.builder.build_address_space_cast()
+        //     // self.context._global(struct_type,Some(AddressSpace::Local),"dddddd");
+        //     // opaque_struct_type.set_body(&field_tys[..], false);
+        //     //let v = self.module.add_global(struct_type, Some(AddressSpace::Local), "ddddmy_global");
+        // } else {
+        //     println!("found foo");
+        //
+        //     println!("3333found foo");
+        // }
+
+        //  v.set_constant(true);
+        // v.set_linkage(Linkage::Private);
+        // v.set_alignment(32);
+        // v.set_thread_local(true);
+        //  self.module.add_basic_value_flag("Color",struct_type,None,);
+        //let fn_type = struct_type.fn_type(&[], false);
+        //  self.module.add_global()
+        // self.module.add_function("Color", fn_type, None);
+        // self.builder.build_struct_gep()
+        //self.builder.build_store(struct_type.ptr_type(AddressSpace::Generic).const_null(),struct_type.get_undef());
+        //self.module.add_global(struct_type,Some(AddressSpace::Generic),"Color");
+        // let fn_type = struct_type.fn_type(&field_tys[..], false);
+        // self.module.add_function(&self.lookup_name_prefix(&def.name.name), fn_type, Some(Linkage::Internal));
+        // println!("fields is {:?},", field_tys);
+        // let struct_type = self.context.struct_type(&field_tys[..], false);
+        //   let fn_type = struct_type.fn_type(&field_tys[..], false);
+        // self.module.add_function(&self.lookup_name_prefix(&def.name.name), fn_type, Some(Linkage::Internal));
+        // for item in &def.parts {
+        //     match item {
+        //         StructPart::FunctionDefinition(fun) => {
+        //             self.enter_scope();
+        //             self.ctx = CodeGenContext {
+        //                 in_need_block: false,
+        //                 func: FunctionContext::StructFunction(fun.is_static),
+        //                 in_loop: false,
+        //                 in_lambda: false,
+        //                 in_match: false,
+        //             };
+        //             self.compile_fn(fun.as_ref(), true);
+        //             self.leave_scope();
+        //         }
+        //         _ => {}
+        //     }
+        // }
+        self.ctx = prev_ctx;
+        return Ok(());
     }
     fn compile_struct_def(&mut self, def: &StructDefinition) -> Result<(), &'static str> {
         let prev_ctx = self.ctx;

@@ -1,5 +1,10 @@
 package default;
 
+pub enum Color {
+    White,
+    Black,
+    Red(i32,i64,i32),
+}
 pub struct AAA {
     pub aaa: i32,
     pub bbb: i32,
@@ -15,11 +20,13 @@ pub struct AAA {
     }
 }
 
+
 pub fun add(a:i32,b:i32) :i32 {
     return a + b;
 }
 
 fun main():i32 {
+   let panpan = Color::White;
    let bbbb = AAA!{aaa:30,bbb:10000};
    let cc = bbbb.change_bbb_return_aaa();
    let a = bbbb.aaa;

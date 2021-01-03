@@ -9,6 +9,7 @@ use inkwell::module::Module;
 use inkwell::AddressSpace;
 use pan_compiler::symboltable::SymbolTable;
 use pan_parser::ast::Expression;
+use std::collections::HashSet;
 
 pub fn unwrap_const2ir_float_value<'a>(context: &'a Context, value: &'a Constant) -> Result<FloatValue<'a>, &'static str> {
     match value {
@@ -92,6 +93,69 @@ pub fn unwrap_const2ir_int_value<'a>(context: &'a Context, value: &'a Constant) 
         }
         _ => { Err("not a int") }
     }
+}
+
+pub fn get_max_basic_type_size(cty: &CType) -> i32 {
+    match cty {
+        CType::Bool | CType::I8 | CType::U8 | CType::Char => 2,
+        CType::I16 | CType::U16 => 2,
+        CType::I32 | CType::U32 | CType::Str => 4,
+        CType::I64 | CType::U64 | CType::Float => 8,
+        CType::I128 | CType::I128 => 16,
+        CType::Fn(_) => 4,
+        CType::None => 1,
+        CType::Struct(sty) => {
+            let mut sum = 0;
+            for ty in &sty.fields {
+                sum += get_max_basic_type_size(&ty.1);
+            }
+            return sum;
+        }
+        CType::Reference(_, _) => 4,
+        _ => { 0 }
+    }
+}
+
+pub fn get_all_size(cty: &CType) -> i32 {
+    match cty {
+        CType::Bool | CType::I8 | CType::U8 | CType::Char => 2,
+        CType::I16 | CType::U16 => 2,
+        CType::I32 | CType::U32 | CType::Str => 4,
+        CType::I64 | CType::U64 | CType::Float => 8,
+        CType::I128 | CType::I128 => 16,
+        CType::Fn(_) => 4,
+        CType::None => 1,
+        CType::Struct(sty) => {
+            let mut sum = 0;
+            for ty in &sty.fields {
+                sum += get_all_size(&ty.1);
+            }
+            return sum;
+        }
+        CType::Array(ty, i) => {
+            return get_all_size(ty.as_ref()) * *i as i32;
+        }
+        CType::Reference(_, _) => 4,
+        _ => { 0 }
+    }
+}
+
+pub fn get_max_enum_item_size(cty: &CType) -> i32 {
+    if let CType::Enum(enumty) = cty {
+        let mut max = 0;
+        for item in &enumty.items {
+            let mut sum = 0;
+            if let CType::Reference(_, tys) = &item.1
+            {
+                sum = tys.iter().fold(0, (|mut s, ty| { s += get_all_size(ty); s }));
+                if sum > max {
+                    max = sum;
+                }
+            }
+        }
+        return max;
+    }
+    return 0;
 }
 
 pub fn unwrap_const2ir_string_value<'a>(context: &'a Context, value: &'a Constant) -> Result<VectorValue<'a>, &'static str> {
