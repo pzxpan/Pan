@@ -115,7 +115,7 @@ pub fn hash_stable_derive(mut s: synstructure::Structure<'_>) -> proc_macro2::To
     s.bound_impl(
         quote!(
             ::pan_data_structures::stable_hasher::HashStable<
-                ::rustc_middle::ich::StableHashingContext<'__ctx>,
+                ::pan_middle::ich::StableHashingContext<'__ctx>,
             >
         ),
         quote! {

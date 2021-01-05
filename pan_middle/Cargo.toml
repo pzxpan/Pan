@@ -1,0 +1,33 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "pan_middle"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+doctest = false
+
+[dependencies]
+pan_arena = { path = "../pan_arena" }
+bitflags = "1.2.1"
+tracing = "0.1"
+rustc-rayon-core = "0.3.0"
+polonius-engine = "0.12.0"
+pan_apfloat = { path = "../pan_apfloat" }
+pan_attr = { path = "../pan_attr" }
+pan_feature = { path = "../pan_feature" }
+pan_hir = { path = "../pan_hir" }
+pan_target = { path = "../pan_target" }
+pan_macros = { path = "../pan_macros" }
+pan_data_structures = { path = "../pan_data_structures" }
+pan_query_system = { path = "../pan_query_system" }
+pan_errors = { path = "../pan_errors" }
+pan_index = { path = "../pan_index" }
+pan_serialize = { path = "../pan_serialize" }
+pan_ast = { path = "../pan_ast" }
+pan_span = { path = "../pan_span" }
+chalk-ir = "0.36.0"
+smallvec = { version = "1.0", features = ["union", "may_dangle"] }
+measureme = "9.0.0"
+pan_session = { path = "../pan_session" }
+pan_type_ir = { path = "../pan_type_ir" }

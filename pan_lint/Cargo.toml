@@ -1,0 +1,23 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "pan_lint"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+tracing = "0.1"
+unicode-security = "0.0.5"
+pan_middle = { path = "../pan_middle" }
+pan_ast_pretty = { path = "../pan_ast_pretty" }
+pan_attr = { path = "../pan_attr" }
+pan_errors = { path = "../pan_errors" }
+pan_hir = { path = "../pan_hir" }
+pan_target = { path = "../pan_target" }
+pan_ast = { path = "../pan_ast" }
+pan_span = { path = "../pan_span" }
+pan_data_structures = { path = "../pan_data_structures" }
+pan_feature = { path = "../pan_feature" }
+pan_index = { path = "../pan_index" }
+pan_session = { path = "../pan_session" }
+pan_trait_selection = { path = "../pan_trait_selection" }
+pan_parse_format = { path = "../pan_parse_format" }

@@ -1,0 +1,9 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "pan_parse_format"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+pan_span = { path = "../pan_span" }
+pan_lexer = { path = "../rustc_lexer" }
