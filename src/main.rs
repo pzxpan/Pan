@@ -30,6 +30,7 @@ use pan_codegen::code_gen;
 use pan_parser::parse;
 use pan_parser::ast::Loc;
 use pan_parser::ast;
+use std::collections::HashMap;
 use pan_compiler::util::{get_mod_name, get_package_name};
 use inkwell::context::Context;
 use inkwell::passes::PassManager;
