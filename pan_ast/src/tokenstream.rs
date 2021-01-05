@@ -200,7 +200,7 @@ pub type TreeAndSpacing = (TokenTree, Spacing);
 
 // `TokenStream` is used a lot. Make sure it doesn't unintentionally get bigger.
 #[cfg(target_arch = "x86_64")]
-rustc_data_structures::static_assert_size!(TokenStream, 8);
+pan_data_structures::static_assert_size!(TokenStream, 8);
 
 #[derive(Clone, Copy, Debug, PartialEq, Encodable, Decodable)]
 pub enum Spacing {

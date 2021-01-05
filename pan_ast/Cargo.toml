@@ -8,12 +8,12 @@ edition = "2018"
 doctest = false
 
 [dependencies]
-rustc_serialize = { path = "../pan_serialize" }
+pan_serialize = { path = "../pan_serialize" }
 tracing = "0.1"
-rustc_span = { path = "../rustc_span" }
-rustc_data_structures = { path = "../pan_data_structures" }
-rustc_index = { path = "../pan_index" }
-rustc_lexer = { path = "../pan_lexer" }
-rustc_macros = { path = "../pan_macros" }
+pan_span = { path = "../pan_span" }
+pan_data_structures = { path = "../pan_data_structures" }
+pan_index = { path = "../pan_index" }
+pan_lexer = { path = "../pan_lexer" }
+pan_macros = { path = "../pan_macros" }
 smallvec = { version = "1.0", features = ["union", "may_dangle"] }
 bitflags = "1.2.1"

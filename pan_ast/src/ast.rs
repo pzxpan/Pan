@@ -1085,7 +1085,7 @@ pub struct Expr {
 
 // `Expr` is used a lot. Make sure it doesn't unintentionally get bigger.
 #[cfg(target_arch = "x86_64")]
-rustc_data_structures::static_assert_size!(Expr, 120);
+pan_data_structures::static_assert_size!(Expr, 120);
 
 impl Expr {
     /// Returns `true` if this expression would be valid somewhere that expects a value;
@@ -2406,20 +2406,20 @@ pub enum AttrStyle {
     Inner,
 }
 
-rustc_index::newtype_index! {
+pan_index::newtype_index! {
     pub struct AttrId {
         ENCODABLE = custom
         DEBUG_FORMAT = "AttrId({})"
     }
 }
 
-impl<S: Encoder> rustc_serialize::Encodable<S> for AttrId {
+impl<S: Encoder> pan_serialize::Encodable<S> for AttrId {
     fn encode(&self, s: &mut S) -> Result<(), S::Error> {
         s.emit_unit()
     }
 }
 
-impl<D: Decoder> rustc_serialize::Decodable<D> for AttrId {
+impl<D: Decoder> pan_serialize::Decodable<D> for AttrId {
     fn decode(d: &mut D) -> Result<AttrId, D::Error> {
         d.read_nil().map(|_| crate::attr::mk_attr_id())
     }

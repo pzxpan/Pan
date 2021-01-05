@@ -52,12 +52,12 @@ pub mod visit;
 
 pub use self::ast::*;
 
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
+use pan_data_structures::stable_hasher::{HashStable, StableHasher};
 
 /// Requirements for a `StableHashingContext` to be used in this crate.
 /// This is a hack to allow using the `HashStable_Generic` derive macro
 /// instead of implementing everything in librustc_middle.
-pub trait HashStableContext: rustc_span::HashStableContext {
+pub trait HashStableContext: pan_span::HashStableContext {
     fn hash_attr(&mut self, _: &ast::Attribute, hasher: &mut StableHasher);
 }
 
