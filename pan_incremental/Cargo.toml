@@ -1,0 +1,22 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "pan_incremental"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+doctest = false
+
+[dependencies]
+pan_graphviz = { path = "../pan_graphviz" }
+tracing = "0.1"
+rand = "0.7"
+pan_middle = { path = "../pan_middle" }
+pan_data_structures = { path = "../pan_data_structures" }
+pan_hir = { path = "../pan_hir" }
+pan_serialize = { path = "../pan_serialize" }
+pan_ast = { path = "../pan_ast" }
+pan_macros = { path = "../pan_macros" }
+pan_span = { path = "../pan_span" }
+pan_fs_util = { path = "../pan_fs_util" }
+pan_session = { path = "../pan_session" }

@@ -469,7 +469,7 @@ fn register_internals(store: &mut LintStore) {
     store.register_late_pass(|| box TyTyKind);
     store.register_group(
         false,
-        "rustc::internal",
+        "pan::internal",
         None,
         vec![
             LintId::of(DEFAULT_HASH_TYPES),

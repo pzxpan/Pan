@@ -204,7 +204,7 @@ impl<'a> SessionDiagnosticDerive<'a> {
                         DiagnosticId::Error(code) => {
                             let (diag, sess) = (&builder.diag, &builder.sess);
                             quote! {
-                                let mut #diag = #sess.struct_err_with_code("", rustc_errors::DiagnosticId::Error(#code));
+                                let mut #diag = #sess.struct_err_with_code("", pan_errors::DiagnosticId::Error(#code));
                                 #preamble
                                 match self {
                                     #body
@@ -226,13 +226,13 @@ impl<'a> SessionDiagnosticDerive<'a> {
 
         let sess = &builder.sess;
         structure.gen_impl(quote! {
-            gen impl<'__session_diagnostic_sess> rustc_session::SessionDiagnostic<'__session_diagnostic_sess>
+            gen impl<'__session_diagnostic_sess> pan_session::SessionDiagnostic<'__session_diagnostic_sess>
                     for @Self
             {
                 fn into_diagnostic(
                     self,
-                    #sess: &'__session_diagnostic_sess rustc_session::Session
-                ) -> rustc_errors::DiagnosticBuilder<'__session_diagnostic_sess> {
+                    #sess: &'__session_diagnostic_sess pan_session::Session
+                ) -> pan_errors::DiagnosticBuilder<'__session_diagnostic_sess> {
                     #implementation
                 }
             }
@@ -436,7 +436,7 @@ impl<'a> SessionDiagnosticDeriveBuilder<'a> {
                                 let binding = &info.binding.binding;
                                 Ok((
                                     quote!(*#binding),
-                                    quote!(rustc_errors::Applicability::Unspecified),
+                                    quote!(pan_errors::Applicability::Unspecified),
                                 ))
                             }
                             syn::Type::Tuple(tup) => {
@@ -454,7 +454,7 @@ impl<'a> SessionDiagnosticDeriveBuilder<'a> {
                                         }
                                     } else if type_matches_path(
                                         elem,
-                                        &["rustc_errors", "Applicability"],
+                                        &["pan_errors", "Applicability"],
                                     ) {
                                         if applicability_idx.is_none() {
                                             applicability_idx = Some(syn::Index::from(idx));
@@ -474,7 +474,7 @@ impl<'a> SessionDiagnosticDeriveBuilder<'a> {
                                             |applicability_idx| quote!(#binding.#applicability_idx),
                                         )
                                         .unwrap_or(quote!(
-                                            rustc_errors::Applicability::Unspecified
+                                            pan_errors::Applicability::Unspecified
                                         ));
                                     return Ok((span, applicability));
                                 }

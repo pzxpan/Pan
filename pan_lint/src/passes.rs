@@ -8,6 +8,7 @@ use pan_session::lint::LintPass;
 use pan_span::symbol::{Ident, Symbol};
 use pan_span::Span;
 
+
 #[macro_export]
 macro_rules! late_lint_methods {
     ($macro:path, $args:tt, [$hir:tt]) => (

@@ -23,7 +23,7 @@ use std::iter;
 use std::str;
 use std::string;
 
-use rustc_span::{InnerSpan, Symbol};
+use pan_span::{InnerSpan, Symbol};
 
 /// The type of format string that we are parsing.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -493,7 +493,7 @@ impl<'a> Parser<'a> {
             Some(ArgumentIs(i))
         } else {
             match self.cur.peek() {
-                Some(&(_, c)) if rustc_lexer::is_id_start(c) => {
+                Some(&(_, c)) if pan_lexer::is_id_start(c) => {
                     Some(ArgumentNamed(Symbol::intern(self.word())))
                 }
 
@@ -674,7 +674,7 @@ impl<'a> Parser<'a> {
     /// Rust identifier, except that it can't start with `_` character.
     fn word(&mut self) -> &'a str {
         let start = match self.cur.peek() {
-            Some(&(pos, c)) if rustc_lexer::is_id_start(c) => {
+            Some(&(pos, c)) if pan_lexer::is_id_start(c) => {
                 self.cur.next();
                 pos
             }
@@ -684,7 +684,7 @@ impl<'a> Parser<'a> {
         };
         let mut end = None;
         while let Some(&(pos, c)) = self.cur.peek() {
-            if rustc_lexer::is_id_continue(c) {
+            if pan_lexer::is_id_continue(c) {
                 self.cur.next();
             } else {
                 end = Some(pos);

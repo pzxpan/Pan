@@ -2,18 +2,18 @@
 //! Clippy.
 
 use crate::{EarlyContext, EarlyLintPass, LateContext, LateLintPass, LintContext};
-use rustc_ast::{Item, ItemKind};
-use rustc_data_structures::fx::FxHashMap;
-use rustc_errors::Applicability;
-use rustc_hir::def::Res;
-use rustc_hir::{GenericArg, HirId, MutTy, Mutability, Path, PathSegment, QPath, Ty, TyKind};
-use rustc_middle::ty;
-use rustc_session::{declare_lint_pass, declare_tool_lint, impl_lint_pass};
-use rustc_span::hygiene::{ExpnKind, MacroKind};
-use rustc_span::symbol::{kw, sym, Ident, Symbol};
+use pan_ast::{Item, ItemKind};
+use pan_data_structures::fx::FxHashMap;
+use pan_errors::Applicability;
+use pan_hir::def::Res;
+use pan_hir::{GenericArg, HirId, MutTy, Mutability, Path, PathSegment, QPath, Ty, TyKind};
+use pan_middle::ty;
+use pan_session::{declare_lint_pass, declare_tool_lint, impl_lint_pass};
+use pan_span::hygiene::{ExpnKind, MacroKind};
+use pan_span::symbol::{kw, sym, Ident, Symbol};
 
 declare_tool_lint! {
-    pub rustc::DEFAULT_HASH_TYPES,
+    pub pan::DEFAULT_HASH_TYPES,
     Allow,
     "forbid HashMap and HashSet and suggest the FxHash* variants",
     report_in_external_macro: true
@@ -60,21 +60,21 @@ impl EarlyLintPass for DefaultHashTypes {
 }
 
 declare_tool_lint! {
-    pub rustc::USAGE_OF_TY_TYKIND,
+    pub pan::USAGE_OF_TY_TYKIND,
     Allow,
     "usage of `ty::TyKind` outside of the `ty::sty` module",
     report_in_external_macro: true
 }
 
 declare_tool_lint! {
-    pub rustc::TY_PASS_BY_REFERENCE,
+    pub pan::TY_PASS_BY_REFERENCE,
     Allow,
     "passing `Ty` or `TyCtxt` by reference",
     report_in_external_macro: true
 }
 
 declare_tool_lint! {
-    pub rustc::USAGE_OF_QUALIFIED_TY,
+    pub pan::USAGE_OF_QUALIFIED_TY,
     Allow,
     "using `ty::{Ty,TyCtxt}` instead of importing it",
     report_in_external_macro: true
@@ -234,7 +234,7 @@ fn gen_args(segment: &PathSegment<'_>) -> String {
 }
 
 declare_tool_lint! {
-    pub rustc::LINT_PASS_IMPL_WITHOUT_MACRO,
+    pub pan::LINT_PASS_IMPL_WITHOUT_MACRO,
     Allow,
     "`impl LintPass` without the `declare_lint_pass!` or `impl_lint_pass!` macros"
 }
@@ -269,7 +269,7 @@ impl EarlyLintPass for LintPassImpl {
 }
 
 declare_tool_lint! {
-    pub rustc::EXISTING_DOC_KEYWORD,
+    pub pan::EXISTING_DOC_KEYWORD,
     Allow,
     "Check that documented keywords in std and core actually exist",
     report_in_external_macro: true
@@ -282,7 +282,7 @@ fn is_doc_keyword(s: Symbol) -> bool {
 }
 
 impl<'tcx> LateLintPass<'tcx> for ExistingDocKeyword {
-    fn check_item(&mut self, cx: &LateContext<'_>, item: &rustc_hir::Item<'_>) {
+    fn check_item(&mut self, cx: &LateContext<'_>, item: &pan_hir::Item<'_>) {
         for attr in item.attrs {
             if !attr.has_name(sym::doc) {
                 continue;

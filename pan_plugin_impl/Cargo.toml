@@ -1,0 +1,19 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "pan_plugin_impl"
+version = "0.0.0"
+build = false
+edition = "2018"
+
+[lib]
+doctest = false
+
+[dependencies]
+pan_middle = { path = "../pan_middle" }
+pan_errors = { path = "../pan_errors" }
+pan_hir = { path = "../pan_hir" }
+pan_lint = { path = "../pan_lint" }
+pan_metadata = { path = "../pan_metadata" }
+pan_ast = { path = "../pan_ast" }
+pan_session = { path = "../pan_session" }
+pan_span = { path = "../pan_span" }

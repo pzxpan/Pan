@@ -16,13 +16,13 @@
 
 use crate::context::{EarlyContext, LintContext, LintStore};
 use crate::passes::{EarlyLintPass, EarlyLintPassObject};
-use rustc_ast as ast;
-use rustc_ast::visit as ast_visit;
-use rustc_attr::HasAttrs;
-use rustc_session::lint::{BufferedEarlyLint, LintBuffer, LintPass};
-use rustc_session::Session;
-use rustc_span::symbol::Ident;
-use rustc_span::Span;
+use pan_ast as ast;
+use pan_ast::visit as ast_visit;
+use pan_attr::HasAttrs;
+use pan_session::lint::{BufferedEarlyLint, LintBuffer, LintPass};
+use pan_session::Session;
+use pan_span::symbol::Ident;
+use pan_span::Span;
 
 use std::slice;
 use tracing::debug;

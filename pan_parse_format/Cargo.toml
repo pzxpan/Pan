@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 pan_span = { path = "../pan_span" }
-pan_lexer = { path = "../rustc_lexer" }
+pan_lexer = { path = "../pan_lexer" }
