@@ -1,0 +1,61 @@
+use super::BackendTypes;
+use crate::mir::operand::OperandRef;
+use crate::mir::place::PlaceRef;
+use pan_ast::{InlineAsmOptions, InlineAsmTemplatePiece};
+use pan_hir::def_id::DefId;
+use pan_hir::{GlobalAsm, LlvmInlineAsmInner};
+use pan_middle::ty::Instance;
+use pan_span::Span;
+use pan_target::asm::InlineAsmRegOrRegClass;
+
+#[derive(Debug)]
+pub enum InlineAsmOperandRef<'tcx, B: BackendTypes + ?Sized> {
+    In {
+        reg: InlineAsmRegOrRegClass,
+        value: OperandRef<'tcx, B::Value>,
+    },
+    Out {
+        reg: InlineAsmRegOrRegClass,
+        late: bool,
+        place: Option<PlaceRef<'tcx, B::Value>>,
+    },
+    InOut {
+        reg: InlineAsmRegOrRegClass,
+        late: bool,
+        in_value: OperandRef<'tcx, B::Value>,
+        out_place: Option<PlaceRef<'tcx, B::Value>>,
+    },
+    Const {
+        string: String,
+    },
+    SymFn {
+        instance: Instance<'tcx>,
+    },
+    SymStatic {
+        def_id: DefId,
+    },
+}
+
+pub trait AsmBuilderMethods<'tcx>: BackendTypes {
+    /// Take an inline assembly expression and splat it out via LLVM
+    fn codegen_llvm_inline_asm(
+        &mut self,
+        ia: &LlvmInlineAsmInner,
+        outputs: Vec<PlaceRef<'tcx, Self::Value>>,
+        inputs: Vec<Self::Value>,
+        span: Span,
+    ) -> bool;
+
+    /// Take an inline assembly expression and splat it out via LLVM
+    fn codegen_inline_asm(
+        &mut self,
+        template: &[InlineAsmTemplatePiece],
+        operands: &[InlineAsmOperandRef<'tcx, Self>],
+        options: InlineAsmOptions,
+        line_spans: &[Span],
+    );
+}
+
+pub trait AsmMethods {
+    fn codegen_global_asm(&self, ga: &GlobalAsm);
+}

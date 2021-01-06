@@ -1,0 +1,54 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "pan_interface"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+doctest = false
+
+[dependencies]
+libc = "0.2"
+tracing = "0.1"
+rayon = { version = "0.3.0", package = "rustc-rayon" }
+smallvec = { version = "1.0", features = ["union", "may_dangle"] }
+pan_ast = { path = "../pan_ast" }
+pan_attr = { path = "../pan_attr" }
+pan_builtin_macros = { path = "../pan_builtin_macros" }
+pan_expand = { path = "../pan_expand" }
+pan_parse = { path = "../pan_parse" }
+pan_session = { path = "../pan_session" }
+pan_span = { path = "../pan_span" }
+pan_serialize = { path = "../pan_serialize" }
+pan_middle = { path = "../pan_middle" }
+pan_ast_lowering = { path = "../pan_ast_lowering" }
+pan_ast_passes = { path = "../pan_ast_passes" }
+pan_incremental = { path = "../pan_incremental" }
+pan_traits = { path = "../pan_traits" }
+pan_data_structures = { path = "../pan_data_structures" }
+pan_codegen_ssa = { path = "../pan_codegen_ssa" }
+pan_symbol_mangling = { path = "../pan_symbol_mangling" }
+pan_codegen_llvm = { path = "../pan_codegen_llvm", optional = true }
+pan_hir = { path = "../pan_hir" }
+pan_metadata = { path = "../pan_metadata" }
+pan_mir = { path = "../pan_mir" }
+pan_mir_build = { path = "../pan_mir_build" }
+pan_passes = { path = "../pan_passes" }
+pan_typeck = { path = "../pan_typeck" }
+pan_lint = { path = "../pan_lint" }
+pan_errors = { path = "../pan_errors" }
+pan_plugin_impl = { path = "../pan_plugin_impl" }
+pan_privacy = { path = "../pan_privacy" }
+pan_resolve = { path = "../pan_resolve" }
+pan_trait_selection = { path = "../pan_trait_selection" }
+pan_ty_utils = { path = "../pan_ty_utils" }
+tempfile = "3.0.5"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["libloaderapi"] }
+
+[dev-dependencies]
+pan_target = { path = "../pan_target" }
+
+[features]
+llvm = ['pan_codegen_llvm']

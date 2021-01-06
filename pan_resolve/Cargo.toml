@@ -1,0 +1,29 @@
+[package]
+authors = ["The Rust Project Developers"]
+name = "pan_resolve"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+bitflags = "1.2.1"
+tracing = "0.1"
+pan_ast = { path = "../pan_ast" }
+pan_arena = { path = "../pan_arena" }
+pan_middle = { path = "../pan_middle" }
+pan_ast_lowering = { path = "../pan_ast_lowering" }
+pan_ast_pretty = { path = "../pan_ast_pretty" }
+pan_attr = { path = "../pan_attr" }
+pan_data_structures = { path = "../pan_data_structures" }
+pan_errors = { path = "../pan_errors" }
+pan_expand = { path = "../pan_expand" }
+pan_feature = { path = "../pan_feature" }
+pan_hir = { path = "../pan_hir" }
+pan_index = { path = "../pan_index" }
+pan_metadata = { path = "../pan_metadata" }
+pan_session = { path = "../pan_session" }
+pan_span = { path = "../pan_span" }
+smallvec = { version = "1.0", features = ["union", "may_dangle"] }
