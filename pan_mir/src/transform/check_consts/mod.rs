@@ -79,7 +79,7 @@ pub fn is_lang_panic_fn(tcx: TyCtxt<'tcx>, def_id: DefId) -> bool {
         || Some(def_id) == tcx.lang_items().begin_panic_fn()
 }
 
-pub fn pan_allow_const_fn_unstable(
+pub fn rustc_allow_const_fn_unstable(
     tcx: TyCtxt<'tcx>,
     def_id: DefId,
     feature_gate: Symbol,

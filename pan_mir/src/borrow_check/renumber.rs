@@ -1,9 +1,9 @@
 use pan_index::vec::IndexVec;
 use pan_infer::infer::{InferCtxt, NLLRegionVariableOrigin};
-use rustc_middle::mir::visit::{MutVisitor, TyContext};
-use rustc_middle::mir::{Body, Location, PlaceElem, Promoted};
-use rustc_middle::ty::subst::SubstsRef;
-use rustc_middle::ty::{self, Ty, TyCtxt, TypeFoldable};
+use pan_middle::mir::visit::{MutVisitor, TyContext};
+use pan_middle::mir::{Body, Location, PlaceElem, Promoted};
+use pan_middle::ty::subst::SubstsRef;
+use pan_middle::ty::{self, Ty, TyCtxt, TypeFoldable};
 
 /// Replaces all free regions appearing in the MIR with fresh
 /// inference variables, returning the number of variables created.

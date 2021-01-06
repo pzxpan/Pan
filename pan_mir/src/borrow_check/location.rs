@@ -1,5 +1,5 @@
 use pan_index::vec::{Idx, IndexVec};
-use rustc_middle::mir::{BasicBlock, Body, Location};
+use pan_middle::mir::{BasicBlock, Body, Location};
 
 /// Maps between a MIR Location, which identifies a particular
 /// statement within a basic block, to a "rich location", which
@@ -17,7 +17,7 @@ crate struct LocationTable {
     statements_before_block: IndexVec<BasicBlock, usize>,
 }
 
-rustc_index::newtype_index! {
+pan_index::newtype_index! {
     pub struct LocationIndex {
         DEBUG_FORMAT = "LocationIndex({})"
     }
