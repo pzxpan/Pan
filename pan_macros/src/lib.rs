@@ -15,8 +15,8 @@ mod symbols;
 mod type_foldable;
 
 #[proc_macro]
-pub fn pan_queries(input: TokenStream) -> TokenStream {
-    query::pan_queries(input)
+pub fn rustc_queries(input: TokenStream) -> TokenStream {
+    query::rustc_queries(input)
 }
 
 #[proc_macro]
@@ -37,7 +37,8 @@ decl_derive!([TyEncodable] => serialize::type_encodable_derive);
 decl_derive!([MetadataDecodable] => serialize::meta_decodable_derive);
 decl_derive!([MetadataEncodable] => serialize::meta_encodable_derive);
 decl_derive!([TypeFoldable, attributes(type_foldable)] => type_foldable::type_foldable_derive);
-// decl_derive!([Lift, attributes(lift)] => lift::lift_derive);
+decl_derive!([Lift, attributes(lift)] => lift::lift_derive);
+
 decl_derive!(
     [SessionDiagnostic, attributes(
         message,

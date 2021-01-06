@@ -1970,7 +1970,7 @@ impl<'tcx, T: HasTyCtxt<'tcx>> HasTyCtxt<'tcx> for LayoutCx<'tcx, T> {
     }
 }
 
-pub type TyAndLayout<'tcx> = rustc_target::abi::TyAndLayout<'tcx, Ty<'tcx>>;
+pub type TyAndLayout<'tcx> = pan_target::abi::TyAndLayout<'tcx, Ty<'tcx>>;
 
 impl<'tcx> LayoutOf for LayoutCx<'tcx, TyCtxt<'tcx>> {
     type Ty = Ty<'tcx>;

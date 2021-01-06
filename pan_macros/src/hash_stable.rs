@@ -121,7 +121,7 @@ pub fn hash_stable_derive(mut s: synstructure::Structure<'_>) -> proc_macro2::To
         quote! {
             fn hash_stable(
                 &self,
-                __hcx: &mut ::rustc_middle::ich::StableHashingContext<'__ctx>,
+                __hcx: &mut ::pan_middle::ich::StableHashingContext<'__ctx>,
                 __hasher: &mut ::pan_data_structures::stable_hasher::StableHasher) {
                 #discriminant
                 match *self { #body }

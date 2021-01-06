@@ -1068,7 +1068,7 @@ impl<'tcx> LocalDecl<'tcx> {
     }
 }
 
-#[derive(Clone, TyEncodable, TyDecodable, HashStable, TypeFoldable)]
+#[derive(Clone, TyEncodable,TyDecodable, HashStable, TypeFoldable)]
 pub enum VarDebugInfoContents<'tcx> {
     /// NOTE(eddyb) There's an unenforced invariant that this `Place` is
     /// based on a `Local`, not a `Static`, and contains no indexing.

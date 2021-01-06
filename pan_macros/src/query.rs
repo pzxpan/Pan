@@ -449,7 +449,7 @@ fn add_query_description_impl(
     });
 }
 
-pub fn pan_queries(input: TokenStream) -> TokenStream {
+pub fn rustc_queries(input: TokenStream) -> TokenStream {
     let groups = parse_macro_input!(input as List<Group>);
 
     let mut query_stream = quote! {};

@@ -108,12 +108,11 @@ fn decodable_body(
 }
 
 fn decode_field(field: &syn::Field, index: usize, is_struct: bool) -> proc_macro2::TokenStream {
-    // let decode_inner_method = if let syn::Type::Reference(_) = field.ty {
-    //     quote! { ::rustc_middle::ty::codec::RefDecodable::decode }
-    // } else {
-    //     quote! { ::rustc_serialize::Decodable::decode }
-    // };
-    let decode_inner_method = quote! { ::pan_serialize::Decodable::decode };
+    let decode_inner_method = if let syn::Type::Reference(_) = field.ty {
+        quote! { ::pan_middle::ty::codec::RefDecodable::decode }
+    } else {
+        quote! { ::pan_serialize::Decodable::decode }
+    };
     let (decode_method, opt_field_name) = if is_struct {
         let field_name = field.ident.as_ref().map_or_else(|| index.to_string(), |i| i.to_string());
         (
@@ -141,7 +140,7 @@ pub fn type_encodable_derive(mut s: synstructure::Structure<'_>) -> proc_macro2:
         s.add_impl_generic(parse_quote! {'tcx});
     }
     let encoder_ty = quote! { __E };
-    //s.add_impl_generic(parse_quote! {#encoder_ty: ::rustc_middle::ty::codec::TyEncoder<'tcx>});
+    s.add_impl_generic(parse_quote! {#encoder_ty: ::pan_middle::ty::codec::TyEncoder<'tcx>});
     s.add_bounds(synstructure::AddBounds::Generics);
 
     encodable_body(s, encoder_ty, false)
