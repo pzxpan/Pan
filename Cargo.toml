@@ -18,5 +18,6 @@ pan-parser = {path = "parser", version = "0.1.0"}
 pan-bytecode = {path = "bytecode", version = "0.1.0"}
 pan-vm = {path = "vm", version="0.1.0"}
 pan-codegen = {path = "codegen", version="0.1.0"}
+#pan_driver = {path="pan_driver"}
 dirs = "2.0"
 num-traits = "0.2.8"

@@ -30,10 +30,10 @@ use pan_codegen::code_gen;
 use pan_parser::parse;
 use pan_parser::ast::Loc;
 use pan_parser::ast;
-use std::collections::HashMap;
 use pan_compiler::util::{get_mod_name, get_package_name};
 use inkwell::context::Context;
 use inkwell::passes::PassManager;
+// use pan_driver;
 
 
 #[test]
@@ -144,6 +144,11 @@ fn main() {
     test_one_file_code_gen(&env::current_dir().unwrap().join("demo").join("simple_function_codegen.pan"));
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
+    let mut c = std::process::Command::new("cc");
+    let s = c.args(&["/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.bc"]).status().unwrap();
+    println!("ok");
+   // pan_driver::init_env_logger("llvm");
+
 }
 
 fn test_all_demo_file() {
