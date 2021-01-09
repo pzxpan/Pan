@@ -163,6 +163,9 @@ fn main() {
         let ctx = llvm::LLVMRustContextCreate(false);
         let m = llvm::LLVMModuleCreateWithNameInContext(llvm::small_c_str::SmallCStr::new("pan").as_ptr(),ctx);
         let b = llvm::LLVMCreateBuilderInContext(ctx);
+        let p = llvm::small_c_str::SmallCStr::new("/Users/panzhenxing/Desktop/PanPan/Pan/tt.bc");
+        llvm::LLVMWriteBitcodeToFile(m,p.as_ptr());
+        // let a = llvm::LLVMBuildAdd()
 
     }
 }
