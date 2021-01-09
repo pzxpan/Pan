@@ -1,3 +1,7 @@
+#![feature(extern_types)]
+
+mod llvm;
+
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -6,7 +10,6 @@ use std::collections::HashMap;
 
 use walkdir::WalkDir;
 use pan_bytecode::value::{Value, Obj, FnValue, ClosureValue, ThreadValue, TypeValue, EnumValue};
-
 
 use pan_compiler::compile::compile;
 use pan_compiler::error::CompileErrorType;
@@ -33,8 +36,13 @@ use pan_parser::ast;
 use pan_compiler::util::{get_mod_name, get_package_name};
 use inkwell::context::Context;
 use inkwell::passes::PassManager;
-// use pan_driver;
+use pan_llvm;
 
+// use crate::llvm;
+// use pan_driver;
+extern "C" {
+    pub fn LLVMRustInstallFatalErrorHandler();
+}
 
 #[test]
 fn test_no_context_double_free() {
@@ -147,8 +155,16 @@ fn main() {
     let mut c = std::process::Command::new("cc");
     let s = c.args(&["/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.bc"]).status().unwrap();
     println!("ok");
-   // pan_driver::init_env_logger("llvm");
+    // pan_driver::init_env_logger("llvm");
+    //  let a = pan_codegen_llvm::LlvmCodegenBackend::new();
+    pan_llvm::initialize_available_targets();
+    unsafe {
+        LLVMRustInstallFatalErrorHandler();
+        let ctx = llvm::LLVMRustContextCreate(false);
+        let m = llvm::LLVMModuleCreateWithNameInContext(llvm::small_c_str::SmallCStr::new("pan").as_ptr(),ctx);
+        let b = llvm::LLVMCreateBuilderInContext(ctx);
 
+    }
 }
 
 fn test_all_demo_file() {
