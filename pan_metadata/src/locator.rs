@@ -262,7 +262,7 @@ crate struct CrateLocator<'a> {
     rejected_via_filename: Vec<CrateMismatch>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 crate struct CratePaths {
     name: Symbol,
     source: CrateSource,
@@ -610,12 +610,12 @@ impl<'a> CrateLocator<'a> {
     fn crate_matches(&mut self, metadata: &MetadataBlob, libpath: &Path) -> Option<Svh> {
         let rustc_version = rustc_version();
         let found_version = metadata.get_rustc_version();
-        if found_version != rustc_version {
-            info!("Rejecting via version: expected {} got {}", rustc_version, found_version);
-            self.rejected_via_version
-                .push(CrateMismatch { path: libpath.to_path_buf(), got: found_version });
-            return None;
-        }
+        // if found_version != rustc_version {
+        //     info!("Rejecting via version: expected {} got {}", rustc_version, found_version);
+        //     self.rejected_via_version
+        //         .push(CrateMismatch { path: libpath.to_path_buf(), got: found_version });
+        //     return None;
+        // }
 
         let root = metadata.get_root();
         if let Some(expected_is_proc_macro) = self.is_proc_macro {
@@ -676,7 +676,7 @@ impl<'a> CrateLocator<'a> {
 
             if file.starts_with("lib") && (file.ends_with(".rlib") || file.ends_with(".rmeta"))
                 || file.starts_with(&self.target.dll_prefix)
-                    && file.ends_with(&self.target.dll_suffix)
+                && file.ends_with(&self.target.dll_suffix)
             {
                 // Make sure there's at most one rlib and at most one dylib.
                 // Note to take care and match against the non-canonicalized name:

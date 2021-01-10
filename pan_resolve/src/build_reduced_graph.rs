@@ -446,12 +446,12 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
             None if is_glob && use_tree.span.rust_2015() => Some(use_tree.span.ctxt()),
             _ => None,
         }
-        .map(|ctxt| {
-            Segment::from_ident(Ident::new(
-                kw::PathRoot,
-                use_tree.prefix.span.shrink_to_lo().with_ctxt(ctxt),
-            ))
-        });
+            .map(|ctxt| {
+                Segment::from_ident(Ident::new(
+                    kw::PathRoot,
+                    use_tree.prefix.span.shrink_to_lo().with_ctxt(ctxt),
+                ))
+            });
 
         let prefix = crate_root.into_iter().chain(prefix_iter).collect::<Vec<_>>();
         debug!("build_reduced_graph_for_use_tree: prefix={:?}", prefix);
@@ -937,18 +937,19 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
         let expansion = self.parent_scope.expansion;
         // Record primary definitions.
         match res {
-            Res::Def(kind @ (DefKind::Mod | DefKind::Enum | DefKind::Trait), def_id) => {
-                let module = self.r.new_module(
-                    parent,
-                    ModuleKind::Def(kind, def_id, ident.name),
-                    def_id,
-                    expansion,
-                    span,
-                );
-                self.r.define(parent, ident, TypeNS, (module, vis, span, expansion));
-            }
-            Res::Def(
-                DefKind::Struct
+            Res::Def(kind @ (
+        DefKind::Mod | DefKind::Enum | DefKind::Trait), def_id) => {
+        let module = self.r.new_module(
+        parent,
+        ModuleKind::Def(kind, def_id, ident.name),
+        def_id,
+        expansion,
+        span,
+        );
+        self.r.define(parent, ident, TypeNS, (module, vis, span, expansion));
+        }
+        Res::Def(
+            DefKind::Struct
                 | DefKind::Union
                 | DefKind::Variant
                 | DefKind::TyAlias
@@ -956,24 +957,23 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
                 | DefKind::OpaqueTy
                 | DefKind::TraitAlias
                 | DefKind::AssocTy,
-                _,
-            )
-            | Res::PrimTy(..)
-            | Res::ToolMod => self.r.define(parent, ident, TypeNS, (res, vis, span, expansion)),
-            Res::Def(
-                DefKind::Fn
+        _,
+        )
+        |Res::PrimTy(..)| Res::ToolMod => self.r.define(parent, ident, TypeNS, (res, vis, span, expansion)),
+        Res::Def(
+            DefKind::Fn
                 | DefKind::AssocFn
                 | DefKind::Static
                 | DefKind::Const
                 | DefKind::AssocConst
                 | DefKind::Ctor(..),
-                _,
-            ) => self.r.define(parent, ident, ValueNS, (res, vis, span, expansion)),
-            Res::Def(DefKind::Macro(..), _) | Res::NonMacroAttr(..) => {
-                self.r.define(parent, ident, MacroNS, (res, vis, span, expansion))
-            }
-            Res::Def(
-                DefKind::TyParam
+        _,
+        ) => self.r.define(parent, ident, ValueNS, (res, vis, span, expansion)),
+        Res::Def(DefKind::Macro(..), _) | Res::NonMacroAttr(..) => {
+            self.r.define(parent, ident, MacroNS, (res, vis, span, expansion))
+        }
+        Res::Def(
+            DefKind::TyParam
                 | DefKind::ConstParam
                 | DefKind::ExternCrate
                 | DefKind::Use
@@ -985,35 +985,34 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
                 | DefKind::Closure
                 | DefKind::Impl
                 | DefKind::Generator,
-                _,
-            )
-            | Res::Local(..)
-            | Res::SelfTy(..)
+        _,
+        )
+        |Res::Local(..)| Res::SelfTy(..)
             | Res::SelfCtor(..)
             | Res::Err => bug!("unexpected resolution: {:?}", res),
-        }
+    }
         // Record some extra data for better diagnostics.
         let cstore = self.r.cstore();
         match res {
-            Res::Def(DefKind::Struct | DefKind::Union, def_id) => {
-                let field_names = cstore.struct_field_names_untracked(def_id, self.r.session);
-                self.insert_field_names(def_id, field_names);
-            }
-            Res::Def(DefKind::AssocFn, def_id) => {
-                if cstore
-                    .associated_item_cloned_untracked(def_id, self.r.session)
-                    .fn_has_self_parameter
-                {
-                    self.r.has_self.insert(def_id);
-                }
-            }
-            Res::Def(DefKind::Ctor(CtorOf::Struct, ..), def_id) => {
-                let parent = cstore.def_key(def_id).parent;
-                if let Some(struct_def_id) = parent.map(|index| DefId { index, ..def_id }) {
-                    self.r.struct_constructors.insert(struct_def_id, (res, vis, vec![]));
-                }
-            }
-            _ => {}
+        Res::Def(DefKind::Struct | DefKind::Union, def_id) => {
+        let field_names = cstore.struct_field_names_untracked(def_id, self.r.session);
+        self.insert_field_names(def_id, field_names);
+        }
+        Res::Def(DefKind::AssocFn, def_id) => {
+        if cstore
+        .associated_item_cloned_untracked(def_id, self.r.session)
+        .fn_has_self_parameter
+        {
+        self.r.has_self.insert(def_id);
+        }
+        }
+        Res::Def(DefKind::Ctor(CtorOf::Struct, ..), def_id) => {
+        let parent = cstore.def_key(def_id).parent;
+        if let Some(struct_def_id) = parent.map( | index | DefId { index, ..def_id }) {
+        self.r.struct_constructors.insert(struct_def_id, (res, vis, vec ! []));
+        }
+        }
+        _ => {}
         }
     }
 
@@ -1045,7 +1044,7 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
                         E0468,
                         "an `extern crate` loading macros must be at the crate root"
                     )
-                    .emit();
+                        .emit();
                 }
                 if let ItemKind::ExternCrate(Some(orig_name)) = item.kind {
                     if orig_name == kw::SelfLower {
@@ -1399,9 +1398,9 @@ impl<'a, 'b> Visitor<'b> for BuildReducedGraphVisitor<'a, 'b> {
                 // Inherent impl item visibility is never inherited from other items.
                 if matches!(item.vis.kind, ast::VisibilityKind::Inherited)
                     && self
-                        .r
-                        .trait_impl_items
-                        .contains(&ty::DefIdTree::parent(&*self.r, def_id).unwrap().expect_local())
+                    .r
+                    .trait_impl_items
+                    .contains(&ty::DefIdTree::parent(&*self.r, def_id).unwrap().expect_local())
                 {
                     None
                 } else {

@@ -220,9 +220,10 @@ impl<'a> CrateLoader<'a> {
 
     fn existing_match(&self, name: Symbol, hash: Option<Svh>, kind: PathKind) -> Option<CrateNum> {
         let mut ret = None;
+        // println!("333ddddd:{:?}",self.cstore);
         self.cstore.iter_crate_data(|cnum, data| {
             if data.name() != name {
-                tracing::trace!("{} did not match {}", data.name(), name);
+                println!("{} did not match {}", data.name(), name);
                 return;
             }
 
@@ -232,7 +233,7 @@ impl<'a> CrateLoader<'a> {
                     return;
                 }
                 Some(hash) => {
-                    debug!("actual hash {} did not match expected {}", hash, data.hash());
+                    println!("actual hash {} did not match expected {}", hash, data.hash());
                     return;
                 }
                 None => {}
@@ -250,6 +251,7 @@ impl<'a> CrateLoader<'a> {
             let source = self.cstore.get_crate_data(cnum).cdata.source();
             if let Some(entry) = self.sess.opts.externs.get(&name.as_str()) {
                 // Only use `--extern crate_name=path` here, not `--extern crate_name`.
+                println!("ddddd");
                 if let Some(mut files) = entry.files() {
                     if files.any(|l| {
                         let l = fs::canonicalize(l).unwrap_or(l.clone().into());
@@ -275,6 +277,7 @@ impl<'a> CrateLoader<'a> {
                 .or(source.rmeta.as_ref())
                 .expect("No sources for crate")
                 .1;
+            println!("111ddddd");
             if kind.matches(prev_kind) {
                 ret = Some(cnum);
             } else {
@@ -299,8 +302,8 @@ impl<'a> CrateLoader<'a> {
         let mut res = Ok(());
         self.cstore.iter_crate_data(|_, other| {
             if other.name() == root.name() && // same crate-name
-               other.disambiguator() == root.disambiguator() && // same crate-disambiguator
-               other.hash() != root.hash()
+                other.disambiguator() == root.disambiguator() && // same crate-disambiguator
+                other.hash() != root.hash()
             {
                 // but different SVH
                 res = Err(CrateError::SymbolConflictsOthers(root.name()));
@@ -388,8 +391,8 @@ impl<'a> CrateLoader<'a> {
         locator: &mut CrateLocator<'b>,
         path_kind: PathKind,
     ) -> Result<Option<(LoadResult, Option<Library>)>, CrateError>
-    where
-        'a: 'b,
+        where
+            'a: 'b,
     {
         // Use a new crate locator so trying to load a proc macro doesn't affect the error
         // message we emit
@@ -449,6 +452,7 @@ impl<'a> CrateLoader<'a> {
         dep_kind: CrateDepKind,
         dep: Option<(&'b CratePaths, &'b CrateDep)>,
     ) -> CrateNum {
+        println!("pppp");
         if dep.is_none() {
             self.used_extern_options.insert(name);
         }
@@ -462,7 +466,7 @@ impl<'a> CrateLoader<'a> {
         mut dep_kind: CrateDepKind,
         dep: Option<(&'b CratePaths, &'b CrateDep)>,
     ) -> Result<CrateNum, CrateError> {
-        info!("resolving crate `{}`", name);
+        println!("resolving crate `{}`", name);
         if !name.as_str().is_ascii() {
             return Err(CrateError::NonAsciiName(name));
         }
@@ -476,10 +480,13 @@ impl<'a> CrateLoader<'a> {
             ),
             None => (None, None, None, None, PathKind::Crate),
         };
+        //let (root, hash, host_hash, extra_filename, path_kind) = (None, None, None, None, PathKind::Dependency);
+
+        println!("name:{:?},hash:{:?},path:{:?}", name, hash, path_kind);
         let result = if let Some(cnum) = self.existing_match(name, hash, path_kind) {
             (LoadResult::Previous(cnum), None)
         } else {
-            info!("falling back to a load");
+            println!("falling back to a load");
             let mut locator = CrateLocator::new(
                 self.sess,
                 self.metadata_loader,
@@ -493,6 +500,7 @@ impl<'a> CrateLoader<'a> {
                 Some(false), // is_proc_macro
             );
 
+            println!("extra_filename:{:?},name:{:?}", extra_filename, name);
             match self.load(&mut locator)? {
                 Some(res) => (res, None),
                 None => {
@@ -522,6 +530,7 @@ impl<'a> CrateLoader<'a> {
     }
 
     fn load(&self, locator: &mut CrateLocator<'_>) -> Result<Option<LoadResult>, CrateError> {
+        println!("aaaabbb");
         let library = match locator.maybe_load_library_crate()? {
             Some(library) => library,
             None => return Ok(None),
@@ -536,8 +545,10 @@ impl<'a> CrateLoader<'a> {
         // don't want to match a host crate against an equivalent target one
         // already loaded.
         let root = library.metadata.get_root();
+        println!("aaaabbb2222");
         Ok(Some(if locator.triple == self.sess.opts.target_triple {
             let mut result = LoadResult::Loaded(library);
+            println!("aaaabbb3333");
             self.cstore.iter_crate_data(|cnum, data| {
                 if data.name() == root.name() && root.hash() == data.hash() {
                     assert!(locator.hash.is_none());
@@ -547,6 +558,7 @@ impl<'a> CrateLoader<'a> {
             });
             result
         } else {
+            println!("aaaabbb4444");
             LoadResult::Loaded(library)
         }))
     }
@@ -591,6 +603,7 @@ impl<'a> CrateLoader<'a> {
                 CrateDepKind::MacrosOnly => CrateDepKind::MacrosOnly,
                 _ => dep.kind,
             };
+            println!("333pppp");
             let cnum = self.maybe_resolve_crate(dep.name, dep_kind, Some((root, &dep)))?;
             crate_num_map.push(cnum);
         }
@@ -939,6 +952,7 @@ impl<'a> CrateLoader<'a> {
     }
 
     pub fn process_path_extern(&mut self, name: Symbol, span: Span) -> CrateNum {
+        println!("777pppp");
         let cnum = self.resolve_crate(name, span, CrateDepKind::Explicit, None);
 
         self.update_extern_crate(
@@ -956,6 +970,7 @@ impl<'a> CrateLoader<'a> {
     }
 
     pub fn maybe_process_path_extern(&mut self, name: Symbol) -> Option<CrateNum> {
+        println!("pppp");
         self.maybe_resolve_crate(name, CrateDepKind::Explicit, None).ok()
     }
 }

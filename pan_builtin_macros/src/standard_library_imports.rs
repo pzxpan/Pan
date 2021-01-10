@@ -14,8 +14,9 @@ pub fn inject(
     sess: &Session,
     alt_std_name: Option<Symbol>,
 ) -> ast::Crate {
-    let rust_2018 = sess.parse_sess.edition >= Edition::Edition2018;
-
+    // let rust_2018 = sess.parse_sess.edition >= Edition::Edition2018;
+    let rust_2018 = true;
+    println!("rust_2018:{:?}",rust_2018);
     // the first name in this list is the crate name of the crate with the prelude
     let names: &[Symbol] = if sess.contains_name(&krate.attrs, sym::no_core) {
         return krate;

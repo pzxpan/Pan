@@ -241,7 +241,7 @@ enum DiagnosticBuilderMethod {
     Note,
     SpanNote,
     SpanSuggestion(String), // suggestion
-                            // Add more variants as needed to support one-time diagnostics.
+    // Add more variants as needed to support one-time diagnostics.
 }
 
 /// Trait implemented by error types. This should not be implemented manually. Instead, use
@@ -256,7 +256,8 @@ pub trait SessionDiagnostic<'a> {
 /// emitting the same message more than once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum DiagnosticMessageId {
-    ErrorId(u16), // EXXXX error code as integer
+    ErrorId(u16),
+    // EXXXX error code as integer
     LintId(lint::LintId),
     StabilityId(Option<NonZeroU32>), // issue number
 }
@@ -467,8 +468,8 @@ impl Session {
     }
     // FIXME(matthewjasper) Remove this method, it should never be needed.
     pub fn track_errors<F, T>(&self, f: F) -> Result<T, ErrorReported>
-    where
-        F: FnOnce() -> T,
+        where
+            F: FnOnce() -> T,
     {
         let old_count = self.err_count();
         let result = f();
@@ -889,8 +890,7 @@ impl Session {
     ) {
         let mut incr_comp_session = self.incr_comp_session.borrow_mut();
 
-        if let IncrCompSession::NotInitialized = *incr_comp_session {
-        } else {
+        if let IncrCompSession::NotInitialized = *incr_comp_session {} else {
             panic!("Trying to initialize IncrCompSession `{:?}`", *incr_comp_session)
         }
 
@@ -901,8 +901,7 @@ impl Session {
     pub fn finalize_incr_comp_session(&self, new_directory_path: PathBuf) {
         let mut incr_comp_session = self.incr_comp_session.borrow_mut();
 
-        if let IncrCompSession::Active { .. } = *incr_comp_session {
-        } else {
+        if let IncrCompSession::Active { .. } = *incr_comp_session {} else {
             panic!("trying to finalize `IncrCompSession` `{:?}`", *incr_comp_session);
         }
 
@@ -1108,9 +1107,9 @@ impl Session {
     /// Checks if LLVM lifetime markers should be emitted.
     pub fn emit_lifetime_markers(&self) -> bool {
         self.opts.optimize != config::OptLevel::No
-        // AddressSanitizer uses lifetimes to detect use after scope bugs.
-        // MemorySanitizer uses lifetimes to detect use of uninitialized stack variables.
-        || self.opts.debugging_opts.sanitizer.intersects(SanitizerSet::ADDRESS | SanitizerSet::MEMORY)
+            // AddressSanitizer uses lifetimes to detect use after scope bugs.
+            // MemorySanitizer uses lifetimes to detect use of uninitialized stack variables.
+            || self.opts.debugging_opts.sanitizer.intersects(SanitizerSet::ADDRESS | SanitizerSet::MEMORY)
     }
 
     pub fn link_dead_code(&self) -> bool {
@@ -1172,7 +1171,7 @@ impl Session {
         &'a self,
         attrs: &'a [Attribute],
         name: Symbol,
-    ) -> impl Iterator<Item = &'a Attribute> {
+    ) -> impl Iterator<Item=&'a Attribute> {
         attrs.iter().filter(move |attr| self.check_name(attr, name))
     }
 
@@ -1232,7 +1231,7 @@ fn default_emitter(
                 sopts.debugging_opts.terminal_width,
                 macro_backtrace,
             )
-            .ui_testing(sopts.debugging_opts.ui_testing),
+                .ui_testing(sopts.debugging_opts.ui_testing),
         ),
         (config::ErrorOutputType::Json { pretty, json_rendered }, Some(dst)) => Box::new(
             JsonEmitter::new(
@@ -1244,7 +1243,7 @@ fn default_emitter(
                 sopts.debugging_opts.terminal_width,
                 macro_backtrace,
             )
-            .ui_testing(sopts.debugging_opts.ui_testing),
+                .ui_testing(sopts.debugging_opts.ui_testing),
         ),
     }
 }
@@ -1329,11 +1328,12 @@ pub fn build_session(
     };
 
     let parse_sess = ParseSess::with_span_handler(span_diagnostic, source_map);
-    let sysroot = match &sopts.maybe_sysroot {
-        Some(sysroot) => sysroot.clone(),
-        None => filesearch::get_or_default_sysroot(),
-    };
-
+    // let sysroot = match &sopts.maybe_sysroot {
+    //     Some(sysroot) => sysroot.clone(),
+    //     None => filesearch::get_or_default_sysroot(),
+    // };
+    let sysroot = PathBuf::from("/Users/panzhenxing/.rustup/toolchains/nightly-x86_64-apple-darwin");
+    println!("222sysroot:{:?}", sysroot);
     let host_triple = config::host_triple();
     let target_triple = sopts.target_triple.triple();
     let host_tlib_path = SearchPath::from_sysroot_and_triple(&sysroot, host_triple);

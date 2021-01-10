@@ -199,7 +199,7 @@ impl<'tcx> Queries<'tcx> {
                         self.session().time("blocked_on_dep_graph_loading", || {
                             future
                                 .open()
-                                .unwrap_or_else(|e| rustc_incremental::LoadResult::Error {
+                                .unwrap_or_else(|e| pan_incremental::LoadResult::Error {
                                     message: format!("could not decode incremental cache: {:?}", e),
                                 })
                                 .open(self.session())

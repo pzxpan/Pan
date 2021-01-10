@@ -25,7 +25,7 @@ struct Finder<'tcx> {
 
 impl<'v> ItemLikeVisitor<'v> for Finder<'_> {
     fn visit_item(&mut self, item: &hir::Item<'_>) {
-        if self.tcx.sess.contains_name(&item.attrs, sym::pan_proc_macro_decls) {
+        if self.tcx.sess.contains_name(&item.attrs, sym::rustc_proc_macro_decls) {
             self.decls = Some(item.hir_id);
         }
     }

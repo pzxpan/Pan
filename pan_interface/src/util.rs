@@ -1,27 +1,28 @@
-use rustc_ast::mut_visit::{visit_clobber, MutVisitor, *};
-use rustc_ast::ptr::P;
-use rustc_ast::{self as ast, AttrVec, BlockCheckMode};
-use rustc_codegen_ssa::traits::CodegenBackend;
-use rustc_data_structures::fingerprint::Fingerprint;
-use rustc_data_structures::fx::{FxHashMap, FxHashSet};
+use pan_ast::mut_visit::{visit_clobber, MutVisitor, *};
+use pan_ast::ptr::P;
+use pan_ast::{self as ast, AttrVec, BlockCheckMode};
+use pan_codegen_ssa::traits::CodegenBackend;
+use pan_data_structures::fingerprint::Fingerprint;
+use pan_data_structures::fx::{FxHashMap, FxHashSet};
 #[cfg(parallel_compiler)]
-use rustc_data_structures::jobserver;
-use rustc_data_structures::stable_hasher::StableHasher;
-use rustc_data_structures::sync::Lrc;
-use rustc_errors::registry::Registry;
-use rustc_metadata::dynamic_lib::DynamicLibrary;
-use rustc_resolve::{self, Resolver};
-use rustc_session as session;
-use rustc_session::config::{self, CrateType};
-use rustc_session::config::{ErrorOutputType, Input, OutputFilenames};
-use rustc_session::lint::{self, BuiltinLintDiagnostics, LintBuffer};
-use rustc_session::parse::CrateConfig;
-use rustc_session::CrateDisambiguator;
-use rustc_session::{early_error, filesearch, output, DiagnosticOutput, Session};
-use rustc_span::edition::Edition;
-use rustc_span::lev_distance::find_best_match_for_name;
-use rustc_span::source_map::FileLoader;
-use rustc_span::symbol::{sym, Symbol};
+use pan_data_structures::jobserver;
+use pan_data_structures::stable_hasher::StableHasher;
+use pan_data_structures::sync::Lrc;
+use pan_errors::registry::Registry;
+use pan_metadata::dynamic_lib::DynamicLibrary;
+use pan_resolve::{self, Resolver};
+use pan_session as session;
+use pan_session::config::{self, CrateType};
+use pan_session::config::{ErrorOutputType, Input, OutputFilenames};
+use pan_session::lint::{self, BuiltinLintDiagnostics, LintBuffer};
+use pan_session::parse::CrateConfig;
+use pan_session::CrateDisambiguator;
+use pan_session::{early_error, filesearch, output, DiagnosticOutput, Session};
+use pan_span::edition::Edition;
+use pan_span::lev_distance::find_best_match_for_name;
+use pan_span::source_map::FileLoader;
+use pan_span::symbol::{sym, Symbol};
+use pan_codegen_llvm;
 use smallvec::SmallVec;
 use std::env;
 use std::env::consts::{DLL_PREFIX, DLL_SUFFIX};
@@ -147,7 +148,7 @@ pub fn setup_callbacks_and_run_in_thread_pool_with_globals<F: FnOnce() -> R + Se
     crate::callbacks::setup_callbacks();
 
     let main_handler = move || {
-        rustc_span::with_session_globals(edition, || {
+        pan_span::with_session_globals(edition, || {
             io::set_output_capture(stderr.clone());
             f()
         })
@@ -163,7 +164,7 @@ pub fn setup_callbacks_and_run_in_thread_pool_with_globals<F: FnOnce() -> R + Se
     stderr: &Option<Arc<Mutex<Vec<u8>>>>,
     f: F,
 ) -> R {
-    use rustc_middle::ty;
+    use pan_middle::ty;
     crate::callbacks::setup_callbacks();
 
     let mut config = rayon::ThreadPoolBuilder::new()
@@ -179,13 +180,13 @@ pub fn setup_callbacks_and_run_in_thread_pool_with_globals<F: FnOnce() -> R + Se
 
     let with_pool = move |pool: &rayon::ThreadPool| pool.install(f);
 
-    rustc_span::with_session_globals(edition, || {
-        rustc_span::SESSION_GLOBALS.with(|session_globals| {
+    pan_span::with_session_globals(edition, || {
+        pan_span::SESSION_GLOBALS.with(|session_globals| {
             // The main handler runs for each Rayon worker thread and sets up
-            // the thread local rustc uses. `session_globals` is captured and set
+            // the thread local pan uses. `session_globals` is captured and set
             // on the new threads.
             let main_handler = move |thread: rayon::ThreadBuilder| {
-                rustc_span::SESSION_GLOBALS.set(session_globals, || {
+                pan_span::SESSION_GLOBALS.set(session_globals, || {
                     io::set_output_capture(stderr.clone());
                     thread.run()
                 })
@@ -257,7 +258,8 @@ pub fn get_codegen_backend(sopts: &config::Options) -> Box<dyn CodegenBackend> {
 pub fn rustc_path<'a>() -> Option<&'a Path> {
     static RUSTC_PATH: SyncOnceCell<Option<PathBuf>> = SyncOnceCell::new();
 
-    const BIN_PATH: &str = env!("RUSTC_INSTALL_BINDIR");
+    //const BIN_PATH: &str = env!("RUSTC_INSTALL_BINDIR");
+    const BIN_PATH: &str = "/Users/panzhenxing/.rustup/toolchains/nightly-x86_64-apple-darwin/bin";
 
     RUSTC_PATH.get_or_init(|| get_rustc_path_inner(BIN_PATH)).as_ref().map(|v| &**v)
 }
@@ -367,11 +369,12 @@ fn sysroot_candidates() -> Vec<PathBuf> {
 }
 
 pub fn get_builtin_codegen_backend(backend_name: &str) -> fn() -> Box<dyn CodegenBackend> {
-    match backend_name {
-        #[cfg(feature = "llvm")]
-        "llvm" => rustc_codegen_llvm::LlvmCodegenBackend::new,
-        _ => get_codegen_sysroot(backend_name),
-    }
+    pan_codegen_llvm::LlvmCodegenBackend::new
+    // match backend_name {
+    //     #[cfg(feature = "llvm")]
+    //     "llvm" => pan_codegen_llvm::LlvmCodegenBackend::new,
+    //     _ => get_codegen_sysroot(backend_name),
+    // }
 }
 
 pub fn get_codegen_sysroot(backend_name: &str) -> fn() -> Box<dyn CodegenBackend> {
@@ -628,7 +631,7 @@ pub fn build_output_filenames(
                 .opts
                 .crate_name
                 .clone()
-                .or_else(|| rustc_attr::find_crate_name(&sess, attrs).map(|n| n.to_string()))
+                .or_else(|| pan_attr::find_crate_name(&sess, attrs).map(|n| n.to_string()))
                 .unwrap_or_else(|| input.filestem().to_owned());
 
             OutputFilenames::new(
@@ -792,7 +795,7 @@ impl<'a> MutVisitor for ReplaceBodyWithLoop<'a, '_> {
                 stmts: s.into_iter().collect(),
                 rules,
                 id: resolver.next_node_id(),
-                span: rustc_span::DUMMY_SP,
+                span: pan_span::DUMMY_SP,
                 tokens: None,
             }
         }
@@ -801,7 +804,7 @@ impl<'a> MutVisitor for ReplaceBodyWithLoop<'a, '_> {
             let expr = P(ast::Expr {
                 id: resolver.next_node_id(),
                 kind: ast::ExprKind::Block(P(b), None),
-                span: rustc_span::DUMMY_SP,
+                span: pan_span::DUMMY_SP,
                 attrs: AttrVec::new(),
                 tokens: None,
             });
@@ -809,7 +812,7 @@ impl<'a> MutVisitor for ReplaceBodyWithLoop<'a, '_> {
             ast::Stmt {
                 id: resolver.next_node_id(),
                 kind: ast::StmtKind::Expr(expr),
-                span: rustc_span::DUMMY_SP,
+                span: pan_span::DUMMY_SP,
             }
         }
 
@@ -817,14 +820,14 @@ impl<'a> MutVisitor for ReplaceBodyWithLoop<'a, '_> {
         let loop_expr = P(ast::Expr {
             kind: ast::ExprKind::Loop(P(empty_block), None),
             id: self.resolver.next_node_id(),
-            span: rustc_span::DUMMY_SP,
+            span: pan_span::DUMMY_SP,
             attrs: AttrVec::new(),
             tokens: None,
         });
 
         let loop_stmt = ast::Stmt {
             id: self.resolver.next_node_id(),
-            span: rustc_span::DUMMY_SP,
+            span: pan_span::DUMMY_SP,
             kind: ast::StmtKind::Expr(loop_expr),
         };
 

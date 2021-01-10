@@ -31,15 +31,15 @@ use pan_resolve::{Resolver, ResolverArenas};
 use pan_session::config::{CrateType, Input, OutputFilenames, OutputType, PpMode, PpSourceMode};
 use pan_session::lint;
 use pan_session::output::{filename_for_input, filename_for_metadata};
-use rustc_session::search_paths::PathKind;
-use rustc_session::Session;
-use rustc_span::symbol::Symbol;
-use rustc_span::{FileName, RealFileName};
-use rustc_trait_selection::traits;
-use rustc_typeck as typeck;
+use pan_session::search_paths::PathKind;
+use pan_session::Session;
+use pan_span::symbol::Symbol;
+use pan_span::{FileName, RealFileName};
+use pan_trait_selection::traits;
+use pan_typeck as typeck;
 use tracing::{info, warn};
 
-use rustc_serialize::json;
+use pan_serialize::json;
 use tempfile::Builder as TempFileBuilder;
 
 use std::any::Any;
@@ -69,7 +69,7 @@ pub fn parse<'a>(sess: &'a Session, input: &Input) -> PResult<'a, ast::Crate> {
     }
 
     if let Some(ref s) = sess.opts.debugging_opts.show_span {
-        rustc_ast_passes::show_span::run(sess.diagnostic(), s, &krate);
+        pan_ast_passes::show_span::run(sess.diagnostic(), s, &krate);
     }
 
     if sess.opts.debugging_opts.hir_stats {
@@ -80,7 +80,7 @@ pub fn parse<'a>(sess: &'a Session, input: &Input) -> PResult<'a, ast::Crate> {
 }
 
 fn count_nodes(krate: &ast::Crate) -> usize {
-    let mut counter = rustc_ast_passes::node_count::NodeCounter::new();
+    let mut counter = pan_ast_passes::node_count::NodeCounter::new();
     visit::walk_crate(&mut counter, krate);
     counter.count
 }
@@ -156,14 +156,14 @@ pub fn register_plugins<'a>(
     crate_name: &str,
 ) -> Result<(ast::Crate, Lrc<LintStore>)> {
     krate = sess.time("attributes_injection", || {
-        rustc_builtin_macros::cmdline_attrs::inject(
+        pan_builtin_macros::cmdline_attrs::inject(
             krate,
             &sess.parse_sess,
             &sess.opts.debugging_opts.crate_attr,
         )
     });
 
-    let (krate, features) = rustc_expand::config::features(sess, krate);
+    let (krate, features) = pan_expand::config::features(sess, krate);
     // these need to be set "early" so that expansion sees `quote` if enabled.
     sess.init_features(features);
 
@@ -172,11 +172,11 @@ pub fn register_plugins<'a>(
 
     let disambiguator = util::compute_crate_disambiguator(sess);
     sess.crate_disambiguator.set(disambiguator).expect("not yet initialized");
-    rustc_incremental::prepare_session_directory(sess, &crate_name, disambiguator);
+    pan_incremental::prepare_session_directory(sess, &crate_name, disambiguator);
 
     if sess.opts.incremental.is_some() {
         sess.time("incr_comp_garbage_collect_session_directories", || {
-            if let Err(e) = rustc_incremental::garbage_collect_session_directories(sess) {
+            if let Err(e) = pan_incremental::garbage_collect_session_directories(sess) {
                 warn!(
                     "Error while trying to garbage collect incremental \
                      compilation cache directory: {}",
@@ -190,7 +190,7 @@ pub fn register_plugins<'a>(
         middle::limits::update_limits(sess, &krate);
     });
 
-    let mut lint_store = rustc_lint::new_lint_store(
+    let mut lint_store = pan_lint::new_lint_store(
         sess.opts.debugging_opts.no_interleave_lints,
         sess.unstable_options(),
     );
@@ -213,13 +213,13 @@ pub fn register_plugins<'a>(
 
 fn pre_expansion_lint(sess: &Session, lint_store: &LintStore, krate: &ast::Crate) {
     sess.time("pre_AST_expansion_lint_checks", || {
-        rustc_lint::check_ast_crate(
+        pan_lint::check_ast_crate(
             sess,
             lint_store,
             &krate,
             true,
             None,
-            rustc_lint::BuiltinCombinedPreExpansionLintPass::new(),
+            pan_lint::BuiltinCombinedPreExpansionLintPass::new(),
         );
     });
 }
@@ -236,11 +236,11 @@ fn configure_and_expand_inner<'a>(
     pre_expansion_lint(sess, lint_store, &krate);
 
     let mut resolver = Resolver::new(sess, &krate, crate_name, metadata_loader, &resolver_arenas);
-    rustc_builtin_macros::register_builtin_macros(&mut resolver, sess.edition());
+    pan_builtin_macros::register_builtin_macros(&mut resolver, sess.edition());
 
     krate = sess.time("crate_injection", || {
         let alt_std_name = sess.opts.alt_std_name.as_ref().map(|s| Symbol::intern(s));
-        rustc_builtin_macros::standard_library_imports::inject(
+        pan_builtin_macros::standard_library_imports::inject(
             krate,
             &mut resolver,
             &sess,
@@ -285,14 +285,14 @@ fn configure_and_expand_inner<'a>(
 
         // Create the config for macro expansion
         let features = sess.features_untracked();
-        let cfg = rustc_expand::expand::ExpansionConfig {
+        let cfg = pan_expand::expand::ExpansionConfig {
             features: Some(&features),
             recursion_limit: sess.recursion_limit(),
             trace_mac: sess.opts.debugging_opts.trace_macros,
             should_test: sess.opts.test,
             span_debug: sess.opts.debugging_opts.span_debug,
             proc_macro_backtrace: sess.opts.debugging_opts.proc_macro_backtrace,
-            ..rustc_expand::expand::ExpansionConfig::default(crate_name.to_string())
+            ..pan_expand::expand::ExpansionConfig::default(crate_name.to_string())
         };
 
         let extern_mod_loaded = |k: &ast::Crate| pre_expansion_lint(sess, lint_store, k);
@@ -338,7 +338,7 @@ fn configure_and_expand_inner<'a>(
     })?;
 
     sess.time("maybe_building_test_harness", || {
-        rustc_builtin_macros::test_harness::inject(&sess, &mut resolver, &mut krate)
+        pan_builtin_macros::test_harness::inject(&sess, &mut resolver, &mut krate)
     });
 
     if let Some(PpMode::PpmSource(PpSourceMode::PpmEveryBodyLoops)) = sess.opts.pretty {
@@ -347,7 +347,7 @@ fn configure_and_expand_inner<'a>(
     }
 
     let has_proc_macro_decls = sess.time("AST_validation", || {
-        rustc_ast_passes::ast_validation::check_crate(sess, &krate, &mut resolver.lint_buffer())
+        pan_ast_passes::ast_validation::check_crate(sess, &krate, &mut resolver.lint_buffer())
     });
 
     let crate_types = sess.crate_types();
@@ -371,7 +371,7 @@ fn configure_and_expand_inner<'a>(
         krate = sess.time("maybe_create_a_macro_crate", || {
             let num_crate_types = crate_types.len();
             let is_test_crate = sess.opts.test;
-            rustc_builtin_macros::proc_macro_harness::inject(
+            pan_builtin_macros::proc_macro_harness::inject(
                 &sess,
                 &mut resolver,
                 krate,
@@ -402,7 +402,7 @@ fn configure_and_expand_inner<'a>(
 
     // Needs to go *after* expansion to be able to check the results of macro expansion.
     sess.time("complete_gated_feature_checking", || {
-        rustc_ast_passes::feature_gate::check_crate(&krate, sess);
+        pan_ast_passes::feature_gate::check_crate(&krate, sess);
     });
 
     // Add all buffered lints from the `ParseSess` to the `Session`.
@@ -422,7 +422,7 @@ pub fn lower_to_hir<'res, 'tcx>(
     resolver: &'res mut Resolver<'_>,
     dep_graph: &'res DepGraph,
     krate: &'res ast::Crate,
-    arena: &'tcx rustc_ast_lowering::Arena<'tcx>,
+    arena: &'tcx pan_ast_lowering::Arena<'tcx>,
 ) -> Crate<'tcx> {
     // We're constructing the HIR here; we don't care what we will
     // read, since we haven't even constructed the *input* to
@@ -430,11 +430,11 @@ pub fn lower_to_hir<'res, 'tcx>(
     dep_graph.assert_ignored();
 
     // Lower AST to HIR.
-    let hir_crate = rustc_ast_lowering::lower_crate(
+    let hir_crate = pan_ast_lowering::lower_crate(
         sess,
         &krate,
         resolver,
-        rustc_parse::nt_to_tokenstream,
+        pan_parse::nt_to_tokenstream,
         arena,
     );
 
@@ -443,19 +443,19 @@ pub fn lower_to_hir<'res, 'tcx>(
     }
 
     sess.time("early_lint_checks", || {
-        rustc_lint::check_ast_crate(
+        pan_lint::check_ast_crate(
             sess,
             lint_store,
             &krate,
             false,
             Some(std::mem::take(resolver.lint_buffer())),
-            rustc_lint::BuiltinCombinedEarlyLintPass::new(),
+            pan_lint::BuiltinCombinedEarlyLintPass::new(),
         )
     });
 
     // Discard hygiene data, which isn't required after lowering to HIR.
     if !sess.opts.debugging_opts.keep_hygiene_data {
-        rustc_span::hygiene::clear_syntax_context_map();
+        pan_span::hygiene::clear_syntax_context_map();
     }
 
     hir_crate
@@ -706,28 +706,28 @@ pub static DEFAULT_QUERY_PROVIDERS: SyncLazy<Providers> = SyncLazy::new(|| {
     providers.analysis = analysis;
     proc_macro_decls::provide(providers);
     plugin::build::provide(providers);
-    rustc_middle::hir::provide(providers);
+    pan_middle::hir::provide(providers);
     mir::provide(providers);
     mir_build::provide(providers);
-    rustc_privacy::provide(providers);
+    pan_privacy::provide(providers);
     typeck::provide(providers);
     ty::provide(providers);
     traits::provide(providers);
-    rustc_passes::provide(providers);
-    rustc_resolve::provide(providers);
-    rustc_traits::provide(providers);
-    rustc_ty_utils::provide(providers);
-    rustc_metadata::provide(providers);
-    rustc_lint::provide(providers);
-    rustc_symbol_mangling::provide(providers);
-    rustc_codegen_ssa::provide(providers);
+    pan_passes::provide(providers);
+    pan_resolve::provide(providers);
+    pan_traits::provide(providers);
+    pan_ty_utils::provide(providers);
+    pan_metadata::provide(providers);
+    pan_lint::provide(providers);
+    pan_symbol_mangling::provide(providers);
+    pan_codegen_ssa::provide(providers);
     *providers
 });
 
 pub static DEFAULT_EXTERN_QUERY_PROVIDERS: SyncLazy<Providers> = SyncLazy::new(|| {
     let mut extern_providers = *DEFAULT_QUERY_PROVIDERS;
-    rustc_metadata::provide_extern(&mut extern_providers);
-    rustc_codegen_ssa::provide_extern(&mut extern_providers);
+    pan_metadata::provide_extern(&mut extern_providers);
+    pan_codegen_ssa::provide_extern(&mut extern_providers);
     extern_providers
 });
 
@@ -764,7 +764,7 @@ pub fn create_global_ctxt<'tcx>(
         Definitions::new(crate_name, sess.local_crate_disambiguator()),
     ));
 
-    let query_result_on_disk_cache = rustc_incremental::load_query_result_cache(sess, defs);
+    let query_result_on_disk_cache = pan_incremental::load_query_result_cache(sess, defs);
 
     let codegen_backend = compiler.codegen_backend();
     let mut local_providers = *DEFAULT_QUERY_PROVIDERS;
@@ -800,7 +800,7 @@ pub fn create_global_ctxt<'tcx>(
     // Do some initialization of the DepGraph that can only be done with the tcx available.
     let icx = ty::tls::ImplicitCtxt::new(&gcx);
     ty::tls::enter_context(&icx, |_| {
-        icx.tcx.sess.time("dep_graph_tcx_init", || rustc_incremental::dep_graph_tcx_init(icx.tcx));
+        icx.tcx.sess.time("dep_graph_tcx_init", || pan_incremental::dep_graph_tcx_init(icx.tcx));
     });
 
     QueryContext(gcx)
@@ -811,7 +811,7 @@ pub fn create_global_ctxt<'tcx>(
 fn analysis(tcx: TyCtxt<'_>, cnum: CrateNum) -> Result<()> {
     assert_eq!(cnum, LOCAL_CRATE);
 
-    rustc_passes::hir_id_validator::check_crate(tcx);
+    pan_passes::hir_id_validator::check_crate(tcx);
 
     let sess = tcx.sess;
     let mut entry_point = None;
@@ -820,7 +820,7 @@ fn analysis(tcx: TyCtxt<'_>, cnum: CrateNum) -> Result<()> {
         parallel!(
             {
                 entry_point = sess
-                    .time("looking_for_entry_point", || rustc_passes::entry::find_entry_point(tcx));
+                    .time("looking_for_entry_point", || pan_passes::entry::find_entry_point(tcx));
 
                 sess.time("looking_for_plugin_registrar", || {
                     plugin::build::find_plugin_registrar(tcx)
@@ -906,17 +906,17 @@ fn analysis(tcx: TyCtxt<'_>, cnum: CrateNum) -> Result<()> {
                         tcx.ensure().check_private_in_public(LOCAL_CRATE);
                     },
                     {
-                        sess.time("death_checking", || rustc_passes::dead::check_crate(tcx));
+                        sess.time("death_checking", || pan_passes::dead::check_crate(tcx));
                     },
                     {
                         sess.time("unused_lib_feature_checking", || {
-                            rustc_passes::stability::check_unused_or_stable_features(tcx)
+                            pan_passes::stability::check_unused_or_stable_features(tcx)
                         });
                     },
                     {
                         sess.time("lint_checking", || {
-                            rustc_lint::check_crate(tcx, || {
-                                rustc_lint::BuiltinCombinedLateLintPass::new()
+                            pan_lint::check_crate(tcx, || {
+                                pan_lint::BuiltinCombinedLateLintPass::new()
                             });
                         });
                     }
@@ -1016,12 +1016,12 @@ pub fn start_codegen<'tcx>(
     // Don't run these test assertions when not doing codegen. Compiletest tries to build
     // build-fail tests in check mode first and expects it to not give an error in that case.
     if tcx.sess.opts.output_types.should_codegen() {
-        rustc_incremental::assert_module_sources::assert_module_sources(tcx);
-        rustc_symbol_mangling::test::report_symbol_names(tcx);
+        pan_incremental::assert_module_sources::assert_module_sources(tcx);
+        pan_symbol_mangling::test::report_symbol_names(tcx);
     }
 
-    tcx.sess.time("assert_dep_graph", || rustc_incremental::assert_dep_graph(tcx));
-    tcx.sess.time("serialize_dep_graph", || rustc_incremental::save_dep_graph(tcx));
+    tcx.sess.time("assert_dep_graph", || pan_incremental::assert_dep_graph(tcx));
+    tcx.sess.time("serialize_dep_graph", || pan_incremental::save_dep_graph(tcx));
 
     // We assume that no queries are run past here. If there are new queries
     // after this point, they'll show up as "<unknown>" in self-profiling data.

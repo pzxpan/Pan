@@ -1444,12 +1444,15 @@ impl<'a> Resolver<'a> {
         let _prof_timer = self.session.prof.generic_activity("resolve_crate");
 
         ImportResolver { r: self }.finalize_imports();
+        println!("resolve_crate0000");
         self.finalize_macro_resolutions();
-
+        println!("resolve_crate2222");
         self.late_resolve_crate(krate);
-
+        println!("resolve_crate333");
         self.check_unused(krate);
+        println!("resolve_crate444");
         self.report_errors(krate);
+        println!("resolve_crate555");
         self.crate_loader.postprocess(krate);
     }
 
@@ -2082,7 +2085,7 @@ impl<'a> Resolver<'a> {
                     break;
                 }
             }
-            debug!(
+            println!(
                 "resolve_crate_root: found opaque mark {:?} {:?}",
                 result,
                 result.map(|r| r.expn_data())
@@ -2095,14 +2098,14 @@ impl<'a> Resolver<'a> {
                     break;
                 }
             }
-            debug!(
+            println!(
                 "resolve_crate_root: found semi-transparent mark {:?} {:?}",
                 result,
                 result.map(|r| r.expn_data())
             );
             result
         } else {
-            debug!("resolve_crate_root: not DollarCrate");
+            println!("resolve_crate_root: not DollarCrate");
             ctxt = ctxt.normalize_to_macros_2_0();
             ctxt.adjust(ExpnId::root())
         };
@@ -2117,7 +2120,7 @@ impl<'a> Resolver<'a> {
             }
         };
         let module = self.get_module(DefId { index: CRATE_DEF_INDEX, ..module.normal_ancestor_id });
-        debug!(
+        println!(
             "resolve_crate_root({:?}): got module {:?} ({:?}) (ident.span = {:?})",
             ident,
             module,
@@ -2170,7 +2173,7 @@ impl<'a> Resolver<'a> {
         let mut allow_super = true;
         let mut second_binding = None;
 
-        debug!(
+        println!(
             "resolve_path(path={:?}, opt_ns={:?}, record_used={:?}, \
              path_span={:?}, crate_lint={:?})",
             path, opt_ns, record_used, path_span, crate_lint,
@@ -2229,7 +2232,7 @@ impl<'a> Resolver<'a> {
                         ));
                         continue;
                     }
-                    if name == kw::PathRoot && ident.span.rust_2018() {
+                    if name == kw::PathRoot {
                         module = Some(ModuleOrUniformRoot::ExternPrelude);
                         continue;
                     }
@@ -2826,7 +2829,7 @@ impl<'a> Resolver<'a> {
 
     fn report_errors(&mut self, krate: &Crate) {
         self.report_with_use_injections(krate);
-
+        println!("kkkrate:{:#?}",krate);
         for &(span_use, span_def) in &self.macro_expanded_macro_export_errors {
             let msg = "macro-expanded `macro_export` macros from the current crate \
                        cannot be referred to by absolute paths";
