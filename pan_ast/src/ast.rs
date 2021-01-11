@@ -2760,7 +2760,7 @@ impl ItemKind {
             ItemKind::Enum(..) => "enum",
             ItemKind::Struct(..) => "struct",
             ItemKind::Union(..) => "union",
-            ItemKind::Trait(..) => "trait",
+            ItemKind::Trait(..) => "bound",
             ItemKind::TraitAlias(..) => "trait alias",
             ItemKind::MacCall(..) => "item macro invocation",
             ItemKind::MacroDef(..) => "macro definition",

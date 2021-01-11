@@ -117,7 +117,7 @@ impl DefKind {
             DefKind::TraitAlias => "trait alias",
             DefKind::AssocTy => "associated type",
             DefKind::Union => "union",
-            DefKind::Trait => "trait",
+            DefKind::Trait => "bound",
             DefKind::ForeignTy => "foreign type",
             DefKind::AssocFn => "associated function",
             DefKind::Const => "constant",

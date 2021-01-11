@@ -1044,7 +1044,7 @@ fn hir_id_to_string(map: &Map<'_>, id: HirId) -> String {
                 ItemKind::Use(..) => "use",
                 ItemKind::Static(..) => "static",
                 ItemKind::Const(..) => "const",
-                ItemKind::Fn(..) => "fn",
+                ItemKind::Fn(..) => "fun",
                 ItemKind::Mod(..) => "mod",
                 ItemKind::ForeignMod { .. } => "foreign mod",
                 ItemKind::GlobalAsm(..) => "global asm",
@@ -1053,7 +1053,7 @@ fn hir_id_to_string(map: &Map<'_>, id: HirId) -> String {
                 ItemKind::Enum(..) => "enum",
                 ItemKind::Struct(..) => "struct",
                 ItemKind::Union(..) => "union",
-                ItemKind::Trait(..) => "trait",
+                ItemKind::Trait(..) => "bound",
                 ItemKind::TraitAlias(..) => "trait alias",
                 ItemKind::Impl { .. } => "impl",
             };

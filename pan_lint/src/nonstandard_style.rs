@@ -162,7 +162,7 @@ impl EarlyLintPass for NonCamelCaseTypes {
             | ast::ItemKind::Enum(..)
             | ast::ItemKind::Struct(..)
             | ast::ItemKind::Union(..) => self.check_case(cx, "type", &it.ident),
-            ast::ItemKind::Trait(..) => self.check_case(cx, "trait", &it.ident),
+            ast::ItemKind::Trait(..) => self.check_case(cx, "bound", &it.ident),
             _ => (),
         }
     }

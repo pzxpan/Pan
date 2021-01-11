@@ -225,7 +225,7 @@ impl<'a> PathSource<'a> {
     fn descr_expected(self) -> &'static str {
         match &self {
             PathSource::Type => "type",
-            PathSource::Trait(_) => "trait",
+            PathSource::Trait(_) => "bound",
             PathSource::Pat => "unit struct, unit variant or constant",
             PathSource::Struct => "struct, variant or union type",
             PathSource::TupleStruct(..) => "tuple struct or tuple variant",

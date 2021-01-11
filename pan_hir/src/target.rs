@@ -74,7 +74,7 @@ impl Display for Target {
                 Target::Variant => "enum variant",
                 Target::Struct => "struct",
                 Target::Union => "union",
-                Target::Trait => "trait",
+                Target::Trait => "bound",
                 Target::TraitAlias => "trait alias",
                 Target::Impl => "item",
                 Target::Expression => "expression",

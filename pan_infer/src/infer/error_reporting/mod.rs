@@ -214,7 +214,7 @@ fn item_scope_tag(item: &hir::Item<'_>) -> &'static str {
         hir::ItemKind::Struct(..) => "struct",
         hir::ItemKind::Union(..) => "union",
         hir::ItemKind::Enum(..) => "enum",
-        hir::ItemKind::Trait(..) => "trait",
+        hir::ItemKind::Trait(..) => "bound",
         hir::ItemKind::Fn(..) => "function body",
         _ => "item",
     }

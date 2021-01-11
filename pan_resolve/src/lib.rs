@@ -2914,7 +2914,7 @@ impl<'a> Resolver<'a> {
             (MacroNS, _) => "macro",
             (TypeNS, _) if old_binding.is_extern_crate() => "extern crate",
             (TypeNS, Some(module)) if module.is_normal() => "module",
-            (TypeNS, Some(module)) if module.is_trait() => "trait",
+            (TypeNS, Some(module)) if module.is_trait() => "bound",
             (TypeNS, _) => "type",
         };
 

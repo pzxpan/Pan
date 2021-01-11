@@ -1612,7 +1612,7 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
                     self.report_ambiguous_associated_type(
                         span,
                         &qself_ty.to_string(),
-                        "Trait",
+                        "Bound",
                         assoc_ident.name,
                     );
                 }

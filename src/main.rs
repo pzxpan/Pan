@@ -177,7 +177,10 @@ fn main() {
     let mut callbacks = pan_driver::TimePassesCallbacks::default();
     args.push("rustc".to_string());
 
-    args.push("test.rs".to_string());
+    args.push("test.pan".to_string());
+    // args.push("-Z incremental-ignore-spans=val".to_string());
+    // args.push("-Z incremental-info=val".to_string());
+    // args.push("-Z incremental-verify-ich=val".to_string());
     // args.push("--extern".to_string());
     // args.push("std=/Users/panzhenxing/Desktop/PanPan/Pan/target/debug/libstd.rlib".to_string());
     // args.push("--extern".to_string());

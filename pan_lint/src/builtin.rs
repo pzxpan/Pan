@@ -1556,7 +1556,7 @@ impl<'tcx> LateLintPass<'tcx> for TrivialConstraints {
             let predicates = cx.tcx.predicates_of(def_id);
             for &(predicate, span) in predicates.predicates {
                 let predicate_kind_name = match predicate.skip_binders() {
-                    Trait(..) => "Trait",
+                    Trait(..) => "Bound",
                     TypeOutlives(..) |
                     RegionOutlives(..) => "Lifetime",
 

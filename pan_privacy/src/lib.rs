@@ -95,7 +95,7 @@ where
 {
     fn visit_trait(&mut self, trait_ref: TraitRef<'tcx>) -> ControlFlow<V::BreakTy> {
         let TraitRef { def_id, substs } = trait_ref;
-        self.def_id_visitor.visit_def_id(def_id, "trait", &trait_ref.print_only_trait_path())?;
+        self.def_id_visitor.visit_def_id(def_id, "bound", &trait_ref.print_only_trait_path())?;
         if self.def_id_visitor.shallow() { ControlFlow::CONTINUE } else { substs.visit_with(self) }
     }
 
@@ -193,7 +193,7 @@ where
                         }
                     };
                     let ty::ExistentialTraitRef { def_id, substs: _ } = trait_ref;
-                    self.def_id_visitor.visit_def_id(def_id, "trait", &trait_ref)?;
+                    self.def_id_visitor.visit_def_id(def_id, "bound", &trait_ref)?;
                 }
             }
             ty::Opaque(def_id, ..) => {
@@ -1762,7 +1762,7 @@ impl SearchInterfaceForPrivateItemsVisitor<'tcx> {
             };
             let make_msg = || format!("{} {} `{}` in public interface", vis_descr, kind, descr);
             if self.has_pub_restricted || self.has_old_errors || self.in_assoc_ty {
-                let mut err = if kind == "trait" {
+                let mut err = if kind == "bound" {
                     struct_span_err!(self.tcx.sess, self.span, E0445, "{}", make_msg())
                 } else {
                     struct_span_err!(self.tcx.sess, self.span, E0446, "{}", make_msg())
@@ -1773,7 +1773,7 @@ impl SearchInterfaceForPrivateItemsVisitor<'tcx> {
                 err.span_label(vis_span, format!("`{}` declared as {}", descr, vis_descr));
                 err.emit();
             } else {
-                let err_code = if kind == "trait" { "E0445" } else { "E0446" };
+                let err_code = if kind == "bound" { "E0445" } else { "E0446" };
                 self.tcx.struct_span_lint_hir(
                     lint::builtin::PRIVATE_IN_PUBLIC,
                     hir_id,
