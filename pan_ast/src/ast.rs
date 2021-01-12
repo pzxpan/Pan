@@ -335,16 +335,19 @@ impl Ord for ParamKindOrd {
         to_int(*self).cmp(&to_int(*other))
     }
 }
+
 impl PartialOrd for ParamKindOrd {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
+
 impl PartialEq for ParamKindOrd {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
     }
 }
+
 impl Eq for ParamKindOrd {}
 
 impl fmt::Display for ParamKindOrd {
@@ -1656,7 +1659,9 @@ impl LitKind {
     pub fn is_suffixed(&self) -> bool {
         match *self {
             // suffixed variants
-            LitKind::Int(_, LitIntType::Signed(..) | LitIntType::Unsigned(..))
+            LitKind::Int(
+            _,
+            LitIntType::Signed(..) | LitIntType::Unsigned(..))
             | LitKind::Float(_, LitFloatType::Suffixed(..)) => true,
             // unsuffixed variants
             LitKind::Str(..)
@@ -2261,6 +2266,13 @@ pub enum Const {
     No,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Encodable, Decodable, Debug)]
+#[derive(HashStable_Generic)]
+pub enum Mutable {
+    Yes(Span),
+    No,
+}
+
 /// Item defaultness.
 /// For details see the [RFC #2532](https://github.com/rust-lang/rfcs/pull/2532).
 #[derive(Copy, Clone, PartialEq, Encodable, Decodable, Debug, HashStable_Generic)]
@@ -2638,14 +2650,13 @@ pub struct FnHeader {
     pub unsafety: Unsafe,
     pub asyncness: Async,
     pub constness: Const,
-    pub staticness: Static,
     pub ext: Extern,
 }
 
 impl FnHeader {
     /// Does this function header have any qualifiers or is it empty?
     pub fn has_qualifiers(&self) -> bool {
-        let Self { unsafety, staticness, asyncness, constness, ext } = self;
+        let Self { unsafety, asyncness, constness, ext } = self;
         matches!(unsafety, Unsafe::Yes(_))
             || asyncness.is_async()
             || matches!(constness, Const::Yes(_))
@@ -2656,7 +2667,6 @@ impl FnHeader {
 impl Default for FnHeader {
     fn default() -> FnHeader {
         FnHeader {
-            staticness: Static::No,
             unsafety: Unsafe::No,
             asyncness: Async::No,
             constness: Const::No,

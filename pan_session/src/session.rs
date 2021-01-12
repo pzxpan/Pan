@@ -1332,7 +1332,7 @@ pub fn build_session(
     //     Some(sysroot) => sysroot.clone(),
     //     None => filesearch::get_or_default_sysroot(),
     // };
-    let sysroot = PathBuf::from("/Users/cuiqingbo/.rustup/toolchains/nightly-x86_64-apple-darwin");
+    let sysroot = PathBuf::from("/Users/panzhenxing/.rustup/toolchains/nightly-x86_64-apple-darwin");
     println!("222sysroot:{:?}", sysroot);
     let host_triple = config::host_triple();
     let target_triple = sopts.target_triple.triple();

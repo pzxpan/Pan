@@ -996,7 +996,7 @@ pub fn noop_flat_map_assoc_item<T: MutVisitor>(
 }
 
 pub fn noop_visit_fn_header<T: MutVisitor>(header: &mut FnHeader, vis: &mut T) {
-    let FnHeader { unsafety: _, asyncness, staticness, constness: _, ext: _ } = header;
+    let FnHeader { unsafety: _, asyncness, constness: _, ext: _ } = header;
     vis.visit_asyncness(asyncness);
 }
 

@@ -259,7 +259,7 @@ pub fn rustc_path<'a>() -> Option<&'a Path> {
     static RUSTC_PATH: SyncOnceCell<Option<PathBuf>> = SyncOnceCell::new();
 
    // const BIN_PATH: &str = env!("RUSTC_INSTALL_BINDIR");
-    const BIN_PATH: &str = "/Users/cuiqingbo/.rustup/toolchains/nightly-x86_64-apple-darwin/bin";
+    const BIN_PATH: &str = "/Users/panzhenxing/.rustup/toolchains/nightly-x86_64-apple-darwin/bin";
 
     RUSTC_PATH.get_or_init(|| get_rustc_path_inner(BIN_PATH)).as_ref().map(|v| &**v)
 }

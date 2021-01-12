@@ -302,10 +302,10 @@ impl<'a> Parser<'a> {
     /// When parsing a statement, would the start of a path be an item?
     pub(super) fn is_path_start_item(&mut self) -> bool {
         self.is_crate_vis() // no: `crate::b`, yes: `crate $item`
-        || self.is_kw_followed_by_ident(kw::Union) // no: `union::b`, yes: `union U { .. }`
-        || self.check_auto_or_unsafe_trait_item() // no: `auto::b`, yes: `auto trait X { .. }`
-        || self.is_async_fn() // no(2015): `async::b`, yes: `async fn`
-        || self.is_macro_rules_item() // no: `macro_rules::b`, yes: `macro_rules! mac`
+            || self.is_kw_followed_by_ident(kw::Union) // no: `union::b`, yes: `union U { .. }`
+            || self.check_auto_or_unsafe_trait_item() // no: `auto::b`, yes: `auto trait X { .. }`
+            || self.is_async_fn() // no(2015): `async::b`, yes: `async fn`
+            || self.is_macro_rules_item() // no: `macro_rules::b`, yes: `macro_rules! mac`
     }
 
     /// Are we sure this could not possibly be a macro invocation?
@@ -1650,9 +1650,8 @@ impl<'a> Parser<'a> {
         let constness = self.parse_constness();
         let asyncness = self.parse_asyncness();
         let unsafety = self.parse_unsafety();
-        let staticness = self.parse_staticness();
         let ext = self.parse_extern()?;
-
+        self.associate_item_mut = constness == Const::No;
         if let Async::Yes { span, .. } = asyncness {
             self.ban_async_in_2015(span);
         }
@@ -1666,7 +1665,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(FnHeader { constness, staticness, unsafety, asyncness, ext })
+        Ok(FnHeader { constness, unsafety, asyncness, ext })
     }
 
     /// We are parsing `async fn`. If we are on Rust 2015, emit an error.
@@ -1697,8 +1696,9 @@ impl<'a> Parser<'a> {
     /// Parses the parameter list of a function, including the `(` and `)` delimiters.
     fn parse_fn_params(&mut self, req_name: ReqName) -> PResult<'a, Vec<Param>> {
         let mut first_param = true;
+        let mut paras = vec![];
         if self.is_associate_item {
-
+            paras.push(self.insert_self_param().unwrap().unwrap());
         }
         // Parse the arguments, starting out with `self` being allowed...
         let (mut params, _) = self.parse_paren_comma_seq(|p| {
@@ -1714,9 +1714,10 @@ impl<'a> Parser<'a> {
             first_param = false;
             param
         })?;
+        paras.extend(params);
         // Replace duplicated recovered params with `_` pattern to avoid unnecessary errors.
-        self.deduplicate_recovered_params_names(&mut params);
-        Ok(params)
+        self.deduplicate_recovered_params_names(&mut paras);
+        Ok(paras)
     }
 
     /// Parses a single function parameter.
@@ -1795,7 +1796,20 @@ impl<'a> Parser<'a> {
             ty,
         })
     }
-
+    /// Returns the parsed optional self parameter and whether a self shortcut was used.
+    fn insert_self_param(&mut self) -> PResult<'a, Option<Param>> {
+        // Extract an identifier *after* having confirmed that the token is one.
+        // Parse optional `self` parameter of a method.
+        // Only a limited set of initial token sequences is considered `self` parameters; anything
+        // else is parsed as a normal function parameter list, so some lookahead is required.
+        let eself_lo = self.token.span;
+        let eself_ident = Ident::with_dummy_span(Symbol::intern("self"));
+        let eself = if self.associate_item_mut { SelfKind::Region(None, Mutability::Mut) } else {
+            SelfKind::Region(None, Mutability::Not)
+        };
+        let eself = source_map::respan(eself_lo.to(eself_lo), eself);
+        Ok(Some(Param::from_self(AttrVec::default(), eself, eself_ident)))
+    }
     /// Returns the parsed optional self parameter and whether a self shortcut was used.
     fn parse_self_param(&mut self) -> PResult<'a, Option<Param>> {
         // Extract an identifier *after* having confirmed that the token is one.

@@ -117,6 +117,7 @@ pub struct Parser<'a> {
     /// If present, this `Parser` is not parsing Rust code but rather a macro call.
     subparser_name: Option<&'static str>,
     pub is_associate_item: bool,
+    pub associate_item_mut: bool,
 }
 
 impl<'a> Drop for Parser<'a> {
@@ -369,6 +370,7 @@ impl<'a> Parser<'a> {
             last_type_ascription: None,
             subparser_name,
             is_associate_item: false,
+            associate_item_mut: false,
         };
 
         // Make parser point to the first token.
@@ -895,6 +897,17 @@ impl<'a> Parser<'a> {
             Const::Yes(self.prev_token.uninterpolated_span())
         } else {
             Const::No
+        }
+    }
+
+    fn parse_mutable(&mut self) -> Mutability {
+        // Avoid const blocks to be parsed as const items
+        if self.look_ahead(1, |t| t != &token::OpenDelim(DelimToken::Brace))
+            && self.eat_keyword(kw::Mut)
+        {
+            Mutability::Mut
+        } else {
+            Mutability::Not
         }
     }
 
