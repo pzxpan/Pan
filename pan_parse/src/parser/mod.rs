@@ -116,6 +116,7 @@ pub struct Parser<'a> {
     pub last_type_ascription: Option<(Span, bool /* likely path typo */)>,
     /// If present, this `Parser` is not parsing Rust code but rather a macro call.
     subparser_name: Option<&'static str>,
+    pub is_associate_item: bool,
 }
 
 impl<'a> Drop for Parser<'a> {
@@ -237,9 +238,9 @@ impl TokenCursor {
                 TokenTree::token(token::Eq, sp),
                 TokenTree::token(TokenKind::lit(token::StrRaw(num_of_hashes), data, None), sp),
             ]
-            .iter()
-            .cloned()
-            .collect::<TokenStream>(),
+                .iter()
+                .cloned()
+                .collect::<TokenStream>(),
         );
 
         self.stack.push(mem::replace(
@@ -367,6 +368,7 @@ impl<'a> Parser<'a> {
             last_unexpected_token_span: None,
             last_type_ascription: None,
             subparser_name,
+            is_associate_item: false,
         };
 
         // Make parser point to the first token.
@@ -554,10 +556,10 @@ impl<'a> Parser<'a> {
     fn check_inline_const(&self, dist: usize) -> bool {
         self.is_keyword_ahead(dist, &[kw::Const])
             && self.look_ahead(dist + 1, |t| match t.kind {
-                token::Interpolated(ref nt) => matches!(**nt, token::NtBlock(..)),
-                token::OpenDelim(DelimToken::Brace) => true,
-                _ => false,
-            })
+            token::Interpolated(ref nt) => matches!(**nt, token::NtBlock(..)),
+            token::OpenDelim(DelimToken::Brace) => true,
+            _ => false,
+        })
     }
 
     /// Checks to see if the next token is either `+` or `+=`.
@@ -953,9 +955,9 @@ impl<'a> Parser<'a> {
                 match self.parse_token_tree() {
                     TokenTree::Delimited(dspan, delim, tokens) =>
                     // We've confirmed above that there is a delimiter so unwrapping is OK.
-                    {
-                        MacArgs::Delimited(dspan, MacDelimiter::from_token(delim).unwrap(), tokens)
-                    }
+                        {
+                            MacArgs::Delimited(dspan, MacDelimiter::from_token(delim).unwrap(), tokens)
+                        }
                     _ => unreachable!(),
                 }
             } else if !delimited_only {
@@ -1318,8 +1320,8 @@ impl<'a> Parser<'a> {
     fn is_import_coupler(&mut self) -> bool {
         self.check(&token::ModSep)
             && self.look_ahead(1, |t| {
-                *t == token::OpenDelim(token::Brace) || *t == token::BinOp(token::Star)
-            })
+            *t == token::OpenDelim(token::Brace) || *t == token::BinOp(token::Star)
+        })
     }
 
     pub fn clear_expected_tokens(&mut self) {
@@ -1365,7 +1367,7 @@ pub fn emit_unclosed_delims(unclosed_delims: &mut Vec<UnmatchedBrace>, sess: &Pa
 /// into a `TokenStream`, creating a `TokenTree::Delimited` for each matching pair
 /// of open and close delims.
 fn make_token_stream(
-    tokens: impl Iterator<Item = (Token, Spacing)>,
+    tokens: impl Iterator<Item=(Token, Spacing)>,
     append_unglued_token: Option<TreeAndSpacing>,
 ) -> TokenStream {
     #[derive(Debug)]

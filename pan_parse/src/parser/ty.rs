@@ -350,14 +350,14 @@ impl<'a> Parser<'a> {
         let elt_ty = match self.parse_ty() {
             Ok(ty) => ty,
             Err(mut err)
-                if self.look_ahead(1, |t| t.kind == token::CloseDelim(token::Bracket))
-                    | self.look_ahead(1, |t| t.kind == token::Semi) =>
-            {
-                // Recover from `[LIT; EXPR]` and `[LIT]`
-                self.bump();
-                err.emit();
-                self.mk_ty(self.prev_token.span, TyKind::Err)
-            }
+            if self.look_ahead(1, |t| t.kind == token::CloseDelim(token::Bracket))
+                | self.look_ahead(1, |t| t.kind == token::Semi) =>
+                {
+                    // Recover from `[LIT; EXPR]` and `[LIT]`
+                    self.bump();
+                    err.emit();
+                    self.mk_ty(self.prev_token.span, TyKind::Err)
+                }
             Err(err) => return Err(err),
         };
         let ty = if self.eat(&token::Semi) {
@@ -426,7 +426,7 @@ impl<'a> Parser<'a> {
         params: Vec<GenericParam>,
         recover_return_sign: RecoverReturnSign,
     ) -> PResult<'a, TyKind> {
-        let ast::FnHeader { ext, unsafety, constness, asyncness } = self.parse_fn_front_matter()?;
+        let ast::FnHeader { ext, unsafety, staticness, constness, asyncness } = self.parse_fn_front_matter()?;
         let decl = self.parse_fn_decl(|_| false, AllowPlus::No, recover_return_sign)?;
         let whole_span = lo.to(self.prev_token.span);
         if let ast::Const::Yes(span) = constness {
@@ -463,9 +463,9 @@ impl<'a> Parser<'a> {
     fn is_explicit_dyn_type(&mut self) -> bool {
         self.check_keyword(kw::Dyn)
             && (self.token.uninterpolated_span().rust_2018()
-                || self.look_ahead(1, |t| {
-                    t.can_begin_bound() && !can_continue_type_after_non_fn_ident(t)
-                }))
+            || self.look_ahead(1, |t| {
+            t.can_begin_bound() && !can_continue_type_after_non_fn_ident(t)
+        }))
     }
 
     /// Parses a `dyn B0 + ... + Bn` type.
@@ -511,7 +511,7 @@ impl<'a> Parser<'a> {
             E0743,
             "C-variadic type `...` may not be nested inside another type",
         )
-        .emit();
+            .emit();
     }
 
     pub(super) fn parse_generic_bounds(
@@ -552,11 +552,11 @@ impl<'a> Parser<'a> {
     fn can_begin_bound(&mut self) -> bool {
         // This needs to be synchronized with `TokenKind::can_begin_bound`.
         self.check_path()
-        || self.check_lifetime()
-        || self.check(&token::Not) // Used for error reporting only.
-        || self.check(&token::Question)
-        || self.check_keyword(kw::For)
-        || self.check(&token::OpenDelim(token::Paren))
+            || self.check_lifetime()
+            || self.check(&token::Not) // Used for error reporting only.
+            || self.check(&token::Question)
+            || self.check_keyword(kw::For)
+            || self.check(&token::OpenDelim(token::Paren))
     }
 
     fn error_negative_bounds(
@@ -638,7 +638,7 @@ impl<'a> Parser<'a> {
                 span,
                 "`?const` may only modify trait bounds, not lifetime bounds",
             )
-            .emit();
+                .emit();
         }
 
         if let Some(span) = modifiers.maybe {

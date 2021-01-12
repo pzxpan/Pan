@@ -1688,6 +1688,13 @@ pub struct FnSig {
     pub span: Span,
 }
 
+#[derive(Clone, Encodable, Decodable, Debug)]
+pub enum FnMutable {
+    Const,
+    Static,
+    Mut,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[derive(Encodable, Decodable, HashStable_Generic)]
 pub enum FloatTy {
@@ -2340,6 +2347,7 @@ pub struct GlobalAsm {
 pub struct EnumDef {
     pub variants: Vec<Variant>,
 }
+
 /// Enum variant.
 #[derive(Clone, Encodable, Decodable, Debug)]
 pub struct Variant {
@@ -2630,13 +2638,14 @@ pub struct FnHeader {
     pub unsafety: Unsafe,
     pub asyncness: Async,
     pub constness: Const,
+    pub staticness: Static,
     pub ext: Extern,
 }
 
 impl FnHeader {
     /// Does this function header have any qualifiers or is it empty?
     pub fn has_qualifiers(&self) -> bool {
-        let Self { unsafety, asyncness, constness, ext } = self;
+        let Self { unsafety, staticness, asyncness, constness, ext } = self;
         matches!(unsafety, Unsafe::Yes(_))
             || asyncness.is_async()
             || matches!(constness, Const::Yes(_))
@@ -2647,6 +2656,7 @@ impl FnHeader {
 impl Default for FnHeader {
     fn default() -> FnHeader {
         FnHeader {
+            staticness: Static::No,
             unsafety: Unsafe::No,
             asyncness: Async::No,
             constness: Const::No,

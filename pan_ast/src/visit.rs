@@ -450,8 +450,8 @@ pub fn walk_path_segment<'a, V: Visitor<'a>>(
 }
 
 pub fn walk_generic_args<'a, V>(visitor: &mut V, _path_span: Span, generic_args: &'a GenericArgs)
-where
-    V: Visitor<'a>,
+    where
+        V: Visitor<'a>,
 {
     match *generic_args {
         GenericArgs::AngleBracketed(ref data) => {
@@ -470,8 +470,8 @@ where
 }
 
 pub fn walk_generic_arg<'a, V>(visitor: &mut V, generic_arg: &'a GenericArg)
-where
-    V: Visitor<'a>,
+    where
+        V: Visitor<'a>,
 {
     match generic_arg {
         GenericArg::Lifetime(lt) => visitor.visit_lifetime(lt),
@@ -595,18 +595,18 @@ pub fn walk_generics<'a, V: Visitor<'a>>(visitor: &mut V, generics: &'a Generics
 pub fn walk_where_predicate<'a, V: Visitor<'a>>(visitor: &mut V, predicate: &'a WherePredicate) {
     match *predicate {
         WherePredicate::BoundPredicate(WhereBoundPredicate {
-            ref bounded_ty,
-            ref bounds,
-            ref bound_generic_params,
-            ..
-        }) => {
+                                           ref bounded_ty,
+                                           ref bounds,
+                                           ref bound_generic_params,
+                                           ..
+                                       }) => {
             visitor.visit_ty(bounded_ty);
             walk_list!(visitor, visit_param_bound, bounds);
             walk_list!(visitor, visit_generic_param, bound_generic_params);
         }
         WherePredicate::RegionPredicate(WhereRegionPredicate {
-            ref lifetime, ref bounds, ..
-        }) => {
+                                            ref lifetime, ref bounds, ..
+                                        }) => {
             visitor.visit_lifetime(lifetime);
             walk_list!(visitor, visit_param_bound, bounds);
         }
@@ -649,6 +649,7 @@ pub fn walk_assoc_item<'a, V: Visitor<'a>>(visitor: &mut V, item: &'a AssocItem,
     visitor.visit_vis(vis);
     visitor.visit_ident(ident);
     walk_list!(visitor, visit_attribute, attrs);
+    println!("assoc_item:{:?}", item);
     match kind {
         AssocItemKind::Const(_, ty, expr) => {
             visitor.visit_ty(ty);
@@ -675,6 +676,7 @@ pub fn walk_struct_def<'a, V: Visitor<'a>>(visitor: &mut V, struct_definition: &
 }
 
 pub fn walk_struct_field<'a, V: Visitor<'a>>(visitor: &mut V, struct_field: &'a StructField) {
+    println!("struct field is :{:?},", struct_field);
     visitor.visit_vis(&struct_field.vis);
     if let Some(ident) = struct_field.ident {
         visitor.visit_ident(ident);
@@ -803,6 +805,7 @@ pub fn walk_expr<'a, V: Visitor<'a>>(visitor: &mut V, expression: &'a Expr) {
             visitor.visit_expr(right_expression);
         }
         ExprKind::Field(ref subexpression, ident) => {
+            println!("subexpression:{:?},ident:{:?}", subexpression, ident);
             visitor.visit_expr(subexpression);
             visitor.visit_ident(ident);
         }
