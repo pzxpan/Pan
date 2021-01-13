@@ -19,7 +19,7 @@ use pan_ast::token::{self, DelimToken, Token, TokenKind};
 use pan_ast::tokenstream::{self, DelimSpan, LazyTokenStream, Spacing};
 use pan_ast::tokenstream::{CreateTokenStream, TokenStream, TokenTree, TreeAndSpacing};
 use pan_ast::DUMMY_NODE_ID;
-use pan_ast::{self as ast, AnonConst, AttrStyle, AttrVec, Const, CrateSugar, Extern, Unsafe};
+use pan_ast::{self as ast, AnonConst, AttrStyle, AttrVec, Const, PtrMut, CrateSugar, Extern, Unsafe};
 use pan_ast::{Async, Expr, ExprKind, MacArgs, MacDelimiter, Mutability, StrLit};
 use pan_ast::{Visibility, VisibilityKind};
 use pan_ast_pretty::pprust;
@@ -117,7 +117,7 @@ pub struct Parser<'a> {
     /// If present, this `Parser` is not parsing Rust code but rather a macro call.
     subparser_name: Option<&'static str>,
     pub is_associate_item: bool,
-    pub associate_item_mut: bool,
+    pub associate_item_mut: PtrMut,
 }
 
 impl<'a> Drop for Parser<'a> {
@@ -370,7 +370,7 @@ impl<'a> Parser<'a> {
             last_type_ascription: None,
             subparser_name,
             is_associate_item: false,
-            associate_item_mut: false,
+            associate_item_mut: PtrMut::Share,
         };
 
         // Make parser point to the first token.
@@ -888,6 +888,11 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parses unsafety: `unsafe` or nothing.
+    fn parse_static(&mut self) -> bool {
+        return self.look_ahead(0, |t| t == &token::ModSep);
+    }
+
     /// Parses constness: `const` or nothing.
     fn parse_constness(&mut self) -> Const {
         // Avoid const blocks to be parsed as const items
@@ -899,18 +904,23 @@ impl<'a> Parser<'a> {
             Const::No
         }
     }
-
-    fn parse_mutable(&mut self) -> Mutability {
-        // Avoid const blocks to be parsed as const items
-        if self.look_ahead(1, |t| t != &token::OpenDelim(DelimToken::Brace))
-            && self.eat_keyword(kw::Mut)
-        {
-            Mutability::Mut
-        } else {
-            Mutability::Not
+    /// Parses constness: `mut,share,own` or nothing.
+    fn parse_self_mutibility(&mut self) -> PtrMut {
+        // Avoid const blocks to be parsed as mut items
+        println!("this token is self.token:{:?}",self.token);
+        println!("prev token is self.token:{:?}",self.prev_token);
+        if self.eat_keyword_noexpect(kw::Mut) {
+            return PtrMut::Mut;
+        } else if self.eat_keyword_noexpect(kw::Share) {
+            return PtrMut::Share;
+        } else if self.eat_keyword_noexpect(kw::Own) {
+            return PtrMut::Own;
         }
+        // if self.look_ahead(1, |t| t != &token::OpenDelim(DelimToken::Brace)) {
+        //
+        // }
+        return PtrMut::Share;
     }
-
     /// Parses inline const expressions.
     fn parse_const_block(&mut self, span: Span) -> PResult<'a, P<Expr>> {
         self.sess.gated_spans.gate(sym::inline_const, span);

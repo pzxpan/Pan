@@ -157,7 +157,7 @@ fn main() {
     // println!("parse_file,time cost:{:?}", start.elapsed().as_nanos());
     // test_all_demo_file();
     let mut c = std::process::Command::new("cc");
-    let s = c.args(&["/Users/panzhenxing/Desktop/PanPan/Pan/demo/for.bc"]).status().unwrap();
+    let s = c.args(&["/Users/cuiqingbo/Desktop/PanPan/Pan/demo/for.bc"]).status().unwrap();
     println!("ok");
     // pan_driver::init_env_logger("llvm");
     //  let a = pan_codegen_llvm::LlvmCodegenBackend::new();

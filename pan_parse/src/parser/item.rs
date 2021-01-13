@@ -7,7 +7,7 @@ use crate::maybe_whole;
 use pan_ast::ptr::P;
 use pan_ast::token::{self, TokenKind};
 use pan_ast::tokenstream::{DelimSpan, TokenStream, TokenTree};
-use pan_ast::{self as ast, AttrVec, Attribute, DUMMY_NODE_ID};
+use pan_ast::{self as ast, AttrVec, Attribute, DUMMY_NODE_ID, PtrMut};
 use pan_ast::{AssocItem, AssocItemKind, ForeignItemKind, Item, ItemKind, Mod};
 use pan_ast::{Async, Const, Defaultness, IsAuto, Mutability, Unsafe, UseTree, UseTreeKind};
 use pan_ast::{BindingMode, Block, FnDecl, FnSig, Param, SelfKind};
@@ -732,20 +732,22 @@ impl<'a> Parser<'a> {
 
     /// Parses associated items.
     fn parse_assoc_item(&mut self, req_name: ReqName) -> PResult<'a, Option<Option<P<AssocItem>>>> {
-        Ok(self.parse_item_(req_name)?.map(|Item { attrs, id, span, vis, ident, kind, tokens }| {
-            let kind = match AssocItemKind::try_from(kind) {
-                Ok(kind) => kind,
-                Err(kind) => match kind {
-                    ItemKind::Static(a, _, b) => {
-                        self.struct_span_err(span, "associated `static` items are not allowed")
-                            .emit();
-                        AssocItemKind::Const(Defaultness::Final, a, b)
-                    }
-                    _ => return self.error_bad_item_kind(span, &kind, "`trait`s or `impl`s"),
-                },
-            };
-            Some(P(Item { attrs, id, span, vis, ident, kind, tokens }))
-        }))
+        Ok(self.parse_item_(req_name)?
+            .map(|Item { attrs, id, span, vis, ident, kind, tokens }| {
+                println!("kind:{:?},token:{:?}", kind, tokens);
+                let kind = match AssocItemKind::try_from(kind) {
+                    Ok(kind) => kind,
+                    Err(kind) => match kind {
+                        ItemKind::Static(a, _, b) => {
+                            self.struct_span_err(span, "associated `static` items are not allowed")
+                                .emit();
+                            AssocItemKind::Const(Defaultness::Final, a, b)
+                        }
+                        _ => return self.error_bad_item_kind(span, &kind, "`trait`s or `impl`s"),
+                    },
+                };
+                Some(P(Item { attrs, id, span, vis, ident, kind, tokens }))
+            }))
     }
 
     /// Parses a `type` alias with the following grammar:
@@ -1551,6 +1553,15 @@ impl<'a> Parser<'a> {
         sig_lo: Span,
     ) -> PResult<'a, (Ident, FnSig, Generics, Option<P<Block>>)> {
         let header = self.parse_fn_front_matter()?; // `const ... fn`
+        if self.is_associate_item {
+            println!("self.token:{:?},pretoken:{:?}",self.token,self.prev_token);
+            if self.parse_static() {
+                self.associate_item_mut = PtrMut::Static;
+                self.bump();
+            }
+        }
+        println!("222self.token:{:?},pretoken:{:?}",self.token,self.prev_token);
+        println!("eeee:{:?},",self.associate_item_mut);
         let ident = self.parse_ident()?; // `foo`
         let mut generics = self.parse_generics()?; // `<'a, T, ...>`
         let decl = self.parse_fn_decl(req_name, AllowPlus::Yes, RecoverReturnSign::Yes)?; // `(p: u8, ...)`
@@ -1559,7 +1570,6 @@ impl<'a> Parser<'a> {
         let mut sig_hi = self.prev_token.span;
         let body = self.parse_fn_body(attrs, &ident, &mut sig_hi)?; // `;` or `{ ... }`.
         let fn_sig_span = sig_lo.to(sig_hi);
-        println!("fn_sig_span:{:?}", fn_sig_span);
         Ok((ident, FnSig { header, decl, span: fn_sig_span }, generics, body))
     }
 
@@ -1618,15 +1628,22 @@ impl<'a> Parser<'a> {
     pub(super) fn check_fn_front_matter(&mut self) -> bool {
         // We use an over-approximation here.
         // `const const`, `fn const` won't parse, but we're not stepping over other syntax either.
-        const QUALS: [Symbol; 4] = [kw::Const, kw::Async, kw::Unsafe, kw::Extern];
+        const QUALS_ASSOCIATE: [Symbol; 7] = [kw::Const, kw::Async, kw::Unsafe, kw::Extern, kw::Mut, kw::Share, kw::Own];
+        const QUALS_FN: [Symbol; 4] = [kw::Const, kw::Async, kw::Unsafe, kw::Extern];
+        let mut fn_header = vec![];
+        if self.is_associate_item {
+            fn_header.extend_from_slice(&QUALS_ASSOCIATE);
+        } else {
+            fn_header.extend_from_slice(&QUALS_FN);
+        }
         self.check_keyword(kw::Fn) // Definitely an `fn`.
             // `$qual fn` or `$qual $qual`:
-            || QUALS.iter().any(|&kw| self.check_keyword(kw))
+            || fn_header.iter().any(|&kw| self.check_keyword(kw))
             && self.look_ahead(1, |t| {
             // `$qual fn`, e.g. `const fn` or `async fn`.
             t.is_keyword(kw::Fn)
                 // Two qualifiers `$qual $qual` is enough, e.g. `async unsafe`.
-                || t.is_non_raw_ident_where(|i| QUALS.contains(&i.name)
+                || t.is_non_raw_ident_where(|i| fn_header.contains(&i.name)
                 // Rule out 2015 `const async: T = val`.
                 && i.is_reserved()
                 // Rule out unsafe extern block.
@@ -1650,8 +1667,13 @@ impl<'a> Parser<'a> {
         let constness = self.parse_constness();
         let asyncness = self.parse_asyncness();
         let unsafety = self.parse_unsafety();
+        if self.is_associate_item {
+            self.associate_item_mut = self.parse_self_mutibility();
+            println!("asscotiat_item_mut:{:?},", self.associate_item_mut);
+            println!("2222asscotiat_item_mut:{:?},", self.associate_item_mut);
+        }
         let ext = self.parse_extern()?;
-        self.associate_item_mut = constness == Const::No;
+
         if let Async::Yes { span, .. } = asyncness {
             self.ban_async_in_2015(span);
         }
@@ -1698,8 +1720,11 @@ impl<'a> Parser<'a> {
         let mut first_param = true;
         let mut paras = vec![];
         if self.is_associate_item {
-            paras.push(self.insert_self_param().unwrap().unwrap());
+            if self.associate_item_mut != PtrMut::Static {
+                paras.push(self.insert_self_param().unwrap().unwrap());
+            }
         }
+        println!("self paras:{:?},", paras);
         // Parse the arguments, starting out with `self` being allowed...
         let (mut params, _) = self.parse_paren_comma_seq(|p| {
             let param = p.parse_param_general(req_name, first_param).or_else(|mut e| {
@@ -1804,9 +1829,13 @@ impl<'a> Parser<'a> {
         // else is parsed as a normal function parameter list, so some lookahead is required.
         let eself_lo = self.token.span;
         let eself_ident = Ident::with_dummy_span(Symbol::intern("self"));
-        let eself = if self.associate_item_mut { SelfKind::Region(None, Mutability::Mut) } else {
-            SelfKind::Region(None, Mutability::Not)
+        let eself = match self.associate_item_mut {
+            PtrMut::Mut => SelfKind::Region(None, Mutability::Mut),
+            PtrMut::Share => SelfKind::Region(None, Mutability::Not),
+            PtrMut::Own => SelfKind::Value(Mutability::Not),
+            _ => unreachable!()
         };
+
         let eself = source_map::respan(eself_lo.to(eself_lo), eself);
         Ok(Some(Param::from_self(AttrVec::default(), eself, eself_ident)))
     }

@@ -673,7 +673,7 @@ impl Default for Options {
             describe_lints: false,
             output_types: OutputTypes(BTreeMap::new()),
             search_paths: vec![],
-            maybe_sysroot: Some(PathBuf::from("/Users/panzhenxing/.rustup/toolchains")),
+            maybe_sysroot: Some(PathBuf::from("/Users/cuiqingbo/.rustup/toolchains")),
             target_triple: TargetTriple::from_triple(host_triple()),
             test: false,
             incremental: None,

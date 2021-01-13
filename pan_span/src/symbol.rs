@@ -34,6 +34,8 @@ symbols! {
         As:                 "as",
         Break:              "break",
         Const:              "const",
+        Share:              "share",
+        Own:                "own",
         Continue:           "continue",
         Crate:              "crate",
         Else:               "else",

@@ -2268,6 +2268,15 @@ pub enum Const {
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Encodable, Decodable, Debug)]
 #[derive(HashStable_Generic)]
+pub enum PtrMut {
+    Own,
+    Share,
+    Mut,
+    Static,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Encodable, Decodable, Debug)]
+#[derive(HashStable_Generic)]
 pub enum Mutable {
     Yes(Span),
     No,
