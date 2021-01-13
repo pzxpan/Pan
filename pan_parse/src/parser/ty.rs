@@ -245,6 +245,10 @@ impl<'a> Parser<'a> {
                 self.error_illegal_c_varadic_ty(lo);
                 TyKind::Err
             }
+        } else if self.eat_keyword(kw::Own) {
+            return self.parse_ty_common(allow_plus, allow_c_variadic, recover_qpath, recover_return_sign);
+        } else if self.check_keyword(kw::Mut) {
+            self.parse_borrowed_pointee()?
         } else {
             let msg = format!("expected type, found {}", super::token_descr(&self.token));
             let mut err = self.struct_span_err(self.token.span, &msg);
@@ -282,10 +286,10 @@ impl<'a> Parser<'a> {
                     self.parse_remaining_bounds_path(Vec::new(), path, lo, true)
                 }
                 TyKind::TraitObject(bounds, TraitObjectSyntax::None)
-                    if maybe_bounds && bounds.len() == 1 && !trailing_plus =>
-                {
-                    self.parse_remaining_bounds(bounds, true)
-                }
+                if maybe_bounds && bounds.len() == 1 && !trailing_plus =>
+                    {
+                        self.parse_remaining_bounds(bounds, true)
+                    }
                 // `(TYPE)`
                 _ => Ok(TyKind::Paren(P(ty))),
             }

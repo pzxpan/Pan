@@ -148,7 +148,7 @@ impl<'a, 'tcx> ExprUseVisitor<'a, 'tcx> {
     }
 
     pub fn consume_expr(&mut self, expr: &hir::Expr<'_>) {
-        debug!("consume_expr(expr={:?})", expr);
+        println!("consume_expr(expr={:?})", expr);
 
         let place_with_id = return_if_err!(self.mc.cat_expr(expr));
         self.delegate_consume(&place_with_id, place_with_id.hir_id);
@@ -162,7 +162,7 @@ impl<'a, 'tcx> ExprUseVisitor<'a, 'tcx> {
     }
 
     fn borrow_expr(&mut self, expr: &hir::Expr<'_>, bk: ty::BorrowKind) {
-        debug!("borrow_expr(expr={:?}, bk={:?})", expr, bk);
+        println!("wwwwborrow_expr(expr={:?}, bk={:?})", expr, bk);
 
         let place_with_id = return_if_err!(self.mc.cat_expr(expr));
         self.delegate.borrow(&place_with_id, place_with_id.hir_id, bk);

@@ -92,6 +92,7 @@ impl<'a, 'tcx> NiceRegionError<'a, 'tcx> {
             err.note_expected_found(&"", expected, &"", found);
         } else {
             // This fallback shouldn't be necessary, but let's keep it in just in case.
+            println!("dddddddd");
             err.note(&format!("expected `{}`\n   found `{}`", expected, found));
         }
         err.span_help(

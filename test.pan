@@ -15,6 +15,11 @@ impl D {
     }
 }
 
+pub fun dosomething(d:D,s:i32)-> BB {
+    d.bb.b += s;
+    return d.bb;
+}
+
 
 pub struct D {
     pub d:i32,
@@ -26,7 +31,6 @@ pub struct BB {
 
 fun main() {
     let mut dd = D {d:20,bb:BB{b:10}};
-    let a = D::DCC(20);
-    println!("add:{:?}",a);
-    println!("helloeeeeeworld");
+    let b = dosomething(dd,40);
+    println!("ddd:{:?}",b.b);
 }

@@ -1745,6 +1745,7 @@ impl<'a> Parser<'a> {
         Ok(paras)
     }
 
+
     /// Parses a single function parameter.
     ///
     /// - `self` is syntactically allowed when `first_param` holds.
