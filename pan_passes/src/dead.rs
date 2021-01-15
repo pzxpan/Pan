@@ -124,13 +124,18 @@ impl<'tcx> MarkSymbolVisitor<'tcx> {
     }
 
     fn handle_field_access(&mut self, lhs: &hir::Expr<'_>, hir_id: hir::HirId) {
+        println!("passes:{:?},", lhs);
         match self.typeck_results().expr_ty_adjusted(lhs).kind() {
             ty::Adt(def, _) => {
                 let index = self.tcx.field_index(hir_id, self.typeck_results());
                 self.insert_def_id(def.non_enum_variant().fields[index].did);
             }
             ty::Tuple(..) => {}
-            _ => span_bug!(lhs.span, "named field access on non-ADT"),
+
+            ttt @ _ => {
+                println!("ttttt:{:?}", ttt);
+                span_bug!(lhs.span, "named field access on non-ADT")
+            }
         }
     }
 
@@ -404,10 +409,10 @@ impl<'v, 'k, 'tcx> ItemLikeVisitor<'v> for LifeSeeder<'k, 'tcx> {
                     let impl_item = self.krate.impl_item(impl_item_ref.id);
                     if of_trait.is_some()
                         || has_allow_dead_code_or_lang_attr(
-                            self.tcx,
-                            impl_item.hir_id,
-                            &impl_item.attrs,
-                        )
+                        self.tcx,
+                        impl_item.hir_id,
+                        &impl_item.attrs,
+                    )
                     {
                         self.worklist.push(impl_item_ref.id.hir_id);
                     }

@@ -805,7 +805,7 @@ pub fn walk_expr<'a, V: Visitor<'a>>(visitor: &mut V, expression: &'a Expr) {
             visitor.visit_expr(right_expression);
         }
         ExprKind::Field(ref subexpression, ident) => {
-            println!("subexpression:{:?},ident:{:?}", subexpression, ident);
+            println!("subexpression:{:?}", subexpression);
             visitor.visit_expr(subexpression);
             visitor.visit_ident(ident);
         }

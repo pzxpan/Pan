@@ -630,7 +630,7 @@ impl<'tcx> TypeckResults<'tcx> {
     pub fn closure_min_captures_flattened(
         &self,
         closure_def_id: DefId,
-    ) -> impl Iterator<Item = &ty::CapturedPlace<'tcx>> {
+    ) -> impl Iterator<Item=&ty::CapturedPlace<'tcx>> {
         self.closure_min_captures
             .get(&closure_def_id)
             .map(|closure_min_captures| closure_min_captures.values().flat_map(|v| v.iter()))
@@ -697,9 +697,7 @@ impl<'a, 'tcx> HashStable<StableHashingContext<'a>> for TypeckResults<'tcx> {
             ref closure_kind_origins,
             ref liberated_fn_sigs,
             ref fru_field_types,
-
             ref coercion_casts,
-
             ref used_trait_imports,
             tainted_by_errors,
             ref concrete_opaque_types,
@@ -756,7 +754,7 @@ pan_index::newtype_index! {
 
 /// Mapping of type annotation indices to canonical user type annotations.
 pub type CanonicalUserTypeAnnotations<'tcx> =
-    IndexVec<UserTypeAnnotationIndex, CanonicalUserTypeAnnotation<'tcx>>;
+IndexVec<UserTypeAnnotationIndex, CanonicalUserTypeAnnotation<'tcx>>;
 
 #[derive(Clone, Debug, TyEncodable, TyDecodable, HashStable, TypeFoldable, Lift)]
 pub struct CanonicalUserTypeAnnotation<'tcx> {
@@ -1337,8 +1335,8 @@ impl<'tcx> TyCtxt<'tcx> {
     }
 
     pub fn serialize_query_result_cache<E>(self, encoder: &mut E) -> Result<(), E::Error>
-    where
-        E: ty::codec::OpaqueEncoder,
+        where
+            E: ty::codec::OpaqueEncoder,
     {
         self.queries.on_disk_cache.as_ref().map(|c| c.serialize(self, encoder)).unwrap_or(Ok(()))
     }
@@ -1449,38 +1447,38 @@ impl<'tcx> TyCtxt<'tcx> {
         let hir_id = self.hir().local_def_id_to_hir_id(scope_def_id);
         let hir_output = match self.hir().get(hir_id) {
             Node::Item(hir::Item {
-                kind:
-                    ItemKind::Fn(
-                        hir::FnSig {
-                            decl: hir::FnDecl { output: hir::FnRetTy::Return(ty), .. },
-                            ..
-                        },
-                        ..,
-                    ),
-                ..
-            })
+                           kind:
+                           ItemKind::Fn(
+                               hir::FnSig {
+                                   decl: hir::FnDecl { output: hir::FnRetTy::Return(ty), .. },
+                                   ..
+                               },
+                               ..,
+                           ),
+                           ..
+                       })
             | Node::ImplItem(hir::ImplItem {
-                kind:
-                    hir::ImplItemKind::Fn(
-                        hir::FnSig {
-                            decl: hir::FnDecl { output: hir::FnRetTy::Return(ty), .. },
-                            ..
-                        },
-                        _,
-                    ),
-                ..
-            })
+                                 kind:
+                                 hir::ImplItemKind::Fn(
+                                     hir::FnSig {
+                                         decl: hir::FnDecl { output: hir::FnRetTy::Return(ty), .. },
+                                         ..
+                                     },
+                                     _,
+                                 ),
+                                 ..
+                             })
             | Node::TraitItem(hir::TraitItem {
-                kind:
-                    hir::TraitItemKind::Fn(
-                        hir::FnSig {
-                            decl: hir::FnDecl { output: hir::FnRetTy::Return(ty), .. },
-                            ..
-                        },
-                        _,
-                    ),
-                ..
-            }) => ty,
+                                  kind:
+                                  hir::TraitItemKind::Fn(
+                                      hir::FnSig {
+                                          decl: hir::FnDecl { output: hir::FnRetTy::Return(ty), .. },
+                                          ..
+                                      },
+                                      _,
+                                  ),
+                                  ..
+                              }) => ty,
             _ => return vec![],
         };
 
@@ -1728,8 +1726,8 @@ pub mod tls {
     /// Sets `context` as the new current `ImplicitCtxt` for the duration of the function `f`.
     #[inline]
     pub fn enter_context<'a, 'tcx, F, R>(context: &ImplicitCtxt<'a, 'tcx>, f: F) -> R
-    where
-        F: FnOnce(&ImplicitCtxt<'a, 'tcx>) -> R,
+        where
+            F: FnOnce(&ImplicitCtxt<'a, 'tcx>) -> R,
     {
         set_tlv(context as *const _ as usize, || f(&context))
     }
@@ -1737,8 +1735,8 @@ pub mod tls {
     /// Allows access to the current `ImplicitCtxt` in a closure if one is available.
     #[inline]
     pub fn with_context_opt<F, R>(f: F) -> R
-    where
-        F: for<'a, 'tcx> FnOnce(Option<&ImplicitCtxt<'a, 'tcx>>) -> R,
+        where
+            F: for<'a, 'tcx> FnOnce(Option<&ImplicitCtxt<'a, 'tcx>>) -> R,
     {
         let context = get_tlv();
         if context == 0 {
@@ -1756,8 +1754,8 @@ pub mod tls {
     /// Panics if there is no `ImplicitCtxt` available.
     #[inline]
     pub fn with_context<F, R>(f: F) -> R
-    where
-        F: for<'a, 'tcx> FnOnce(&ImplicitCtxt<'a, 'tcx>) -> R,
+        where
+            F: for<'a, 'tcx> FnOnce(&ImplicitCtxt<'a, 'tcx>) -> R,
     {
         with_context_opt(|opt_context| f(opt_context.expect("no ImplicitCtxt stored in tls")))
     }
@@ -1769,8 +1767,8 @@ pub mod tls {
     /// `ImplicitCtxt`'s `tcx` field.
     #[inline]
     pub fn with_related_context<'tcx, F, R>(tcx: TyCtxt<'tcx>, f: F) -> R
-    where
-        F: FnOnce(&ImplicitCtxt<'_, 'tcx>) -> R,
+        where
+            F: FnOnce(&ImplicitCtxt<'_, 'tcx>) -> R,
     {
         with_context(|context| unsafe {
             assert!(ptr_eq(context.tcx.gcx, tcx.gcx));
@@ -1783,8 +1781,8 @@ pub mod tls {
     /// Panics if there is no `ImplicitCtxt` available.
     #[inline]
     pub fn with<F, R>(f: F) -> R
-    where
-        F: for<'tcx> FnOnce(TyCtxt<'tcx>) -> R,
+        where
+            F: for<'tcx> FnOnce(TyCtxt<'tcx>) -> R,
     {
         with_context(|context| f(context.tcx))
     }
@@ -1793,8 +1791,8 @@ pub mod tls {
     /// The closure is passed None if there is no `ImplicitCtxt` available.
     #[inline]
     pub fn with_opt<F, R>(f: F) -> R
-    where
-        F: for<'tcx> FnOnce(Option<TyCtxt<'tcx>>) -> R,
+        where
+            F: for<'tcx> FnOnce(Option<TyCtxt<'tcx>>) -> R,
     {
         with_context_opt(|opt_context| f(opt_context.map(|context| context.tcx)))
     }
@@ -1930,6 +1928,7 @@ impl<'tcx, T: 'tcx + ?Sized> Clone for Interned<'tcx, T> {
         Interned(self.0)
     }
 }
+
 impl<'tcx, T: 'tcx + ?Sized> Copy for Interned<'tcx, T> {}
 
 impl<'tcx, T: 'tcx + ?Sized> IntoPointer for Interned<'tcx, T> {
@@ -1937,6 +1936,7 @@ impl<'tcx, T: 'tcx + ?Sized> IntoPointer for Interned<'tcx, T> {
         self.0 as *const _ as *const ()
     }
 }
+
 // N.B., an `Interned<Ty>` compares and hashes as a `TyKind`.
 impl<'tcx> PartialEq for Interned<'tcx, TyS<'tcx>> {
     fn eq(&self, other: &Interned<'tcx, TyS<'tcx>>) -> bool {
@@ -1958,6 +1958,7 @@ impl<'tcx> Borrow<TyKind<'tcx>> for Interned<'tcx, TyS<'tcx>> {
         &self.0.kind()
     }
 }
+
 // N.B., an `Interned<PredicateInner>` compares and hashes as a `PredicateKind`.
 impl<'tcx> PartialEq for Interned<'tcx, PredicateInner<'tcx>> {
     fn eq(&self, other: &Interned<'tcx, PredicateInner<'tcx>>) -> bool {
@@ -2483,8 +2484,8 @@ impl<'tcx> TyCtxt<'tcx> {
         unsafety: hir::Unsafety,
         abi: abi::Abi,
     ) -> <I::Item as InternIteratorElement<Ty<'tcx>, ty::FnSig<'tcx>>>::Output
-    where
-        I: Iterator<Item: InternIteratorElement<Ty<'tcx>, ty::FnSig<'tcx>>>,
+        where
+            I: Iterator<Item: InternIteratorElement<Ty<'tcx>, ty::FnSig<'tcx>>>,
     {
         inputs.chain(iter::once(output)).intern_with(|xs| ty::FnSig {
             inputs_and_output: self.intern_type_list(xs),
@@ -2630,19 +2631,19 @@ impl TyCtxtAt<'tcx> {
 pub trait InternAs<T: ?Sized, R> {
     type Output;
     fn intern_with<F>(self, f: F) -> Self::Output
-    where
-        F: FnOnce(&T) -> R;
+        where
+            F: FnOnce(&T) -> R;
 }
 
 impl<I, T, R, E> InternAs<[T], R> for I
-where
-    E: InternIteratorElement<T, R>,
-    I: Iterator<Item = E>,
+    where
+        E: InternIteratorElement<T, R>,
+        I: Iterator<Item=E>,
 {
     type Output = E::Output;
     fn intern_with<F>(self, f: F) -> Self::Output
-    where
-        F: FnOnce(&[T]) -> R,
+        where
+            F: FnOnce(&[T]) -> R,
     {
         E::intern_with(self, f)
     }
@@ -2650,29 +2651,29 @@ where
 
 pub trait InternIteratorElement<T, R>: Sized {
     type Output;
-    fn intern_with<I: Iterator<Item = Self>, F: FnOnce(&[T]) -> R>(iter: I, f: F) -> Self::Output;
+    fn intern_with<I: Iterator<Item=Self>, F: FnOnce(&[T]) -> R>(iter: I, f: F) -> Self::Output;
 }
 
 impl<T, R> InternIteratorElement<T, R> for T {
     type Output = R;
-    fn intern_with<I: Iterator<Item = Self>, F: FnOnce(&[T]) -> R>(iter: I, f: F) -> Self::Output {
+    fn intern_with<I: Iterator<Item=Self>, F: FnOnce(&[T]) -> R>(iter: I, f: F) -> Self::Output {
         f(&iter.collect::<SmallVec<[_; 8]>>())
     }
 }
 
 impl<'a, T, R> InternIteratorElement<T, R> for &'a T
-where
-    T: Clone + 'a,
+    where
+        T: Clone + 'a,
 {
     type Output = R;
-    fn intern_with<I: Iterator<Item = Self>, F: FnOnce(&[T]) -> R>(iter: I, f: F) -> Self::Output {
+    fn intern_with<I: Iterator<Item=Self>, F: FnOnce(&[T]) -> R>(iter: I, f: F) -> Self::Output {
         f(&iter.cloned().collect::<SmallVec<[_; 8]>>())
     }
 }
 
 impl<T, R, E> InternIteratorElement<T, R> for Result<T, E> {
     type Output = Result<R, E>;
-    fn intern_with<I: Iterator<Item = Self>, F: FnOnce(&[T]) -> R>(
+    fn intern_with<I: Iterator<Item=Self>, F: FnOnce(&[T]) -> R>(
         mut iter: I,
         f: F,
     ) -> Self::Output {

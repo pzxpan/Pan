@@ -84,8 +84,8 @@ impl<'a> Resolver<'a> {
     /// Defines `name` in namespace `ns` of module `parent` to be `def` if it is not yet defined;
     /// otherwise, reports an error.
     crate fn define<T>(&mut self, parent: Module<'a>, ident: Ident, ns: Namespace, def: T)
-    where
-        T: ToNameBinding<'a>,
+        where
+            T: ToNameBinding<'a>,
     {
         let binding = def.to_name_binding(self.arenas);
         let key = self.new_key(ident, ns);
@@ -938,18 +938,18 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
         // Record primary definitions.
         match res {
             Res::Def(kind @ (
-        DefKind::Mod | DefKind::Enum | DefKind::Trait), def_id) => {
-        let module = self.r.new_module(
-        parent,
-        ModuleKind::Def(kind, def_id, ident.name),
-        def_id,
-        expansion,
-        span,
-        );
-        self.r.define(parent, ident, TypeNS, (module, vis, span, expansion));
-        }
-        Res::Def(
-            DefKind::Struct
+                DefKind::Mod | DefKind::Enum | DefKind::Trait), def_id) => {
+                let module = self.r.new_module(
+                    parent,
+                    ModuleKind::Def(kind, def_id, ident.name),
+                    def_id,
+                    expansion,
+                    span,
+                );
+                self.r.define(parent, ident, TypeNS, (module, vis, span, expansion));
+            }
+            Res::Def(
+                DefKind::Struct
                 | DefKind::Union
                 | DefKind::Variant
                 | DefKind::TyAlias
@@ -957,23 +957,23 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
                 | DefKind::OpaqueTy
                 | DefKind::TraitAlias
                 | DefKind::AssocTy,
-        _,
-        )
-        |Res::PrimTy(..)| Res::ToolMod => self.r.define(parent, ident, TypeNS, (res, vis, span, expansion)),
-        Res::Def(
-            DefKind::Fn
+                _,
+            )
+            | Res::PrimTy(..) | Res::ToolMod => self.r.define(parent, ident, TypeNS, (res, vis, span, expansion)),
+            Res::Def(
+                DefKind::Fn
                 | DefKind::AssocFn
                 | DefKind::Static
                 | DefKind::Const
                 | DefKind::AssocConst
                 | DefKind::Ctor(..),
-        _,
-        ) => self.r.define(parent, ident, ValueNS, (res, vis, span, expansion)),
-        Res::Def(DefKind::Macro(..), _) | Res::NonMacroAttr(..) => {
-            self.r.define(parent, ident, MacroNS, (res, vis, span, expansion))
-        }
-        Res::Def(
-            DefKind::TyParam
+                _,
+            ) => self.r.define(parent, ident, ValueNS, (res, vis, span, expansion)),
+            Res::Def(DefKind::Macro(..), _) | Res::NonMacroAttr(..) => {
+                self.r.define(parent, ident, MacroNS, (res, vis, span, expansion))
+            }
+            Res::Def(
+                DefKind::TyParam
                 | DefKind::ConstParam
                 | DefKind::ExternCrate
                 | DefKind::Use
@@ -985,34 +985,34 @@ impl<'a, 'b> BuildReducedGraphVisitor<'a, 'b> {
                 | DefKind::Closure
                 | DefKind::Impl
                 | DefKind::Generator,
-        _,
-        )
-        |Res::Local(..)| Res::SelfTy(..)
+                _,
+            )
+            | Res::Local(..) | Res::SelfTy(..)
             | Res::SelfCtor(..)
             | Res::Err => bug!("unexpected resolution: {:?}", res),
-    }
+        }
         // Record some extra data for better diagnostics.
         let cstore = self.r.cstore();
         match res {
-        Res::Def(DefKind::Struct | DefKind::Union, def_id) => {
-        let field_names = cstore.struct_field_names_untracked(def_id, self.r.session);
-        self.insert_field_names(def_id, field_names);
-        }
-        Res::Def(DefKind::AssocFn, def_id) => {
-        if cstore
-        .associated_item_cloned_untracked(def_id, self.r.session)
-        .fn_has_self_parameter
-        {
-        self.r.has_self.insert(def_id);
-        }
-        }
-        Res::Def(DefKind::Ctor(CtorOf::Struct, ..), def_id) => {
-        let parent = cstore.def_key(def_id).parent;
-        if let Some(struct_def_id) = parent.map( | index | DefId { index, ..def_id }) {
-        self.r.struct_constructors.insert(struct_def_id, (res, vis, vec ! []));
-        }
-        }
-        _ => {}
+            Res::Def(DefKind::Struct | DefKind::Union, def_id) => {
+                let field_names = cstore.struct_field_names_untracked(def_id, self.r.session);
+                self.insert_field_names(def_id, field_names);
+            }
+            Res::Def(DefKind::AssocFn, def_id) => {
+                if cstore
+                    .associated_item_cloned_untracked(def_id, self.r.session)
+                    .fn_has_self_parameter
+                {
+                    self.r.has_self.insert(def_id);
+                }
+            }
+            Res::Def(DefKind::Ctor(CtorOf::Struct, ..), def_id) => {
+                let parent = cstore.def_key(def_id).parent;
+                if let Some(struct_def_id) = parent.map(|index| DefId { index, ..def_id }) {
+                    self.r.struct_constructors.insert(struct_def_id, (res, vis, vec![]));
+                }
+            }
+            _ => {}
         }
     }
 

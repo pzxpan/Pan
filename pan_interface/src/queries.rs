@@ -17,10 +17,14 @@ use pan_middle::ty::{GlobalCtxt, ResolverOutputs, TyCtxt};
 use pan_serialize::json;
 use pan_session::config::{self, OutputFilenames, OutputType};
 use pan_session::{output::find_crate_name, Session};
-use pan_span::symbol::sym;
+use pan_span::symbol::{sym, Ident, Symbol};
 use std::any::Any;
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
+use pan_ast::mut_visit::{MutVisitor, noop_visit_expr};
+use pan_data_structures::fx::{FxHashMap, FxHashSet};
+use pan_ast::{NodeId, Expr, ExprKind, Path, PathSegment, ptr::P};
+
 
 /// Represent the result of a query.
 ///
@@ -85,6 +89,106 @@ pub struct Queries<'tcx> {
     prepare_outputs: Query<OutputFilenames>,
     global_ctxt: Query<QueryContext<'tcx>>,
     ongoing_codegen: Query<Box<dyn Any>>,
+}
+
+struct ToZzIdentMutVisitor {
+    pub self_exprs: FxHashSet<NodeId>,
+}
+
+impl MutVisitor for ToZzIdentMutVisitor {
+    fn token_visiting_enabled(&self) -> bool {
+        true
+    }
+    fn visit_expr(&mut self, e: &mut P<Expr>) {
+        // let  Expr { kind, id, span, attrs, tokens } = e;
+        if self.self_exprs.contains(&e.id) {
+            println!("expr is {:?}", e);
+            // let copy = e.kind.clone();
+            if let ExprKind::Path(ref mut s, ref mut p) = &mut e.kind.clone() {
+                println!("segments is {:?}", p.segments[0].ident.name.to_string());
+                let field_name = p.segments[0].ident.clone();
+
+                let mut path = p.clone();
+                path.segments[0].ident = Ident::new(Symbol::intern("self"), e.span.clone());
+                let mut path_expr = e.clone();
+                path_expr.kind = ExprKind::Path(None, path);
+
+                let mut ee = e.clone();
+                ee.kind = ExprKind::Field(path_expr, field_name);
+                ee.id = pan_ast::node_id::NodeId::from_u32(10000000);
+                *e = ee;
+                println!("ddddddd:{:?},", e);
+
+
+                //Expr { id: NodeId(41), kind: Field(Expr { id: NodeId(40), kind:
+                // Path(None, Path { span: test.pan:6:16: 6:20 (#0),
+                // segments: [PathSegment { ident: self#0, id: NodeId(39), args: None }], tokens: None }),
+                // span: test.pan:6:16: 6:20 (#0), attrs: ThinVec(None), tokens: None }, bb#0),
+                // span: test.pan:6:16: 6:23 (#0), attrs: ThinVec(None), tokens: None },
+                // kind: Field(Expr { id: NodeId(10000000),
+                //     kind: Path(None, Path { span: test.pan:6:16: 6:20 (#0),
+                //         segments: [PathSegment { ident: self#0, id: NodeId(39), args: None }],
+                //         tokens: None }), span: test.pan:6:16: 6:20 (#0),
+                //     attrs: ThinVec(None), tokens: None },
+                // self#0)
+
+                // kind:
+                // Binary(Spanned { node: Add, span: test.pan:6:21: 6:22 (#0) },
+                //  Expr {
+                //  id: NodeId(41), kind:
+                //      Field(
+                //  Expr { id: NodeId(40), kind:
+                //  Field()
+                //
+                //  Path(None, Path {
+                //      span: test.pan:6:16: 6:18 (#0),
+                //      segments: [PathSegment{ ident: bb#0, id: NodeId(39), args: None }], tokens: None }), span: test.pan:6:16: 6:18 (#0), attrs: ThinVec(None), tokens: None },
+                // b#0),
+                //
+                //  span: test.pan:6:16: 6:20 (#0), attrs: ThinVec(None), tokens: None },
+
+
+                // kind:
+                // Binary(Spanned { node: Add, span: test.pan:6:26: 6:27 (#0) },
+                // Expr {
+                // id: NodeId(42), kind: Field(
+                // Expr {
+                // id: NodeId(41), kind: Field(
+                // Expr { id: NodeId(40), kind:
+                // Path(None, Path { span: test.pan:6:16: 6:20 (#0),
+                // segments: [PathSegment { ident: self#0, id: NodeId(39), args: None }], tokens: None }),
+                // span: test.pan:6:16: 6:20 (#0), attrs: ThinVec(None), tokens: None }, bb#0),
+                // span: test.pan:6:16: 6:23 (#0), attrs: ThinVec(None), tokens: None }, b#0),
+                // span: test.pan:6:16: 6:25 (#0), attrs: ThinVec(None), tokens: None },
+
+
+        //         Expr { id: NodeId(40),
+        //             kind: Field(Expr { id: NodeId(10000000),
+        //                 kind: Path(None, Path { span: test.pan:6:16: 6:20 (#0),
+        //                         segments: [PathSegment { ident: self#0, id: NodeId(39), args: None }], tokens: None }),
+        // span: test.pan:6:16: 6:20 (#0), attrs: ThinVec(None), tokens: None }, self#0), span: test.pan:6:16: 6:20 (#0),
+        // attrs: ThinVec(None), tokens: None }
+                //             Expr {
+                //                 id: NodeId(40),
+                //                 kind: Field(Expr {
+                //                     id: NodeId(40),
+                //                     kind: Path(None, Path {
+                //                         span: test.pan: 6: 16: 6: 18( #0), segments: [PathSegment {
+                //                 ident: bb #
+                //             0, id: NodeId(
+                //             39), args: None
+                //         }], tokens: None
+                //     }), span: test.pan: 6: 16: 6: 18( # 0),
+                //     attrs: ThinVec(None), tokens: None
+                // }, self # 0), span: test.pan: 6: 16: 6: 18 ( #0), attrs: ThinVec(None), tokens: None },
+
+
+                //let pp = Path { span:*p.span, segments, tokens: *p.tokens };
+            }
+        } else {
+            noop_visit_expr(e, self);
+        }
+    }
 }
 
 impl<'tcx> Queries<'tcx> {
@@ -175,7 +279,7 @@ impl<'tcx> Queries<'tcx> {
         tracing::trace!("expansion");
         self.expansion.compute(|| {
             let crate_name = self.crate_name()?.peek().clone();
-            let (krate, lint_store) = self.register_plugins()?.take();
+            let (mut krate, lint_store) = self.register_plugins()?.take();
             let _timer = self.session().timer("configure_and_expand");
             passes::configure_and_expand(
                 self.session().clone(),
@@ -184,11 +288,16 @@ impl<'tcx> Queries<'tcx> {
                 krate,
                 &crate_name,
             )
-            .map(|(krate, resolver)| {
-                (krate, Steal::new(Rc::new(RefCell::new(resolver))), lint_store)
-            })
+                .map(|(mut krate, resolver)| {
+                    let mut hash_set: FxHashSet<NodeId> = FxHashSet::default();
+                    hash_set.insert(NodeId::from_u32(40));
+                    let mut zz_visitor = ToZzIdentMutVisitor { self_exprs: hash_set };
+                    zz_visitor.visit_crate(&mut krate);
+                    (krate, Steal::new(Rc::new(RefCell::new(resolver))), lint_store)
+                })
         })
     }
+
 
     pub fn dep_graph(&self) -> Result<&Query<DepGraph>> {
         self.dep_graph.compute(|| {
@@ -303,15 +412,15 @@ impl<'tcx> Queries<'tcx> {
             match attr.meta_item_list() {
                 // Check if there is a `#[rustc_error(delay_span_bug_from_inside_query)]`.
                 Some(list)
-                    if list.iter().any(|list_item| {
-                        matches!(
+                if list.iter().any(|list_item| {
+                    matches!(
                             list_item.ident().map(|i| i.name),
                             Some(sym::delay_span_bug_from_inside_query)
                         )
-                    }) =>
-                {
-                    tcx.ensure().trigger_delay_span_bug(def_id);
-                }
+                }) =>
+                    {
+                        tcx.ensure().trigger_delay_span_bug(def_id);
+                    }
 
                 // Bare `#[rustc_error]`.
                 None => {
@@ -410,8 +519,8 @@ impl Linker {
 
 impl Compiler {
     pub fn enter<F, T>(&self, f: F) -> T
-    where
-        F: for<'tcx> FnOnce(&'tcx Queries<'tcx>) -> T,
+        where
+            F: for<'tcx> FnOnce(&'tcx Queries<'tcx>) -> T,
     {
         let mut _timer = None;
         let queries = Queries::new(&self);

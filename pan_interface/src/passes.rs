@@ -279,7 +279,7 @@ fn configure_and_expand_inner<'a>(
                 &env::join_paths(
                     new_path.iter().filter(|p| env::join_paths(iter::once(p)).is_ok()),
                 )
-                .unwrap(),
+                    .unwrap(),
             );
         }
 
@@ -494,8 +494,8 @@ fn generated_output_paths(
 // Runs `f` on every output file path and returns the first non-None result, or None if `f`
 // returns None for every file path.
 fn check_output<F, T>(output_paths: &[PathBuf], f: F) -> Option<T>
-where
-    F: Fn(&PathBuf) -> Option<T>,
+    where
+        F: Fn(&PathBuf) -> Option<T>,
 {
     for output_path in output_paths {
         if let Some(result) = f(output_path) {
@@ -735,8 +735,8 @@ pub struct QueryContext<'tcx>(&'tcx GlobalCtxt<'tcx>);
 
 impl<'tcx> QueryContext<'tcx> {
     pub fn enter<F, R>(&mut self, f: F) -> R
-    where
-        F: FnOnce(TyCtxt<'tcx>) -> R,
+        where
+            F: FnOnce(TyCtxt<'tcx>) -> R,
     {
         let icx = ty::tls::ImplicitCtxt::new(self.0);
         ty::tls::enter_context(&icx, |_| f(icx.tcx))

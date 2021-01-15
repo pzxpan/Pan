@@ -13,6 +13,7 @@ use crate::{ResolutionError, Resolver, Segment, UseError};
 
 use pan_ast::ptr::P;
 use pan_ast::visit::{self, AssocCtxt, FnCtxt, FnKind, Visitor};
+use pan_ast::mut_visit::MutVisitor;
 use pan_ast::*;
 use pan_ast::{unwrap_or, walk_list};
 use pan_ast_lowering::ResolverAstLowering;
@@ -32,7 +33,6 @@ use pan_span::source_map::{respan, Spanned};
 use std::collections::{hash_map::Entry, BTreeSet};
 use std::mem::{replace, take};
 use tracing::debug;
-use pan_span::def_id::DefIndex;
 
 mod diagnostics;
 crate mod lifetimes;
@@ -378,7 +378,7 @@ struct DiagnosticMetadata<'ast> {
     current_where_predicate: Option<&'ast WherePredicate>,
 }
 
-struct LateResolutionVisitor<'a, 'b, 'ast> {
+struct MutLateResolutionVisitor<'a, 'b, 'ast> {
     r: &'b mut Resolver<'a>,
 
     /// The module that represents the current item scope.
@@ -405,9 +405,8 @@ struct LateResolutionVisitor<'a, 'b, 'ast> {
     in_func_body: bool,
 }
 
-/// Walks the whole crate in DFS order, visiting each item, resolving names as it goes.
-impl<'a: 'ast, 'ast> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast> {
-    fn visit_item(&mut self, item: &'ast Item) {
+impl<'a: 'ast, 'ast> MutLateResolutionVisitor<'a, '_, 'ast> {
+    pub fn visit_item(&mut self, item: &'ast Item) {
         let prev = replace(&mut self.diagnostic_metadata.current_item, Some(item));
         // Always report errors in items we just entered.
         let old_ignore = replace(&mut self.in_func_body, false);
@@ -415,9 +414,80 @@ impl<'a: 'ast, 'ast> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast> {
         self.in_func_body = old_ignore;
         self.diagnostic_metadata.current_item = prev;
     }
-    fn visit_arm(&mut self, arm: &'ast Arm) {
+    pub fn visit_arm(&mut self, arm: &'ast Arm) {
         self.resolve_arm(arm);
     }
+
+    pub fn visit_poly_trait_ref(&mut self, tref: &'ast PolyTraitRef, m: &'ast TraitBoundModifier) {
+        self.smart_resolve_path(
+            tref.trait_ref.ref_id,
+            None,
+            &tref.trait_ref.path,
+            PathSource::Trait(AliasPossibility::Maybe),
+        );
+        visit::walk_poly_trait_ref(self, tref, m);
+    }
+    pub fn visit_foreign_item(&mut self, foreign_item: &'ast ForeignItem) {
+        match foreign_item.kind {
+            ForeignItemKind::Fn(_, _, ref generics, _)
+            | ForeignItemKind::TyAlias(_, ref generics, ..) => {
+                self.with_generic_param_rib(generics, ItemRibKind(HasGenericParams::Yes), |this| {
+                    visit::walk_foreign_item(this, foreign_item);
+                });
+            }
+            ForeignItemKind::Static(..) => {
+                self.with_item_rib(HasGenericParams::No, |this| {
+                    visit::walk_foreign_item(this, foreign_item);
+                });
+            }
+            ForeignItemKind::MacCall(..) => {
+                visit::walk_foreign_item(self, foreign_item);
+            }
+        }
+    }
+    pub fn visit_fn(&mut self, fn_kind: FnKind<'ast>, sp: Span, _: NodeId) {
+        let rib_kind = match fn_kind {
+            // Bail if there's no body.
+            FnKind::Fn(.., None) => return visit::walk_fn(self, fn_kind, sp),
+            FnKind::Fn(FnCtxt::Free | FnCtxt::Foreign, ..) => FnItemRibKind,
+            FnKind::Fn(FnCtxt::Assoc(_), ..) => NormalRibKind,
+            FnKind::Closure(..) => ClosureOrAsyncRibKind,
+        };
+        let previous_value = self.diagnostic_metadata.current_function;
+        if matches!(fn_kind, FnKind::Fn(..)) {
+            self.diagnostic_metadata.current_function = Some((fn_kind, sp));
+        }
+        debug!("(resolving function) entering function");
+        let declaration = fn_kind.decl();
+
+        // Create a value rib for the function.
+        self.with_rib(ValueNS, rib_kind, |this| {
+            // Create a label rib for the function.
+            this.with_label_rib(rib_kind, |this| {
+                // Add each argument to the rib.
+                this.resolve_params(&declaration.inputs);
+
+                visit::walk_fn_ret_ty(this, &declaration.output);
+
+                // Ignore errors in function bodies if this is rustdoc
+                // Be sure not to set this until the function signature has been resolved.
+                let previous_state = replace(&mut this.in_func_body, true);
+                // Resolve the function body, potentially inside the body of an async closure
+                match fn_kind {
+                    FnKind::Fn(.., body) => walk_list!(this, visit_block, body),
+                    FnKind::Closure(_, body) => this.visit_expr(body),
+                };
+
+                debug!("(resolving function) leaving function");
+                this.in_func_body = previous_state;
+            })
+        });
+        self.diagnostic_metadata.current_function = previous_value;
+    }
+}
+
+/// Walks the whole crate in DFS order, visiting each item, resolving names as it goes.
+impl<'a: 'ast, 'ast> MutVisitor<'ast> for MutLateResolutionVisitor<'a, '_, 'ast> {
     fn visit_block(&mut self, block: &'ast Block) {
         self.resolve_block(block);
     }
@@ -463,74 +533,9 @@ impl<'a: 'ast, 'ast> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast> {
         visit::walk_ty(self, ty);
         self.diagnostic_metadata.current_trait_object = prev;
     }
-    fn visit_poly_trait_ref(&mut self, tref: &'ast PolyTraitRef, m: &'ast TraitBoundModifier) {
-        self.smart_resolve_path(
-            tref.trait_ref.ref_id,
-            None,
-            &tref.trait_ref.path,
-            PathSource::Trait(AliasPossibility::Maybe),
-        );
-        visit::walk_poly_trait_ref(self, tref, m);
-    }
-    fn visit_foreign_item(&mut self, foreign_item: &'ast ForeignItem) {
-        match foreign_item.kind {
-            ForeignItemKind::Fn(_, _, ref generics, _)
-            | ForeignItemKind::TyAlias(_, ref generics, ..) => {
-                self.with_generic_param_rib(generics, ItemRibKind(HasGenericParams::Yes), |this| {
-                    visit::walk_foreign_item(this, foreign_item);
-                });
-            }
-            ForeignItemKind::Static(..) => {
-                self.with_item_rib(HasGenericParams::No, |this| {
-                    visit::walk_foreign_item(this, foreign_item);
-                });
-            }
-            ForeignItemKind::MacCall(..) => {
-                visit::walk_foreign_item(self, foreign_item);
-            }
-        }
-    }
-    fn visit_fn(&mut self, fn_kind: FnKind<'ast>, sp: Span, _: NodeId) {
-        let rib_kind = match fn_kind {
-            // Bail if there's no body.
-            FnKind::Fn(.., None) => return visit::walk_fn(self, fn_kind, sp),
-            FnKind::Fn(FnCtxt::Free | FnCtxt::Foreign, ..) => FnItemRibKind,
-            FnKind::Fn(FnCtxt::Assoc(_), ..) => NormalRibKind,
-            FnKind::Closure(..) => ClosureOrAsyncRibKind,
-        };
-        let previous_value = self.diagnostic_metadata.current_function;
-        if matches!(fn_kind, FnKind::Fn(..)) {
-            self.diagnostic_metadata.current_function = Some((fn_kind, sp));
-        }
-        debug!("(resolving function) entering function");
-        let declaration = fn_kind.decl();
 
-        // Create a value rib for the function.
-        self.with_rib(ValueNS, rib_kind, |this| {
-            // Create a label rib for the function.
-            this.with_label_rib(rib_kind, |this| {
-                // Add each argument to the rib.
-                this.resolve_params(&declaration.inputs);
 
-                visit::walk_fn_ret_ty(this, &declaration.output);
-
-                // Ignore errors in function bodies if this is rustdoc
-                // Be sure not to set this until the function signature has been resolved.
-                let previous_state = replace(&mut this.in_func_body, true);
-                // Resolve the function body, potentially inside the body of an async closure
-                match fn_kind {
-                    FnKind::Fn(.., body) => walk_list!(this, visit_block, body),
-                    FnKind::Closure(_, body) => this.visit_expr(body),
-                };
-
-                debug!("(resolving function) leaving function");
-                this.in_func_body = previous_state;
-            })
-        });
-        self.diagnostic_metadata.current_function = previous_value;
-    }
-
-    fn visit_generics(&mut self, generics: &'ast Generics) {
+    fn visit_generics(&mut self, generics: &'ast mut Generics) {
         // For type parameter defaults, we have to ban access
         // to following type parameters, as the InternalSubsts can only
         // provide previous type parameters as they're built. We
@@ -672,14 +677,14 @@ impl<'a: 'ast, 'ast> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast> {
     }
 }
 
-impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
-    fn new(resolver: &'b mut Resolver<'a>) -> LateResolutionVisitor<'a, 'b, 'ast> {
+impl<'a: 'ast, 'b, 'ast> MutLateResolutionVisitor<'a, 'b, 'ast> {
+    fn new(resolver: &'b mut Resolver<'a>) -> MutLateResolutionVisitor<'a, 'b, 'ast> {
         // During late resolution we only track the module component of the parent scope,
         // although it may be useful to track other components as well for diagnostics.
         let graph_root = resolver.graph_root;
         let parent_scope = ParentScope::module(graph_root, resolver);
         let start_rib_kind = ModuleRibKind(graph_root);
-        LateResolutionVisitor {
+        MutLateResolutionVisitor {
             r: resolver,
             parent_scope,
             ribs: PerNS {
@@ -991,7 +996,7 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
                 });
             }
 
-            ItemKind::TraitAlias(ref generics, ref bounds) => {
+            ItemKind::TraitAlias(ref mut generics, ref mut bounds) => {
                 // Create a new rib for the trait-wide type parameters.
                 self.with_generic_param_rib(generics, ItemRibKind(HasGenericParams::Yes), |this| {
                     let local_def_id = this.r.local_def_id(item.id).to_def_id();
@@ -1925,7 +1930,7 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
                     let self_is_available = self.self_value_is_available(path[0].ident.span, span);
                     if self_is_available {
                         let partial_res = self.resolve_implicit_self(path[0].ident.span, span);
-                        return PartialRes::new(Res::Def(DefKind::Field,DefId::local(DefIndex::from_u32(6))));
+                        return PartialRes::new(partial_res.unwrap());
                     }
                 }
                 report_errors(self, None)
@@ -2225,10 +2230,7 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
     fn resolve_expr(&mut self, expr: &'ast Expr, parent: Option<&'ast Expr>) {
         // First, record candidate traits for this expression if it could
         // result in the invocation of a method call.
-        // ath(Resolved(None, Path { span: test.pan:6:16: 6:18 (#0), res: Err, segments:
-        //     [PathSegment { ident: self#0, hir_id: Some(HirId { owner: DefId(0:6 ~ test[317d]::{impl#0}::add), local_id: 5 }),
-        //     res: Some(Err), args: None, infer_args: true }] })),
-        // attrs: ThinVec(None), span: test.pan:6:16: 6:18 (#0) }, bb#0), attrs: ThinVec(None), span: test.pan:6:16: 6:18 (#0) }, b#0)
+
         self.record_candidate_traits_for_expr_if_necessary(expr);
 
         // Next, resolve the node.
@@ -2438,7 +2440,7 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
 
 impl<'a> Resolver<'a> {
     pub(crate) fn late_resolve_crate(&mut self, krate: &Crate) {
-        let mut late_resolution_visitor = LateResolutionVisitor::new(self);
+        let mut late_resolution_visitor = MutLateResolutionVisitor::new(self);
         visit::walk_crate(&mut late_resolution_visitor, krate);
         for (id, span) in late_resolution_visitor.diagnostic_metadata.unused_labels.iter() {
             self.lint_buffer.buffer_lint(lint::builtin::UNUSED_LABELS, *id, *span, "unused label");

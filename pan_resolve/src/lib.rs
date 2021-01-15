@@ -214,7 +214,8 @@ enum ResolutionError<'a> {
     /// Error E0530: `X` bindings cannot shadow `Y`s.
     BindingShadowsSomethingUnacceptable(&'static str, Symbol, &'a NameBinding<'a>),
     /// Error E0128: type parameters with a default cannot use forward-declared identifiers.
-    ForwardDeclaredTyParam, // FIXME(const_generics_defaults)
+    ForwardDeclaredTyParam,
+    // FIXME(const_generics_defaults)
     /// ERROR E0770: the type of const parameters must not depend on other generic parameters.
     ParamInTyOfConstParam(Symbol),
     /// constant values inside of type parameter defaults must not depend on generic parameters.
@@ -513,9 +514,9 @@ impl<'a> ModuleData<'a> {
     }
 
     fn for_each_child<R, F>(&'a self, resolver: &mut R, mut f: F)
-    where
-        R: AsMut<Resolver<'a>>,
-        F: FnMut(&mut R, Ident, Namespace, &'a NameBinding<'a>),
+        where
+            R: AsMut<Resolver<'a>>,
+            F: FnMut(&mut R, Ident, Namespace, &'a NameBinding<'a>),
     {
         for (key, name_resolution) in resolver.as_mut().resolutions(self).borrow().iter() {
             if let Some(binding) = name_resolution.borrow().binding {
@@ -526,8 +527,8 @@ impl<'a> ModuleData<'a> {
 
     /// This modifies `self` in place. The traits will be stored in `self.traits`.
     fn ensure_traits<R>(&'a self, resolver: &mut R)
-    where
-        R: AsMut<Resolver<'a>>,
+        where
+            R: AsMut<Resolver<'a>>,
     {
         let mut traits = self.traits.borrow_mut();
         if traits.is_none() {
@@ -721,9 +722,9 @@ impl<'a> NameBinding<'a> {
     fn is_ambiguity(&self) -> bool {
         self.ambiguity.is_some()
             || match self.kind {
-                NameBindingKind::Import { binding, .. } => binding.is_ambiguity(),
-                _ => false,
-            }
+            NameBindingKind::Import { binding, .. } => binding.is_ambiguity(),
+            _ => false,
+        }
     }
 
     fn is_possibly_imported_variant(&self) -> bool {
@@ -963,9 +964,9 @@ pub struct Resolver<'a> {
     proc_macro_stubs: FxHashSet<LocalDefId>,
     /// Traces collected during macro resolution and validated when it's complete.
     single_segment_macro_resolutions:
-        Vec<(Ident, MacroKind, ParentScope<'a>, Option<&'a NameBinding<'a>>)>,
+    Vec<(Ident, MacroKind, ParentScope<'a>, Option<&'a NameBinding<'a>>)>,
     multi_segment_macro_resolutions:
-        Vec<(Vec<Segment>, Span, MacroKind, ParentScope<'a>, Option<Res>)>,
+    Vec<(Vec<Segment>, Span, MacroKind, ParentScope<'a>, Option<Res>)>,
     builtin_attrs: Vec<(Ident, ParentScope<'a>)>,
     /// `derive(Copy)` marks items they are applied to so they are treated specially later.
     /// Derive macros cannot modify the item themselves and have to store the markers in the global
@@ -1057,7 +1058,7 @@ impl<'a> ResolverArenas<'a> {
     fn alloc_ast_paths(&'a self, paths: &[ast::Path]) -> &'a [ast::Path] {
         self.ast_paths.alloc_from_iter(paths.iter().cloned())
     }
-    fn alloc_pattern_spans(&'a self, spans: impl Iterator<Item = Span>) -> &'a [Span] {
+    fn alloc_pattern_spans(&'a self, spans: impl Iterator<Item=Span>) -> &'a [Span] {
         self.dropless.alloc_from_iter(spans)
     }
 }
@@ -1074,7 +1075,7 @@ impl<'a, 'b> DefIdTree for &'a Resolver<'b> {
             Some(id) => self.definitions.def_key(id).parent,
             None => self.cstore().def_key(id).parent,
         }
-        .map(|index| DefId { index, ..id })
+            .map(|index| DefId { index, ..id })
     }
 }
 
@@ -1444,15 +1445,10 @@ impl<'a> Resolver<'a> {
         let _prof_timer = self.session.prof.generic_activity("resolve_crate");
 
         ImportResolver { r: self }.finalize_imports();
-        println!("resolve_crate0000");
         self.finalize_macro_resolutions();
-        println!("resolve_crate2222");
         self.late_resolve_crate(krate);
-        println!("resolve_crate333");
         self.check_unused(krate);
-        println!("resolve_crate444");
         self.report_errors(krate);
-        println!("resolve_crate555");
         self.crate_loader.postprocess(krate);
     }
 
@@ -2311,13 +2307,13 @@ impl<'a> Resolver<'a> {
                         Some(LexicalScopeBinding::Item(binding)) => Ok(binding),
                         // we found a local variable or type param
                         Some(LexicalScopeBinding::Res(res))
-                            if opt_ns == Some(TypeNS) || opt_ns == Some(ValueNS) =>
-                        {
-                            record_segment_res(this, res);
-                            return FindBindingResult::PathResult(PathResult::NonModule(
-                                PartialRes::with_unresolved_segments(res, path.len() - 1),
-                            ));
-                        }
+                        if opt_ns == Some(TypeNS) || opt_ns == Some(ValueNS) =>
+                            {
+                                record_segment_res(this, res);
+                                return FindBindingResult::PathResult(PathResult::NonModule(
+                                    PartialRes::with_unresolved_segments(res, path.len() - 1),
+                                ));
+                            }
                         _ => Err(Determinacy::determined(record_used)),
                     }
                 };
@@ -2433,7 +2429,7 @@ impl<'a> Resolver<'a> {
                         if ns == TypeNS || ns == ValueNS {
                             let ns_to_try = if ns == TypeNS { ValueNS } else { TypeNS };
                             if let FindBindingResult::Binding(Ok(binding)) =
-                                find_binding_in_ns(self, ns_to_try)
+                            find_binding_in_ns(self, ns_to_try)
                             {
                                 let mut found = |what| {
                                     msg = format!(
@@ -2829,7 +2825,7 @@ impl<'a> Resolver<'a> {
 
     fn report_errors(&mut self, krate: &Crate) {
         self.report_with_use_injections(krate);
-        println!("kkkrate:{:#?}",krate);
+        println!("kkkrate:{:#?}", krate);
         for &(span_use, span_def) in &self.macro_expanded_macro_export_errors {
             let msg = "macro-expanded `macro_export` macros from the current crate \
                        cannot be referred to by absolute paths";
@@ -2856,7 +2852,7 @@ impl<'a> Resolver<'a> {
 
     fn report_with_use_injections(&mut self, krate: &Crate) {
         for UseError { mut err, candidates, def_id, instead, suggestion } in
-            self.use_injections.drain(..)
+        self.use_injections.drain(..)
         {
             let (span, found_use) = if let Some(def_id) = def_id.as_local() {
                 UsePlacementFinder::check(krate, self.def_id_to_node_id[def_id])
@@ -2952,18 +2948,18 @@ impl<'a> Resolver<'a> {
             // If there are two imports where one or both have attributes then prefer removing the
             // import without attributes.
             (Import { import: new, .. }, Import { import: old, .. })
-                if {
-                    !new_binding.span.is_dummy()
-                        && !old_binding.span.is_dummy()
-                        && (new.has_attributes || old.has_attributes)
-                } =>
-            {
-                if old.has_attributes {
-                    Some((new, new_binding.span, true))
-                } else {
-                    Some((old, old_binding.span, true))
+            if {
+                !new_binding.span.is_dummy()
+                    && !old_binding.span.is_dummy()
+                    && (new.has_attributes || old.has_attributes)
+            } =>
+                {
+                    if old.has_attributes {
+                        Some((new, new_binding.span, true))
+                    } else {
+                        Some((old, old_binding.span, true))
+                    }
                 }
-            }
             // Otherwise prioritize the new binding.
             (Import { import, .. }, other) if !new_binding.span.is_dummy() => {
                 Some((import, new_binding.span, other.is_import()))
@@ -3039,7 +3035,7 @@ impl<'a> Resolver<'a> {
             }
             ImportKind::Single { source, .. } => {
                 if let Some(pos) =
-                    source.span.hi().0.checked_sub(binding_span.lo().0).map(|pos| pos as usize)
+                source.span.hi().0.checked_sub(binding_span.lo().0).map(|pos| pos as usize)
                 {
                     if let Ok(snippet) = self.session.source_map().span_to_snippet(binding_span) {
                         if pos <= snippet.len() {

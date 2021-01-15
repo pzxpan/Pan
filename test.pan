@@ -3,7 +3,7 @@ bound AA {
 }
 impl AA for D {
      share fun add(a:i32) -> i32 {
-        return self.bb.b + a;
+        return bb.b + a;
     }
 }
 impl D {
@@ -15,22 +15,23 @@ impl D {
     }
 }
 
-pub fun dosomething(d:D,s:i32)-> BB {
-    d.bb.b += s;
-    return d.bb;
+pub fun dosomething(d:mut D,s: mut i32) -> BB {
+    return d.bb.clone();
 }
-
 
 pub struct D {
     pub d:i32,
     pub bb:BB,
 }
+
+#[derive(Clone)]
 pub struct BB {
     pub b:i32,
 }
 
 fun main() {
     let mut dd = D {d:20,bb:BB{b:10}};
-    let b = dosomething(dd,40);
-    println!("ddd:{:?}",b.b);
+    let mut c = 20;
+    let b = dosomething(&mut dd,&mut c);
+    println!("ddd:{:?},c:{:?}",b.b,c);
 }

@@ -467,18 +467,22 @@ impl<'hir> Map<'hir> {
         let module = self.tcx.hir_module_items(module);
 
         for id in &module.items {
+            println!("wwwwpan_item_id:{:?},",id);
             visitor.visit_item(self.expect_item(*id));
         }
 
         for id in &module.trait_items {
+            println!("pan_item_id:{:?},",id);
             visitor.visit_trait_item(self.expect_trait_item(id.hir_id));
         }
 
         for id in &module.impl_items {
+            println!("3eeewwwwpan_item_id:{:?},",id);
             visitor.visit_impl_item(self.expect_impl_item(id.hir_id));
         }
 
         for id in &module.foreign_items {
+            println!("44444eeewwwwpan_item_id:{:?},",id);
             visitor.visit_foreign_item(self.expect_foreign_item(id.hir_id));
         }
     }

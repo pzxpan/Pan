@@ -50,8 +50,8 @@ impl<'v, V> DeepVisitor<'v, V> {
 }
 
 impl<'v, 'hir, V> ItemLikeVisitor<'hir> for DeepVisitor<'v, V>
-where
-    V: Visitor<'hir>,
+    where
+        V: Visitor<'hir>,
 {
     fn visit_item(&mut self, item: &'hir Item<'hir>) {
         self.visitor.visit_item(item);
@@ -78,8 +78,8 @@ pub trait IntoVisitor<'hir> {
 pub struct ParDeepVisitor<V>(pub V);
 
 impl<'hir, V> ParItemLikeVisitor<'hir> for ParDeepVisitor<V>
-where
-    V: IntoVisitor<'hir>,
+    where
+        V: IntoVisitor<'hir>,
 {
     fn visit_item(&self, item: &'hir Item<'hir>) {
         self.0.into_visitor().visit_item(item);
@@ -898,11 +898,11 @@ pub fn walk_where_predicate<'v, V: Visitor<'v>>(
 ) {
     match predicate {
         &WherePredicate::BoundPredicate(WhereBoundPredicate {
-            ref bounded_ty,
-            bounds,
-            bound_generic_params,
-            ..
-        }) => {
+                                            ref bounded_ty,
+                                            bounds,
+                                            bound_generic_params,
+                                            ..
+                                        }) => {
             visitor.visit_ty(bounded_ty);
             walk_list!(visitor, visit_param_bound, bounds);
             walk_list!(visitor, visit_generic_param, bound_generic_params);
@@ -912,8 +912,8 @@ pub fn walk_where_predicate<'v, V: Visitor<'v>>(
             walk_list!(visitor, visit_param_bound, bounds);
         }
         &WherePredicate::EqPredicate(WhereEqPredicate {
-            hir_id, ref lhs_ty, ref rhs_ty, ..
-        }) => {
+                                         hir_id, ref lhs_ty, ref rhs_ty, ..
+                                     }) => {
             visitor.visit_id(hir_id);
             visitor.visit_ty(lhs_ty);
             visitor.visit_ty(rhs_ty);
@@ -1133,6 +1133,7 @@ pub fn walk_expr<'v, V: Visitor<'v>>(visitor: &mut V, expression: &'v Expr<'v>) 
             walk_list!(visitor, visit_expr, arguments);
         }
         ExprKind::Binary(_, ref left_expression, ref right_expression) => {
+            println!("left_expression:{:?},left_expression:{:?}", left_expression, right_expression);
             visitor.visit_expr(left_expression);
             visitor.visit_expr(right_expression)
         }
@@ -1183,6 +1184,7 @@ pub fn walk_expr<'v, V: Visitor<'v>>(visitor: &mut V, expression: &'v Expr<'v>) 
             visitor.visit_expr(index_expression)
         }
         ExprKind::Path(ref qpath) => {
+            println!("ddddqpath:{:?},express_hir:{:?},span:{:?}", qpath, expression.hir_id, expression.span);
             visitor.visit_qpath(qpath, expression.hir_id, expression.span);
         }
         ExprKind::Break(ref destination, ref opt_expr) => {
