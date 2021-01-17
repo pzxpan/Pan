@@ -112,10 +112,10 @@ impl MutVisitor for ToZzIdentMutVisitor {
                 path.segments[0].ident = Ident::new(Symbol::intern("self"), e.span.clone());
                 let mut path_expr = e.clone();
                 path_expr.kind = ExprKind::Path(None, path);
+                path_expr.id = pan_ast::node_id::NodeId::from_u32(1000000);
 
                 let mut ee = e.clone();
                 ee.kind = ExprKind::Field(path_expr, field_name);
-                ee.id = pan_ast::node_id::NodeId::from_u32(10000000);
                 *e = ee;
                 println!("ddddddd:{:?},", e);
 
@@ -162,12 +162,12 @@ impl MutVisitor for ToZzIdentMutVisitor {
                 // span: test.pan:6:16: 6:25 (#0), attrs: ThinVec(None), tokens: None },
 
 
-        //         Expr { id: NodeId(40),
-        //             kind: Field(Expr { id: NodeId(10000000),
-        //                 kind: Path(None, Path { span: test.pan:6:16: 6:20 (#0),
-        //                         segments: [PathSegment { ident: self#0, id: NodeId(39), args: None }], tokens: None }),
-        // span: test.pan:6:16: 6:20 (#0), attrs: ThinVec(None), tokens: None }, self#0), span: test.pan:6:16: 6:20 (#0),
-        // attrs: ThinVec(None), tokens: None }
+                //         Expr { id: NodeId(40),
+                //             kind: Field(Expr { id: NodeId(10000000),
+                //                 kind: Path(None, Path { span: test.pan:6:16: 6:20 (#0),
+                //                         segments: [PathSegment { ident: self#0, id: NodeId(39), args: None }], tokens: None }),
+                // span: test.pan:6:16: 6:20 (#0), attrs: ThinVec(None), tokens: None }, self#0), span: test.pan:6:16: 6:20 (#0),
+                // attrs: ThinVec(None), tokens: None }
                 //             Expr {
                 //                 id: NodeId(40),
                 //                 kind: Field(Expr {
@@ -289,10 +289,10 @@ impl<'tcx> Queries<'tcx> {
                 &crate_name,
             )
                 .map(|(mut krate, resolver)| {
-                    let mut hash_set: FxHashSet<NodeId> = FxHashSet::default();
-                    hash_set.insert(NodeId::from_u32(40));
-                    let mut zz_visitor = ToZzIdentMutVisitor { self_exprs: hash_set };
-                    zz_visitor.visit_crate(&mut krate);
+                    // let mut hash_set: FxHashSet<NodeId> = FxHashSet::default();
+                    // hash_set.insert(NodeId::from_u32(26));
+                    // let mut zz_visitor = ToZzIdentMutVisitor { self_exprs: hash_set };
+                    // zz_visitor.visit_crate(&mut krate);
                     (krate, Steal::new(Rc::new(RefCell::new(resolver))), lint_store)
                 })
         })

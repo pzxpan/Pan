@@ -219,8 +219,13 @@ pub enum Res<Id = hir::HirId> {
     // Value namespace
     SelfCtor(DefId /* impl */), // `DefId` refers to the impl
     Local(Id),
-
-    // Macro namespace
+   // Local(HirId { owner:
+   // DefId(0:4 ~ test[317d]::{impl#0}::add), local_id: 2 }),
+   // segments: [PathSegment { ident: self#0, hir_id:
+   // Some(HirId { owner: DefId(0:4 ~ test[317d]::{impl#0}::add), local_id: 5 }),
+   // res: Some(Local(HirId { owner: DefId(0:4 ~ test[317d]::{impl#0}::add), local_id: 2 })),
+   // args: None, infer_args: true }] }) hir_id=HirId { owner: DefId(0:4 ~ test[317d]::{impl#0}::add), local_id: 6 }
+// Macro namespace
     NonMacroAttr(NonMacroAttrKind), // e.g., `#[inline]` or `#[rustfmt::skip]`
 
     // All namespaces

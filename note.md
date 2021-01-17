@@ -17,7 +17,7 @@ llc hello.bc
 llc hello.bc --filetype=obj
 Then you need to link the files to produce an executable. This requires linking to the Rust standard libraries. The path is platform- and version-dependent:
 
-cc -L/Users/cuiqingbo/Desktop/Pan/rust/build/x86_64-apple-darwin/stage1-std/x86_64-apple-darwin/release -lstd -o test test.bc
+cc -L/Users/panzhenxing/Desktop/Pan/rust/build/x86_64-apple-darwin/stage1-std/x86_64-apple-darwin/release -lstd -o test test.bc
 You can then run the program:
 
 DYLD_LIBRARY_PATH=/path/to/stage2/lib/rustlib/x86_64-apple-darwin/lib/ ./hello2

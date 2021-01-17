@@ -310,7 +310,10 @@ impl<'a> PathSource<'a> {
                 )
                 | Res::SelfTy(..)),
             PathSource::TraitItem(ns) => match res {
-                Res::Def(DefKind::AssocConst | DefKind::AssocFn, _) if ns == ValueNS => true,
+                Res::Def(DefKind::AssocConst | DefKind::AssocFn,
+                _) if
+                ns ==
+                ValueNS => true,
                 Res::Def(DefKind::AssocTy, _) if ns == TypeNS => true,
                 _ => false,
             },
@@ -328,12 +331,13 @@ impl<'a> PathSource<'a> {
             (PathSource::Struct, false) => error_code!(E0422),
             (PathSource::Expr(..), true) => error_code!(E0423),
             (PathSource::Expr(..), false) => error_code!(E0425),
-            (PathSource::Pat | PathSource::TupleStruct(..), true) => error_code!(E0532),
-            (PathSource::Pat | PathSource::TupleStruct(..), false) => error_code!(E0531),
-            (PathSource::TraitItem(..), true) => error_code!(E0575),
-            (PathSource::TraitItem(..), false) => error_code!(E0576),
-        }
+            (
+        PathSource::Pat | PathSource::TupleStruct(..), true) => error_code!(E0532),
+        (PathSource::Pat | PathSource::TupleStruct(..), false) => error_code!(E0531),
+        (PathSource::TraitItem(..), true) => error_code!(E0575),
+        (PathSource::TraitItem(..), false) => error_code!(E0576),
     }
+        }
 }
 
 #[derive(Default)]
@@ -494,7 +498,8 @@ impl<'a: 'ast, 'ast> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast> {
         let rib_kind = match fn_kind {
             // Bail if there's no body.
             FnKind::Fn(.., None) => return visit::walk_fn(self, fn_kind, sp),
-            FnKind::Fn(FnCtxt::Free | FnCtxt::Foreign, ..) => FnItemRibKind,
+            FnKind::Fn(FnCtxt::Free | FnCtxt::Foreign, ..) =>
+            FnItemRibKind,
             FnKind::Fn(FnCtxt::Assoc(_), ..) => NormalRibKind,
             FnKind::Closure(..) => ClosureOrAsyncRibKind,
         };
@@ -1696,30 +1701,35 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
         match res {
             Res::SelfCtor(_) // See #70549.
             | Res::Def(
-                DefKind::Ctor(_, CtorKind::Const) | DefKind::Const | DefKind::ConstParam,
-                _,
-            ) if is_syntactic_ambiguity => {
+                DefKind::Ctor(
+            _,
+            CtorKind::Const)
+            | DefKind::Const | DefKind::ConstParam,
+            _,
+            ) if
+            is_syntactic_ambiguity => {
                 // Disambiguate in favor of a unit struct/variant or constant pattern.
                 if let Some(binding) = binding {
                     self.r.record_use(ident, ValueNS, binding, false);
                 }
                 Some(res)
             }
-            Res::Def(DefKind::Ctor(..) | DefKind::Const | DefKind::Static, _) => {
-                // This is unambiguously a fresh binding, either syntactically
-                // (e.g., `IDENT @ PAT` or `ref IDENT`) or because `IDENT` resolves
-                // to something unusable as a pattern (e.g., constructor function),
-                // but we still conservatively report an error, see
-                // issues/33118#issuecomment-233962221 for one reason why.
-                self.report_error(
-                    ident.span,
-                    ResolutionError::BindingShadowsSomethingUnacceptable(
-                        pat_src.descr(),
-                        ident.name,
-                        binding.expect("no binding for a ctor or static"),
-                    ),
-                );
-                None
+            Res::Def(DefKind::Ctor(..) | DefKind::Const | DefKind::Static,
+            _) => {
+            // This is unambiguously a fresh binding, either syntactically
+            // (e.g., `IDENT @ PAT` or `ref IDENT`) or because `IDENT` resolves
+            // to something unusable as a pattern (e.g., constructor function),
+            // but we still conservatively report an error, see
+            // issues/33118#issuecomment-233962221 for one reason why.
+            self.report_error(
+            ident.span,
+            ResolutionError::BindingShadowsSomethingUnacceptable(
+            pat_src.descr(),
+            ident.name,
+            binding.expect("no binding for a ctor or static"),
+            ),
+            );
+            None
             }
             Res::Def(DefKind::Fn, _) | Res::Local(..) | Res::Err => {
                 // These entities are explicitly allowed to be shadowed by fresh bindings.
@@ -1875,6 +1885,7 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
             Ok(Some(partial_res)) if partial_res.unresolved_segments() == 0 => {
                 if source.is_expected(partial_res.base_res()) || partial_res.base_res() == Res::Err
                 {
+                    println!("000ddd partial:{:?}", partial_res);
                     partial_res
                 } else {
                     report_errors(self, Some(partial_res.base_res()))
@@ -1908,7 +1919,7 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
                         hm.insert(span, span);
                     }
                 }
-
+                println!("2222ddd partial:{:?}", partial_res);
                 partial_res
             }
 
@@ -1921,11 +1932,27 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
             }
 
             _ => {
+                //000ddd partial:PartialRes { base_res: Local(NodeId(15)), unresolved_segments: 0 }
                 if self.self_type_is_available(span) {
                     let self_is_available = self.self_value_is_available(path[0].ident.span, span);
                     if self_is_available {
-                        let partial_res = self.resolve_implicit_self(path[0].ident.span, span);
-                        return PartialRes::new(Res::Def(DefKind::Field,DefId::local(DefIndex::from_u32(6))));
+                        let mut self_ident = Ident::new(kw::SelfLower, span);
+                        let mut d = vec![Segment::from_ident(self_ident)];
+                        // d.push();
+                      //  d.extend_from_slice(path);
+                        return self.smart_resolve_path_fragment(id, qself, &d[..], span, source, crate_lint);
+                        // n smart_resolve_path_fragment(
+                        //     &mut self,
+                        //     id: NodeId,
+                        //     qself: Option<&QSelf>,
+                        //     path: &[Segment],
+                        //     span: Span,
+                        //     source: PathSource<'ast>,
+                        //     crate_lint: CrateLint,
+                        // )
+                        // let partial_res = self.resolve_implicit_self(path[0].ident.span, span);
+                        // println!("3333ddd partial:{:?}", partial_res);
+                        // return PartialRes::new(partial_res.unwrap());
                     }
                 }
                 report_errors(self, None)
@@ -1957,7 +1984,7 @@ impl<'a: 'ast, 'b, 'ast> LateResolutionVisitor<'a, 'b, 'ast> {
     }
     fn resolve_implicit_self(&mut self, self_span: Span, path_span: Span) -> Option<Res> {
         let ident = Ident::new(kw::SelfLower, self_span);
-        let binding = self.resolve_ident_in_lexical_scope(ident, ValueNS, None, path_span);
+        let binding = self.resolve_ident_in_lexical_scope(ident, TypeNS, None, path_span);
         if let Some(LexicalScopeBinding::Res(res)) = binding {
             return Some(res);
         } else { return None; }
