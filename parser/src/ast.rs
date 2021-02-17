@@ -23,21 +23,60 @@ pub struct DocComment {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Module {
-    pub content: Vec<ModulePart>,
-    pub package: Vec<Identifier>,
+pub struct Package {
+    pub content: Vec<PackagePart>,
+    pub package_name: Vec<Identifier>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Type {
+    Type(Identifier, Option<Vec<Type>>),
+    Array(Identifier, usize),
+    Tuple(Option<Vec<Type>>),
+    FunType(Option<Vec<Type>>, Option<Box<Type>>),
+}
+
+impl Type {
+    pub fn name(&self) -> String {
+        match self {
+            Type::Type(n, _) => n.name.clone(),
+            Type::Array(n, _) => n.name.clone(),
+            Type::Tuple(n) => {
+                if n.is_none() { return "Unit".to_string(); } else {
+                    let mut v = vec![];
+                    for i in n.as_ref().unwrap() {
+                        v.push(i.name());
+                    }
+                    return format!("Tuple:{:?}", v);
+                }
+            }
+            Type::FunType(args, ret) => {
+                let mut v = vec![];
+                if args.is_some() {
+                    for i in args.as_ref().unwrap() {
+                        v.push(i.name());
+                    }
+                }
+                let mut ret_name = "".to_string();
+                if ret.is_some() {
+                    ret_name = ret.as_ref().unwrap().name();
+                }
+                return format!("fun:{:?}{:?}", args, ret_name);
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleDefinition {
-    pub module_parts: Vec<ModulePart>,
+    pub module_parts: Vec<PackagePart>,
     pub name: Identifier,
     pub package: String,
     pub is_pub: bool,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ModulePart {
+pub enum PackagePart {
     StructDefinition(Box<StructDefinition>),
     BoundDefinition(Box<BoundDefinition>),
     ImportDirective(Import),
@@ -54,16 +93,15 @@ pub enum ModulePart {
 pub enum Import {
     //import std.math.sqrt;
     //import std.math.*;
-    Plain(Vec<Identifier>, bool),
+    Plain(bool, Vec<Identifier>, bool),
 
-    //import std.math.* as Math;
     //import std.math.sqrt as Sqrt
-    Rename(Vec<Identifier>, Identifier, bool),
+    Rename(bool, Vec<Identifier>, Identifier),
 
     //import std.math {sqrt,floor};
     //import std.math {sqrt as Sqrt, floor as Floor};
     //import std { math as Math, math.floor as Floor};
-    PartRename(Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
+    PartRename(bool, Vec<Identifier>, Vec<(Vec<Identifier>, Option<Identifier>)>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -76,7 +114,7 @@ pub enum DestructType {
 #[derive(Debug, PartialEq, Clone)]
 pub struct VariableDeclaration {
     pub loc: Loc,
-    pub ty: Option<Expression>,
+    pub ty: Option<Type>,
     pub name: Identifier,
     pub is_mut: bool,
 }
@@ -86,6 +124,19 @@ pub enum MultiDeclarationPart {
     Single(Identifier),
     TupleOrArray(MultiVariableDeclaration),
     Struct(Identifier, MultiVariableDeclaration),
+}
+
+impl MultiDeclarationPart {
+    pub fn name(&self) -> String {
+        match self {
+            MultiDeclarationPart::Single(ident) => { return ident.name.clone(); }
+            MultiDeclarationPart::TupleOrArray(n) => {
+                //按位置解构，不需要名称，
+                return "".to_string();
+            }
+            MultiDeclarationPart::Struct(ident, ..) => { return ident.name.clone(); }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -136,7 +187,7 @@ impl fmt::Display for StructTy {
 pub struct Generic {
     pub loc: Loc,
     pub name: Identifier,
-    pub bounds: Option<Identifier>,
+    pub bounds: Option<Type>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -176,7 +227,7 @@ pub struct BoundDefinition {
 pub struct StructVariableDefinition {
     pub doc: Vec<DocComment>,
     pub loc: Loc,
-    pub ty: Expression,
+    pub ty: Type,
     pub is_pub: bool,
     pub mut_own: Option<MutOrOwn>,
     pub name: Identifier,
@@ -189,6 +240,7 @@ pub struct EnumVariableDefinition {
     pub loc: Loc,
     pub tys: Option<Vec<Expression>>,
     pub name: Identifier,
+    pub default: Option<i32>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -224,7 +276,7 @@ pub struct NamedArgument {
 pub struct DictEntry {
     pub loc: Loc,
     pub key: Expression,
-    pub value: Expression,
+    pub value: Option<Expression>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -245,6 +297,23 @@ pub enum Number {
     USize(usize),
     Float(f64),
 }
+
+impl Number {
+    pub fn to_i32(&self) -> i32 {
+        match self {
+            Number::I32(v) => return *v,
+            _ => 0,
+        }
+    }
+    pub fn to_usize(&self) -> usize {
+        match self {
+            Number::I32(v) => return *v as usize,
+            Number::USize(v) => return *v,
+            _ => return 0,
+        }
+    }
+}
+
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
@@ -299,9 +368,10 @@ pub enum Expression {
     AssignShiftRight(Loc, Box<Expression>, Box<Expression>),
 
     Subscript(Loc, Box<Expression>, Box<Expression>),
-    Range(Loc, Option<Box<Expression>>, Option<Box<Expression>>),
+    Range(Loc, Box<Option<Expression>>, Box<Option<Expression>>, bool/*是否后闭区间*/),
     Slice(Loc, Vec<Expression>),
     Attribute(Loc, Box<Expression>, Option<Identifier>, Option<i32>),
+    Unit(Loc, Box<Expression>, Vec<Identifier>),
 
     FunctionCall(Loc, Box<Expression>, Vec<Expression>),
     NamedFunctionCall(Loc, Box<Expression>, Vec<NamedArgument>),
@@ -326,6 +396,7 @@ pub enum Expression {
     Comprehension(Loc, Box<ComprehensionKind>, Vec<Comprehension>),
     IfExpression(Loc, Box<Expression>, Box<Expression>, Box<Expression>),
     MatchExpression(Loc, Box<Expression>, Vec<(Box<Expression>, Box<Expression>)>),
+
     Hole(Loc),
     Error,
 }
@@ -338,6 +409,7 @@ impl Expression {
             Expression::NamedFunctionCall(_, n, _) => n.as_ref().expr_name(),
             Expression::Variable(id) => id.clone().name,
             Expression::Attribute(_, name, _, _) => name.clone().expr_name(),
+            Expression::Hole(_) => "_".to_string(),
             _ => "".to_string()
         }
     }
@@ -456,7 +528,7 @@ impl Expression {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Parameter {
     pub loc: Loc,
-    pub ty: Expression,
+    pub ty: Type,
     pub mut_own: Option<MutOrOwn>,
     pub is_varargs: bool,
     pub name: Option<Identifier>,
@@ -540,7 +612,7 @@ pub struct FunctionDefinition {
     pub is_pub: bool,
     pub is_static: bool,
     pub is_mut: bool,
-    pub returns: Option<Expression>,
+    pub returns: Option<Type>,
     pub body: Option<Statement>,
 }
 
@@ -561,11 +633,12 @@ pub enum Statement {
     Args(Loc, Vec<NamedArgument>),
     If(Loc, Expression, Box<Statement>, Option<Box<Statement>>),
     Expression(Loc, Expression),
-    VariableDefinition(Loc, VariableDeclaration, Option<Expression>),
+    VariableDefinition(Loc, VariableDeclaration, Expression),
     MultiVariableDefinition(Loc, MultiVariableDeclaration, Expression),
     ConstDefinition(Loc, VariableDeclaration, Option<Expression>),
     While(Loc, Expression, Box<Statement>),
     Match(Loc, Expression, Vec<(Box<Expression>, Box<Statement>)>),
+    Destruct(Loc, Vec<Identifier>, Box<Statement>),
     For(
         Loc,
         Expression,
@@ -596,7 +669,8 @@ impl Statement {
             | Statement::Break(loc)
             | Statement::ConstDefinition(loc, _, _)
             | Statement::Match(loc, _, _)
-            | Statement::Return(loc, _) => *loc,
+            | Statement::Return(loc, _)
+            | Statement::Destruct(loc, _, _) => *loc,
         }
     }
 }

@@ -14,3 +14,4 @@ pub mod resolve_symbol;
 pub mod resolve_fns;
 pub mod builtin;
 pub mod util;
+pub mod file_cache_symboltable;

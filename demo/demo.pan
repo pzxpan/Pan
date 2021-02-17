@@ -16,9 +16,13 @@ fun main() {
     //a |=b;
     //a &=b;
 
-    let add = (aa:i32,bb:i32) => {
-        return a  + aa + bb ;
-    };
+   let add = (aa:i32,bb:i32) => {
+    if cc > 10 {
+         print("cc:");
+         print(cc);
+      }
+       return a  + aa + bb ;
+   };
    let ddd = add(20,30);
    let d = typeof(ddd);
    print(d);

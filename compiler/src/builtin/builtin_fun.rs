@@ -22,5 +22,9 @@ pub fn get_builtin_fun() -> Vec<(String, CodeObject)> {
     c.instructions.push(Instruction::Ignore);
     vec.push(("sleep".to_string(), c));
 
+    let mut c = CodeObject::new_builtin("panic".to_string(), false, vec!["value".to_string()]);
+    c.instructions.push(Instruction::Ignore);
+    vec.push(("panic".to_string(), c));
+
     vec
 }

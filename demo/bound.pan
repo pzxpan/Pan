@@ -24,6 +24,7 @@ fun main() {
     let p1 = Point!{x:32,y:45};
     let p2 = Point!{x:10000, y: 10000};
     let p3 = p1.swap(p2);
+    let p4 = p3.swap(p2);
     print(p3.x);
     print(p3.y);
 }

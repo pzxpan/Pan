@@ -1,15 +1,15 @@
 package default;
 pub struct Thread {
-    pub f: FunType,
+    f: fun()->None,
     state: i32,
-    pub fun ::new(f: FunType): Thread {
-        return Thread! {f,state:0};
+    pub fun ::new(fff: fun()->None): Thread {
+        return Thread! {f:fff,state:0};
     }
-    pub fun run() :Any {
+    pub fun run() {
         self.state = 1;
-        f();
+        self.f();
     }
-    pub fun stop() : Any {
+    pub fun stop() {
         self.state = 2;
     }
 }
@@ -20,17 +20,28 @@ pub fun add(a:i32,b:i32) : i32 {
 fun main() {
     let aa = 20;
     let bb = 30;
-    let t = Thread::new(() => {
-        let cc = add(aa,bb);
-        print("第一个子线程");
-        print("第一个子线程..暂停4秒");
-        sleep(4000);
-        print("第一个子线程..暂停4秒结束");
-        print("{}+{}结果为:{}",aa,bb,cc);
-    });
-    t.run();
-
-
+    let c = add(aa,bb);
+    let cc = add(1000,200000);
+    print(cc);
+    print(c);
+    let t1 = Thread::new(() => {
+            let ccccc = add(aa,bb);
+            print("第一个子线程");
+            print("第一个子线程..暂停4秒");
+            sleep(4000);
+            print("第一个子线程..暂停4秒结束");
+            print("{}+{}结果为:{}",aa,bb,ccccc);
+        });
+         let t2 = Thread::new(() => {
+                let cc = add(1000,bb);
+                print("第二个子线程");
+                print("第二个子线程..暂停2秒");
+                sleep(2000);
+                print("第二个子线程..暂停2秒结束");
+                print("1000+{}结果为:{}",bb,cc);
+            });
+    t2.run();
+   // t1.run();
 }
 
 

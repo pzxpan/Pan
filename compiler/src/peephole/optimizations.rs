@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use super::{InstructionMetadata, OptimizationBuffer};
 use crate::compile::{insert, get};
 use pan_bytecode::value::{Value, get_map_item};
-use pan_bytecode::value::{get_item, unwrap_constant};
+use pan_bytecode::value::{get_item};
 use log::Metadata;
 
 macro_rules! metas {
@@ -32,81 +32,81 @@ macro_rules! emitconst {
 }
 
 pub fn calculate_const_value(instructions: &mut Vec<(Instruction, InstructionMetadata)>) -> Option<Value> {
-    instructions.reverse();
-    let mut values = Vec::new();
-    let mut const_map = Constant::None;
-    for i in instructions {
-        match &i.0 {
-            Instruction::LoadName(name, _) => {
-                let cons = get(name.clone());
-                if cons.is_some() {
-                    if let Some(Constant::Map(n)) = cons.clone() {
-                        const_map = cons.unwrap();
-                    } else {
-                        values.push(unwrap_constant(&cons.unwrap()));
-                    }
-                } else {
-                    return None;
-                }
-            }
-            Instruction::LoadConst(value) => {
-                values.push(unwrap_constant(&value.clone()));
-            }
-            Instruction::Subscript => {
-                if values.len() == 2 {
-                    return get_item(values[0].clone(), values[1].clone());
-                } else if const_map != Constant::None {
-                    let cons = get_map_item(const_map.clone(), values[0].clone());
-                    if cons.is_some() {
-                        return Some(unwrap_constant(&cons.unwrap()));
-                    }
-                }
-                return None;
-            }
-
-            _ => {}
-        }
-    }
+    // instructions.reverse();
+    // let mut values = Vec::new();
+    // let mut const_map = Constant::None;
+    // for i in instructions {
+    //     match &i.0 {
+    //         Instruction::LoadName(name, _) => {
+    //             let cons = get(name.clone());
+    //             if cons.is_some() {
+    //                 if let Some(Constant::Map(n)) = cons.clone() {
+    //                     const_map = cons.unwrap();
+    //                 } else {
+    //                     values.push(unwrap_constant(&cons.unwrap()));
+    //                 }
+    //             } else {
+    //                 return None;
+    //             }
+    //         }
+    //         Instruction::LoadConst(value) => {
+    //             values.push(unwrap_constant(&value.clone()));
+    //         }
+    //         Instruction::Subscript => {
+    //             if values.len() == 2 {
+    //                 return get_item(values[0].clone(), values[1].clone());
+    //             } else if const_map != Constant::None {
+    //                 let cons = get_map_item(const_map.clone(), values[0].clone());
+    //                 if cons.is_some() {
+    //                     return Some(unwrap_constant(&cons.unwrap()));
+    //                 }
+    //             }
+    //             return None;
+    //         }
+    //
+    //         _ => {}
+    //     }
+    // }
     None
 }
 
 pub fn calculate_const(instructions: &mut Vec<(Instruction, InstructionMetadata)>) -> Option<Constant> {
-    instructions.reverse();
-    let mut values = Vec::new();
-    for i in instructions {
-        match &i.0 {
-            Instruction::LoadName(name, _) => {
-                let value = get(name.clone());
-                if value.is_some() {
-                    values.push(value.unwrap());
-                } else {
-                    return None;
-                }
-            }
-            Instruction::LoadConst(value) => {
-                values.push(value.clone());
-            }
-
-            Instruction::BuildTuple(size, _) | Instruction::BuildList(size, _) => {
-                if values.len() == *size {
-                    return Some(Constant::Tuple(values.clone()));
-                } else {
-                    return None;
-                }
-            }
-            Instruction::BuildMap(size, _, _) => {
-                //将map改为vec,只为获取她其中的某项值，且能被序列化
-                let mut const_vec = Vec::new();
-                for i in 0..*size {
-                    let key = values.pop().unwrap();
-                    let value = values.pop().unwrap();
-                    const_vec.push((key, value));
-                }
-                return Some(Constant::Map(const_vec));
-            }
-            _ => { return None; }
-        }
-    }
+    // instructions.reverse();
+    // let mut values = Vec::new();
+    // for i in instructions {
+    //     match &i.0 {
+    //         Instruction::LoadName(name, _) => {
+    //             let value = get(name.clone());
+    //             if value.is_some() {
+    //                 values.push(value.unwrap());
+    //             } else {
+    //                 return None;
+    //             }
+    //         }
+    //         Instruction::LoadConst(value) => {
+    //             values.push(value.clone());
+    //         }
+    //
+    //         Instruction::BuildTuple(size, _) | Instruction::BuildList(size, _) => {
+    //             if values.len() == *size {
+    //                 return Some(Constant::Tuple(Box::new(values.clone())));
+    //             } else {
+    //                 return None;
+    //             }
+    //         }
+    //         Instruction::BuildMap(size, _, _) => {
+    //             //将map改为vec,只为获取她其中的某项值，且能被序列化
+    //             let mut const_vec = Vec::new();
+    //             for i in 0..*size {
+    //                 let key = values.pop().unwrap();
+    //                 let value = values.pop().unwrap();
+    //                 const_vec.push((key, value));
+    //             }
+    //             return Some(Constant::Map(Box::new(const_vec)));
+    //         }
+    //         _ => { return None; }
+    //     }
+    // }
     None
 }
 
@@ -154,45 +154,45 @@ pub fn operator(buf: &mut impl OptimizationBuffer) {
             }
         }
     } else if let Instruction::ConstEnd = instruction {
-        let mut ops = vec![];
-        loop {
-            let (operation, ometa) = buf.pop();
-            if let Instruction::ConstStart = operation {
-                break;
-            } else {
-                ops.push((operation, ometa));
-            }
-        }
-        let c = calculate_const_value(&mut ops);
-        if c.is_some() {
-            let value = c.unwrap();
-            emit_const_value(buf, meta, value);
-        } else {
-            for i in ops {
-                buf.emit(i.0, i.1);
-            }
-        }
+        // let mut ops = vec![];
+        // loop {
+        //     let (operation, ometa) = buf.pop();
+        //     if let Instruction::ConstStart = operation {
+        //         break;
+        //     } else {
+        //         ops.push((operation, ometa));
+        //     }
+        // }
+        // let c = calculate_const_value(&mut ops);
+        // if c.is_some() {
+        //     let value = c.unwrap();
+        //     emit_const_value(buf, meta, value);
+        // } else {
+        //     for i in ops {
+        //         buf.emit(i.0, i.1);
+        //     }
+        // }
     } else if let Instruction::DefineConstEnd = instruction {
-        let mut ops = vec![];
-        loop {
-            let (operation, ometa) = buf.pop();
-            if let Instruction::DefineConstStart = operation {
-                break;
-            } else {
-                ops.push((operation, ometa));
-            }
-        }
-        let c = calculate_const(&mut ops);
-        if c.is_some() {
-            let (instr, meta) = ops.last_mut().unwrap();
-            if let Instruction::StoreName(name, ..) = instr {
-                //成功直接返回
-                insert(name.clone(), c.unwrap());
-            }
-        }
-        for i in ops {
-            buf.emit(i.0, i.1);
-        }
+        // let mut ops = vec![];
+        // loop {
+        //     let (operation, ometa) = buf.pop();
+        //     if let Instruction::DefineConstStart = operation {
+        //         break;
+        //     } else {
+        //         ops.push((operation, ometa));
+        //     }
+        // }
+        // let c = calculate_const(&mut ops);
+        // if c.is_some() {
+        //     let (instr, meta) = ops.last_mut().unwrap();
+        //     if let Instruction::StoreName(name, ..) = instr {
+        //         //成功直接返回
+        //         insert(name.clone(), c.unwrap());
+        //     }
+        // }
+        // for i in ops {
+        //     buf.emit(i.0, i.1);
+        // }
     } else {
         buf.emit(instruction, meta)
     }
@@ -229,21 +229,21 @@ fn emit_const_value(buf: &mut impl OptimizationBuffer, meta: InstructionMetadata
         Value::I16(value) => { emitconst!(buf, [meta], I16, value); }
         Value::I32(value) => { emitconst!(buf, [meta], I32, value); }
         Value::I64(value) => { emitconst!(buf, [meta], I64, value); }
-        Value::I128(value) => { emitconst!(buf, [meta], I128, value); }
+        Value::I128(value) => { emitconst!(buf, [meta], I128, Box::new(value.as_ref().clone())); }
         Value::ISize(value) => { emitconst!(buf, [meta], ISize, value); }
         Value::U8(value) => { emitconst!(buf, [meta], U8, value); }
         Value::U16(value) => { emitconst!(buf, [meta], U16, value); }
         Value::U32(value) => { emitconst!(buf, [meta], U32, value); }
         Value::U64(value) => { emitconst!(buf, [meta], U64, value); }
-        Value::U128(value) => { emitconst!(buf, [meta], U128, value); }
+        Value::U128(value) => { emitconst!(buf, [meta], U128,  Box::new(value.as_ref().clone())); }
         Value::USize(value) => { emitconst!(buf, [meta], USize, value); }
         Value::Bool(value) => { emitconst!(buf, [meta], Boolean, value); }
         Value::Char(value) => { emitconst!(buf, [meta], Char, value); }
         Value::Closure(value) => { emitconst!(buf, [meta], Code, Box::new(value.code)); }
         Value::Fn(value) => { emitconst!(buf, [meta], Code, Box::new(value.code)); }
-        Value::Code(value) => { emitconst!(buf, [meta], Code, Box::new(value)); }
-        Value::Enum(value) => { emitconst!(buf, [meta], Enum, value); }
-        Value::String(s) => { emitconst!(buf, [meta], String, s); }
+        Value::Code(value) => { emitconst!(buf, [meta], Code, value); }
+        Value::Enum(value) => { emitconst!(buf, [meta], Enum, Box::new(value.as_ref().clone())); }
+        Value::String(s) => { emitconst!(buf, [meta], String, Box::new(s.to_string())); }
         Value::Float(s) => { emitconst!(buf, [meta], Float, s); }
         _ => {}
     }

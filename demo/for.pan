@@ -1,8 +1,7 @@
 package default;
 fun main() {
   let sum = 0;
-  for i in 100..0  {
-      print(i);
+  for i in 99..1110  {
       sum += i;
   }
 

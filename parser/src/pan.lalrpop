@@ -7,33 +7,33 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'input,'err>(input: &'input str, file_no: usize,errors: &'err mut Vec<ErrorRecovery<usize, Token<'input>, LexicalError>>);
 
-pub TopModule: Module = {
-   "package" <p:Dot<Identifier>> ";" <s:ModulePart+> => Module{package:p,content:s}
+pub TopPackage: Package = {
+   "package" <p:Dot<Identifier>> ";" <s:PackagePart+> => Package{package_name:p,content:s}
 }
 
-ModulePart: ModulePart = {
-    StructDefinition => ModulePart::StructDefinition(<>),
-    ImportDirective => ModulePart::ImportDirective(<>),
-    EnumDefinition => ModulePart::EnumDefinition(<>),
-    DataDefinition => ModulePart::DataDefinition(<>),
-    FunctionDefinition => ModulePart::FunctionDefinition(<>),
-    BoundDefinition => ModulePart::BoundDefinition(<>),
-    ConstVariableDefinition => ModulePart::ConstDefinition(<>),
-    ModuleDefinition => ModulePart::ModuleDefinition(Box::new(<>)),
-    <err: !>  => { errors.push(err); ModulePart::Error},
+PackagePart: PackagePart = {
+    StructDefinition => PackagePart::StructDefinition(<>),
+    ImportDirective => PackagePart::ImportDirective(<>),
+    EnumDefinition => PackagePart::EnumDefinition(<>),
+    DataDefinition => PackagePart::DataDefinition(<>),
+    FunctionDefinition => PackagePart::FunctionDefinition(<>),
+    BoundDefinition => PackagePart::BoundDefinition(<>),
+    ConstVariableDefinition => PackagePart::ConstDefinition(<>),
+    ModuleDefinition => PackagePart::ModuleDefinition(Box::new(<>)),
+    <err: !>  => { errors.push(err); PackagePart::Error},
 }
 
 pub ModuleDefinition: ModuleDefinition = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:ModulePart+> "}" <R:@L> => {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?> "mod" <name:Identifier> "{" <parts:PackagePart+> "}" <R:@L> => {
         ModuleDefinition{module_parts:parts,name,is_pub:is_pub.is_some(),package:"".to_string()}
     }
 }
 
 ImportDirective: Import = {
-    "import" <s:Dot<Identifier>> <all:(".*")?> ";" => Import::Plain(s,all.is_some()),
-    "import" <s:Dot<Identifier>> <all:(".*")?> "as" <id:Identifier> ";" => Import::Rename(s, id,all.is_some()),
-    "import" <s:Dot<Identifier>> "{" <rename:CommaOne<ImportRename>> "}" ";" => {
-        Import::PartRename(s, rename)
+    "import" <third_part:"::"?> <s:Dot<Identifier>> <all:(".*")?> ";"? => Import::Plain(third_part.is_some(),s,all.is_some()),
+    "import" <third_part:"::"?> <s:Dot<Identifier>> "as" <id:Identifier> ";"? => Import::Rename(third_part.is_some(),s, id),
+    "import" <third_part:"::"?> <s:Dot<Identifier>> "{" <rename:CommaOne<ImportRename>> "}" ";"? => {
+        Import::PartRename(third_part.is_some(),s, rename)
     }
 }
 
@@ -61,7 +61,7 @@ Identifier: Identifier = {
 }
 
 VariableDeclaration: VariableDeclaration = {
-    <l:@L> "let" <is_mut: "const"?> <name:Identifier>  <ty: (":" Precedence0)?> <r:@R> => VariableDeclaration {
+    <l:@L> "let" <is_mut: "const"?> <name:Identifier>  <ty:(":" Type)?> <r:@R> => VariableDeclaration {
         loc: Loc(file_no, l, r), ty:ty.map(|x|x.1), name,is_mut: is_mut.is_none()
     },
 
@@ -111,7 +111,7 @@ Generics: Vec<Generic> = {
 }
 
 Generic: Generic = {
-    <l:@L> <name:Identifier> <bounds: (":" <Identifier>)?> <r:@R> => {
+    <l:@L> <name:Identifier> <bounds: (":" <Type>)?> <r:@R> => {
         if bounds.is_some() {
             Generic {
                 loc: Loc(file_no, l, r),
@@ -151,7 +151,7 @@ EnumDefinition: Box<EnumDefinition> = {
 }
 
 StructVariableDefinition: Box<StructVariableDefinition> = {
-    <doc:DocComments> <l:@L> <is_pub:"pub"?>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
+    <doc:DocComments> <l:@L> <is_pub:"pub"?>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Type> <e:("=" <Expression>)?> <r:@R> "," => {
         Box::new(StructVariableDefinition {
             doc, loc: Loc(file_no, l, r), ty, is_pub:is_pub.is_some(), name, initializer: e,mut_own
         })
@@ -159,15 +159,16 @@ StructVariableDefinition: Box<StructVariableDefinition> = {
 }
 
 EnumVariableDefinition: Box<EnumVariableDefinition> = {
-    <doc:DocComments> <l:@L>  <name:Identifier> <tys : ("(" <Comma<Expression>>  ")" )?> <r:@R> ","? => {
+    <doc:DocComments> <l:@L>  <name:Identifier> <tys : ("(" <Comma<Expression>>  ")" )?> <e:("=" <Number>)?> <r:@R> ","? => {
+     let default = if e.is_some() { Some(e.unwrap().to_i32())} else {None};
      Box::new(EnumVariableDefinition {
-         doc, loc: Loc(file_no, l, r), tys, name
+         doc, loc: Loc(file_no, l, r), tys, name,default,
         })
     },
 }
 
 DataVariableDefinition: Box<StructVariableDefinition> = {
-    <doc:DocComments> <l:@L>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> "," => {
+    <doc:DocComments> <l:@L>  <name:Identifier> ":" <mut_own:MutOrOwn?> <ty:Type> <e:("=" <Expression>)?> <r:@R> "," => {
         Box::new(StructVariableDefinition {
             doc, loc: Loc(file_no, l, r), ty, is_pub:true, name, initializer: e,mut_own
         })
@@ -182,6 +183,35 @@ ConstVariableDefinition: Box<ConstVariableDefinition> = {
     },
 }
 
+Type: Type = {
+
+    <i:Identifier> <v:("<" <CommaOne<Type>>">")?> => Type::Type(i,v),
+     "[" <i:Identifier> ":" <n:Number> "]" => {
+        let num = n.to_usize();
+        Type::Array(i,num)
+     },
+     "fun" <v:("(" <CommaOne<Type>> ")")?> <r:("->" Type)?> => {
+        if r.is_some() {
+            let rr = r.unwrap().1;
+            Type::FunType(v,Some(Box::new(rr)))
+        } else {
+            Type::FunType(v,None)
+        }
+     },
+      <v:("(" <CommaOne<Type>> ")")?> => {
+          if v.is_some() {
+                let vv = v.unwrap();
+                if vv.len() > 0 {
+                    Type::Tuple(Some(vv))
+                } else {
+                    Type::Tuple(None)
+                }
+            } else {
+                Type::Tuple(None)
+            }
+      }
+
+}
 Expression: Expression = {
     Precedence14,
 }
@@ -228,11 +258,14 @@ Precedence11: Expression = {
     Precedence10,
 }
 
+
 Precedence10: Expression = {
     <l:Precedence10> <a:@L> "<" <b:@R> <r:Precedence9> => Expression::Less(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence10> <a:@L> ">" <b:@R> <r:Precedence9> => Expression::More(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence10> <a:@L> "<=" <b:@R> <r:Precedence9> => Expression::LessEqual(Loc(file_no, a, b), Box::new(l), Box::new(r)),
-    <l:Precedence10> <a:@L> ">=" <b:@R> <r:Precedence9> => Expression::MoreEqual(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <l:Precedence10> <a:@L> ">="  <b:@R> <r:Precedence9> => {
+     Expression::MoreEqual(Loc(file_no, a, b), Box::new(l), Box::new(r))
+    },
     Precedence9,
 }
 
@@ -254,6 +287,7 @@ Precedence7: Expression = {
 Precedence6: Expression = {
     <l:Precedence6> <a:@L> "<<" <b:@R> <r:Precedence5> => Expression::ShiftLeft(Loc(file_no, a, b), Box::new(l), Box::new(r)),
     <l:Precedence6> <a:@L> ">>" <b:@R> <r:Precedence5> => Expression::ShiftRight(Loc(file_no, a, b), Box::new(l), Box::new(r)),
+    <Range> => <>,
     Precedence5,
 }
 
@@ -277,6 +311,7 @@ Precedence3: Expression = {
 }
 
 Precedence2: Expression = {
+
     <a:@L> "!" <b:@R> <e:Precedence2> => Expression::Not(Loc(file_no, a, b), Box::new(e)),
     <a:@L> "+" <b:@R> <e:Precedence2> => Expression::UnaryPlus(Loc(file_no, a, b), Box::new(e)),
     <a:@L> "-" <b:@R> <e:Precedence2> => Expression::UnaryMinus(Loc(file_no, a, b), Box::new(e)),
@@ -295,14 +330,12 @@ NamedArgument: NamedArgument = {
 }
 
 DictEntry: DictEntry = {
-    <l:@L> <key:StringLiteral+> ":" <value:Expression> <r:@R> => {
-        DictEntry{ loc: Loc(file_no, l, r),key:Expression::StringLiteral(key), value }
+    <l:@L> <key:StringLiteral+> <value:(":" Expression)?> <r:@R> => {
+        DictEntry{ loc: Loc(file_no, l, r),key:Expression::StringLiteral(key),value:value.map(|s|s.1) }
     },
-    <l:@L> <n:LexNumber> ":" <value:Expression> <r:@R> => {
-        let s: String = n.chars().filter(|v| *v != '_').collect();
-        let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
-        let key = Expression::NumberLiteral(Loc(file_no, l, r), num);
-        DictEntry{ loc: Loc(file_no, l, r),key, value }
+    <l:@L> <n:Number>  <value:(":" Expression)?> <r:@R> => {
+        let key = Expression::Number(Loc(file_no, l, r), n);
+        DictEntry{ loc: Loc(file_no, l, r),key, value:value.map(|s|s.1) }
      }
 }
 
@@ -318,9 +351,8 @@ ObjAttribute: Expression = {
     <a:@L> <e:Precedence0> "."  <i:Identifier> <b:@R> => {
         Expression::Attribute(Loc(file_no, a, b), Box::new(e),Some(i), None)
      },
-     <a:@L> <e:Precedence0> "."  <n:LexNumber> <b:@R> => {
-        let s: String = n.chars().filter(|v| *v != '_').collect();
-        let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
+     <a:@L> <e:Precedence0> "."  <n:Number> <b:@R> => {
+        let num = n.to_i32();
         Expression::Attribute(Loc(file_no, a, b), Box::new(e), None, Some(num))
      },
      <a:@L> <e:Precedence0> "::"  <i:Identifier> <b:@R> => {
@@ -328,9 +360,30 @@ ObjAttribute: Expression = {
      },
 }
 
+Range : Expression = {
+   <l:@L> <c:Precedence5?> ".."  <d:Identifier> <r:@R>=> {
+       Expression::Range(Loc(file_no, l, r),Box::new(c),Box::new(Some(Expression::Variable(d))),false)
+   },
+   <l:@L> <c:Precedence5?> "..="  <d:Identifier> <r:@R>=> {
+          Expression::Range(Loc(file_no, l, r),Box::new(c),Box::new(Some(Expression::Variable(d))),true)
+      },
+   <a:@L> <e:Precedence5?> ".." <n:Number> <b:@R> => {
+      Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::Number(Loc(file_no, a, b), n))),false)
+   },
+   <a:@L> <e:Precedence5?> "..=" <n:Number> <b:@R> => {
+      Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(Some(Expression::Number(Loc(file_no, a, b), n))),true)
+      },
+
+   <a:@L> <e:Precedence5?> ".."  <b:@R> => {
+       Expression::Range(Loc(file_no, a, b),Box::new(e),Box::new(None),false)
+   },
+
+}
+
 Precedence0: Expression = {
     <FunctionCall> => <>,
     <ObjAttribute> => <>,
+
     <a:@L> <e:Precedence0> "[" <i:Expression> "]" <b:@R> => Expression::Subscript(Loc(file_no, a, b), Box::new(e), Box::new(i)),
     <a:@L> "true" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), true),
     <a:@L> "false" <b:@R> => Expression::BoolLiteral(Loc(file_no, a, b), false),
@@ -349,15 +402,6 @@ Precedence0: Expression = {
         let s: String = n.chars().filter(|v| *v != '_').collect();
         let num = s.parse::<BigInt>().unwrap().to_i32().unwrap();
         Expression::NumberLiteral(Loc(file_no, l, r), num)
-    },
-    <l:@L> <a:ParameterList> <r:@R> => {
-        if a.len() == 1 {
-            if let Some(Parameter{ ty,  name: None, .. }) = &a[0].1 {
-                return ty.clone();
-            }
-        }
-
-        Expression::List(Loc(file_no, l, r), a)
     },
 
    <l:@L> "{" <v:CommaOne<DictEntry>> "}" <r:@R> => Expression::Dict(Loc(file_no, l, r), v),
@@ -393,13 +437,13 @@ MutOrOwn: MutOrOwn = {
     "mut" => MutOrOwn::Mut,
 }
 Parameter: Parameter = {
-    <l:@L><name:Identifier?> ":" <mut_own:MutOrOwn?> <ty:Precedence0> <e:("=" <Expression>)?> <r:@R> => {
+    <l:@L><name:Identifier?> ":" <mut_own:MutOrOwn?> <ty:Type> <e:("=" <Expression>)?> <r:@R> => {
         let loc = Loc(file_no, l, r);
         Parameter{ loc, ty, mut_own, name,default:e,is_varargs:false }
     },
-    <l:@L>".." <name:Identifier?> <r:@R> => {
+    <l:@L> <name:Identifier?> "..." <r:@R> => {
         let loc = Loc(file_no, l, r);
-        Parameter{loc, ty:Expression::List(Loc(file_no, l, r), vec![]), mut_own: None, name,default:None,is_varargs:true}
+        Parameter{loc, ty:Type::Array(Identifier{loc: Loc(file_no, l, r), name: "Any".to_string()},0), mut_own: None, name,default:None,is_varargs:true}
     }
 }
 
@@ -421,7 +465,7 @@ BlockStatementOrSemiColon: Option<Statement> = {
 
 FunctionDefinition: Box<FunctionDefinition> = {
     <doc:DocComments> <is_pub:"pub"?> <c:"const"?> <l:@L> "fun"  <nl:@L> <is_static: "::"?> <name:Identifier?> <nr:@R> <generics:Generics> <params:ParameterList>
-    <returns:(":" Expression)?> <body:BlockStatementOrSemiColon> <r:@R> => {
+    <returns:(":" Type)?> <body:BlockStatementOrSemiColon> <r:@R> => {
         let is_pub = is_pub.is_some();
         let is_static = is_static.is_some();
         Box::new(FunctionDefinition {
@@ -485,9 +529,9 @@ Statement: Statement = {
    <l:@L> "for"  <b:Expression>  "in"  <c:Expression>  <block:BlockStatement> <r:@R> => {
       Statement::For(Loc(file_no, l, r), b, c,Some(Box::new(block)))
    },
-   <l:@L> "for"  <b:Expression>  "in"  <c:Precedence0> ".." <d:Precedence0> <block:BlockStatement> <r:@R> => {
-         Statement::For(Loc(file_no, l, r), b, Expression::Range(Loc(file_no, l, r), Some(Box::new(c)),Some(Box::new(d))),Some(Box::new(block)))
-       },
+  // <l:@L> "for"  <b:Expression>  "in"  <c:Precedence0> ".." <d:Precedence0> <block:BlockStatement> <r:@R> => {
+   //      Statement::For(Loc(file_no, l, r), b, Expression::Range(Loc(file_no, l, r),Box::new(Some(c)),Box::new(Some(d))),Some(Box::new(block)))
+    //   },
    <l:@L> "match"  <e:Expression>  "{" <b1:( <Expression> "->"  <Statement>)*> "}" <r:@R> => {
         let a = b1.iter().map(|s| (Box::new(s.0.clone()),Box::new(s.1.clone()))).collect();
         Statement::Match(Loc(file_no, l, r),e,a)
@@ -495,7 +539,7 @@ Statement: Statement = {
 }
 
 SimpleStatement: Statement = {
-    <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)?> <r:@R> => {
+    <l:@L>  <v:VariableDeclaration> <e:("=" <Expression>)> <r:@R> => {
         Statement::VariableDefinition(Loc(file_no, l, r), v, e)
     },
     //Set放在这里就没法嵌套定义，只能在"="的右边推导出一个Set;放在Expression的话，与NamedArgument有规约冲突
@@ -513,6 +557,10 @@ SimpleStatement: Statement = {
 NonIfStatement: Statement = {
     BlockStatement => <>,
     <SimpleStatement> ";" => <>,
+    <l:@L> <names:CommaOne<(<Identifier> "!!")>> <s:BlockStatement> <r:@R> => {
+        //let a = names.iter().map(|s| s.0).collect();
+        Statement::Destruct(Loc(file_no, l, r),names,Box::new(s))
+     },
     <l:@L> "continue" <r:@R> ";" => {
         Statement::Continue(Loc(file_no, l, r))
     },
@@ -522,9 +570,13 @@ NonIfStatement: Statement = {
     <l:@L> "return" <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), None)
     },
+
     <l:@L> "return" <e:Expression> <r:@R> ";" => {
         Statement::Return(Loc(file_no, l, r), Some(e))
     },
+    <l:@L>  <e:Expression> "|;" <r:@R>   => {
+        Statement::Return(Loc(file_no, l, r), Some(e))
+     },
 }
 
 Dot<T>: Vec<T> = {
@@ -569,8 +621,12 @@ extern {
         LexIdentifier => Token::Identifier(<&'input str>),
         LexStringLiteral => Token::StringLiteral(<&'input str>),
         LexNumber => Token::Number(<&'input str>),
+        " " => Token::WhiteSpace,
         ";" => Token::Semicolon,
         ".." => Token::TwoDot,
+        "|;" => Token::ShortReturn,
+        "..." => Token::ThreeDot,
+        "..=" => Token::RangeInclude,
         ".*" => Token::All,
         "::" => Token::TwoColon,
         "ref" => Token::ReadOnlyRef,
@@ -609,6 +665,7 @@ extern {
         "<=" => Token::LessEqual,
         ">" => Token::More,
         ">=" => Token::MoreEqual,
+        "!!" => Token::Destruct,
         "|" => Token::BitwiseOr,
         "&" => Token::BitwiseAnd,
         "^" => Token::BitwiseXor,

@@ -55,7 +55,7 @@ impl Label {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum NameScope {
     Local,
     Global,
@@ -71,8 +71,9 @@ pub enum Instruction {
     DefineConstStart,
     DefineConstEnd,
 
-    LoadName(String, NameScope),
-    StoreName(String, NameScope),
+    LoadLocalName(usize, NameScope),
+    StoreLocalName(usize, NameScope),
+    StoreNewVariable(NameScope),
     Subscript,
     StoreSubscript,
     DeleteSubscript,
@@ -101,6 +102,8 @@ pub enum Instruction {
     JumpIfTrue(Label),
     ///假跳
     JumpIfFalse(Label),
+    //match需要弹出比较项中的内容;
+    JumpIfFalsePopBlock(Label),
     /// 真跳假弹
     JumpIfTrueOrPop(Label),
     /// 假跳真弹
@@ -115,6 +118,9 @@ pub enum Instruction {
     YieldFrom,
     SetupLoop(Label, Label),
 
+    IntoBlock,
+    OutBlock,
+
     PopBlock,
     FormatString(usize),
     BuildRange,
@@ -122,21 +128,27 @@ pub enum Instruction {
     BuildList(usize, bool),
     BuildSet(usize, bool),
     BuildMap(usize, bool, bool),
-    BuildSlice(usize),
+    Slice,
     ListAppend(usize),
     SetAdd(usize),
     Sleep,
     MapAdd(usize),
     Print,
     TypeOf,
+    Panic,
     //感觉不靠谱，得换这两个指令
     LoadBuildStruct,
     LoadBuildEnum(usize),
     LoadBuildModule,
     BuildThread,
     StartThread,
-    LoadReference(usize, String, String),
-    StoreReference,
+    LoadReference(usize, usize, NameScope),
+    StoreReference(usize, usize, NameScope),
+    LoadCaptureReference(usize, usize, NameScope),
+    StoreCaptureReference(usize, usize, NameScope),
+    LoadFrameReference(usize, usize, NameScope),
+    StoreFrameReference(usize, usize, NameScope),
+    StoreDefaultArg(usize, usize),
     UnpackSequence(usize),
     UnpackEx(usize, usize),
     Reverse(usize),
@@ -161,28 +173,28 @@ pub enum Constant {
     I16(i16),
     I32(i32),
     I64(i64),
-    I128(i128),
+    I128(Box<i128>),
     ISize(isize),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
-    U128(u128),
+    U128(Box<u128>),
     USize(usize),
     Char(char),
     Integer(i32),
     Float(f64),
-    Complex(Complex64),
+    Complex(Box<Complex64>),
     Boolean(bool),
-    String(String),
-    Bytes(Vec<u8>),
+    String(Box<String>),
+    Bytes(Box<Vec<u8>>),
     Code(Box<CodeObject>),
-    Tuple(Vec<Constant>),
-    Map(Vec<(Constant, Constant)>),
-    Struct(TypeValue),
-    Enum(EnumValue),
+    Tuple(Box<Vec<Constant>>),
+    Map(Box<Vec<(Constant, Constant)>>),
+    Struct(Box<TypeValue>),
+    Enum(Box<EnumValue>),
+    Reference(Box<(usize, usize, NameScope)>),
     None,
-    Ellipsis,
 }
 
 impl PartialOrd for CodeObject {
@@ -224,7 +236,6 @@ pub enum BinaryOperator {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum UnaryOperator {
     Not,
-    Invert,
     Minus,
     Plus,
 }
@@ -321,7 +332,7 @@ impl CodeObject {
     }
 
     pub fn display_expand_codeobjects<'a>(&'a self) -> impl fmt::Display + 'a {
-        struct Display<'a>(&'a CodeObject);
+        struct Display<'a> (&'a CodeObject);
         impl fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 self.0.display_inner(f, true, 1)
@@ -346,34 +357,28 @@ impl Instruction {
         level: usize,
     ) -> fmt::Result {
         macro_rules! w {
-            ($variant:ident) => {
+            ($variant: ident) => {
                 write!(f, "{:20}\n", stringify!($variant))
             };
-            ($variant:ident, $var:expr) => {
+            ($variant: ident, $var:expr) => {
                 write!(f, "{:20} ({})\n", stringify!($variant), $var)
             };
-            ($variant:ident, $var1:expr, $var2:expr) => {
+            ($variant: ident, $var1:expr, $var2: expr) => {
                 write!(f, "{:20} ({}, {})\n", stringify!($variant), $var1, $var2)
-            };
-            ($variant:ident, $var1:expr, $var2:expr, $var3:expr) => {
-                write!(
-                    f,
-                    "{:20} ({}, {}, {})\n",
-                    stringify!($variant),
-                    $var1,
-                    $var2,
-                    $var3
-                )
-            };
-        }
+             };
+            ($variant: ident, $var1:expr, $var2: expr, $var3:expr) => {
+                write! (f,"{:20} ({}, {}, {})\n",stringify!($variant),$var1,$var2,$var3)
+             };
+       }
 
         match self {
             ConstStart => w!(ConstStart),
             ConstEnd => w!(ConstEnd),
             DefineConstEnd => w!(DefineConstEnd),
             DefineConstStart => w!(DefineConstStart),
-            LoadName(name, scope) => w!(LoadName, name, format!("{:?}", scope)),
-            StoreName(name, scope) => w!(StoreName, name, format!("{:?}", scope)),
+            LoadLocalName(v_idx, scope) => w!(LoadName, v_idx, format ! ("{:?}", scope)),
+            StoreLocalName(v_idx, scope) => w!(StoreName, v_idx, format! ("{:?}", scope)),
+            StoreNewVariable(scope) => w!(StoreName, format! ("{:?}", scope)),
             Subscript => w!(Subscript),
             StoreSubscript => w!(StoreSubscript),
             DeleteSubscript => w!(DeleteSubscript),
@@ -387,11 +392,11 @@ impl Instruction {
                 }
                 _ => w!(LoadConst, value),
             },
-            UnaryOperation(op) => w!(UnaryOperation, format!("{:?}", op)),
-            BinaryOperation(op, inplace) => w!(BinaryOperation, format!("{:?}", op), inplace),
+            UnaryOperation(op) => w!(UnaryOperation, format ! ("{:?}", op)),
+            BinaryOperation(op, inplace) => w!(BinaryOperation, format ! ("{:?}", op), inplace),
             LoadAttr(name) => w!(LoadAttr, name),
-            CompareOperation(op) => w!(CompareOperation, format!("{:?}", op)),
-            ShallowOperation(op) => w!(CompareOperation, format!("{:?}", op)),
+            CompareOperation(op) => w!(CompareOperation, format ! ("{:?}", op)),
+            ShallowOperation(op) => w!(CompareOperation, format ! ("{:?}", op)),
             Pop => w!(Pop),
             Rotate(amount) => w!(Rotate, amount),
             Ignore => w!(Ignore),
@@ -404,10 +409,13 @@ impl Instruction {
             JumpIfTrue(target) => w!(JumpIfTrue, label_map[target]),
             JumpIfFalse(target) => w!(JumpIfFalse, label_map[target]),
             JumpIfTrueOrPop(target) => w!(JumpIfTrueOrPop, label_map[target]),
+            JumpIfFalsePopBlock(target) => w!(JumpIfFalsePopBlock,label_map[target]),
             JumpIfFalseOrPop(target) => w!(JumpIfFalseOrPop, label_map[target]),
             MakeFunction => w!(MakeFunction),
-            MakeLambda(usize) => w!(MakeLambda,usize),
-            CallFunction(typ) => w!(CallFunction, format!("{:?}", typ)),
+            MakeLambda(usize) => w!(MakeLambda, usize),
+            CallFunction(typ) => w!(CallFunction, format ! ("{:?}", typ)),
+            IntoBlock => w!(IntoBlock),
+            OutBlock => w!(OutBlock),
             ForIter(target) => w!(ForIter, label_map[target]),
             ReturnValue => w!(ReturnValue),
             YieldValue => w!(YieldValue),
@@ -415,7 +423,7 @@ impl Instruction {
             SetupLoop(start, end) => w!(SetupLoop, label_map[start], label_map[end]),
             Sleep => w!(Sleep),
             StartThread => w!(StartThread),
-
+            Panic => w!(Panic),
             BeforeAsyncWith => w!(BeforeAsyncWith),
             SetupAsyncWith(end) => w!(SetupAsyncWith, label_map[end]),
             PrimitiveTypeChange(n) => w!(PrimitiveTypeChange, n),
@@ -431,16 +439,22 @@ impl Instruction {
                 unpack,
                 for_call,
             ) => w!(BuildMap, size, unpack, for_call),
-            BuildSlice(size) => w!(BuildSlice, size),
-            LoadReference(size, name, ref_name) => w!(LoadReference, size,name,ref_name),
-            StoreReference => w!(StoreReference),
+            Slice => w!(BuildSlice),
+            LoadReference(scope_idx, variable_idx, n) => w!(LoadReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreReference(scope_idx, variable_idx, n) => w!(StoreReference,scope_idx,variable_idx,format!("{:?}", n)),
+            LoadCaptureReference(scope_idx, variable_idx, n) => w!(LoadCaptureReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreCaptureReference(scope_idx, variable_idx, n) => w!(StoreCaptureReference,scope_idx,variable_idx,format!("{:?}", n)),
+            LoadFrameReference(scope_idx, variable_idx, n) => w!(LoadFrameReference, scope_idx, variable_idx,format!("{:?}", n)),
+            StoreFrameReference(scope_idx, variable_idx, n) => w!(StoreFrameReference,scope_idx,variable_idx,format!("{:?}", n)),
+
+            StoreDefaultArg(scope_idx, variable_idx) => w!(StoreDefaultArg,scope_idx,variable_idx),
             ListAppend(i) => w!(ListAppend, i),
             SetAdd(i) => w!(SetAdd, i),
             MapAdd(i) => w!(MapAdd, i),
             Print => w!(Print),
             TypeOf => w!(TypeOf),
             LoadBuildStruct => w!(LoadBuildClass),
-            LoadBuildEnum(size) => w!(LoadBuildEnum,size),
+            LoadBuildEnum(size) => w!(LoadBuildEnum, size),
             LoadBuildModule => w!(LoadBuildModule),
             UnpackSequence(size) => w!(UnpackSequence, size),
             UnpackEx(before, after) => w!(UnpackEx, before, after),
@@ -467,7 +481,6 @@ impl fmt::Display for Constant {
             Constant::U64(value) => write!(f, "{}", value),
             Constant::U128(value) => write!(f, "{}", value),
             Constant::USize(value) => write!(f, "{}", value),
-
             Constant::Integer(value) => write!(f, "{}", value),
             Constant::Float(value) => write!(f, "{}", value),
             Constant::Complex(value) => write!(f, "{}", value),
@@ -486,7 +499,6 @@ impl fmt::Display for Constant {
                     .join(", ")
             ),
             Constant::None => write!(f, "None"),
-            Constant::Ellipsis => write!(f, "Ellipsis"),
             Constant::Struct(ty) => write!(f, "Struct{:?}", ty),
             Constant::Enum(ty) => write!(f, "Enum{:?}", ty),
             Constant::Map(elements) => write!(f,
@@ -495,7 +507,8 @@ impl fmt::Display for Constant {
                                                   .iter()
                                                   .map(|e| format!("{},{}", e.0, e.1))
                                                   .collect::<Vec<_>>()
-                                                  .join(", "))
+                                                  .join(", ")),
+            Constant::Reference(n) => write!(f, "Ref {:?},{:?}", n.as_ref().0, n.as_ref().1)
         }
     }
 }

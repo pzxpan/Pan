@@ -23,18 +23,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
-name = "bytecode"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "bitflags",
- "lz4-compress",
- "num-bigint",
- "num-complex",
- "serde",
-]
-
-[[package]]
 name = "byteorder"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -96,6 +84,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac267bcc07f48ee5f8935ab0d24f316fb722d7a1292e2913f0cc196b29ffd611"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "pan-bytecode"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "bitflags",
+ "lz4-compress",
+ "num-bigint",
+ "num-complex",
+ "serde",
 ]
 
 [[package]]

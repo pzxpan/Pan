@@ -7,17 +7,22 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 use pan_bytecode::bytecode;
-use pan_bytecode::bytecode::CodeObject;
+use pan_bytecode::bytecode::{CodeObject, Instruction, NameScope};
 use pan_bytecode::value::{Value, FnValue, Obj, ClosureValue};
 
-use crate::vm::VirtualMachine;
+use crate::vm::{VirtualMachine, scope_len, store_primitive_value, set_attribute, unwrap_constant, is_ref_value};
+use crate::vm::{add_local_value, scope_remove};
 use crate::scope::{Scope, NameProtocol};
 
 use crate::util::change_to_primitive_type;
 use crate::util::get_string_value;
 use bitflags::_core::time::Duration;
 use crate::vm::run_code_in_sub_thread;
-
+use std::time::Instant;
+use pan_bytecode::value::Obj::InstanceObj;
+lazy_static! {
+    static ref STORE_COUNT:i32 = 0;
+}
 #[derive(Clone, Debug)]
 struct Block {
     typ: BlockType,
@@ -50,6 +55,10 @@ pub struct Frame {
     blocks: RefCell<Vec<Block>>,
     /// PC计数
     pub lasti: Cell<usize>,
+
+    idx: usize,
+
+    inner_scope: usize,
 }
 
 // 栈处理结果
@@ -62,18 +71,23 @@ pub enum ExecutionResult {
 pub type FrameResult = Option<ExecutionResult>;
 
 impl Frame {
-    pub fn new(code: CodeObject) -> Frame {
+    pub fn new(code: CodeObject, idx: usize) -> Frame {
         Frame {
             code,
             stack: RefCell::new(vec![]),
             blocks: RefCell::new(vec![]),
             lasti: Cell::new(0),
+            inner_scope: 0,
+            idx,
         }
     }
 
-    pub fn run(&self, vm: &mut VirtualMachine) -> FrameResult {
+    pub fn run(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         loop {
             let result = self.execute_instruction(vm);
+            // println!("耗时:{:?}", start.elapsed().as_nanos());
+
+
             match result {
                 None => {}
                 Some(value) => {
@@ -89,60 +103,79 @@ impl Frame {
         self.lasti.set(self.lasti.get() + 1);
         ins2
     }
-
-    // thread_id:ThreadId(2),instruction is:LoadConst(Code(<code object aabb at ??? file "/Users/panzhenxing/Desktop/PanPan/Pan/demo/structs.pan", line 31>)),
-    // thread_id:ThreadId(2),instruction is:LoadConst(String("older_than.<locals>.aabb")),
-    // thread_id:ThreadId(2),instruction is:MakeFunction,
-    // thread_id:ThreadId(2),instruction is:StoreName("aabb", Local),
-    // thread_id:ThreadId(2),instruction is:LoadName("$default$aabb", Local),
     /// 中间指令处理
-    fn execute_instruction(&self, vm: &mut VirtualMachine) -> FrameResult {
+    fn execute_instruction(&mut self, vm: &mut VirtualMachine) -> FrameResult {
         let instruction = self.fetch_instruction();
-        println!("thread_id:{:?},instruction is:{:?},", std::thread::current().id(), instruction);
+        // let name = format!("{:?}", instruction);
+        // let start = Instant::now();
+        println!("instruction是:{:?},", instruction);
         match instruction {
+            bytecode::Instruction::OutBlock => {
+                scope_remove();
+                self.idx -= 1;
+                self.inner_scope -= 1;
+            }
+            bytecode::Instruction::IntoBlock => {
+                add_local_value(vec![]);
+                self.idx += 1;
+                self.inner_scope += 1;
+            }
             bytecode::Instruction::Sleep => {
                 let time = self.pop_value();
                 std::thread::sleep(Duration::from_millis(time.u64()));
-                None
+            }
+            bytecode::Instruction::Panic => {
+                let v = self.pop_value();
+                panic!(v.to_string());
             }
             bytecode::Instruction::LoadConst(ref value) => {
-                let obj = vm.unwrap_constant(value);
+                let obj = unwrap_constant(value);
                 self.push_value(obj);
-                None
             }
-            bytecode::Instruction::LoadName(
-                ref name,
+            bytecode::Instruction::LoadLocalName(
+                ref v_idx,
                 ref scope,
             ) => {
-                let v = vm.load_name(name, scope);
+                let tt = Instant::now();
+                let v = vm.load_name(self.idx, *v_idx, scope);
                 self.push_value(v);
-                None
             }
-            bytecode::Instruction::StoreName(
-                ref name,
+            bytecode::Instruction::StoreLocalName(
+                ref v_idx,
                 ref scope,
-            ) => vm.store_name(name, self.pop_value(), scope),
-            bytecode::Instruction::Subscript => self.execute_subscript(vm),
-            bytecode::Instruction::StoreSubscript => self.execute_store_subscript(vm),
-            bytecode::Instruction::DeleteSubscript => self.execute_delete_subscript(vm),
+            ) => {
+                let cc = Instant::now();
+                let value = self.pop_value();
+                // println!("pop_cost:{:?},", cc.elapsed().as_nanos());
+                vm.store_name(self.idx, *v_idx, value, scope);
+            }
+
+            bytecode::Instruction::StoreNewVariable(n) => {
+                let v = self.pop_value();
+                // println!("store_value:{:?},", v);
+                vm.store_new_variable(v, n);
+            }
+            bytecode::Instruction::Subscript => { self.execute_subscript(vm); }
+            bytecode::Instruction::Slice => { self.execute_slice(vm); }
+            bytecode::Instruction::StoreSubscript => {
+                self.execute_store_subscript();
+            }
+            bytecode::Instruction::DeleteSubscript => { self.execute_delete_subscript(vm); }
             bytecode::Instruction::Pop => {
                 self.pop_value();
-                None
             }
             bytecode::Instruction::Duplicate => {
                 let value = self.pop_value();
                 self.push_value(value.clone());
                 self.push_value(value);
-                None
             }
             bytecode::Instruction::FormatString(size) => {
-                self.execute_format_string(size);
-                None
+                self.execute_format_string(vm, size);
             }
             bytecode::Instruction::BuildList(size, unpack) => {
-                let list_value = self.get_elements(vm, *size, *unpack);
-                self.push_value(list_value);
-                None
+                //let list_value = self.get_elements(vm, *size, *unpack);
+                let elements = self.pop_multiple(*size);
+                self.push_value(Value::new_array_obj(elements));
             }
             bytecode::Instruction::BuildSet(size, unpack) => {
                 let hash_map: HashMap<String, Value> = HashMap::new();
@@ -151,77 +184,91 @@ impl Frame {
                     vm.set_item(&mut map_obj, key, Value::Nil);
                 }
                 self.push_value(map_obj);
-                None
             }
             bytecode::Instruction::BuildTuple(size, unpack) => {
-                let array_value = self.get_elements(vm, *size, *unpack);
-                self.push_value(array_value);
-                None
+                //Value的宽度相同，用数组表示Tuple
+                let elements = self.pop_multiple(*size);
+                self.push_value(Value::new_array_obj(elements));
             }
             bytecode::Instruction::BuildMap(
                 size,
                 unpack,
                 for_call,
-            ) => self.execute_build_map(vm, *size, *unpack, *for_call),
+            ) => { self.execute_build_map(vm, *size, *unpack, *for_call); }
 
             bytecode::Instruction::BinaryOperation(ref op, inplace) => {
-                self.execute_binop(vm, op, *inplace)
+                self.execute_binop(vm, op, *inplace);
             }
-            bytecode::Instruction::LoadAttr(ref name) => self.load_attr(vm, name),
-            bytecode::Instruction::StoreAttr(ref name) => self.store_attr(vm, name),
-            bytecode::Instruction::DeleteAttr(ref name) => self.delete_attr(vm, name),
-            bytecode::Instruction::UnaryOperation(ref op) => self.execute_unop(vm, op),
-            bytecode::Instruction::CompareOperation(ref op) => self.execute_compare(vm, op),
-            bytecode::Instruction::ShallowOperation(ref op) => self.execute_compare_shallow(op),
+            bytecode::Instruction::LoadAttr(ref name) => { self.load_attr(vm, name); }
+            bytecode::Instruction::StoreAttr(ref name) => { self.store_attr(vm, name); }
+            bytecode::Instruction::DeleteAttr(ref name) => { self.delete_attr(vm, name); }
+            bytecode::Instruction::UnaryOperation(ref op) => { self.execute_unop(vm, op); }
+            bytecode::Instruction::CompareOperation(ref op) => { self.execute_compare(vm, op); }
+            bytecode::Instruction::ShallowOperation(ref op) => { self.execute_compare_shallow(op); }
             bytecode::Instruction::ReturnValue => {
                 let value = self.pop_value();
-                Some(ExecutionResult::Return(value))
+                println!("return_value:{:?}", value);
+                for a in 0..self.inner_scope {
+                    self.idx -= 1;
+                    scope_remove();
+                }
+                self.inner_scope = 0;
+                scope_remove();
+                return Some(ExecutionResult::Return(value));
             }
             bytecode::Instruction::Ignore => {
-                Some(ExecutionResult::Ignore)
+                for a in 0..self.inner_scope {
+                    self.idx -= 1;
+                    scope_remove();
+                }
+                self.inner_scope = 0;
+                return Some(ExecutionResult::Ignore);
             }
             bytecode::Instruction::SetupLoop(start, end) => {
                 self.push_block(BlockType::Loop {
                     start: *start,
                     end: *end,
                 });
-                None
             }
             bytecode::Instruction::Continue => {
                 self.continue_break(UnwindReason::Continue);
-                None
             }
             bytecode::Instruction::Break => {
                 self.continue_break(UnwindReason::Break);
-                None
             }
             bytecode::Instruction::PopBlock => {
                 self.pop_block();
-                None
             }
             bytecode::Instruction::GetIter => {
                 let end = self.pop_value();
-                self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), Value::Bool(false)));
-                None
+                self.push_value(Value::new_range_obj(end.clone(), Value::I32(0), false, false));
             }
-            bytecode::Instruction::ForIter(target) => self.execute_for_iter(vm, *target),
+            bytecode::Instruction::ForIter(target) => { self.execute_for_iter(vm, *target); }
             bytecode::Instruction::BuildRange => {
+                let include = self.pop_value();
                 let end = self.pop_value();
                 let start = self.pop_value();
                 if vm._gt(end.clone(), start.clone()).bool_value() {
-                    self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(true)));
+                    self.push_value(Value::new_range_obj(start.clone(), end, true, include.bool_value()));
                 } else {
-                    self.push_value(Value::new_range_obj(start.clone(), end, Value::Bool(false)));
+                    self.push_value(Value::new_range_obj(start.clone(), end, false, include.bool_value()));
                 }
-                None
             }
-            bytecode::Instruction::MakeFunction => self.execute_make_function(vm),
-            bytecode::Instruction::MakeLambda(size) => self.execute_make_lambda(vm, *size),
-            bytecode::Instruction::CallFunction(typ) => self.execute_call_function(vm, typ),
-            bytecode::Instruction::StartThread => self.start_thread(vm),
+            bytecode::Instruction::MakeFunction => { self.execute_make_function(); }
+            bytecode::Instruction::MakeLambda(size) => { self.execute_make_lambda(*size); }
+            bytecode::Instruction::CallFunction(typ) => {
+                let value = self.execute_call_function(vm, typ);
+                match value {
+                    Some(ExecutionResult::Return(v)) => {
+                        self.push_value(v);
+                    }
+                    Some(ExecutionResult::Ignore) => {}
+                    _ => self.push_value(Value::Nil)
+                }
+            }
+            bytecode::Instruction::StartThread => { self.start_thread(vm); }
             bytecode::Instruction::Jump(target) => {
                 self.jump(*target);
-                None
             }
             bytecode::Instruction::JumpIfTrue(target) => {
                 let obj = self.pop_value();
@@ -229,7 +276,6 @@ impl Frame {
                 if value {
                     self.jump(*target);
                 }
-                None
             }
 
             bytecode::Instruction::JumpIfFalse(target) => {
@@ -238,7 +284,6 @@ impl Frame {
                 if !value {
                     self.jump(*target);
                 }
-                None
             }
 
             bytecode::Instruction::JumpIfTrueOrPop(target) => {
@@ -249,7 +294,6 @@ impl Frame {
                 } else {
                     self.pop_value();
                 }
-                None
             }
 
             bytecode::Instruction::JumpIfFalseOrPop(target) => {
@@ -260,75 +304,153 @@ impl Frame {
                 } else {
                     self.pop_value();
                 }
-                None
+            }
+
+            bytecode::Instruction::JumpIfFalsePopBlock(target) => {
+                let obj = self.last_value();
+                let value = obj.bool_value();
+                if !value {
+                    self.jump(*target);
+                } else {
+                    scope_remove();
+                }
             }
 
             bytecode::Instruction::Match => {
-                let a = self.pop_value();
-                let b = self.last_value();
+                let mut a = self.pop_value();
+                let mut b = self.last_value();
+                if let Value::Reference(n) = &b {
+                    println!("matchref");
+                    b = vm.load_ref_name(n.as_ref().0, &n.as_ref().2, n.as_ref().1);
+                }
                 if let Value::Obj(_) = b {
                     let (matched, values) = vm._match(b, a);
-                    for i in values {
-                        self.push_value(i);
+                    for value in values {
+                        self.push_value(value);
                     }
                     self.push_value(matched)
                 } else {
                     self.push_value(vm._eq(a, b));
                 }
-
-                None
             }
             bytecode::Instruction::LoadBuildStruct => {
                 self.excute_make_struct_instance(vm);
-                None
             }
             bytecode::Instruction::BuildThread => {
                 self.excute_make_struct_instance(vm);
-                None
             }
 
             bytecode::Instruction::LoadBuildEnum(count) => {
                 self.excute_make_enum_instance(vm, *count);
-                None
             }
 
             bytecode::Instruction::LoadBuildModule => {
                 // let value = self.pop_value();
                 // vm.run_code_obj(value.code(), self.scope.clone());
-                None
             }
 
-            bytecode::Instruction::LoadReference(idx, name, ref_name) => {
-                let v = vm.load_capture_reference(*idx, name.clone());
-                println!("load_value:{:?}", v);
-                self.push_value(v);
-                None
+            bytecode::Instruction::LoadReference(scope_idx, variable_idx, n) => {
+                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, scope_len());
+                if n == &NameScope::Local {
+                    let v = vm.load_name(*scope_idx + self.idx - 1, *variable_idx, n);
+                    self.push_value(v);
+                } else {
+                    let v = vm.load_name(*scope_idx, *variable_idx, n);
+                    //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
+                    //println!("load_value:{:?}", v);
+                    self.push_value(v);
+                }
+            }
+            //
+            bytecode::Instruction::StoreReference(scope_idx, variable_idx, n) => {
+                if n == &NameScope::Local {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx + self.idx - 1, *variable_idx, value, n);
+                } else {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx, *variable_idx, value, n);
+                }
             }
 
-            bytecode::Instruction::StoreReference => {
-                let name = self.pop_value();
-                let idx = self.pop_value();
+            bytecode::Instruction::LoadCaptureReference(scope_idx, variable_idx, n) => {
+                println!("当前栈号:{:?},当前scope.local长度:{:?}", self.idx, scope_len());
+                if n == &NameScope::Local {
+                    let v = vm.load_name(*scope_idx, *variable_idx, n);
+                    self.push_value(v);
+                } else {
+                    let v = vm.load_name(*scope_idx, *variable_idx, n);
+                    //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
+                    //println!("load_value:{:?}", v);
+                    self.push_value(v);
+                }
+            }
+            //
+            bytecode::Instruction::StoreCaptureReference(scope_idx, variable_idx, n) => {
+                if n == &NameScope::Local {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx, *variable_idx, value, n);
+                } else {
+                    let value = self.pop_value();
+                    //println!("222store_value:{:?}", value);
+                    vm.store_name(*scope_idx, *variable_idx, value, n);
+                }
+            }
+
+            bytecode::Instruction::LoadFrameReference(scope_idx, variable_idx, n) => {
+                println!("当前栈号:{:?},当前scope.local长度:{:?},inner_scope:{:?},scope_idx:{:?}", self.idx, scope_len(), self.inner_scope, scope_idx);
+                if n == &NameScope::Local {
+                    let v = vm.load_name(self.idx - (self.inner_scope + 1) + *scope_idx, *variable_idx, n);
+                    self.push_value(v);
+                } else {
+                    let v = vm.load_name(0, *variable_idx, n);
+                    //let v = Value::Reference(Box::new((*scope_idx, *variable_idx)));
+                    //println!("load_value:{:?}", v);
+                    self.push_value(v);
+                }
+            }
+            //
+            bytecode::Instruction::StoreFrameReference(scope_idx, variable_idx, n) => {
+                if n == &NameScope::Local {
+                    let value = self.pop_value();
+                    vm.store_name(self.idx - (self.inner_scope + 1) + *scope_idx, *variable_idx, value, n);
+                } else {
+                    let value = self.pop_value();
+                    vm.store_name(0, *variable_idx, value, n);
+                }
+            }
+            bytecode::Instruction::StoreDefaultArg(scope_idx, variable_idx) => {
                 let value = self.pop_value();
-                println!("bbbbname:{:?}", name);
-                vm.store_capture_reference(idx.usize(), name.name(), value);
-                None
+                //println!("222store_value:{:?}", value);
+                vm.store_default_args(self.idx - (self.inner_scope + 1) + *scope_idx, *variable_idx, value);
             }
             bytecode::Instruction::Print => {
                 vm.print(self.pop_value());
-                None
             }
             bytecode::Instruction::TypeOf => {
                 let v = self.pop_value();
-                self.push_value(Value::String(v.ty_name()));
-                None
+                self.push_value(Value::String(Box::new(v.ty_name())));
             }
             bytecode::Instruction::PrimitiveTypeChange(idx) => {
                 let value = self.pop_value();
                 self.push_value(change_to_primitive_type(&value, *idx));
-                None
             }
-            _ => { None }
+            bytecode::Instruction::Reverse(amount) => {
+                let stack_len = self.stack.borrow().len();
+                println!("stack is :{:#?},", self.stack.borrow());
+                self.stack.borrow_mut()[stack_len - *amount..stack_len].reverse();
+            }
+            _ => {}
         }
+        // let a = start.elapsed().as_nanos();
+        // if a > 5000 {
+        //     println!("执行:{:?},耗时为:{:?}", name, a);
+        // } else {
+        //     //println!("Ok:{:?},耗时为:{:?},", name, a);
+        // }
+        None
     }
 
     fn continue_break(&self, reason: UnwindReason) -> FrameResult {
@@ -347,18 +469,19 @@ impl Frame {
                 },
             }
         }
+
         None
     }
 
-    fn get_elements(
-        &self,
-        vm: &VirtualMachine,
-        size: usize,
-        unpack: bool,
-    ) -> Value {
-        let elements = self.pop_multiple(size);
-        Value::new_array_obj(elements)
-    }
+    // fn get_elements(
+    //     &self,
+    //     vm: &VirtualMachine,
+    //     size: usize,
+    //     unpack: bool,
+    // ) -> Value {
+    //
+    //     Value::new_array_obj(elements)
+    // }
 
     // fn store_name(
     //     &self,
@@ -381,29 +504,80 @@ impl Frame {
     //     }
     //     None
     // }
-    fn execute_format_string(&self, size: &usize) -> FrameResult {
+    fn execute_format_string(&self, vm: &VirtualMachine, size: &usize) -> FrameResult {
         let v = self.pop_multiple(*size);
+        let mut vv = Vec::new();
+        for value in &v {
+            if let Value::Reference(n) = value {
+                let real_value = if n.as_ref().2 == NameScope::Local {
+                    vm.load_capture_reference(n.as_ref().0, n.as_ref().1)
+                } else {
+                    vm.load_global_reference(n.as_ref().1)
+                };
+                vv.push(real_value);
+            }
+            vv.push(value.clone());
+        }
+
         let format_str = self.pop_value();
-        let value = get_string_value(format_str, v);
+        let value = get_string_value(format_str, vv);
         self.push_value(value);
         None
     }
 
+
+    fn execute_slice(&self, vm: &VirtualMachine) -> FrameResult {
+        let include = self.pop_value();
+        let end = self.pop_value();
+        let start = self.pop_value();
+        let arr = self.pop_value();
+        println!("arr:{:?}", arr);
+        if let Value::Reference(n) = arr {
+            let v = if n.as_ref().2 == NameScope::Local {
+                vm.load_capture_reference(n.as_ref().0, n.as_ref().1)
+            } else {
+                vm.load_global_reference(n.as_ref().1)
+            };
+            let value = vm.get_slice(v, start, end, include);
+            self.push_value(value);
+        } else {
+            let value = vm.get_slice(arr, start, end, include);
+            self.push_value(value);
+        }
+        None
+    }
 
     fn execute_subscript(&self, vm: &VirtualMachine) -> FrameResult {
         let subscript = self.pop_value();
         let arr = self.pop_value();
+        println!("subscript:{:?},arr {:?}", subscript, arr);
         let value = vm.get_item(arr, subscript).unwrap();
+        println!("subscript_result:{:?}", value.clone());
         self.push_value(value);
+
         None
     }
 
-    fn execute_store_subscript(&self, vm: &VirtualMachine) -> FrameResult {
+    fn execute_store_subscript(&self) -> FrameResult {
+        // let now = Instant::now();
         let idx = self.pop_value();
         let mut obj = self.pop_value();
         let value = self.pop_value();
-        let v = vm.update_item(&mut obj, idx, value);
-        self.push_value(v);
+        // println!("pop 耗时:{:?}", now.elapsed().as_nanos());
+        //println!("idx:{:?},obj:{:?},value:{:?}", idx.clone(), obj.clone(), value.clone());
+        //let now = Instant::now();
+        set_attribute(&mut obj, idx, value);
+        //   println!("set_attribute 耗时:{:?}", now.elapsed().as_nanos());
+        // println!("vvv::{:?},", v);
+
+
+        // VirtualMachine::update_item(&mut obj, idx.clone(), value.clone());
+        // store_primitive_value(n.as_ref().0, idx.usize(), value.clone());
+        // if let Value::Reference(n) = obj.clone() {
+        //     store_primitive_value(n.as_ref().0, idx.usize(), value.clone());
+        // }
+        // self.push_value(obj.clone());
+        // store_obj_reference(1, "person_map".to_string(), idx.clone(), value.clone());
         None
     }
 
@@ -429,27 +603,30 @@ impl Frame {
         None
     }
     fn start_thread(&self, vm: &VirtualMachine) -> FrameResult {
+        let self_ref = self.pop_value();
         let func_ref = self.pop_value();
         let code = func_ref.code();
-        let mut hash_map = HashMap::new();
-        if self.stack.borrow_mut().len() > 0
-        {
-            let last_value = self.last_value();
-            let map = last_value.hash_map_value();
-            for (k, v) in map {
-                hash_map.insert(k, v);
-            }
-            hash_map.insert("self".to_string(), last_value);
-            self.pop_value();
-        }
+        // let mut args = Vec::new();
+        // args.push(self_ref);
+        // if self.stack.borrow_mut().len() > 0
+        // {
+        //     let last_value = self.last_value();
+        //     hash_map.push(last_value.clone());
+        //     let map = last_value.hash_map_value();
+        //     for (k, v) in map {
+        //         hash_map.push(v);
+        //     }
+        //
+        //     self.pop_value();
+        // }
         // let mut global = HashMap::new();
         // global.extend(self.scope.globals.borrow().iter().to_owned());
         // let s = self.scope.new_child_scope_with_locals();
         // self.scope.add_local_value(hash_map);
-        Frame::create_new_thread(code, hash_map, vm.scope.globals.clone());
+        Frame::create_new_thread(code, vec![self_ref], Vec::new());
         None
     }
-    fn create_new_thread(code: CodeObject, hash_map: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> FrameResult {
+    fn create_new_thread(code: CodeObject, hash_map: Vec<Value>, global: Vec<Value>) -> FrameResult {
         run_code_in_sub_thread(code, hash_map, global);
         return None;
     }
@@ -470,59 +647,74 @@ impl Frame {
             }
             _ => { vec![Value::Nil] }
         };
-        let func_ref = self.pop_value();
+        println!("pan:{:?},", args);
+        println!("self_stack:{:#?}", self.stack.borrow());
+        let mut func_ref = self.pop_value();
+        println!("func_ref::{:?},", func_ref);
+        if let Value::Reference(n) = func_ref {
+            func_ref = vm.load_name(n.as_ref().0, n.as_ref().1, &n.as_ref().2);
+            // println!("func_ref::{:?},", func_ref);
+        }
+
         let code = func_ref.code();
 
         // self.scope.new_child_scope_with_locals();
-        let mut hash_map = HashMap::new();
-        println!("len:{:?},stack is :{:?}", self.stack.borrow().len(), self.stack.borrow());
+        let mut hash_map = Vec::new();
         if self.stack.borrow_mut().len() > 0 {
             let last_value = self.last_value();
             match last_value.is_obj_instant() {
                 1 => {
-                    let map = last_value.hash_map_value();
-                    for (k, v) in map {
-                        hash_map.insert(k, v);
-                    }
+                    // let map = last_value.hash_map_value();
+                    // hash_map.push(last_value);
+                    // for (k, v) in map {
+                    //     hash_map.push(v);
+                    // }
                     if code.is_mut {
                         //struct
-                        hash_map.insert("capture$$idx".to_string(), Value::USize(vm.frame_count - 2));
-                        println!("self.nth_value(1):{:?}", self.nth_value(1));
-                        hash_map.insert("capture$$name".to_string(), self.nth_value(1));
+                        // hash_map.insert("capture$$idx".to_string(), Value::USize(len() - 2));
+                        // // println!("self.nth_value(1):{:?}", self.nth_value(1));
+                        // if self.stack.borrow().len() > 1 {
+                        //     hash_map.insert("capture$$name".to_string(), self.nth_value(1));
+                        // } else {
+                        //     hash_map.insert("capture$$name".to_string(), self.nth_value(0));
+                        // }
                     }
-                    hash_map.insert("self".to_string(), last_value);
+
                     self.pop_value();
                 }
                 2 => {
-                    hash_map.insert("self".to_string(), last_value);
+                    hash_map.push(last_value);
                     self.pop_value();
                 }
                 _ => {}
             }
         }
+        println!("pan:{:?},", args);
 
         // let s = self.scope.new_child_scope_with_locals();
         if named_call {
             for (name, value) in args[0].hash_map_value().iter() {
-                hash_map.insert(name.to_string(), value.clone());
+                hash_map.push(value.clone());
             }
         } else {
-            for (i, name) in code.arg_names.iter().enumerate() {
-                if i < args.len() {
-                    hash_map.insert(name.to_string(), args.get(i).unwrap().to_owned());
+            // if func_ref.code().obj_name.ne("main") {
+            //     hash_map.push(Value::Reference(Box::new((1, 0, NameScope::Local))));
+            // }
+            if args.len() > 0 {
+                if args.get(0).unwrap() != &Value::Nil {
+                    hash_map.extend_from_slice(&args);
+                } else {
+                    for (i, name) in code.arg_names.iter().enumerate() {
+                        if i < args.len() {
+                            hash_map.push(args.get(i).unwrap().to_owned());
+                        }
+                    }
                 }
             }
         }
+        println!("hash_map is:{:?}", hash_map);
 
-        let value = vm.run_code_obj(func_ref.code().to_owned(), hash_map);
-        match value {
-            Some(ExecutionResult::Return(v)) => {
-                self.push_value(v);
-            }
-            Some(ExecutionResult::Ignore) => {}
-            _ => self.push_value(Value::Nil)
-        }
-        None
+        vm.run_code_obj(func_ref.code().to_owned(), hash_map)
     }
 
     fn jump(&self, label: bytecode::Label) {
@@ -534,7 +726,9 @@ impl Frame {
         //不能用clone语义
         let mut last_mut = self.stack.borrow_mut();
         let top_of_stack = last_mut.last_mut().unwrap();
+        println!("top_of_stack1111:{:?},", top_of_stack);
         let next_obj = vm.get_next_iter(top_of_stack);
+        println!("top_of_stack:{:?},next_obj:{:?},idx:{:?}", top_of_stack, next_obj, self.idx);
         if Value::Nil != next_obj {
             last_mut.push(next_obj);
             None
@@ -545,20 +739,24 @@ impl Frame {
         }
     }
 
-    fn execute_make_function(&self, vm: &VirtualMachine) -> FrameResult {
+    fn execute_make_function(&self) -> FrameResult {
         let qualified_name = self.pop_value();
+        // println!("make_function:{:?}", qualified_name);
+
         let code_obj = self.pop_value();
-        let func = FnValue { name: qualified_name.name(), code: code_obj.code(), has_return: true };
-        self.push_value(Value::Fn(func));
+        // println!("code:{:?}", code_obj);
+
+        let func = FnValue { name: qualified_name.to_string(), code: code_obj.code(), has_return: true };
+        self.push_value(Value::Fn(Box::new(func)));
         None
     }
 
-    fn execute_make_lambda(&self, vm: &VirtualMachine, count: usize) -> FrameResult {
+    fn execute_make_lambda(&self, count: usize) -> FrameResult {
         let qualified_name = self.pop_value();
         let capture_value = self.pop_multiple(count);
         let code_obj = self.pop_value();
         let func = ClosureValue { name: qualified_name.name(), code: code_obj.code(), capture_values: Box::new(capture_value), has_return: true };
-        self.push_value(Value::Closure(func));
+        self.push_value(Value::Closure(Box::new(func)));
         None
     }
 
@@ -577,7 +775,8 @@ impl Frame {
     }
 
     fn excute_make_enum_instance(&self, vm: &VirtualMachine, count: usize) -> FrameResult {
-        let mut args = self.pop_multiple(count - 2);
+        let mut args = self.pop_multiple(count - 3);
+        let idx = self.pop_value();
         let item_name = self.pop_value();
         let typ = self.pop_value();
         let mut fields: Option<Vec<Value>> = None;
@@ -587,7 +786,7 @@ impl Frame {
             fields = Some(args);
         }
 
-        let v = Value::new_enum_obj(typ, fields, item_name);
+        let v = Value::new_enum_obj(typ, fields, item_name, idx.int_value());
         self.push_value(v);
         None
     }
@@ -603,7 +802,7 @@ impl Frame {
         let value = if inplace {
             match *op {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => vm.add(&a_ref, &b_ref),
                 bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
                 bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
                 bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
@@ -617,7 +816,7 @@ impl Frame {
         } else {
             match *op {
                 bytecode::BinaryOperator::Subtract => vm.sub(a_ref, b_ref),
-                bytecode::BinaryOperator::Add => vm.add(a_ref, b_ref),
+                bytecode::BinaryOperator::Add => vm.add(&a_ref, &b_ref),
                 bytecode::BinaryOperator::Multiply => vm.mul(a_ref, b_ref),
                 bytecode::BinaryOperator::Divide => vm.divide(a_ref, b_ref),
                 bytecode::BinaryOperator::Modulo => vm.modulo(a_ref, b_ref),
@@ -641,7 +840,6 @@ impl Frame {
         let value = match *op {
             bytecode::UnaryOperator::Minus => vm.neg(a),
             bytecode::UnaryOperator::Plus => vm.plus(a),
-            bytecode::UnaryOperator::Invert => vm.invert(a),
             bytecode::UnaryOperator::Not => vm.not(a),
         };
         self.push_value(value);
@@ -692,8 +890,26 @@ impl Frame {
     }
 
     fn load_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
-        let parent = self.last_value();
-        let obj = vm.get_attribute(parent.clone(), attr_name.to_string());
+        let mut parent = self.last_value();
+        let mut obj = (false, Value::Nil);
+        println!("obj:parent:{:?}", parent);
+        if let Value::Reference(n) = parent {
+            parent = if n.as_ref().2 == NameScope::Local {
+                vm.load_name(n.as_ref().0, n.as_ref().1, &n.as_ref().2)
+            } else {
+                vm.load_global_reference(n.as_ref().1)
+            };
+        }
+        // loop  {
+        //      else {
+        //         break;
+        //     }
+        // }
+        println!("vvvvobj:parent:{:?}", parent);
+        obj = vm.get_attribute(parent, attr_name.to_string());
+
+        // }
+
 
         //true 是struct方法， false 为字段
         if !obj.0 {
@@ -706,9 +922,35 @@ impl Frame {
     fn store_attr(&self, vm: &VirtualMachine, attr_name: &str) -> FrameResult {
         let mut parent = self.pop_value();
         let value = self.pop_value();
-        let update_value = vm.set_attribute(&mut parent, attr_name.to_owned(), value);
-        println!("update_value:{:?}", update_value);
-        self.push_value(update_value);
+        println!("parent:{:?},value:{:?},", parent, value);
+        loop {
+            if let Value::Reference(n) = parent.clone() {
+                let r = is_ref_value(n.as_ref().0, n.as_ref().1);
+                if r.0 {
+                    parent = r.1.unwrap();
+                } else {
+                    set_attribute(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
+                    break;
+                }
+            } else {
+                set_attribute(&mut parent, Value::String(Box::new(String::from(attr_name))), value);
+                break;
+            }
+        }
+
+
+        // if let Value::Reference(n) = parent {
+        //     let v = if n.as_ref().2 == NameScope::Local {
+        //         set_attribute(&mut parent, attr_name.to_owned(), value);
+        //         vm.load_name(n.as_ref().0 + self.idx - 1, n.as_ref().1, &n.as_ref().2)
+        //     } else {
+        //         vm.load_global_reference(n.as_ref().1)
+        //     };
+        //     obj = vm.get_attribute(v, attr_name.to_string());
+        // } else {
+        //     obj = vm.get_attribute(parent.clone(), attr_name.to_string());
+        // }
+        //vm.set_attribute(&mut parent, attr_name.to_owned(), value);
         None
     }
 
@@ -743,7 +985,6 @@ impl Frame {
     }
 
     pub fn push_value(&self, obj: Value) {
-        println!("push_value:{:?}", obj);
         self.stack.borrow_mut().push(obj);
     }
 

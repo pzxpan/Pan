@@ -1,10 +1,12 @@
 //! 执行指令的虚拟机
 //!
+use cached::proc_macro::cached;
+
 use std::borrow::Borrow;
 use std::rc::Rc;
 use std::ops::Add;
 
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, AsPrimitive};
 
 use pan_bytecode::bytecode;
 use pan_bytecode::bytecode::*;
@@ -16,15 +18,241 @@ use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
 use std::cell::RefCell;
-use crate::scope::NameProtocol;
+use std::sync::Mutex;
+use crate::scope_vec::{ScopeVec, NameProtocol};
+use std::sync::Arc;
+use std::time::Instant;
 
 pub struct VirtualMachine {
-    pub scope: Scope,
     pub frame_count: usize,
     pub initialized: bool,
 }
 
 pub const NSIG: usize = 64;
+
+lazy_static! {
+    static ref SCOPE: Arc<Mutex<ScopeVec>> = Arc::new(Mutex::new(ScopeVec::with_builtins(vec![vec![]],vec![])));
+    static ref CONSTANT: Arc<Mutex<HashMap<String,Constant>>> = Arc::new(Mutex::new(HashMap::new()));
+    static ref TYPE: Arc<Mutex<HashMap<String,TypeValue>>> = Arc::new(Mutex::new(HashMap::new()));
+}
+
+pub fn add_constant_value(name: String, value: Constant) {
+    let ref mut map = CONSTANT.lock().unwrap();
+    map.insert(name, value);
+}
+
+pub fn get_constant_value(name: String) -> Constant {
+    let ref mut map = CONSTANT.lock().unwrap();
+    return map.get(&name).unwrap().clone();
+}
+
+pub fn add_type_value(name: String, value: TypeValue) {
+    let ref mut map = TYPE.lock().unwrap();
+    map.insert(name, value);
+}
+
+pub fn get_type_value(name: String) -> TypeValue {
+    let ref mut map = TYPE.lock().unwrap();
+    return map.get(&name).unwrap().clone();
+}
+
+pub fn add_local_value(vec_value: Vec<Value>) {
+    let ref mut map = SCOPE.lock().unwrap();
+    println!("before:size:{:?},", map.locals.len());
+    map.locals.push(vec_value);
+    println!("after:size:{:?},", map.locals.len());
+}
+
+pub fn scope_len() -> usize {
+    let ref mut map = SCOPE.lock().unwrap();
+    return map.locals.len();
+}
+
+pub fn scope_remove() {
+    let ref mut map = SCOPE.lock().unwrap();
+    map.locals.pop();
+}
+
+pub fn scope_clear() {
+    let ref mut map = SCOPE.lock().unwrap();
+    map.locals.clear();
+    map.globals.clear();
+}
+
+pub fn load_capture_reference(scope_idx: usize, variable_idx: usize) -> Value {
+    let ref mut scope = SCOPE.lock().unwrap();
+    println!("scope_idx:{:?},value::{:?}", scope_idx, variable_idx);
+    return scope.load_local(scope_idx, variable_idx);
+    // //println!("idx::{:?},name:{:?}", idx, name);
+    // let vvvv = vv.unwrap().get(&name).unwrap();
+    // vvvv.clone()
+}
+
+// [{"print": Fn(FnValue { name: "print", code: < code object print at ? ? ? file "", line 0 >, has_return: true }),
+// "sleep": Fn(FnValue { name: "sleep", code: < code object sleep at ? ? ? file "", line 0 >, has_return: true }),
+// "typeof": Fn(FnValue { name: "typeof", code: < code object typeof at ? ? ? file "", line 0 >, has_return: true }),
+// "format": Fn(FnValue { name: "format", code: < code object format at ? ? ? file "", line 0 >, has_return: true }),
+// "panic": Fn(FnValue { name: "panic", code: < code object panic at ? ? ? file "", line 0 >, has_return: true })},
+// {"capture$$idx": USize(2), "capture$$name": String("person"),
+// "person": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff",
+// < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older",
+// <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ),
+// ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ),
+// ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )],
+// static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }),
+// field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) }))}, {"age": I32(50), "a": I32(1000), "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Person", methods: [("fff", < code object fff at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 15 > ), ("is_older", <code object is_older at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 24 > ), ("change_age", < code object change_age at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 28 > ), ("older_than", < code object older_than at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 31> )], static_fields: [("ceshi", < code object ceshi at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 46 > )] }), field_map: Obj(MapObj({"age": I32(50), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")})) })), "house": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "House", methods: [("idea", < code object idea at ? ? ? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 2 > )], static_fields: [("static", < code object static at ? ?? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/structs.pan", line 7 > )] }), field_map: Obj(MapObj({"price": Float(1000000.0), "size": Float(111.0)})) })), "name": String("pan")}]
+
+
+pub fn store_primitive_value(scope_idx: usize, variable_idx: usize, value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.store_local(scope_idx, variable_idx, value);
+}
+
+
+fn load_primitive_global(idx: usize) -> Value {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.load_global(idx)
+}
+
+// fn load_reference_global(idx: usize) -> Option<Value> {
+//     let ref mut scope = SCOPE.lock().unwrap();
+//     return scope.sto();
+// }
+
+fn store_primitive_global(v_idx: usize, value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.store_global(v_idx, value);
+}
+
+fn store_global_new(value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.store_global_new(value);
+}
+
+fn store_local_new(value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.store_local_new(value);
+}
+
+fn load_primitive_name(scope_idx: usize, idx: usize) -> Value {
+    let ref mut scope = SCOPE.lock().unwrap();
+    return scope.load_local(scope_idx, idx);
+}
+
+fn get_attribute_inner(a: &Value, b: &Value) -> Option<Value> {
+    match (a, b) {
+        (Value::Obj(e), Value::I32(sub)) => {
+            match e.as_ref() {
+                Obj::ArrayObj(arr) => {
+                    arr.get(*sub as usize).cloned()
+                }
+                Obj::MapObj(map) => {
+                    map.get(&sub.to_string()).cloned()
+                }
+                _ => unreachable!()
+            }
+        }
+
+        (Value::Obj(e), Value::String(sub)) => {
+            match e.as_ref() {
+                Obj::MapObj(map) => {
+                    map.get(sub.as_str()).cloned()
+                }
+                _ => unreachable!()
+            }
+        }
+        _ => unreachable!()
+    }
+}
+
+pub fn get_attribute(obj: Value, attr: Value) -> Option<Value> {
+    if let Value::Reference(n) = obj {
+        let ref mut scope = SCOPE.lock().unwrap();
+        if n.as_ref().2 == NameScope::Local {
+            let v = scope.locals.get(n.as_ref().0).unwrap();
+            let vv = v.get(n.as_ref().1).unwrap();
+            return get_attribute_inner(vv, &attr);
+        } else {
+            let v = scope.globals.get(n.as_ref().1).unwrap();
+            return get_attribute_inner(v, &attr);
+        }
+    } else {
+        return get_attribute_inner(&obj, &attr);
+    }
+    None
+}
+
+pub fn set_attribute(obj: &mut Value, attr: Value, value: Value) {
+    // let now = Instant::now();
+    if let Value::Reference(n) = obj {
+        let ref mut scope = SCOPE.lock().unwrap();
+        // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
+        // let v = scope.locals.get_mut(1).unwrap();
+        // println!("获取ddv:{:?}", now.elapsed().as_nanos());
+        // let vv = v.get_mut(0).unwrap();
+        // println!("获取222:{:?}", now.elapsed().as_nanos());
+        VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
+        //  println!("获取333:{:?}", now.elapsed().as_nanos());
+    } else {
+        VirtualMachine::update_item(obj, attr, value);
+    }
+    //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
+}
+
+pub fn is_ref_value(scope_idx: usize, variable_idx: usize) -> (bool, Option<Value>) {
+    // let now = Instant::now();
+    let ref mut scope = SCOPE.lock().unwrap();
+    // println!("获取锁耗时:{:?}", now.elapsed().as_nanos());
+    // let v = scope.locals.get_mut(1).unwrap();
+    // println!("获取ddv:{:?}", now.elapsed().as_nanos());
+    // let vv = v.get_mut(0).unwrap();
+    // println!("获取222:{:?}", now.elapsed().as_nanos());
+    // VirtualMachine::update_item(&mut scope.locals[n.as_ref().0][n.as_ref().1], attr, value);
+    let ref_value = &scope.locals[scope_idx][variable_idx];
+    if let Value::Reference(n) = &ref_value {
+        return (true, Some(Value::Reference(n.clone())));
+    }
+    return (false, None);
+    //  println!("获取333:{:?}", now.elapsed().as_nanos());
+    //  println!("2222set_attribute:耗时:{:?}", now.elapsed().as_nanos());
+}
+
+fn load_reference_name(scope_idx: usize, idx: usize) -> Value {
+    let ref mut scope = SCOPE.lock().unwrap();
+    scope.load_local(scope_idx, idx)
+    // None
+}
+
+pub fn store_primitive_local(scope_idx: usize, idx: usize, value: Value) {
+    //  println!("ddddscope:{:?},idx:{:?},value:{:?},", scope_idx, idx, value);
+    let cc = Instant::now();
+    let ref mut scope = SCOPE.lock().unwrap();
+    // println!("获取锁:{:?},", cc.elapsed().as_nanos());
+    // println!("store_name index:{:?},value:{:?}", idx, value);
+    let a = scope.locals.get_mut(scope_idx).unwrap();
+    //  println!("获取map:{:?},", cc.elapsed().as_nanos());
+    //  println!("value_is:{:?}", value);
+    //   println!("获取2222map:{:?},", cc.elapsed().as_nanos());
+    let v = a.get_mut(idx);
+    if v.is_some() {
+        let v = v.unwrap();
+        *v = value;
+    } else {
+        a.push(value);
+    }
+
+    //  println!("插入insert_cost:{:?},", cc.elapsed().as_nanos());
+}
+
+pub fn store_default_arg(scope_idx: usize, idx: usize, value: Value) {
+    let ref mut scope = SCOPE.lock().unwrap();
+    let a = scope.locals.get_mut(scope_idx).unwrap();
+    let v = a.get_mut(idx);
+    if v.is_none() {
+        a.push(value);
+    }
+}
+
 
 #[derive(Copy, Clone)]
 pub enum InitParameter {
@@ -34,10 +262,9 @@ pub enum InitParameter {
 }
 
 impl VirtualMachine {
-    pub fn new(scope: Scope) -> VirtualMachine {
+    pub fn new() -> VirtualMachine {
         let initialize_parameter = InitParameter::NoInitialize;
         let mut vm = VirtualMachine {
-            scope,
             frame_count: 0,
             initialized: false,
         };
@@ -57,17 +284,15 @@ impl VirtualMachine {
         }
     }
 
-    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: HashMap<String, Value>) -> FrameResult {
-        let frame = Frame::new(code);
-        self.frame_count += 1;
-        self.scope.add_local_value(hash_map);
-        let r = self.run_frame(frame);
-        self.frame_count -= 1;
+    pub fn run_code_obj(&mut self, code: CodeObject, hash_map: Vec<Value>) -> FrameResult {
+        let mut frame = Frame::new(code, scope_len());
+        add_local_value(hash_map);
+
+        let r = self.run_frame(&mut frame);
         r
     }
 
-    pub fn run_frame_full(&mut self, frame:
-    Frame) -> FrameResult {
+    pub fn run_frame_full(&mut self, frame: &mut Frame) -> FrameResult {
         match self.run_frame(frame)? {
             ExecutionResult::Return(value) => Some(ExecutionResult::Return(value)),
             ExecutionResult::Ignore => Some(ExecutionResult::Ignore),
@@ -75,7 +300,7 @@ impl VirtualMachine {
         }
     }
 
-    pub fn run_frame(&mut self, frame: Frame) -> FrameResult {
+    pub fn run_frame(&mut self, frame: &mut Frame) -> FrameResult {
         //self.frames.push(Rc::from(frame.clone()));
         let result = frame.run(self);
         //self.frames.pop();
@@ -85,78 +310,140 @@ impl VirtualMachine {
     #[cfg_attr(feature = "flame-it", flame("Frame"))]
     pub fn load_name(
         &self,
-        name: &str,
+        scope_idx: usize,
+        idx: usize,
         name_scope: &bytecode::NameScope,
     ) -> Value {
         let optional_value = match name_scope {
-            bytecode::NameScope::Global => self.scope.load_global(name.to_string()),
-            bytecode::NameScope::Local => self.scope.load_name(name.to_string()),
-            bytecode::NameScope::Const => self.scope.load_global(name.to_string()),
-        };
-
-        match optional_value {
-            Some(value) => value,
-            None => {
-                Value::Nil
+            bytecode::NameScope::Global => load_primitive_global(idx),
+            bytecode::NameScope::Local => {
+                load_primitive_name(scope_idx, idx)
             }
-        }
+            bytecode::NameScope::Const => load_primitive_global(idx),
+        };
+        println!("load_name:{:?},value:{:?}", idx, optional_value);
+        optional_value
+    }
+
+    #[cfg_attr(feature = "flame-it", flame("Frame"))]
+    pub fn load_ref_name(
+        &self,
+        scope_idx: usize,
+        name_scope: &bytecode::NameScope,
+        idx: usize,
+    ) -> Value {
+        let optional_value = match name_scope {
+            bytecode::NameScope::Global => load_primitive_global(idx),
+            bytecode::NameScope::Local => {
+                load_reference_name(scope_idx, idx)
+            }
+            bytecode::NameScope::Const => load_primitive_global(idx),
+        };
+        //println!("load_name:{:?},value:{:?}", name, optional_value);
+        optional_value
     }
 
     pub fn load_capture_reference(
         &self,
-        idx: usize,
-        name: String,
+        scope_idx: usize,
+        v_idx: usize,
     ) -> Value {
-        return self.scope.load_capture_reference(idx, name);
+        return load_capture_reference(scope_idx, v_idx);
+    }
+
+    pub fn load_global_reference(
+        &self,
+        v_idx: usize,
+    ) -> Value {
+        return load_primitive_global(v_idx);
+    }
+
+    pub fn store_global_reference(&self, v_idx: usize, value: Value) {
+        store_primitive_global(v_idx, value);
     }
 
     pub fn store_capture_reference(
-        &self,
-        idx: usize,
-        name: String,
+        &mut self,
+        scope_idx: usize,
+        v_idx: usize,
         value: Value,
     ) {
-        self.scope.store_capture_reference(idx, name, value);
+        store_primitive_value(scope_idx, v_idx, value);
     }
 
     pub fn store_name(
-        &self,
-        name: &str,
+        &mut self,
+        scope_idx: usize,
+        idx: usize,
         obj: Value,
         name_scope: &bytecode::NameScope,
     ) -> FrameResult {
+        let a = Instant::now();
         match name_scope {
             bytecode::NameScope::Global => {
-                self.scope.store_global(name.to_string(), obj);
+                store_primitive_global(idx, obj);
             }
             bytecode::NameScope::Local => {
-                self.scope.store_name(name.to_string(), obj);
+                store_primitive_local(scope_idx, idx, obj);
             }
             bytecode::NameScope::Const => {
-                self.scope.store_global(name.to_string(), obj);
+                store_primitive_global(idx, obj);
             }
         }
+        // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
+        None
+    }
+
+    pub fn store_default_args(
+        &mut self,
+        scope_idx: usize,
+        idx: usize,
+        obj: Value,
+    ) -> FrameResult {
+        store_default_arg(scope_idx, idx, obj);
+        // println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
+        None
+    }
+
+    pub fn store_new_variable(
+        &mut self,
+        value: Value,
+        name_scope: &bytecode::NameScope,
+    ) -> FrameResult {
+        let a = Instant::now();
+        match name_scope {
+            bytecode::NameScope::Global => {
+                store_global_new(value);
+            }
+            bytecode::NameScope::Local => {
+                store_local_new(value);
+            }
+            bytecode::NameScope::Const => {
+                store_global_new(value);
+            }
+        }
+        println!("frame store_name: 耗时{:?},", a.elapsed().as_nanos());
         None
     }
 
     fn check_recursive_call(&self, _where: &str) -> FrameResult {
         None
     }
-    pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
-        //println!("obj:{:?},attri:{:?}", obj, attr);
+    fn get_attribute_inner(&self, obj: Value, attr: String) -> (bool, Value) {
+        println!("obj:{:?},attri:{:?}", obj, attr);
         match obj {
             Value::Obj(mut e) => {
                 match e.as_mut() {
                     Obj::InstanceObj(InstanceObj { typ, field_map }) => {
-                        if let Value::Type(TypeValue { methods, static_fields, .. }) = typ.as_ref() {
-                            for method in methods {
+                        if let Value::Type(n) = typ.as_ref() {
+                            for method in &n.as_ref().methods {
                                 if method.0.eq(&attr.to_string()) {
-                                    return (true, Value::Code(method.1.clone()));
+                                    return (true, Value::Code(Box::new(method.1.clone())));
                                 }
                             }
-                            for (k, v) in static_fields.iter() {
+                            for (k, v) in n.as_ref().static_fields.iter() {
                                 if k.eq(&attr.to_string()) {
-                                    return (true, Value::Code(v.clone()));
+                                    return (true, Value::Code(Box::new(v.clone())));
                                 }
                             }
                         }
@@ -169,16 +456,16 @@ impl VirtualMachine {
                             }
                         }
                     }
-                    Obj::EnumObj(EnumObj { typ, .. }) => {
-                        if let Value::Type(TypeValue { methods, static_fields, .. }) = typ.as_ref() {
-                            for method in methods {
+                    Obj::EnumObj(ety) => {
+                        if let Value::Type(n) = ety.typ.as_ref() {
+                            for method in &n.as_ref().methods {
                                 if method.0.eq(&attr.to_string()) {
-                                    return (true, Value::Code(method.1.clone()));
+                                    return (true, Value::Code(Box::new(method.1.clone())));
                                 }
                             }
-                            for (k, v) in static_fields.iter() {
+                            for (k, v) in n.as_ref().static_fields.iter() {
                                 if k.eq(&attr.to_string()) {
-                                    return (true, Value::Code(v.clone()));
+                                    return (true, Value::Code(Box::new(v.clone())));
                                 }
                             }
                         }
@@ -187,14 +474,14 @@ impl VirtualMachine {
                 }
             }
             Value::Type(ty) => {
-                for (k, v) in ty.static_fields.iter() {
+                for (k, v) in ty.as_ref().static_fields.iter() {
                     if k.eq(&attr.to_string()) {
-                        return (true, Value::Code(v.clone()));
+                        return (true, Value::Code(Box::new(v.clone())));
                     }
                 }
-                for (k, v) in ty.methods.iter() {
+                for (k, v) in ty.as_ref().methods.iter() {
                     if k.eq(&attr.to_string()) {
-                        return (true, Value::Code(v.clone()));
+                        return (true, Value::Code(Box::new(v.clone())));
                     }
                 }
             }
@@ -202,20 +489,32 @@ impl VirtualMachine {
         }
         unreachable!()
     }
+    pub fn get_attribute(&self, obj: Value, attr: String) -> (bool, Value) {
+        println!("obj:{:?},attri:{:?}", obj, attr);
+        if let Value::Reference(n) = obj {
+            if n.as_ref().2 == NameScope::Global {
+                let v = load_primitive_global(n.as_ref().1);
+                return self.get_attribute_inner(v, attr);
+            } else {
+                let v = load_reference_name(n.as_ref().0, n.as_ref().1);
+                return self.get_attribute_inner(v, attr);
+            }
+        } else {
+            return self.get_attribute_inner(obj, attr);
+        }
+        // self.get_attribute_inner(obj, attr);
+        unreachable!()
+    }
 
     pub fn set_attribute(&self, obj: &mut Value, attr: String, value: Value) -> Value {
         let mut update_value = Value::Nil;
-        println!("attr:{:?},value:{:?}", attr, value);
         match obj {
             Value::Obj(ref mut e) => {
                 match e.as_mut() {
                     Obj::InstanceObj(o) => {
                         if let InstanceObj { field_map, typ } = o {
                             if let Value::Obj(map) = field_map {
-                                let mut cc = field_map.hash_map_value();
-                                cc.insert(attr, value);
-                                let field = Value::new_map_obj(cc);
-                                update_value = Value::new_instance_obj(typ.as_ref().clone(), field);
+                                map.as_mut().insert(attr, value);
                             }
                         }
                     }
@@ -226,6 +525,7 @@ impl VirtualMachine {
         }
         return update_value;
     }
+
 
     pub fn _match(&self, obj: Value, b: Value) -> (Value, Vec<Value>) {
         match obj {
@@ -250,13 +550,76 @@ impl VirtualMachine {
     }
 
     pub fn _eq(&self, a: Value, b: Value) -> Value {
+        println!("a:{:?},b:{:?}", a, b);
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a == b)
+            }
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a == b)
             }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::String(a), Value::String(b)) => {
+                Value::Bool(a.eq(&b))
+            }
             //TODO
             (Value::Obj(a), Value::Obj(b)) => {
-                Value::Bool(true)
+                Value::Bool(a.as_ref() == b.as_ref())
+            }
+            (Value::Enum(a), Value::Enum(b)) => {
+                Value::Bool(a == b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() == b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(a.to_i32() == b)
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() == b.to_i32())
+            }
+            (Value::String(a), Value::String(b)) => {
+                Value::Bool(a.as_str().eq(b.as_str()))
+            }
+            (Value::String(a), Value::Reference(b)) => {
+                let v = load_capture_reference(b.as_ref().0, b.as_ref().1);
+                if let Value::String(ss) = v {
+                    Value::Bool(a.as_str().eq(ss.as_str()))
+                } else {
+                    Value::Bool(false)
+                }
             }
             (Value::Nil, Value::Nil) => {
                 Value::Bool(true)
@@ -270,52 +633,157 @@ impl VirtualMachine {
 
     pub fn _ne(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a != b)
+            }
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a != b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a != b)
+            }
+            (Value::String(a), Value::String(b)) => {
+                Value::Bool(a.ne(&b))
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() != b.to_i32())
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() != b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(a.to_i32() != b)
             }
             _ => unreachable!()
         }
     }
 
     pub fn get_item(&self, a: Value, b: Value) -> Option<Value> {
-        match (a, b) {
-            (Value::Obj(e), Value::I32(sub)) => {
-                match e.as_ref() {
-                    Obj::ArrayObj(arr) => {
-                        arr.get(sub as usize).cloned()
-                    }
-                    Obj::MapObj(map) => {
-                        map.get(&sub.to_string()).cloned()
-                    }
-                    _ => unreachable!()
-                }
-            }
-
-            (Value::Obj(e), Value::String(sub)) => {
-                match e.as_ref() {
-                    Obj::MapObj(map) => {
-                        map.get(sub.as_str()).cloned()
-                    }
-                    _ => unreachable!()
-                }
-            }
-            _ => unreachable!()
-        }
+        return get_attribute(a, b);
+        // let mut v = Value::Nil;
+        // if let Value::Reference(n) = a {
+        //     v = load_primitive_name(n.as_ref().1.clone(), n.as_ref().0).unwrap();
+        // }
+        // println!("vvvv:{:?},b:{:?}", v, b);
+        // match (v, b) {
+        //     (Value::Obj(e), Value::I32(sub)) => {
+        //         match e.as_ref() {
+        //             Obj::ArrayObj(arr) => {
+        //                 arr.get(sub as usize).cloned()
+        //             }
+        //             Obj::MapObj(map) => {
+        //                 map.get(&sub.to_string()).cloned()
+        //             }
+        //             _ => unreachable!()
+        //         }
+        //     }
+        //
+        //     (Value::Obj(e), Value::String(sub)) => {
+        //         match e.as_ref() {
+        //             Obj::MapObj(map) => {
+        //                 map.get(sub.as_str()).cloned()
+        //             }
+        //             _ => unreachable!()
+        //         }
+        //     }
+        //     _ => unreachable!()
+        // }
     }
 
-    pub fn update_item(&self, obj: &mut Value, idx: Value, value: Value) -> Value {
-        let mut update_value = Value::Nil;
+    pub fn get_slice(&self, arr: Value, start: Value, end: Value, include: Value) -> Value {
+        if let Value::Obj(e) = arr {
+            if let Obj::ArrayObj(arr) = e.as_ref() {
+                let mut start = start.int_value();
+                let mut end = end.int_value();
+                if end < start || start >= arr.len() as i32 {
+                    return Value::Obj(Box::new(Obj::ArrayObj(vec![])));
+                }
+                if start < 0 {
+                    start = 0;
+                }
+                let mut start = start as usize;
+                let mut end = end as usize;
+                if end >= arr.len() {
+                    end = arr.len() - 1;
+                }
+                if include.bool_value() {
+                    let a = &arr[start..=end];
+                    return Value::Obj(Box::new(Obj::ArrayObj(a.to_vec())));
+                } else {
+                    let a = &arr[start..end];
+                    return Value::Obj(Box::new(Obj::ArrayObj(a.to_vec())));
+                }
+            }
+        } else if let Value::String(s) = arr {
+            let mut start = start.int_value();
+            let mut end = end.int_value();
+            if end < start || start >= s.len() as i32 {
+                return Value::String(Box::new("".to_string()));
+            }
+            if start < 0 {
+                start = 0;
+            }
+            let mut start = start as usize;
+            let mut end = end as usize;
+            if end >= s.len() {
+                end = s.len() - 1;
+            }
+            if include.bool_value() {
+                let a = &s[start..=end];
+                return Value::String(Box::new(String::from(a)));
+            } else {
+                let a = &s[start..end];
+                return Value::String(Box::new(String::from(a)));
+            }
+        }
+        unreachable!()
+    }
+
+    pub fn update_item(obj: &mut Value, idx: Value, value: Value) {
+        println!("obj:{:?},idx:{:?},value:{:?}", obj, idx, value);
+        // let mut update_value = Value::Nil;
         match (obj, idx) {
             (Value::Obj(ref mut e), Value::I32(sub)) => {
                 match e.as_mut() {
                     Obj::ArrayObj(ref mut arr) => {
-                        arr.swap_remove(sub as usize);
-                        arr.insert(sub as usize, value);
-                        update_value = Value::new_array_obj(arr.clone());
+                        *arr.get_mut(sub as usize).unwrap() = value;
+                        // arr.remove(sub as usize);
+                        // arr.insert(sub as usize, value);
+                        //  update_value = Value::new_array_obj(arr.clone());
                     }
                     Obj::MapObj(ref mut map) => {
                         map.insert(sub.to_string(), value);
-                        update_value = Value::new_map_obj(map.clone());
+                        //  update_value = Value::new_map_obj(map.clone());
                     }
                     _ => unreachable!()
                 }
@@ -325,7 +793,14 @@ impl VirtualMachine {
                 match e.as_mut() {
                     Obj::MapObj(ref mut map) => {
                         map.insert(sub.to_string(), value);
-                        update_value = Value::new_map_obj(map.clone());
+                        //    update_value = Value::new_map_obj(map.clone());
+                    }
+                    Obj::InstanceObj(o) => {
+                        if let InstanceObj { field_map, typ } = o {
+                            if let Value::Obj(map) = field_map {
+                                map.as_mut().insert(sub.to_string(), value);
+                            }
+                        }
                     }
                     _ => unreachable!()
                 }
@@ -333,7 +808,9 @@ impl VirtualMachine {
 
             _ => unreachable!()
         }
-        return update_value;
+
+
+        return;
     }
     pub fn set_item(&self, obj: &mut Value, idx: Value, value: Value) {
         match (obj, idx) {
@@ -365,8 +842,56 @@ impl VirtualMachine {
 
     pub fn _le(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a <= b)
+            }
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a <= b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::Float(a), Value::Float(b)) => {
+                Value::Bool(a <= b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() <= b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b <= a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() <= b.to_i32())
             }
             _ => unreachable!()
         }
@@ -374,8 +899,56 @@ impl VirtualMachine {
 
     pub fn _ge(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a >= b)
+            }
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a >= b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::Float(a), Value::Float(b)) => {
+                Value::Bool(a >= b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() >= b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b >= a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() >= b.to_i32())
             }
             _ => unreachable!()
         }
@@ -383,11 +956,56 @@ impl VirtualMachine {
 
     pub fn _gt(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a > b)
+            }
             (Value::I32(a), Value::I32(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::Bool(a > b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
                 Value::Bool(a > b)
             }
             (Value::Float(a), Value::Float(b)) => {
                 Value::Bool(a > b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() > b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b > a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() > b.to_i32())
             }
             _ => unreachable!()
         }
@@ -395,33 +1013,96 @@ impl VirtualMachine {
 
     pub fn _lt(&self, a: Value, b: Value) -> Value {
         match (a, b) {
+            (Value::I8(a), Value::I8(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::I16(a), Value::I16(b)) => {
+                Value::Bool(a < b)
+            }
             (Value::I32(a), Value::I32(b)) => {
                 Value::Bool(a < b)
+            }
+            (Value::I64(a), Value::I64(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::I128(a), Value::I128(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::ISize(a), Value::ISize(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U8(a), Value::U8(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U16(a), Value::U16(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U32(a), Value::U32(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U64(a), Value::U64(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::U128(a), Value::U128(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::USize(a), Value::USize(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::Char(a), Value::Char(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::Float(a), Value::Float(b)) => {
+                Value::Bool(a < b)
+            }
+            (Value::Obj(a), Value::I32(b)) => {
+                Value::Bool(a.to_i32() < b)
+            }
+            (Value::I32(b), Value::Obj(a)) => {
+                Value::Bool(b < a.to_i32())
+            }
+            (Value::Obj(a), Value::Obj(b)) => {
+                Value::Bool(a.to_i32() < b.to_i32())
             }
             _ => unreachable!()
         }
     }
     pub fn get_next_iter(&self, v: &mut Value) -> Value {
+        //let now = Instant::now();
         let mut ret = Value::Nil;
         if let Value::Obj(ref mut e) = v {
             match e.as_mut() {
-                Obj::RangObj(ref mut start, ref mut end, ref mut up) => {
+                Obj::RangObj(ref mut start, ref mut end, ref mut up, ref mut include) => {
                     if let Value::I32(_) = start {
-                        if up.bool_value() {
+                        if *up {
                             let item = start.int_value();
                             let a = item + 1;
                             let b = end.int_value();
-                            if item < b {
-                                *start = Value::I32(a);
-                                ret = Value::I32(item);
+                            if *include {
+                                if item <= b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
+                            } else {
+                                if item < b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
                             }
                         } else {
                             let item = start.int_value();
                             let a = item - 1;
                             let b = end.int_value();
-                            if item > b {
-                                *start = Value::I32(a);
-                                ret = Value::I32(item);
+                            if *include {
+                                if item >= b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
+                            } else {
+                                if item > b {
+                                    *start = Value::I32(a);
+                                    ret = Value::I32(item);
+                                }
                             }
                         }
                         *v = Value::Obj(e.clone())
@@ -438,7 +1119,7 @@ impl VirtualMachine {
                                 let idx = end.int_value() as usize;
                                 if idx < map.len() {
                                     let t = map.iter().nth(idx).unwrap();
-                                    ret = Value::new_array_obj(vec![Value::String(t.0.clone()), t.1.clone()]);
+                                    ret = Value::new_array_obj(vec![Value::String(Box::new(t.0.clone())), t.1.clone()]);
                                     *end = Value::I32(idx as i32 + 1);
                                 }
                             }
@@ -450,10 +1131,16 @@ impl VirtualMachine {
                 _ => {}
             }
         }
+        // println!("获取item耗时:{:?}",now.elapsed().as_nanos());
         ret
     }
     pub fn print(&self, value: Value) {
-        println! {"{}", value.to_string()};
+        if let Value::Reference(n) = value {
+            let v = self.load_ref_name(n.as_ref().0, &n.as_ref().2, n.as_ref().1);
+            println!("{}", v.to_string());
+        } else {
+            println! {"{}", value.to_string()};
+        }
     }
 
     pub fn sub(&self, a: Value, b: Value) -> Value {
@@ -484,10 +1171,10 @@ impl VirtualMachine {
                 Value::U64(a - b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a - b)
+                Value::I128(Box::new(a.as_ref().clone() - b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a - b)
+                Value::U128(Box::new(a.as_ref().clone() - b.as_ref().clone()))
             }
             (Value::ISize(a), Value::ISize(b)) => {
                 Value::ISize(a - b)
@@ -501,8 +1188,8 @@ impl VirtualMachine {
             _ => unreachable!()
         }
     }
-    pub fn add(&self, a: Value, b: Value) -> Value {
-        println!("add:{:?},b:{:?},", a, b);
+    pub fn add(&self, a: &Value, b: &Value) -> Value {
+        println!("hhhha:{:?},b:{:?}", a, b);
         match (a, b) {
             (Value::I8(a), Value::I8(b)) => {
                 Value::I8(a + b)
@@ -529,10 +1216,10 @@ impl VirtualMachine {
                 Value::U64(a + b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a + b)
+                Value::I128(Box::new(a.as_ref().clone() + b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a + b)
+                Value::U128(Box::new(a.as_ref().clone() + b.as_ref().clone()))
             }
             (Value::ISize(a), Value::ISize(b)) => {
                 Value::ISize(a + b)
@@ -543,9 +1230,27 @@ impl VirtualMachine {
             (Value::Float(a), Value::Float(b)) => {
                 Value::Float(a + b)
             }
-            (Value::String(s1), Value::String(s2)) => {
-                Value::String(s1.add(s2.as_str()))
+            (Value::Reference(n1), Value::Reference(n2)) => {
+                let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
+                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
+                self.add(&v1, &v2)
             }
+            (Value::String(n1), Value::Reference(n2)) => {
+                //  let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
+                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
+                self.add(a, &v2)
+            }
+            (Value::Reference(n2), Value::String(n1)) => {
+                //  let v1 = self.load_capture_reference(n1.as_ref().0, n1.as_ref().1);
+                let v2 = self.load_capture_reference(n2.as_ref().0, n2.as_ref().1);
+                self.add(&v2, b)
+            }
+            (Value::String(s1), Value::String(s2)) => {
+                let mut s = s1.as_ref().clone();
+                s.push_str(s2.as_str());
+                Value::String(Box::new(s))
+            }
+
             _ => unreachable!()
         }
     }
@@ -576,10 +1281,10 @@ impl VirtualMachine {
                 Value::U64(a * b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a * b)
+                Value::I128(Box::new(a.as_ref().clone() * b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a * b)
+                Value::U128(Box::new(a.as_ref().clone() * b.as_ref().clone()))
             }
             (Value::Float(a), Value::Float(b)) => {
                 Value::Float(a * b)
@@ -614,10 +1319,10 @@ impl VirtualMachine {
                 Value::U64(a / b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a / b)
+                Value::I128(Box::new(a.as_ref().clone() / b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a / b)
+                Value::U128(Box::new(a.as_ref().clone() / b.as_ref().clone()))
             }
             (Value::Float(a), Value::Float(b)) => {
                 Value::Float(a / b)
@@ -652,10 +1357,10 @@ impl VirtualMachine {
                 Value::U64(a % b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a % b)
+                Value::I128(Box::new(a.as_ref().clone() % b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a % b)
+                Value::U128(Box::new(a.as_ref().clone() % b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -687,10 +1392,10 @@ impl VirtualMachine {
                 Value::U64(a | b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a | b)
+                Value::I128(Box::new(a.as_ref().clone() | b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a | b)
+                Value::U128(Box::new(a.as_ref().clone() | b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -722,10 +1427,10 @@ impl VirtualMachine {
                 Value::U64(a ^ b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a ^ b)
+                Value::I128(Box::new(a.as_ref().clone() ^ b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a ^ b)
+                Value::U128(Box::new(a.as_ref().clone() ^ b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -757,10 +1462,10 @@ impl VirtualMachine {
                 Value::U64(a & b)
             }
             (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a & b)
+                Value::I128(Box::new(a.as_ref().clone() & b.as_ref().clone()))
             }
             (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a & b)
+                Value::U128(Box::new(a.as_ref().clone() & b.as_ref().clone()))
             }
             _ => unreachable!()
         }
@@ -791,11 +1496,11 @@ impl VirtualMachine {
             (Value::U64(a), Value::U64(b)) => {
                 Value::U64(a << b)
             }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a << b)
+            (Value::I128(a), Value::I32(b)) => {
+                Value::I128(Box::new(a.as_ref().clone() << b))
             }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a << b)
+            (Value::U128(a), Value::I32(b)) => {
+                Value::U128(Box::new(a.as_ref().clone() << b))
             }
             _ => unreachable!()
         }
@@ -826,11 +1531,11 @@ impl VirtualMachine {
             (Value::U64(a), Value::U64(b)) => {
                 Value::U64(a >> b)
             }
-            (Value::I128(a), Value::I128(b)) => {
-                Value::I128(a >> b)
+            (Value::I128(a), Value::I32(b)) => {
+                Value::I128(Box::new(a.as_ref().clone() >> b))
             }
-            (Value::U128(a), Value::U128(b)) => {
-                Value::U128(a >> b)
+            (Value::U128(a), Value::I32(b)) => {
+                Value::U128(Box::new(a.as_ref().clone() >> b))
             }
             _ => unreachable!()
         }
@@ -839,96 +1544,121 @@ impl VirtualMachine {
 
     pub fn neg(&self, value: Value) -> Value {
         match value {
+            Value::I8(i) => Value::I8(-i),
+            Value::I16(i) => Value::I16(-i),
             Value::I32(i) => Value::I32(-i),
+            Value::I64(i) => Value::I64(-i),
+            Value::I128(i) => Value::I128(Box::new(-i.as_ref().clone())),
+            Value::ISize(i) => Value::ISize(-i),
             Value::Float(i) => Value::Float(-i),
-            _ => unreachable!()
+            _ => { return value; }
         }
     }
     pub fn plus(&self, value: Value) -> Value {
         match value {
-            Value::I32(i) => Value::I32(i),
-            Value::Float(i) => Value::Float(i),
-            _ => unreachable!()
+            Value::I8(i) => if i < 0 { Value::I8(-i) } else { value },
+            Value::I16(i) => if i < 0 { Value::I16(-i) } else { value },
+            Value::I32(i) => if i < 0 { Value::I32(-i) } else { value },
+            Value::I64(i) => if i < 0 { Value::I64(-i) } else { value },
+            Value::I128(i) => if i.as_ref().is_negative() { Value::I128(Box::new(-i.as_ref().clone())) } else { Value::I128(Box::new(i.as_ref().clone())) },
+            Value::ISize(i) => if i < 0 { Value::ISize(-i) } else { value },
+            _ => { return value; }
         }
     }
     pub fn not(&self, value: Value) -> Value {
         match value {
             Value::Bool(i) => Value::Bool(!i),
-            _ => unreachable!()
-        }
-    }
-
-    pub fn invert(&self, value: Value) -> Value {
-        match value {
+            Value::I8(i) => Value::I8(!i),
+            Value::I16(i) => Value::I16(!i),
             Value::I32(i) => Value::I32(!i),
-            _ => unreachable!()
-        }
-    }
-
-    pub fn unwrap_constant(&mut self, value: &bytecode::Constant) -> Value {
-        use bytecode::Constant::*;
-        match *value {
-            I8(ref value) => Value::I8(*value),
-            I16(ref value) => Value::I16(*value),
-            I32(ref value) => Value::I32(*value),
-            I64(ref value) => Value::I64(*value),
-            I128(ref value) => Value::I128(*value),
-            ISize(ref value) => Value::ISize(*value),
-            U8(ref value) => Value::U8(*value),
-            U16(ref value) => Value::U16(*value),
-            U32(ref value) => Value::U32(*value),
-            U64(ref value) => Value::U64(*value),
-            U128(ref value) => Value::U128(*value),
-            USize(ref value) => Value::USize(*value),
-            Integer(ref value) => Value::I32(value.to_i32().unwrap()),
-            Float(ref value) => Value::Float(*value),
-            Complex(ref value) => Value::Nil,
-            String(ref value) => Value::String(value.clone()),
-            Bytes(ref value) => Value::Nil,
-            Char(ref value) => Value::Char(*value),
-            Boolean(ref value) => Value::Bool(value.clone()),
-            Code(ref code) => {
-                Value::Code(*code.to_owned())
-            }
-            Tuple(ref elements) => {
-                Value::Nil
-            }
-            None => Value::Nil,
-            Ellipsis => Value::Nil,
-            Struct(ref ty) => Value::Type(ty.clone()),
-            Enum(ref ty) => Value::Enum(ty.clone()),
-            Map(ref ty) => { Value::Nil }
+            Value::I64(i) => Value::I64(!i),
+            Value::I128(i) => Value::I128(Box::new(!i.as_ref().clone())),
+            Value::ISize(i) => Value::ISize(!i),
+            Value::U8(i) => Value::U8(!i),
+            Value::U16(i) => Value::U16(!i),
+            Value::U32(i) => Value::U32(!i),
+            Value::U64(i) => Value::U64(!i),
+            Value::U128(i) => Value::U128(Box::new(!i.as_ref().clone())),
+            Value::USize(i) => Value::USize(!i),
+            _ => { return value; }
         }
     }
 }
 
 
-pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) -> JoinHandle<()> {
+pub fn run_code_in_thread(code: CodeObject, locals: HashMap<String, Value>, global: HashMap<String, Value>) -> JoinHandle<()> {
     return thread::spawn(|| {
         let scope = Scope::new(vec![locals], global);
-        println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new(scope);
-        let frame = Frame::new(code);
-        vm.frame_count += 1;
-        vm.run_frame(frame);
-        vm.frame_count -= 1;
+        let mut vm = VirtualMachine::new();
+        let mut frame = Frame::new(code, scope_len() - 1);
+
+        // vm.frame_count += 1;
+
+        vm.run_frame(&mut frame);
+        // vm.frame_count -= 1;
         let handle = thread::current();
     });
 }
+// {"f": Fn(FnValue { name: "main.<locals>.lambda_35_13",
+// code: <code object lambda_35_13 at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }),
+// "self": Obj(InstanceObj(InstanceObj { typ: Type(TypeValue { name: "Thread", methods:
+// [("run", <code object run at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 6>),
+// ("stop", <code object stop at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 10>)],
+// static_fields: [("new", <code object new at ??? file "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 0>)] }),
+// field_map: Obj(MapObj({"f": Fn(FnValue { name: "main.<locals>.lambda_35_13", code: <code object lambda_35_13 at ??? file
+// "/Users/cuiqingbo/Desktop/Pan/Pan/demo/thread.pan", line 35>, has_return: true }), "state": I32(0)})) })), "state": I32(0)}
 
-pub fn run_code_in_sub_thread(code: CodeObject, locals: HashMap<String, Value>, global: RefCell<HashMap<String, Value>>) {
-    thread::spawn(|| {
-        println!("local_hash_map:{:?},", locals);
-        println!("global_:{:?},", global);
-        let scope = Scope::new(vec![locals], global);
-        println!("handler:{:?}", thread::current().id());
-        let mut vm = VirtualMachine::new(scope);
-        let frame = Frame::new(code);
-        vm.frame_count += 1;
-        vm.run_frame(frame);
-        vm.frame_count -= 1;
+pub fn run_code_in_sub_thread(code: CodeObject, locals: Vec<Value>, global: Vec<Value>) {
+    let hander = thread::spawn(|| {
+        // println!("local_hash_map:{:?},", locals);
+        // println!("global_:{:?},", global);
+        //  let scope = Scope::new(vec![locals], global);
+        let mut vm = VirtualMachine::new();
+        add_local_value(locals);
+        let mut frame = Frame::new(code, scope_len() - 1);
+
+
+        //vm.frame_count += 1;
+        vm.run_frame(&mut frame);
+        //vm.frame_count -= 1;
         let handle = thread::current();
     });
-
+    //hander.join();
     // println!("handler:{:?}",thread::current());
+}
+
+pub fn unwrap_constant(constant: &bytecode::Constant) -> Value {
+    use bytecode::Constant::*;
+    match constant {
+        I8(ref value) => Value::I8(*value),
+        I16(ref value) => Value::I16(*value),
+        I32(ref value) => Value::I32(*value),
+        I64(ref value) => Value::I64(*value),
+        I128(ref value) => Value::I128(Box::new(**value)),
+        ISize(ref value) => Value::ISize(*value),
+        U8(ref value) => Value::U8(*value),
+        U16(ref value) => Value::U16(*value),
+        U32(ref value) => Value::U32(*value),
+        U64(ref value) => Value::U64(*value),
+        U128(ref value) => Value::U128(Box::new(**value)),
+        USize(ref value) => Value::USize(*value),
+        Integer(ref value) => Value::I32(value.to_i32().unwrap()),
+        Float(ref value) => Value::Float(*value),
+        Complex(ref value) => Value::Nil,
+        String(ref value) => Value::String(Box::new(value.as_ref().clone())),
+        Bytes(ref value) => Value::Nil,
+        Char(ref value) => Value::Char(*value),
+        Boolean(ref value) => Value::Bool(value.clone()),
+        Code(code) => {
+            Value::Code(code.to_owned())
+        }
+        Tuple(ref elements) => {
+            Value::Nil
+        }
+        None => Value::Nil,
+        Struct(ref ty) => Value::Type(Box::new(ty.as_ref().to_owned())),
+        Enum(ref ty) => Value::Enum(Box::new(ty.as_ref().to_owned())),
+        Reference(ref n) => Value::Reference(Box::new((n.as_ref().0, n.as_ref().1.clone(), n.as_ref().2.clone()))),
+        Map(ref ty) => { Value::Nil }
+    }
 }

@@ -15,10 +15,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -33,10 +33,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -50,10 +50,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -67,10 +67,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -84,10 +84,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -101,10 +101,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -118,10 +118,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -135,27 +135,27 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
         Value::I128(v) => {
             match ty_index {
-                -8 => Value::I8(*v as i8),
-                8 => Value::U8(*v as u8),
-                -16 => Value::I16(*v as i16),
-                16 => Value::U16(*v as u16),
-                -32 => Value::I32(*v as i32),
-                32 => Value::U32(*v as u32),
-                -64 => Value::I64(*v as i64),
-                64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
-                1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                -8 => Value::I8(*v.as_ref() as i8),
+                8 => Value::U8(*v.as_ref() as u8),
+                -16 => Value::I16(*v.as_ref() as i16),
+                16 => Value::U16(*v.as_ref() as u16),
+                -32 => Value::I32(*v.as_ref() as i32),
+                32 => Value::U32(*v.as_ref() as u32),
+                -64 => Value::I64(*v.as_ref() as i64),
+                64 => Value::U64(*v.as_ref() as u64),
+                -128 => Value::I128(Box::new(*v.as_ref() as i128)),
+                128 => Value::U128(Box::new(*v.as_ref() as u128)),
+                1000 => Value::Float(*v.as_ref() as f64),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -169,27 +169,27 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 // 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
         Value::U128(v) => {
             match ty_index {
-                -8 => Value::I8(*v as i8),
-                8 => Value::U8(*v as u8),
-                -16 => Value::I16(*v as i16),
-                16 => Value::U16(*v as u16),
-                -32 => Value::I32(*v as i32),
-                32 => Value::U32(*v as u32),
-                -64 => Value::I64(*v as i64),
-                64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
-                1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                -8 => Value::I8(*v.as_ref() as i8),
+                8 => Value::U8(*v.as_ref() as u8),
+                -16 => Value::I16(*v.as_ref() as i16),
+                16 => Value::U16(*v.as_ref() as u16),
+                -32 => Value::I32(*v.as_ref() as i32),
+                32 => Value::U32(*v.as_ref() as u32),
+                -64 => Value::I64(*v.as_ref() as i64),
+                64 => Value::U64(*v.as_ref() as u64),
+                -128 => Value::I128(Box::new(*v.as_ref() as i128)),
+                128 => Value::U128(v.to_owned()),
+                1000 => Value::Float(*v.as_ref() as f64),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -203,10 +203,10 @@ pub fn change_to_primitive_type(value: &Value, ty_index: i32) -> Value {
                 32 => Value::U32(*v as u32),
                 -64 => Value::I64(*v as i64),
                 64 => Value::U64(*v as u64),
-                -128 => Value::I128(*v as i128),
-                128 => Value::U128(*v as u128),
+                -128 => Value::I128(Box::new(*v as i128)),
+                128 => Value::U128(Box::new(*v as u128)),
                 1000 => Value::Float(*v as f64),
-                2000 => Value::String((*v.to_string()).parse().unwrap()),
+                2000 => Value::String(Box::new((*v.to_string()).parse().unwrap())),
                 _ => Value::Nil
             }
         }
@@ -251,10 +251,10 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
                 fmt.usize(value)
             }
             Value::I128(value) => {
-                fmt.i128(value)
+                fmt.i128(*value)
             }
             Value::U128(value) => {
-                fmt.u128(value)
+                fmt.u128(*value)
             }
             Value::Float(value) => {
                 fmt.f64(value)
@@ -271,9 +271,11 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
             Value::Code(_) => {
                 fmt.str(&vv.to_string())
             }
-
-            Value::Reference(idx,name) => {
-                fmt.str(&name)
+            Value::Reference(n) => {
+                fmt.usize(n.as_ref().1)
+            }
+            Value::Package(n) => {
+                fmt.str(&n.as_ref().name)
             }
             Value::Nil => { fmt.str(&"None".to_string()) }
         }
@@ -281,7 +283,7 @@ pub fn get_string_value(format_str: Value, v: Vec<Value>) -> Value {
     if let Value::String(s) = format_str {
         let a = strfmt_map(s.as_ref(), &f);
         if a.is_ok() {
-            return Value::String(a.unwrap());
+            return Value::String(Box::new(a.unwrap()));
         }
     }
     Value::Nil

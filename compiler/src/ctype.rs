@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use crate::symboltable::SymbolMutability;
+use crate::ctype::CType::Generic;
+use std::ptr::hash;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd)]
 pub enum CType {
@@ -36,26 +38,37 @@ pub enum CType {
     Bound(BoundType),
     Generic(String, Box<CType>),
     Reference(String, Vec<CType>),
-    Args(String),
+    Args(String, Vec<CType>),
+    Package(PackageType),
     Any,
     TSelf,
-    //编译辅助类型,确定一些在编译阶段需要进行区分的属性，如Color::Red(10),color.is_red()等调用的区别;
-    NeedPackageName,
     Unknown,
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct FnType {
     pub name: String,
     pub arg_types: Vec<(String, CType, bool, bool, SymbolMutability)>,
-    pub type_args: Vec<String>,
+    pub type_args: Vec<(String, CType)>,
     pub ret_type: Box<CType>,
     pub is_varargs: bool,
     pub is_pub: bool,
     pub is_mut: bool,
     pub is_static: bool,
     pub has_body: bool,
+}
+
+#[derive(Debug, Clone, Eq, Hash)]
+pub struct PackageType {
+    pub name: String,
+    pub consts: Vec<(bool, String, CType)>,
+    pub funs: Vec<(bool, String, CType)>,
+    pub enums: Vec<(bool, String, CType)>,
+    pub structs: Vec<(bool, String, CType)>,
+    pub bounds: Vec<(bool, String, CType)>,
+    pub imports: Vec<(bool, String, CType)>,
+    pub submods: Vec<(bool, String, CType)>,
 }
 
 
@@ -145,18 +158,111 @@ pub struct BoundType {
     pub is_pub: bool,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct EnumType {
     pub name: String,
     pub generics: Option<Vec<CType>>,
-    pub items: Vec<(String, CType)>,
+    pub items: Vec<(String, CType, i32)>,
     pub static_methods: Vec<(String, CType)>,
     pub methods: Vec<(String, CType)>,
     pub bases: Vec<String>,
     pub is_pub: bool,
 }
 
+impl EnumType {
+    pub fn get_concrete_ty(&self) -> HashMap<String, Vec<CType>> {
+        let mut vv: HashMap<String, Vec<CType>> = HashMap::new();
+        for item in self.items.iter() {
+            if let CType::Reference(name, nty) = item.1.clone() {
+                let mut vvv = Vec::new();
+                for i in nty {
+                    vvv.push(i);
+                }
+                vv.insert(item.0.clone(), vvv);
+            }
+        }
+        return vv;
+    }
+}
+
+impl PartialEq for PackageType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name.eq(&other.name) {
+            return true;
+        }
+        return false;
+    }
+}
+
+// items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Generic(\"E\", Any)]))],
+// items: [(\"Ok\", Reference(\"Ok\", [U32])), (\"Err\", Reference(\"Err\", [Str]))],
+
+impl PartialEq for FnType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name.eq(&other.name) {
+            return true;
+        }
+        let s = self.get_fn_args_ret_str();
+        let s1: Vec<_> = s.split("$").collect();
+        let s = other.get_fn_args_ret_str();
+        let s2: Vec<_> = s.split("$").collect();
+        if s1.len() != s2.len() {
+            return false;
+        }
+        for (i1, i2) in s1.iter().zip(s2.iter()) {
+            if i1.eq(&"Any") || i2.eq(&"Any") {
+                continue;
+            } else if i1.eq(i2) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+impl PartialEq for EnumType {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name.eq(&other.name) {
+            let this_item = self.get_concrete_ty();
+            let other_item = other.get_concrete_ty();
+
+            for (name, tys) in this_item.iter() {
+                let other_tys = other_item.get(name).unwrap().clone();
+                for i in tys.iter().enumerate() {
+                    if let CType::Generic(_, _) = i.1.clone() {
+                        continue;
+                    } else if let CType::Generic(_, _) = other_tys.get(i.0).unwrap().clone() {
+                        continue;
+                    } else {
+                        if i.1.clone() != other_tys.get(i.0).unwrap().clone() {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+//     Enum(EnumType { name: "Result", generics: None, items: [("Ok", Reference("Ok", [I32])), ("Err", Reference("Err", [Str]))],
+//     static_methods: [], methods: [("is_ok", Fn(FnType { name: "is_ok", arg_types: [], type_args: [], ret_type: Bool, is_varargs: false, is_pub:
+//     true, is_mut: false, is_static: false, has_body: true })), ("is_err", Fn(FnType { name: "is_err", arg_types: [], type_args: [], ret_type: Bool,
+// is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true })), ("unwrap", Fn(FnType { name: "unwrap",
+// arg_types: [], type_args: [], ret_type: I32, is_varargs: false, is_pub: true, is_mut: false, is_static: false, has_body: true }))],
+// bases: [], is_pub: true }),aaa:U32,
+}
+
 impl CType {
+    pub fn is_unit(&self) -> bool {
+        match self {
+            CType::Tuple(n) => return n.is_empty(),
+            _ => return false,
+        }
+        return false;
+    }
     pub fn name(&self) -> String {
         match self {
             CType::Float => "f64".to_string(),
@@ -195,6 +301,58 @@ impl CType {
         }
     }
 
+    pub fn is_generic(&self) -> bool {
+        let mut generics = false;
+        if let CType::Enum(ety) = self {
+            if ety.generics.is_some() {
+                generics = true;
+            }
+        }
+        if let CType::Struct(cty) = self {
+            if cty.generics.is_some() {
+                generics = true;
+            }
+        }
+        if let CType::Fn(cty) = self {
+            if !cty.type_args.is_empty() {
+                generics = true;
+            }
+        }
+        return generics;
+    }
+
+    pub fn generic_map(&self) -> HashMap<String, CType> {
+        let mut map = HashMap::new();
+        if let CType::Enum(ety) = self {
+            if ety.generics.is_some() {
+                for item in ety.generics.as_ref().unwrap().iter() {
+                    if let CType::Generic(name, ty) = item {
+                        map.insert(name.clone(), ty.as_ref().clone());
+                    }
+                }
+            }
+        }
+        if let CType::Struct(cty) = self {
+            if cty.generics.is_some() {
+                for item in cty.generics.as_ref().unwrap().iter() {
+                    if let CType::Generic(name, ty) = item {
+                        map.insert(name.clone(), ty.as_ref().clone());
+                    }
+                }
+            }
+        }
+        if let CType::Fn(cty) = self {
+            if !cty.type_args.is_empty() {
+                for item in cty.type_args.iter() {
+                    if let CType::Generic(name, ty) = item.1.clone() {
+                        map.insert(name.clone(), ty.as_ref().clone());
+                    }
+                }
+            }
+        }
+        return map;
+    }
+
     pub fn attri_index(&self, index: i32) -> &CType {
         //struct的属性类型需要名称，而tuple需要索引值;
         match self {
@@ -202,33 +360,33 @@ impl CType {
             _ => &CType::Unknown
         }
     }
-    pub fn attri_name_type(&self, name: String) -> (i32, &CType) {
+    pub fn attri_name_type(&self, name: String) -> (i32, &CType, i32) {
         if let CType::Struct(ty) = self {
             //1为字段，2为普通函数，3为静态函数
             for (method_name, cty, is_pub, ..) in ty.fields.iter() {
                 if method_name.eq(&name) {
-                    return (1, cty);
+                    return (1, cty, 0);
                 }
             }
             for (method_name, cty) in ty.methods.iter() {
                 if method_name.eq(&name) {
-                    return (2, cty);
+                    return (2, cty, 0);
                 }
             }
             for (method_name, cty) in ty.static_methods.iter() {
                 if method_name.eq(&name) {
-                    return (3, cty);
+                    return (3, cty, 0);
                 }
             }
         } else if let CType::Enum(ty) = self {
             //1为无参属性，2为有参属性，3为普通函数，4为静态函数
-            for (method_name, cty) in ty.items.iter() {
+            for (method_name, cty, idx) in ty.items.iter() {
                 if method_name.eq(&name) {
                     if let CType::Reference(_, v) = cty {
                         if v.is_empty() {
-                            return (1, cty);
+                            return (1, cty, *idx);
                         } else {
-                            return (2, cty);
+                            return (2, cty, *idx);
                         }
                     }
                 }
@@ -236,16 +394,23 @@ impl CType {
 
             for (method_name, cty) in ty.methods.iter() {
                 if method_name.eq(&name) {
-                    return (3, cty);
+                    return (3, cty, 0);
                 }
             }
             for (method_name, cty) in ty.static_methods.iter() {
                 if method_name.eq(&name) {
-                    return (4, cty);
+                    return (4, cty, 0);
+                }
+            }
+        } else if let CType::Bound(ty) = self {
+            //1为无参属性，2为有参属性，3为普通函数，4为静态函数
+            for (method_name, cty) in ty.methods.iter() {
+                if method_name.eq(&name) {
+                    return (3, cty, 0);
                 }
             }
         }
-        (0, &CType::Unknown)
+        (0, &CType::Unknown, 0)
     }
 
     pub fn param_type(&self) -> Vec<(CType, bool, bool, SymbolMutability)> {
@@ -255,9 +420,38 @@ impl CType {
         }
     }
 
+    pub fn param_type_args(&self) -> Vec<(String, CType)> {
+        match self {
+            CType::Fn(s) => s.type_args.clone(),
+            _ => Vec::new()
+        }
+    }
+
     pub fn is_mut_fun(&self) -> bool {
         return if let CType::Fn(n) = self {
             n.is_mut
+        } else {
+            false
+        };
+    }
+    pub fn is_static(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_static
+        } else {
+            false
+        };
+    }
+
+    pub fn is_varargs(&self) -> bool {
+        return if let CType::Fn(n) = self {
+            n.is_varargs
+        } else {
+            false
+        };
+    }
+    pub fn is_fun(&self) -> bool {
+        return if let CType::Fn(..) = self {
+            true
         } else {
             false
         };
@@ -313,7 +507,84 @@ impl CType {
     // }
 }
 
+impl LambdaType {
+    pub fn get_fn_args_ret_str(&self) -> String {
+        let mut s = String::new();
+        for i in &self.arg_types {
+            if let CType::Generic(n, ty) = i.1.clone() {
+                s.push_str(ty.as_ref().name().as_str());
+            } else if !i.1.is_unit() {
+                s.push_str(i.1.name().as_str());
+            }
+            s.push_str("$");
+        }
+
+        if self.arg_types.is_empty() {
+            s.push_str("$");
+        }
+
+        // for i in &self.type_args {
+        //     if let Generic(_, ty) = i.1.clone() {
+        //         s.push_str(ty.name().as_str());
+        //         s.push_str("$");
+        //     } else {
+        //         s.push_str(i.1.name().as_str());
+        //         s.push_str("$");
+        //     }
+        // }
+        if let Generic(_, ty) = self.ret_type.as_ref() {
+            s.push_str(ty.as_ref().name().as_str());
+        } else if !self.ret_type.is_unit() {
+            s.push_str(self.ret_type.name().as_str());
+        }
+        return s;
+    }
+}
+
+impl FnType {
+    pub fn get_fn_args_ret_str(&self) -> String {
+        let mut s = String::new();
+        for i in &self.arg_types {
+            if let CType::Generic(n, ty) = i.1.clone() {
+                s.push_str(ty.as_ref().name().as_str());
+            } else if !i.1.is_unit() {
+                s.push_str(i.1.name().as_str());
+            }
+
+            s.push_str("$");
+        }
+        if self.arg_types.is_empty() {
+            s.push_str("$");
+        }
+        // for i in &self.type_args {
+        //     if let Generic(_, ty) = i.1.clone() {
+        //         s.push_str(ty.name().as_str());
+        //         s.push_str("$");
+        //     } else {
+        //         s.push_str(i.1.name().as_str());
+        //         s.push_str("$");
+        //     }
+        // }
+        if let Generic(_, ty) = self.ret_type.as_ref() {
+            s.push_str(ty.as_ref().name().as_str());
+        } else if !self.ret_type.is_unit() {
+            s.push_str(self.ret_type.name().as_str());
+        }
+        return s;
+    }
+}
+
 impl PartialOrd for FnType {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.name.eq(&other.name) {
+            Some(Ordering::Equal)
+        } else {
+            None
+        }
+    }
+}
+
+impl PartialOrd for PackageType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.name.eq(&other.name) {
             Some(Ordering::Equal)
